@@ -5,6 +5,7 @@ import { SKPoint, type GestureEventProcessingInfo, type SkiaGesturesParameters }
 import { SkiaLayout } from "./SkiaLayout";
 import { SkiaLabel } from "./SkiaLabel";
 import { SkiaShape } from "./SkiaShape";
+import { type PrebuiltControlStyle, ResolveControlStyle, type ResolvedControlStyle } from "../core/ControlStyle";
 
 /**
  * Mirrors DrawnUi SkiaButton (default style): a SkiaShape frame tagged "BtnShape" + a centered SkiaLabel
@@ -15,6 +16,8 @@ export class SkiaButton extends SkiaLayout {
   static PanThreshold = 5;
 
   Text = "";
+  /** Look of the default content (C# SkiaButton.ControlStyle): background, corners, font, minimum size when left unset. */
+  ControlStyle: PrebuiltControlStyle = "Unset";
   TextColor: Color = Colors.White;
   FontSize = 15;
   FontFamily = "";
@@ -42,7 +45,6 @@ export class SkiaButton extends SkiaLayout {
   constructor() {
     super();
     this.Type = "Absolute";
-    this.BackgroundColor = Colors.CornflowerBlue;
     this.Padding = new Thickness(16, 10);
     this.frame.Tag = "BtnShape";
     this.frame.HorizontalOptions = "Fill";
@@ -63,14 +65,30 @@ export class SkiaButton extends SkiaLayout {
   /** The button's own BackgroundColor/CornerRadius/Stroke are the frame's; the button itself paints nothing. */
   protected override PaintBackground(): void {}
 
+  get UsingControlStyle(): ResolvedControlStyle { return ResolveControlStyle(this.ControlStyle); }
+
+  /** C# Create*StyleContent defaults: accent, corner radius, font size/weight, minimum content size. */
+  private static Look(s: ResolvedControlStyle): { bg: Color; radius: number; font: number; weight: number; minH: number } {
+    switch (s) {
+      case "Cupertino": return { bg: "#007AFF", radius: 8, font: 17, weight: 600, minH: 36 };
+      case "Material": return { bg: "#2196F3", radius: 4, font: 14, weight: 0, minH: 40 };
+      case "Material3": return { bg: "#6750A4", radius: 20, font: 14, weight: 0, minH: 40 };
+      case "Windows": return { bg: "#0078D7", radius: 4, font: 15, weight: 500, minH: 32 };
+      default: return { bg: "#DC143C", radius: 8, font: 15, weight: 0, minH: 41 };
+    }
+  }
+
   protected override MeasureAbsolute(w: number, h: number, scale: number): ScaledSize {
-    this.frame.BackgroundColor = this.BackgroundColor;
-    this.frame.CornerRadius = this.CornerRadius;
+    const look = SkiaButton.Look(this.UsingControlStyle);
+    this.frame.BackgroundColor = this.BackgroundColor ?? look.bg;
+    this.frame.CornerRadius = this.CornerRadius === 8 ? look.radius : this.CornerRadius; // C#: 8 = "not customized"
     this.frame.StrokeColor = this.StrokeColor;
     this.frame.StrokeWidth = this.StrokeWidth;
+    if (this.MinimumHeightRequest < 0 && this.UsingControlStyle !== "Unset") this.MinimumHeightRequest = look.minH;
     this.label.Text = this.Text;
     this.label.TextColor = this.TextColor;
-    this.label.FontSize = this.FontSize;
+    this.label.FontSize = this.FontSize === 15 ? look.font : this.FontSize;
+    this.label.FontWeight = look.weight;
     this.label.FontFamily = this.FontFamily;
     this.label.FontFamilyFallback = this.FontFamilyFallback;
     // Size comes from the label + Padding; the Fill frame follows whatever the button is arranged to.

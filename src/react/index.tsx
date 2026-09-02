@@ -5,6 +5,11 @@ import type { SkiaControl } from "../core/SkiaControl";
 import type { SkiaLabel as SkiaLabelCtrl } from "../controls/SkiaLabel";
 import type { TextSpan as TextSpanCtrl } from "../controls/TextSpan";
 import type { SkiaRichLabel as SkiaRichLabelCtrl } from "../controls/SkiaRichLabel";
+import type { SkiaSwitch as SkiaSwitchCtrl } from "../controls/SkiaSwitch";
+import type { SkiaCheckbox as SkiaCheckboxCtrl } from "../controls/SkiaCheckbox";
+import type { SkiaRadioButton as SkiaRadioButtonCtrl } from "../controls/SkiaRadioButton";
+import type { SkiaProgress as SkiaProgressCtrl } from "../controls/SkiaProgress";
+import type { SkiaSlider as SkiaSliderCtrl } from "../controls/SkiaSlider";
 import type { SkiaLayout as SkiaLayoutCtrl } from "../controls/SkiaLayout";
 import type { SkiaHotspot as SkiaHotspotCtrl } from "../controls/SkiaHotspot";
 import type { SkiaButton as SkiaButtonCtrl } from "../controls/SkiaButton";
@@ -19,7 +24,7 @@ import { createDrawnRoot } from "./reconciler";
 /** Public settable properties of a control become its JSX props, same PascalCase names as C#. */
 type PropsOf<T> = Partial<{
   // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-  [K in keyof T as T[K] extends Function ? never : K extends "Children" | "Views" | "Parent" | "Spans" | "GridStructure" | "AccessibilityId" | "IsAccessibilityElement" | "HasTransform" | "RenderTransformMatrix" | "RenderObjectPrevious" | "LastMeasuredIndex" | "ItemsInsertedAtStart" | "Rects" | "HasTapHandler" | "HasDecorations" | "LinesCount" | "Superview" | "DrawingRect" | "MeasuredSize" | "RenderingScale" | "NeedMeasure" | "_superview" | "HitBoxAuto" | "TotalDown" | "TotalTapped" | "TouchDown" | "PostAnimators" | "LoadedSource" | "IsLoading" | "DisplayRect" | "AspectScale" | "Content" | "ContentSize" | "ContentOffsetBounds" | "OverscrollDistance" | "OverScrolled" | "IsUserPanning" | "IsUserFocused" | "IsScrolling" | "IsTemplated" | "FirstVisibleIndex" | "LastVisibleIndex" | "DebugString" | "ChildrenFactory" | "ContextIndex" | "RenderObject" | "UsingCacheType" ? never : K]: T[K];
+  [K in keyof T as T[K] extends Function ? never : K extends "Children" | "Views" | "Parent" | "Spans" | "GridStructure" | "AccessibilityId" | "IsAccessibilityElement" | "HasTransform" | "RenderTransformMatrix" | "RenderObjectPrevious" | "LastMeasuredIndex" | "ItemsInsertedAtStart" | "UsingControlStyle" | "Track" | "Thumb" | "FrameOn" | "FrameOff" | "ViewCheckOn" | "ViewOn" | "ViewText" | "Ratio" | "StartThumbX" | "EndThumbX" | "Rects" | "HasTapHandler" | "HasDecorations" | "LinesCount" | "Superview" | "DrawingRect" | "MeasuredSize" | "RenderingScale" | "NeedMeasure" | "_superview" | "HitBoxAuto" | "TotalDown" | "TotalTapped" | "TouchDown" | "PostAnimators" | "LoadedSource" | "IsLoading" | "DisplayRect" | "AspectScale" | "Content" | "ContentSize" | "ContentOffsetBounds" | "OverscrollDistance" | "OverScrolled" | "IsUserPanning" | "IsUserFocused" | "IsScrolling" | "IsTemplated" | "FirstVisibleIndex" | "LastVisibleIndex" | "DebugString" | "ChildrenFactory" | "ContextIndex" | "RenderObject" | "UsingCacheType" ? never : K]: T[K];
 }>;
 
 /** `ref` receives the engine control instance (react-reconciler getPublicInstance). */
@@ -45,6 +50,11 @@ export const SkiaSvg = "SkiaSvg" as unknown as FC<LeafProps<SkiaSvgCtrl>>;
 export const SkiaScroll = "SkiaScroll" as unknown as FC<LayoutProps<SkiaScrollCtrl>>;
 export const SkiaShape = "SkiaShape" as unknown as FC<LayoutProps<SkiaShapeCtrl>>;
 export const SkiaFrame = "SkiaFrame" as unknown as FC<LayoutProps<SkiaShapeCtrl>>;
+export const SkiaSwitch = "SkiaSwitch" as unknown as FC<LeafProps<SkiaSwitchCtrl>>;
+export const SkiaCheckbox = "SkiaCheckbox" as unknown as FC<LeafProps<SkiaCheckboxCtrl>>;
+export const SkiaRadioButton = "SkiaRadioButton" as unknown as FC<LeafProps<SkiaRadioButtonCtrl>>;
+export const SkiaProgress = "SkiaProgress" as unknown as FC<LeafProps<SkiaProgressCtrl>>;
+export const SkiaSlider = "SkiaSlider" as unknown as FC<LeafProps<SkiaSliderCtrl>>;
 
 export interface CanvasProps {
   BackgroundColor?: Color;
@@ -128,7 +138,10 @@ function AccessibilityOverlay({ view }: { view: CanvasView }) {
         const pos: CSSProperties = { left: n.Rect.Left, top: n.Rect.Top, width: n.Rect.Width, height: n.Rect.Height };
         const activate = () => n.Source.OnAccessibilityActivated();
         return n.CanInteract ? (
-          <div key={n.Id} role={n.Role} aria-label={n.Label} title={n.Hint} aria-pressed={n.IsPressed} aria-live={n.Live as "polite" | "assertive" | undefined}
+          <div key={n.Id} role={n.Role} aria-label={n.Label} title={n.Hint}
+            aria-pressed={n.Role === "button" ? n.IsPressed : undefined}
+            aria-checked={n.Role === "switch" || n.Role === "checkbox" || n.Role === "radio" ? n.IsPressed : undefined}
+            aria-live={n.Live as "polite" | "assertive" | undefined}
             tabIndex={0} className="drawnui-a11y-node" style={{ ...pos, fontSize: 0, userSelect: "none" }}
             onClick={activate}
             onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); activate(); } }}

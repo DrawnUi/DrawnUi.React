@@ -78,6 +78,8 @@ export class SkiaSvg extends SkiaControl {
 
   private async Decode(svg: string, sourceName: string, generation: number): Promise<void> {
     this.IsLoading = true;
+    // browsers refuse to rasterize an <img> SVG whose root has no xmlns (SkiaSharp's parser does not care)
+    if (!/<svg[^>]*\sxmlns\s*=/.test(svg)) svg = svg.replace(/<svg(?=[\s>])/, '<svg xmlns="http://www.w3.org/2000/svg"');
     const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
     try {
       const img = new window.Image();
