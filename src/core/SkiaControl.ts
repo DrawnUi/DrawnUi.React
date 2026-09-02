@@ -134,7 +134,8 @@ export class SkiaControl {
     switch (this.UseCache) {
       case "None": return "None";
       case "Operations": case "OperationsFull": return "Operations";
-      default: return "Image"; // Image, GPU, ImageDoubleBuffered, ImageComposite(GPU) -> single offscreen image for now
+      case "ImageDoubleBuffered": return "ImageDoubleBuffered";
+      default: return "Image"; // Image, GPU, ImageComposite(GPU) -> single offscreen image for now
     }
   }
   /** Current cache, if any. */
@@ -454,7 +455,9 @@ export class SkiaControl {
         || this.RenderObject.Scale !== ctx.Scale
         || Math.round(this.RenderObject.Bounds.Width) !== Math.round(r.Width) || Math.round(this.RenderObject.Bounds.Height) !== Math.round(r.Height);
       if (stale) this.CreateRenderingObject(own, cacheType);
-      this.RenderObject?.Draw(ctx.Context.Canvas, r.Left, r.Top);
+      if (this.RenderObject) this.RenderObject.Draw(ctx.Context.Canvas, r.Left, r.Top);
+      else if (this.RenderObjectPrevious) this.RenderObjectPrevious.Draw(ctx.Context.Canvas, r.Left, r.Top); // double buffer: last good frame
+      else this.DrawPlaceholder(own);
     }
     this.ExecutePostAnimators(own);
   }
@@ -465,12 +468,26 @@ export class SkiaControl {
     this.Paint(ctx);
   }
 
+  /**
+   * ImageDoubleBuffered: the last cache is kept while a new one is produced and shown when producing fails
+   * (no surface yet); no background thread in the browser, so recording itself stays synchronous like DrawnUi.Blazor.
+   */
+  RenderObjectPrevious?: CachedObject;
+
+  /** Drawn when a cache is expected but none exists yet (DrawnUi DrawPlaceholder, ImageDoubleBuffered only). Default: nothing. */
+  protected DrawPlaceholder(_ctx: DrawingContext): void {}
+
   /** Records/renders the content into a new CachedObject for the current DrawingRect. */
   protected CreateRenderingObject(ctx: DrawingContext, cacheType: SkiaCacheType): void {
     const CK = Super.CK;
     const r = this.DrawingRect;
     const w = Math.max(1, Math.round(r.Width)), h = Math.max(1, Math.round(r.Height));
-    this.DestroyRenderingObject();
+    if (cacheType === "ImageDoubleBuffered") {
+      // keep the previous frame as the fallback until the new cache exists
+      if (this.RenderObject) { this.DisposePrevious(); this.RenderObjectPrevious = this.RenderObject; this.RenderObject = undefined; }
+    } else {
+      this.DestroyRenderingObject();
+    }
     if (cacheType === "Operations") {
       const recorder = new CK.PictureRecorder();
       const canvas = recorder.beginRecording(CK.LTRBRect(r.Left, r.Top, r.Right, r.Bottom));
@@ -482,20 +499,29 @@ export class SkiaControl {
       const main = ctx.Context.Surface;
       if (!main) { this.PaintContent(ctx); return; } // no surface to derive from (e.g. recording): draw live
       const offscreen = main.makeSurface({ ...main.imageInfo(), width: w, height: h });
-      if (!offscreen) { this.PaintContent(ctx); return; }
+      if (!offscreen) { if (!this.RenderObjectPrevious) this.PaintContent(ctx); return; }
       const canvas = offscreen.getCanvas();
       canvas.clear(CK.TRANSPARENT);
       canvas.translate(-r.Left, -r.Top);
       this.PaintContent({ ...ctx, Context: { Canvas: canvas, Surface: offscreen } });
       const image = offscreen.makeImageSnapshot();
       offscreen.delete();
-      this.RenderObject = new CachedObject("Image", r, ctx.Scale, undefined, image);
+      this.RenderObject = new CachedObject(cacheType, r, ctx.Scale, undefined, image);
     }
     this.cacheDirty = false;
   }
 
+  private DisposePrevious(): void {
+    const old = this.RenderObjectPrevious;
+    if (!old) return;
+    this.RenderObjectPrevious = undefined;
+    const sv = this.Superview;
+    if (sv) sv.DisposeObject(old); else old.Dispose();
+  }
+
   /** Drops the cache (disposed after the frame, never mid-draw). */
   DestroyRenderingObject(): void {
+    this.DisposePrevious();
     const old = this.RenderObject;
     if (!old) return;
     this.RenderObject = undefined;

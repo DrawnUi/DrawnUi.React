@@ -67,6 +67,14 @@ Updated whenever the port deliberately diverges or finds something worth back-po
 
 ## Lists
 
+### MeasureVisible measures visible cells on demand, not only in the background
+- **C#**: initial measured batch + background batches; a cell entering the viewport before its batch arrives uses
+  the estimate until measured.
+- **React**: a cell entering the viewport is measured right there (it is being bound anyway) and laid out with its
+  real height, the estimate is used only for the anchor offset of the first visible item; the idle pass then
+  extends the exact prefix. Result: no visible resize of on-screen cells, only the far-away offsets refine.
+- Opinion: back-portable and cheap on .NET too (measure at bind time in `DrawStack` when the height is unknown).
+
 ### Recycled cells contract
 - Same in both: the templated `SkiaLayout` (ItemsSource + ItemTemplate) is the `SkiaScroll`'s ONLY content; anything
   above the list goes above the scroll or into the scroll `Header` (not ported yet). Nesting the templated layout inside a

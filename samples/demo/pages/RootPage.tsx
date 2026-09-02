@@ -2,6 +2,7 @@ import { Aria, Colors, SkiaLabel, SkiaScroll, SkiaShape, SkiaStack, SkiaSvg, Thi
 
 const SAMPLES: { route: string; title: string; text: string }[] = [
   { route: "cells", title: "Recycled cells", text: "100 000 items in a SkiaScroll, RecyclingTemplate + MeasureFirst, UseCache=Image" },
+  { route: "uneven", title: "Uneven cells", text: "10 000 rows of different heights — MeasureVisible, ImageDoubleBuffered cells" },
   { route: "images", title: "Images", text: "SkiaImage — every TransformAspect, alignment, clipping" },
   { route: "svg", title: "SVG", text: "SkiaSvg — file and inline sources, TintColor, LockRatio" },
   { route: "shapes", title: "Shapes", text: "SkiaShape — rectangle, circle, ellipse, arc, polygon, line, path; stroke, corner radii, clipping" },

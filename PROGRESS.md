@@ -27,6 +27,7 @@ Detailed per-feature omissions: [SKIPPED.md](SKIPPED.md). Live sample: https://h
 | 2026-09-02 | Responsive demo | `MinimumWidthRequest`/`MaximumWidthRequest` (+Height), `SkiaLayout` Wrap + `SkiaWrap`; demo pages fluid on 390-px phones (verified in an iframe harness at 390 and 760): root cards, Images/Shapes wrap, Text alignment rows wrap, cells toolbar wraps at the bottom, nav title reserves Back space |
 | 2026-09-02 | Spans | `TextSpan` as `<SkiaLabel>` children (reconciler mounts non-control children): inherit-or-override color/size/family, weight/bold/italic, underline, strikeout, background, `Tapped` with per-fragment hit rects + ripple; line height per line from the tallest run, glued fragments wrap as one word; Text snippet card |
 | 2026-09-02 | Accessibility | Port of the DrawnUi.Blazor model: `Accessibility*` props on `SkiaControl`, `Aria` constants, `Canvas.AccessibilityManager` snapshot (≤1 rebuild/s, deferred frame on an on-demand renderer), `<Canvas>` renders an `aria-hidden` canvas + ARIA overlay with keyboard/AT activation routed as `Tapped`; `DefaultAccessibilityRole` statics; demo: labels readable, cards/buttons focusable, headings, logo img. Verified with the browser accessibility tree + Tab/Enter/Space + mouse click through the overlay |
+| 2026-09-02 | MeasureVisible | Uneven recycled rows: viewport-filling initial pass, exact prefix + average estimate, on-demand measurement of visible cells, idle-time background pass (`requestIdleCallback`, budgeted), `ScrollToIndex` on estimates; `ImageDoubleBuffered` keeps the previous cache + `DrawPlaceholder`; "Uneven cells" snippet: 10 000 rows of 1–6 lines, 10k measured in ~2 s idle, 60 fps, HOME/MIDDLE/END land correctly |
 | 2026-09-02 | Transforms | `TranslationX/Y`, `Rotation`, `ScaleX/Y`/`Scale`, `SkewX/Y`, `AnchorX/Y`, `Opacity` applied at render (C# `ApplyTransforms` order, `saveLayer` alpha); gestures map through the inverse `RenderTransformMatrix`; `*ToAsync` animations (Promise + AbortSignal); `RepaintComposition()` stales ancestor caches only; React transform props repaint without invalidating; Transforms snippet (tiles, rotated+scaled tappable button, animated logo, spin loop) |
 | 2026-09-02 | Accessibility snippet | Dedicated page: snapshot status (live region), buttons with hint / custom label / disabled, toggles (`aria-pressed`), shape-as-button, img, presentation opt-out, headings. Keyboard reaches off-screen nodes: `SkiaScroll.EnsureVisible(control)` scrolls the focused control into view, overlay stays pinned; pooled recycled cells are detached (`Parent = undefined`) so they never appear as ghost nodes |
 | 2026-09-02 | Fix | `LockRatio` + `WidthRequest`: requests are locked before constraints (C# `CalculateSizeRequest`), a 40pt circle no longer balloons to a tall grid row |
@@ -42,10 +43,10 @@ Detailed per-feature omissions: [SKIPPED.md](SKIPPED.md). Live sample: https://h
 1. ~~`SkiaShape`~~ done (Rectangle/Circle/Ellipse, `CornerRadius`, stroke, children clipped) → real `SkiaButton` templating (`BtnShape`/`BtnText`).
 2. ~~`SkiaLabel` spans~~ done → `SkiaRichLabel` (markdown → spans).
 3. ~~`SkiaLayout` Grid~~ done, ~~Wrap~~ done → templated `Split` grids, `SkiaDecoratedGrid`.
-4. `MeasureVisible` for uneven rows; `ImageDoubleBuffered` as a real double buffer.
+4. ~~`MeasureVisible`~~ done; ~~`ImageDoubleBuffered`~~ previous-cache + placeholder (sync record, as Blazor).
 5. `SkiaLabel` wrapping, `MaxLines`, alignment, font weights.
 6. ~~Transforms + gesture mapping~~ done → 3D (`RotationX/Y`, `Perspective`), `Left`/`Top` cache offsets.
-7. `MeasureVisible` + virtualization, windowed `ItemsSource`.
+7. Windowed `ItemsSource` (`ItemsSourceWindow`), `LoadMore`, structure-preserving inserts.
 
 ## Web-specific divergences (deliberate)
 

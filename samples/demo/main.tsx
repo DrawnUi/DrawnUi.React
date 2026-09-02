@@ -12,6 +12,7 @@ import { TextPage } from "./pages/TextPage";
 import { LayoutsPage } from "./pages/LayoutsPage";
 import { AccessibilityPage } from "./pages/AccessibilityPage";
 import { TransformsPage } from "./pages/TransformsPage";
+import { UnevenCellsPage } from "./pages/UnevenCellsPage";
 import { Aria } from "drawnui-react";
 import { SkiaButton as SkiaButtonCtrl, SkiaLabel as SkiaLabelCtrl } from "drawnui-react/core";
 
@@ -38,8 +39,9 @@ const ROUTES = {
   layouts: () => <LayoutsPage />,
   a11y: () => <AccessibilityPage />,
   transforms: () => <TransformsPage />,
+  uneven: () => <UnevenCellsPage />,
 };
-const TITLES = { images: "Images", svg: "SVG", cells: "Recycled cells", shapes: "Shapes", text: "Text", layouts: "Layouts", a11y: "Accessibility", transforms: "Transforms" };
+const TITLES = { images: "Images", svg: "SVG", cells: "Recycled cells", shapes: "Shapes", text: "Text", layouts: "Layouts", a11y: "Accessibility", transforms: "Transforms", uneven: "Uneven cells" };
 
 function App() {
   const [view, setView] = useState<CanvasView | null>(null);

@@ -44,6 +44,20 @@ export class SkiaLayout extends SkiaControl {
   private uniformHeight = 0;
   private measuredWidthPx = 0;
 
+  // ---- MeasureVisible (DrawnUi experimental strategy): measured prefix + average estimate for the rest ----
+  /** Items measured per idle slice before the estimate is refreshed (DrawnUi BackgroundMeasurementBatchSize). */
+  BackgroundMeasurementBatchSize = 10;
+  /** Pixel heights of measured items (0 = not measured yet), any order: visible cells are measured on demand. */
+  private mvHeights = new Float64Array(0);
+  /** mvPrefix[i] = offset of item i (inside padding, gaps included) for i <= mvMeasured; items 0..mvMeasured-1 are exact. */
+  private mvPrefix = new Float64Array(1);
+  private mvMeasured = 0;
+  private mvSum = 0;
+  private mvCount = 0;
+  private mvIdle = 0;
+  /** Index of the last item measured by the background pass (DrawnUi LastMeasuredIndex); -1 = none. */
+  get LastMeasuredIndex(): number { return this.mvMeasured - 1; }
+
   get ItemsSource(): readonly unknown[] | undefined { return this.itemsSource; }
   set ItemsSource(value: readonly unknown[] | undefined) {
     if (this.itemsSource === value) return;
@@ -74,7 +88,8 @@ export class SkiaLayout extends SkiaControl {
   get DebugString(): string {
     if (!this.IsTemplated) return `views ${this.views.length}`;
     const f = this.ChildrenFactory;
-    return `items ${this.itemsSource!.length} visible ${this.FirstVisibleIndex}-${this.LastVisibleIndex} inuse ${f.InUseCount} pool ${f.PoolSize} created ${f.Created}`;
+    const measured = this.MeasureItemsStrategy === "MeasureVisible" ? ` measured ${this.mvMeasured}/${this.itemsSource!.length}` : "";
+    return `items ${this.itemsSource!.length} visible ${this.FirstVisibleIndex}-${this.LastVisibleIndex}${measured} inuse ${f.InUseCount} pool ${f.PoolSize} created ${f.Created}`;
   }
 
   // ---- static children ----
@@ -184,9 +199,18 @@ export class SkiaLayout extends SkiaControl {
       this.measuredWidthPx = w;
       this.itemHeights = [];
       this.uniformHeight = 0;
+      this.MvReset(items.length);
       if (items.length > 0) {
         if (this.MeasureItemsStrategy === "MeasureAll") {
           for (let i = 0; i < items.length; i++) this.itemHeights.push(this.MeasureItem(i, w, scale));
+        } else if (this.MeasureItemsStrategy === "MeasureVisible") {
+          // initial pass: enough items to fill the viewport (at least one batch), the rest is estimated
+          const viewportH = this.GetVisibleViewport().Height;
+          for (let i = 0; i < items.length; i++) {
+            this.MvMeasure(i, w, scale, true);
+            this.MvExtendPrefix(gap);
+            if (i + 1 >= this.BackgroundMeasurementBatchSize && this.mvPrefix[this.mvMeasured] >= viewportH + this.VirtualisationInflated * scale) break;
+          }
         } else {
           this.uniformHeight = this.MeasureItem(0, w, scale);
         }
@@ -195,10 +219,71 @@ export class SkiaLayout extends SkiaControl {
     }
 
     let total = 0;
-    if (this.MeasureItemsStrategy === "MeasureAll") for (const h of this.itemHeights) total += h;
-    else total = this.uniformHeight * items.length;
-    total += Math.max(0, items.length - 1) * gap;
+    if (this.MeasureItemsStrategy === "MeasureAll") { for (const h of this.itemHeights) total += h; total += Math.max(0, items.length - 1) * gap; }
+    else if (this.MeasureItemsStrategy === "MeasureVisible") { total = this.MvContentHeight(gap); this.MvScheduleBackground(); }
+    else total = this.uniformHeight * items.length + Math.max(0, items.length - 1) * gap;
     return ScaledSize.FromPixels(w + px, total + py, scale);
+  }
+
+  private MvReset(count: number): void {
+    if (this.mvIdle) { (window.cancelIdleCallback ?? clearTimeout)(this.mvIdle); this.mvIdle = 0; }
+    this.mvHeights = new Float64Array(count);
+    this.mvPrefix = new Float64Array(count + 1);
+    this.mvMeasured = 0; this.mvSum = 0; this.mvCount = 0;
+  }
+
+  /** Average item stride (height + gap) from everything measured so far. */
+  private MvStride(gap: number): number { return (this.mvCount > 0 ? this.mvSum / this.mvCount : 0) + gap; }
+
+  /** DrawnUi MeasureList estimate: exact prefix + average × remaining. */
+  private MvContentHeight(gap: number): number {
+    const n = this.mvHeights.length;
+    if (n === 0) return 0;
+    return this.mvPrefix[this.mvMeasured] + (n - this.mvMeasured) * this.MvStride(gap) - gap;
+  }
+
+  /** Measures one item (binding it through the adapter); release = give the cell back to the pool right away. */
+  private MvMeasure(index: number, widthPx: number, scale: number, release: boolean): number {
+    const known = this.mvHeights[index];
+    if (known > 0) return known;
+    const view = this.ChildrenFactory.GetOrCreateViewForIndex(index);
+    if (!view) return 0;
+    const h = view.Measure(widthPx, Infinity, scale).Pixels.Height;
+    if (release && this.RecyclingTemplate === "Enabled") this.ChildrenFactory.ReleaseViewAt(index);
+    this.mvHeights[index] = h;
+    this.mvSum += h; this.mvCount++;
+    return h;
+  }
+
+  /** Grows the exact prefix over every already-measured item that follows it. */
+  private MvExtendPrefix(gap: number): void {
+    const n = this.mvHeights.length;
+    while (this.mvMeasured < n && this.mvHeights[this.mvMeasured] > 0) {
+      this.mvPrefix[this.mvMeasured + 1] = this.mvPrefix[this.mvMeasured] + this.mvHeights[this.mvMeasured] + gap;
+      this.mvMeasured++;
+    }
+  }
+
+  /** Background measurement in idle time (DrawnUi StartBackgroundMeasurement): time-sliced, then the estimate is refreshed once. */
+  private MvScheduleBackground(): void {
+    if (this.mvIdle || this.mvMeasured >= this.mvHeights.length || !this.Superview) return;
+    const run = (deadline?: IdleDeadline) => {
+      this.mvIdle = 0;
+      if (this.MeasureItemsStrategy !== "MeasureVisible" || !this.IsTemplated || !this.Superview) return;
+      const scale = this.RenderingScale, gap = this.Spacing * scale, w = this.measuredWidthPx;
+      const before = this.MvContentHeight(gap);
+      const started = performance.now();
+      const budget = () => (deadline ? deadline.timeRemaining() > 1 : performance.now() - started < 8);
+      let measured = 0;
+      while (this.mvMeasured < this.mvHeights.length && (measured < this.BackgroundMeasurementBatchSize || budget())) {
+        this.MvMeasure(this.mvMeasured, w, scale, true);
+        this.MvExtendPrefix(gap);
+        measured++;
+      }
+      if (Math.abs(this.MvContentHeight(gap) - before) > 0.5) this.InvalidateMeasure(); // parents (the scroll) pick up the new extent
+      if (this.mvMeasured < this.mvHeights.length) this.MvScheduleBackground();
+    };
+    this.mvIdle = window.requestIdleCallback ? window.requestIdleCallback(run, { timeout: 200 }) : window.setTimeout(() => run(), 16);
   }
 
   /** Binds a cell to items[index] (through the adapter, so MeasureFirst's cell 0 stays realized) and measures it. */
@@ -216,12 +301,15 @@ export class SkiaLayout extends SkiaControl {
     const gap = this.Spacing * scale;
     let y = this.Padding.Top * scale;
     if (this.MeasureItemsStrategy === "MeasureAll") for (let i = 0; i < index && i < this.itemHeights.length; i++) y += this.itemHeights[i] + gap;
+    else if (this.MeasureItemsStrategy === "MeasureVisible") y += index <= this.mvMeasured ? this.mvPrefix[index] : this.mvPrefix[this.mvMeasured] + (index - this.mvMeasured) * this.MvStride(gap);
     else y += index * (this.uniformHeight + gap);
     return y;
   }
 
   private ItemHeightPixels(index: number): number {
-    return this.MeasureItemsStrategy === "MeasureAll" ? this.itemHeights[index] ?? 0 : this.uniformHeight;
+    if (this.MeasureItemsStrategy === "MeasureAll") return this.itemHeights[index] ?? 0;
+    if (this.MeasureItemsStrategy === "MeasureVisible") return this.mvHeights[index] || this.MvStride(this.Spacing * this.RenderingScale) - this.Spacing * this.RenderingScale;
+    return this.uniformHeight;
   }
 
   // ---- arrange ----
@@ -284,6 +372,8 @@ export class SkiaLayout extends SkiaControl {
     const inflate = this.VirtualisationInflated * scale;
     const visTop = viewport.Top - inflate, visBottom = viewport.Bottom + inflate;
 
+    if (this.MeasureItemsStrategy === "MeasureVisible") { this.PaintMeasureVisible(ctx, visTop, visBottom, left, width); return; }
+
     let first = -1, last = -1;
     if (items.length > 0 && visBottom > visTop) {
       if (this.MeasureItemsStrategy === "MeasureAll") {
@@ -315,6 +405,50 @@ export class SkiaLayout extends SkiaControl {
       view.Arrange(SKRect.Create(left, top, width, h), view.WidthRequest, view.HeightRequest, scale);
       view.Render(ctx);
     }
+  }
+
+  /**
+   * MeasureVisible frame: the first visible index comes from the exact prefix (binary search) or the estimate,
+   * then cells are laid out contiguously with their REAL measured heights (measured on demand, kept for the prefix).
+   */
+  private PaintMeasureVisible(ctx: DrawingContext, visTop: number, visBottom: number, left: number, width: number): void {
+    const n = this.mvHeights.length;
+    const scale = this.RenderingScale, gap = this.Spacing * scale;
+    const top0 = this.DrawingRect.Top + this.Padding.Top * scale;
+    let first = -1, last = -1;
+    if (n > 0 && visBottom > visTop) {
+      const rel = visTop - top0;
+      if (rel <= this.mvPrefix[this.mvMeasured]) {
+        let lo = 0, hi = this.mvMeasured; // largest i with prefix[i] <= rel
+        while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (this.mvPrefix[mid] <= rel) lo = mid; else hi = mid - 1; }
+        first = Math.min(lo, n - 1);
+      } else {
+        const stride = this.MvStride(gap);
+        first = Math.min(n - 1, this.mvMeasured + (stride > 0 ? Math.floor((rel - this.mvPrefix[this.mvMeasured]) / stride) : 0));
+      }
+      first = Math.max(0, first);
+    }
+    if (first < 0) { this.FirstVisibleIndex = this.LastVisibleIndex = -1; this.ChildrenFactory.ReleaseOutside(1, 0); return; }
+
+    let y = top0 + this.GetItemOffsetPixels(first) - this.Padding.Top * scale;
+    const drawn: { view: SkiaControl; top: number; h: number }[] = [];
+    for (let i = first; i < n && y <= visBottom; i++) {
+      const h = this.MvMeasure(i, width, scale, false);
+      const view = this.ChildrenFactory.GetOrCreateViewForIndex(i);
+      if (view && y + h >= visTop) drawn.push({ view, top: y, h });
+      last = i;
+      y += h + gap;
+    }
+    this.MvExtendPrefix(gap);
+    this.FirstVisibleIndex = first;
+    this.LastVisibleIndex = last;
+    this.ChildrenFactory.ReleaseOutside(first, last);
+    for (const d of drawn) {
+      d.view.Measure(width, Infinity, scale);
+      d.view.Arrange(SKRect.Create(left, d.top, width, d.h), d.view.WidthRequest, d.view.HeightRequest, scale);
+      d.view.Render(ctx);
+    }
+    this.MvScheduleBackground();
   }
 }
 
