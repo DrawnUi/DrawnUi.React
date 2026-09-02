@@ -1,6 +1,6 @@
 import { createContext, forwardRef, type ReactNode, useCallback, useContext, useImperativeHandle, useMemo, useState } from "react";
 import { Colors, Thickness } from "../core/Types";
-import { SkiaButton, SkiaLabel, SkiaLayer, SkiaStack } from "./index";
+import { SkiaButton, SkiaLabel, SkiaLayer } from "./index";
 
 /** Route name -> page factory. Pages are plain JSX, rendered inside the shell when navigated to. */
 export type ShellRoutes = Record<string, () => ReactNode>;
@@ -42,7 +42,7 @@ export interface SkiaShellProps {
  * Not ported yet: transitions, modals, popups, toasts, tabs, hardware back.
  */
 export const SkiaShell = forwardRef<ShellNavigation, SkiaShellProps>(function SkiaShell(
-  { Routes, children, NavBarHeight = 56, NavBarColor = "#222222", Titles }, ref,
+  { Routes, children, NavBarHeight = 56, NavBarColor = "#212529", Titles }, ref,
 ) {
   const [stack, setStack] = useState<string[]>([]);
   const route = stack[stack.length - 1] ?? "";
@@ -65,12 +65,11 @@ export const SkiaShell = forwardRef<ShellNavigation, SkiaShellProps>(function Sk
           ? <SkiaLayer VerticalOptions="Fill" Margin={new Thickness(0, NavBarHeight, 0, 0)}>{Routes[route]()}</SkiaLayer>
           : children}
         {route && (
-          <SkiaStack HeightRequest={NavBarHeight} BackgroundColor={NavBarColor}>
-            <SkiaLayer VerticalOptions="Fill">
-              <SkiaButton Text="‹ Back" BackgroundColor="#00000000" TextColor={Colors.White} FontSize={16} VerticalOptions="Center" Margin={new Thickness(4, 0)} ApplyEffect="Ripple" Tapped={() => void GoBackAsync()} />
-              <SkiaLabel Text={Titles?.[route] ?? route} FontSize={18} TextColor={Colors.White} HorizontalOptions="Center" VerticalOptions="Center" />
-            </SkiaLayer>
-          </SkiaStack>
+          <SkiaLayer HeightRequest={NavBarHeight} BackgroundColor={NavBarColor}>
+            <SkiaButton Text="‹  Back" BackgroundColor="#00000000" TextColor="#6EA8FE" FontSize={16} VerticalOptions="Center" Margin={new Thickness(8, 0)} ApplyEffect="Ripple" Tapped={() => void GoBackAsync()} />
+            <SkiaLabel Text={Titles?.[route] ?? route} FontSize={18} FontFamily="FontTextBold" TextColor={Colors.White} HorizontalOptions="Center" VerticalOptions="Center" />
+            <SkiaLayer HeightRequest={1} VerticalOptions="End" BackgroundColor="#343A40" />
+          </SkiaLayer>
         )}
       </SkiaLayer>
     </ShellContext.Provider>

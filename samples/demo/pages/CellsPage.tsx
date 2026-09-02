@@ -36,11 +36,11 @@ export function CellsPage() {
       </SkiaScroll>
 
       <SkiaStack Spacing={8} Margin={new Thickness(8, 8)} HorizontalOptions="End" VerticalOptions="Center" WidthRequest={120}>
-        <SkiaButton Text="HOME" BackgroundColor="#DC143C" HorizontalOptions="Fill" Tapped={() => jump(0)} />
-        <SkiaButton Text="BACKWARD" BackgroundColor="#DC143C" HorizontalOptions="Fill" Tapped={() => jump((feed.current?.FirstVisibleIndex ?? 0) - 5)} />
-        <SkiaButton Text="MIDDLE" BackgroundColor="#DC143C" HorizontalOptions="Fill" Tapped={() => jump(ITEMS.length / 2)} />
-        <SkiaButton Text="FORWARD" BackgroundColor="#DC143C" HorizontalOptions="Fill" Tapped={() => jump((feed.current?.FirstVisibleIndex ?? 0) + 5)} />
-        <SkiaButton Text="END" BackgroundColor="#DC143C" HorizontalOptions="Fill" Tapped={() => jump(ITEMS.length, "End")} />
+        <SkiaButton Text="HOME" BackgroundColor="#0D6EFD" HorizontalOptions="Fill" Tapped={() => jump(0)} />
+        <SkiaButton Text="BACKWARD" BackgroundColor="#0D6EFD" HorizontalOptions="Fill" Tapped={() => jump((feed.current?.FirstVisibleIndex ?? 0) - 5)} />
+        <SkiaButton Text="MIDDLE" BackgroundColor="#0D6EFD" HorizontalOptions="Fill" Tapped={() => jump(ITEMS.length / 2)} />
+        <SkiaButton Text="FORWARD" BackgroundColor="#0D6EFD" HorizontalOptions="Fill" Tapped={() => jump((feed.current?.FirstVisibleIndex ?? 0) + 5)} />
+        <SkiaButton Text="END" BackgroundColor="#0D6EFD" HorizontalOptions="Fill" Tapped={() => jump(ITEMS.length, "End")} />
       </SkiaStack>
 
       <SkiaLabel Text={debug} FontSize={12} TextColor="#00FF00" BackgroundColor="#AA000000" InputTransparent Margin={new Thickness(8)} HorizontalOptions="End" VerticalOptions="End" />
