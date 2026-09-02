@@ -193,11 +193,26 @@ export class Canvas {
   };
   private readonly preventTouch = (e: TouchEvent) => e.preventDefault();
 
+  /** Mouse wheel -> TouchActionResult.Wheel (page scroll suppressed while gestures are enabled). */
+  private readonly onWheel = (e: WheelEvent) => {
+    e.preventDefault();
+    const rect = this.Element.getBoundingClientRect();
+    const args = new TouchActionEventArgs();
+    args.Id = -1;
+    args.Type = "Wheel";
+    args.Scale = this.RenderingScale;
+    args.Location = new SKPoint((e.clientX - rect.left) * this.RenderingScale, (e.clientY - rect.top) * this.RenderingScale);
+    args.StartingLocation = args.Location;
+    args.Wheel = { Delta: e.deltaY !== 0 ? e.deltaY : e.deltaX };
+    this.OnGestureEvent(args, "Wheel");
+  };
+
   private AttachInput(): void {
     const el = this.Element;
     el.style.touchAction = "none";
     el.style.userSelect = "none";
     for (const t of ["pointerdown", "pointermove", "pointerup", "pointercancel"]) el.addEventListener(t, this.onPointer as EventListener);
+    el.addEventListener("wheel", this.onWheel, { passive: false });
     if (this.gestures === "Lock") el.addEventListener("touchmove", this.preventTouch, { passive: false });
   }
 
@@ -206,6 +221,7 @@ export class Canvas {
     el.style.touchAction = "";
     el.style.userSelect = "";
     for (const t of ["pointerdown", "pointermove", "pointerup", "pointercancel"]) el.removeEventListener(t, this.onPointer as EventListener);
+    el.removeEventListener("wheel", this.onWheel);
     el.removeEventListener("touchmove", this.preventTouch);
     this.activeTouchIds.clear(); this.pointerDownArgs.clear(); this.previousTouchArgs.clear();
   }

@@ -64,6 +64,10 @@ export class SkiaControl {
 
   // ---- tree ----
   Parent?: SkiaControl;
+  /** Containers override; a leaf control cannot host children. */
+  AddSubView(_control: SkiaControl): void { throw new Error(`DrawnUi: ${this.constructor.name} cannot host children`); }
+  InsertSubView(_index: number, control: SkiaControl): void { this.AddSubView(control); }
+  RemoveSubView(_control: SkiaControl): void {}
   /** Set by Canvas on its Content. Children resolve through Parent. */
   _superview?: Canvas;
   get Superview(): Canvas | undefined {

@@ -19,12 +19,13 @@ export type GesturesMode = "Disabled" | "Enabled" | "Lock";
 
 export type LockTouch = "Disabled" | "Enabled" | "PassNone" | "PassTap" | "PassTapAndLongPress";
 
-/** TouchActionEventArgs.DistanceInfo (Velocity not ported). */
+/** TouchActionEventArgs.DistanceInfo. Velocity is pixels per second. */
 export class DistanceInfo {
   Start = SKPoint.Empty;
   End = SKPoint.Empty;
   Delta = SKPoint.Empty;
   Total = SKPoint.Empty;
+  Velocity = SKPoint.Empty;
 }
 
 /** AppoMobi.Gestures TouchActionEventArgs. */
@@ -39,18 +40,25 @@ export class TouchActionEventArgs {
   IsInContact = false;
   Scale = 1;
   Timestamp = performance.now();
+  /** ms since the previous event of the same pointer. */
+  DeltaTimeMs = 0;
+  /** Mouse wheel: Delta > 0 = wheel down (browser deltaY sign). */
+  Wheel = { Delta: 0 };
 
   /** Same as the .NET helper: derives Start/End/Delta/Total from the previous event of the same pointer. */
   static FillDistanceInfo(current: TouchActionEventArgs, previous: TouchActionEventArgs | undefined): void {
     if (!previous) { current.Distance = new DistanceInfo(); return; }
     current.StartingLocation = previous.StartingLocation;
     current.IsInContact = previous.IsInContact;
+    current.DeltaTimeMs = current.Timestamp - previous.Timestamp;
     const d = new DistanceInfo();
     d.Start = previous.Location;
     const released = current.Type === "Released" || current.Type === "Cancelled";
     d.End = released ? previous.Location : current.Location;
     d.Delta = released ? SKPoint.Empty : current.Location.Subtract(previous.Location);
     d.Total = previous.Distance.Total.Add(d.Delta);
+    const secs = current.DeltaTimeMs / 1000;
+    d.Velocity = secs > 0 && !released ? new SKPoint(d.Delta.X / secs, d.Delta.Y / secs) : previous.Distance.Velocity;
     current.Distance = d;
   }
 }

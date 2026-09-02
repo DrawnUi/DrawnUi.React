@@ -71,6 +71,9 @@ export type TransformAspect = "None" | "Fill" | "Fit" | "AspectFit" | "AspectFil
 /** DrawnUi DrawImageAlignment. */
 export type DrawImageAlignment = "Start" | "Center" | "End";
 
+/** MAUI/DrawnUi ScrollOrientation. */
+export type ScrollOrientation = "Vertical" | "Horizontal" | "Both" | "Neither";
+
 /** DrawnUi SkiaTouchAnimation (Shimmer declared for parity, not ported). */
 export type SkiaTouchAnimation = "None" | "Ripple" | "Shimmer";
 

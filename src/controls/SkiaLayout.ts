@@ -22,15 +22,15 @@ export class SkiaLayout extends SkiaControl {
 
   protected override GetGestureListeners(): readonly SkiaControl[] { return this.views; }
 
-  AddSubView(control: SkiaControl): void { this.InsertSubView(this.views.length, control); }
+  override AddSubView(control: SkiaControl): void { this.InsertSubView(this.views.length, control); }
 
-  InsertSubView(index: number, control: SkiaControl): void {
+  override InsertSubView(index: number, control: SkiaControl): void {
     control.Parent = this;
     this.views.splice(index, 0, control);
     this.InvalidateMeasure();
   }
 
-  RemoveSubView(control: SkiaControl): void {
+  override RemoveSubView(control: SkiaControl): void {
     const i = this.views.indexOf(control);
     if (i < 0) return;
     this.views.splice(i, 1);

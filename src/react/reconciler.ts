@@ -9,10 +9,11 @@ import { SkiaHotspot } from "../controls/SkiaHotspot";
 import { SkiaButton } from "../controls/SkiaButton";
 import { SkiaImage } from "../controls/SkiaImage";
 import { SkiaSvg } from "../controls/SkiaSvg";
+import { SkiaScroll } from "../controls/SkiaScroll";
 
 /** JSX tag name -> engine class. Add a control here to expose it to React. */
 export const Registry: Record<string, new () => SkiaControl> = {
-  SkiaLayout, SkiaStack, SkiaRow, SkiaLayer, SkiaLabel, SkiaHotspot, SkiaButton, SkiaImage, SkiaSvg,
+  SkiaLayout, SkiaStack, SkiaRow, SkiaLayer, SkiaLabel, SkiaHotspot, SkiaButton, SkiaImage, SkiaSvg, SkiaScroll,
 };
 
 type Props = Record<string, unknown>;
@@ -34,11 +35,6 @@ function applyProps(inst: SkiaControl, prev: Props | null, next: Props): void {
     changed = true;
   }
   if (changed && prev) inst.Update();
-}
-
-function asLayout(parent: SkiaControl): SkiaLayout {
-  if (!(parent instanceof SkiaLayout)) throw new Error(`DrawnUi: <${parent.constructor.name}> cannot host children`);
-  return parent;
 }
 
 let currentUpdatePriority: number = DefaultEventPriority;
@@ -73,13 +69,13 @@ const hostConfig: Cfg & Record<string, unknown> = {
   createTextInstance(text: string): never {
     throw new Error(`DrawnUi: raw text "${text}" is not allowed, use <SkiaLabel Text="..." />`);
   },
-  appendInitialChild: (parent: SkiaControl, child: SkiaControl) => asLayout(parent).AddSubView(child),
-  appendChild: (parent: SkiaControl, child: SkiaControl) => asLayout(parent).AddSubView(child),
+  appendInitialChild: (parent: SkiaControl, child: SkiaControl) => parent.AddSubView(child),
+  appendChild: (parent: SkiaControl, child: SkiaControl) => parent.AddSubView(child),
   insertBefore: (parent: SkiaControl, child: SkiaControl, before: SkiaControl) => {
-    const l = asLayout(parent);
-    l.InsertSubView(l.Views.indexOf(before), child);
+    const index = parent instanceof SkiaLayout ? parent.Views.indexOf(before) : 0;
+    parent.InsertSubView(index, child);
   },
-  removeChild: (parent: SkiaControl, child: SkiaControl) => asLayout(parent).RemoveSubView(child),
+  removeChild: (parent: SkiaControl, child: SkiaControl) => parent.RemoveSubView(child),
   appendChildToContainer: (canvas: Canvas, child: SkiaControl) => { canvas.Content = child; },
   insertInContainerBefore: (canvas: Canvas, child: SkiaControl) => { canvas.Content = child; },
   removeChildFromContainer: (canvas: Canvas, child: SkiaControl) => { if (canvas.Content === child) canvas.Content = undefined; },
