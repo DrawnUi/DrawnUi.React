@@ -16,7 +16,7 @@ DrawnUi name and semantics; nothing here is a redesign, only an omission.
 | Clipping to bounds, `ClipEffect`, `IsClippedToBounds` | skipped | Children can overflow their parent. |
 | `Padding` on base `SkiaControl` | skipped | Only `SkiaLayout.Padding` exists. |
 | `MinimumWidthRequest`/`MaximumWidthRequest` (+Height) | ported | Same semantics as C#: `-1` = unset; `WidthRequest` wins over `MaximumWidthRequest`; the maximum caps both the measured size and the arranged Fill box, alignment still uses the parent's full box (a centered `Fill` child with `MaximumWidthRequest` stays centered). |
-| `LockRatio` | ported | Same `SmartMax`/`SmartMin` rule as C# (sign decides larger/smaller side, infinite side loses). |
+| `LockRatio` | ported | Same as C#: a single set `WidthRequest`/`HeightRequest` drives both sides (`CalculateSizeRequest`), otherwise the constraints are locked with `SmartMax`/`SmartMin` × \|ratio\| (sign decides larger/smaller side, infinite side loses). |
 | `HorizontalFillRatio`/`VerticalFillRatio` | skipped | |
 | `ZIndex` | skipped | Children draw in declaration order. |
 | `FillGradient` | partial | Linear only, on the background of any control (`Type`, `Colors`, `Start/End*Ratio`). No radial/sweep, no `Light`, no `SkiaLabel.FillGradient` on glyphs, no `StrokeGradient`. |

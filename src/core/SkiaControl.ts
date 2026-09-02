@@ -178,27 +178,36 @@ export class SkiaControl {
     const mx = this.Margin.HorizontalThickness * scale;
     const my = this.Margin.VerticalThickness * scale;
 
+    // DrawnUi CalculateSizeRequest: with LockRatio a single set request drives BOTH sides
+    // (WidthRequest=42 + LockRatio=1 => 42x42 whatever the cell is), requests then win over locked constraints.
+    let reqW = this.WidthRequest, reqH = this.HeightRequest;
+    if (this.LockRatio !== 0 && (reqW >= 0 || reqH >= 0)) {
+      const both = reqW >= 0 && reqH >= 0;
+      reqW = reqH = both ? (this.LockRatio > 0 ? Math.max(reqW, reqH) : Math.min(reqW, reqH)) : Math.max(reqW, reqH);
+    }
+
     let w = widthConstraint - mx;
     let h = heightConstraint - my;
-    if (this.WidthRequest >= 0) w = this.WidthRequest * scale;
+    if (reqW >= 0) w = reqW * scale;
     else if (this.MaximumWidthRequest >= 0) w = Math.min(w, this.MaximumWidthRequest * scale);
-    if (this.HeightRequest >= 0) h = this.HeightRequest * scale;
+    if (reqH >= 0) h = reqH * scale;
     else if (this.MaximumHeightRequest >= 0) h = Math.min(h, this.MaximumHeightRequest * scale);
 
+    // DrawnUi CreateMeasureRequest: no request set -> the constraints themselves are locked (SmartMax/SmartMin * |ratio|)
     let locked = false;
-    if (this.LockRatio !== 0) {
-      const lock = this.LockRatio > 0 ? SkiaControl.SmartMax(w, h) : SkiaControl.SmartMin(w, h);
+    if (this.LockRatio !== 0 && reqW < 0 && reqH < 0) {
+      const lock = (this.LockRatio > 0 ? SkiaControl.SmartMax(w, h) : SkiaControl.SmartMin(w, h)) * Math.abs(this.LockRatio);
       if (lock > 0 && isFinite(lock)) { w = h = lock; locked = true; }
     }
 
     const content = this.MeasureAbsolute(w, h, scale);
 
-    let rw = locked || this.WidthRequest >= 0 ? w : this.HorizontalOptions === "Fill" && isFinite(w) ? w : content.Pixels.Width;
-    let rh = locked || this.HeightRequest >= 0 ? h : this.VerticalOptions === "Fill" && isFinite(h) ? h : content.Pixels.Height;
+    let rw = locked || reqW >= 0 ? w : this.HorizontalOptions === "Fill" && isFinite(w) ? w : content.Pixels.Width;
+    let rh = locked || reqH >= 0 ? h : this.VerticalOptions === "Fill" && isFinite(h) ? h : content.Pixels.Height;
     if (this.MinimumWidthRequest >= 0) rw = Math.max(rw, this.MinimumWidthRequest * scale);
     if (this.MinimumHeightRequest >= 0) rh = Math.max(rh, this.MinimumHeightRequest * scale);
-    if (this.MaximumWidthRequest >= 0 && this.WidthRequest < 0) rw = Math.min(rw, this.MaximumWidthRequest * scale);
-    if (this.MaximumHeightRequest >= 0 && this.HeightRequest < 0) rh = Math.min(rh, this.MaximumHeightRequest * scale);
+    if (this.MaximumWidthRequest >= 0 && reqW < 0) rw = Math.min(rw, this.MaximumWidthRequest * scale);
+    if (this.MaximumHeightRequest >= 0 && reqH < 0) rh = Math.min(rh, this.MaximumHeightRequest * scale);
 
     this.MeasuredSize = ScaledSize.FromPixels(rw + mx, rh + my, scale);
     this.NeedMeasure = false;
