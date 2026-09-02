@@ -340,6 +340,11 @@ export class SkiaLabel extends SkiaControl {
     return ScaledSize.FromPixels(Math.ceil(width) + px, Math.ceil(this.BlockHeight()) + py, scale);
   }
 
+  /** C# GradientByLines: FillGradient spans each line's bounds (default) instead of the whole text block. */
+  GradientByLines = true;
+  /** C# SkiaLabel.SetupBackgroundPaint: no BackgroundColor = no background, the gradient goes on the glyphs. */
+  protected override FillGradientPaintsBackground(): boolean { return !!this.BackgroundColor; }
+
   protected override Paint(ctx: DrawingContext): void {
     if (this.lines.length === 0 || !this.mainFonts) return;
     const scale = ctx.Scale;
@@ -369,12 +374,16 @@ export class SkiaLabel extends SkiaControl {
       return paint;
     };
     const canvas = ctx.Context.Canvas;
+    const gradient = this.FillGradient;
+    const textRect = new SKRect(left, top, right, bottom);
     for (const line of this.lines) {
       const lh = this.LineHeightPx(line);
       let x = left;
       if (this.horizontalTextAlignment === "Center") x = left + (right - left - line.Width) / 2;
       else if (this.horizontalTextAlignment === "End") x = right - line.Width;
       const baseline = y + line.Ascent;
+      // C# paintDefault gets the gradient over rectDraw, or over line.Bounds per line (GradientByLines)
+      const gradientRect = gradient ? (this.GradientByLines ? new SKRect(x, y, x + line.Width, y + lh) : textRect) : undefined;
       for (const run of line.Runs) {
         const span = run.Span;
         if (span) {
@@ -382,7 +391,11 @@ export class SkiaLabel extends SkiaControl {
           if (span.BackgroundColor) canvas.drawRect(CK.LTRBRect(x, y, x + run.Width, y + lh), paintFor(span.BackgroundColor));
         }
         const color = span?.TextColor ?? this.textColor;
-        if (run.Text) canvas.drawText(run.Text, x, baseline, paintFor(color), run.Font);
+        if (run.Text) {
+          const paint = paintFor(color);
+          if (gradient && gradientRect) this.SetupGradient(paint, gradient, gradientRect);
+          canvas.drawText(run.Text, x, baseline, paint, run.Font);
+        }
         if (span?.HasDecorations) {
           // same geometry as C# DrawSpanDecorations; CanvasKit exposes no underline/strikeout/x-height metrics,
           // so the C# fallbacks apply: underline 1 scaled px under the baseline, strikeout at half an estimated x-height

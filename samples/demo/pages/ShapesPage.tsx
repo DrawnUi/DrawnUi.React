@@ -41,8 +41,11 @@ export function ShapesPage() {
           <Demo title="StrokeGradient · StrokeWidth 8">
             <SkiaShape Type="Rectangle" CornerRadius={16} WidthRequest={110} HeightRequest={70} HorizontalOptions="Center" VerticalOptions="Center" StrokeWidth={8} ClipBackgroundColor StrokeGradient={{ Type: "Linear", StartXRatio: 0, EndXRatio: 1, EndYRatio: 0, Colors: ["#FFC107", "#D63384"] }} />
           </Demo>
-          <Demo title="Opacity={0.5} on a label background">
-            <SkiaLabel Text="gradient bg" FontSize={16} TextColor={Colors.White} Padding={new Thickness(12, 8)} HorizontalOptions="Center" VerticalOptions="Center" FillGradient={{ Type: "Linear", Angle: 90, Opacity: 0.5, Colors: ["#6610F2", "#0DCAF0"] }} />
+          <Demo title="SkiaLabel FillGradient → glyphs (GradientByLines)">
+            <SkiaLabel Text="Gradient text, line by line" FontSize={18} FontFamily="FontTextBold" TextColor={Colors.White} HorizontalOptions="Center" VerticalOptions="Center" HorizontalTextAlignment="Center" WidthRequest={130} FillGradient={{ Type: "Linear", Angle: 90, Colors: ["#FFC107", "#D63384"] }} />
+          </Demo>
+          <Demo title="Label: BackgroundColor + FillGradient = both">
+            <SkiaLabel Text="bg + text" FontSize={16} TextColor={Colors.White} BackgroundColor="#212529" Padding={new Thickness(12, 8)} HorizontalOptions="Center" VerticalOptions="Center" GradientByLines={false} FillGradient={{ Type: "Linear", Angle: 0, Colors: ["#6610F2", "#0DCAF0"] }} />
           </Demo>
         </SkiaWrap>
 

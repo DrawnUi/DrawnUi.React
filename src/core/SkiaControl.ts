@@ -606,20 +606,41 @@ export class SkiaControl {
     const paint = new CK.Paint();
     paint.setAntiAlias(true);
     if (this.BackgroundColor) paint.setColor(Super.ParseColor(this.BackgroundColor));
-    if (this.FillGradient) this.SetupGradient(paint, this.FillGradient, rect);
+    if (this.FillGradient && this.FillGradientPaintsBackground()) this.SetupGradient(paint, this.FillGradient, rect);
     return paint;
   }
 
-  /** C# SetupGradient: white base color, the gradient's BlendMode and shader on the paint. */
+  /** Whether FillGradient fills the background (C# base: yes, even without BackgroundColor; SkiaLabel: only the glyphs unless BackgroundColor is set). */
+  protected FillGradientPaintsBackground(): boolean { return true; }
+
+  /** Shaders built for a gradient object, keyed by the rect they were built for (C# cached SetupGradient overload). */
+  private gradientShaders?: Map<SkiaGradient, Map<string, import("canvaskit-wasm").Shader>>;
+
+  /** C# SetupGradient: white base color, the gradient's BlendMode and a (cached) shader on the paint. */
   SetupGradient(paint: import("canvaskit-wasm").Paint, gradient: SkiaGradient, rect: SKRect): boolean {
-    const shader = this.CreateGradient(rect, gradient);
-    if (!shader) return false;
     const CK = Super.CK;
+    const key = `${rect.Left},${rect.Top},${rect.Width},${rect.Height}|${this.Value1},${this.Value2}`;
+    this.gradientShaders ??= new Map();
+    let byRect = this.gradientShaders.get(gradient);
+    if (!byRect) {
+      // a new gradient object (React re-render literal) replaces the old ones: drop their shaders
+      for (const m of this.gradientShaders.values()) for (const s of m.values()) s.delete();
+      this.gradientShaders.clear();
+      byRect = new Map();
+      this.gradientShaders.set(gradient, byRect);
+    }
+    let shader = byRect.get(key);
+    if (!shader) {
+      const made = this.CreateGradient(rect, gradient);
+      if (!made) return false;
+      if (byRect.size >= 32) { for (const s of byRect.values()) s.delete(); byRect.clear(); } // GradientByLines on long text
+      byRect.set(key, made);
+      shader = made;
+    }
     paint.setColor(CK.WHITE);
     const blend = gradient.BlendMode ? (CK.BlendMode as unknown as Record<string, import("canvaskit-wasm").BlendMode>)[gradient.BlendMode] : undefined;
     if (blend) paint.setBlendMode(blend);
     paint.setShader(shader);
-    shader.delete();
     return true;
   }
 
