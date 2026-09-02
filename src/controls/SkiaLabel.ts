@@ -38,7 +38,7 @@ export class SkiaLabel extends SkiaControl {
   protected override Paint(ctx: DrawingContext): void {
     if (!this.Text) return;
     const paint = new Super.CK.Paint();
-    paint.setColor(Super.CK.parseColorString(this.TextColor));
+    paint.setColor(Super.ParseColor(this.TextColor));
     paint.setAntiAlias(true);
     ctx.Context.Canvas.drawText(this.Text, ctx.Destination.Left, ctx.Destination.Top - this.ascent, paint, this.GetFont(ctx.Scale));
     paint.delete();

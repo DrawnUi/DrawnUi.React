@@ -18,6 +18,7 @@ Detailed per-feature omissions: [SKIPPED.md](SKIPPED.md). Live sample: https://h
 | 2026-09-02 | Images | `SkiaImage` (all `TransformAspect` but Tile, alignments, `Success`/`Error`), `SkiaImageManager` cache/preload |
 | 2026-09-02 | SVG | `SkiaSvg` (browser-decoded, rasterized per displayed size, `TintColor`) |
 | 2026-09-02 | Infra | repo layout `src/` + `samples/<name>/`, Cloudflare Pages deploy on push (`.github/workflows/deploy.yml`) |
+| 2026-09-02 | Demo shell | `samples/demo`: root menu (logo, gradient, buttons) + pages Images / SVG / Recycled cells; React-level `SkiaShell` (`Routes`, `GoToAsync`/`GoBackAsync`, nav bar with Back, `useShell()`); `FillGradient` (linear); colors parsed MAUI-style `#AARRGGBB` via `Super.ParseColor` |
 | 2026-09-02 | Recycled cells | Templated `SkiaLayout` (`ItemsSource`/`ItemTemplate`/`RecyclingTemplate`/`MeasureFirst`+`MeasureAll`), `ViewsAdapter` pool, `BindingContext` + `SkiaDynamicDrawnCell.SetContent`, `SkiaScroll.ScrollToIndex`, `FirstVisibleIndex`/`DebugString`; sample = Cells fiddle shape with 100 000 items |
 | 2026-09-02 | Scrolling | `SkiaScroll` plain content: pan, deceleration fling cut at edges, rubber-band + spring bounce, wheel, `ScrollTo*`, `Scrolled`; physics classes `ScrollFlingAnimator`, `DecelerationTimingParameters`, `SpringWithVelocityAnimator`, `VelocityAccumulator`, `RubberBandUtils` |
 

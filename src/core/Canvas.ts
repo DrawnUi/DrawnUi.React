@@ -110,7 +110,7 @@ export class Canvas {
   private Draw(canvas: import("canvaskit-wasm").Canvas): void {
     this.ProcessPendingGestures();
     const executed = this.ExecuteAnimators(Math.round(performance.now() * 1_000_000));
-    canvas.clear(Super.CK.parseColorString(this.BackgroundColor));
+    canvas.clear(Super.ParseColor(this.BackgroundColor));
     const root = this.content;
     if (root) {
       const scale = this.RenderingScale;

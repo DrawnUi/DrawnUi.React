@@ -19,6 +19,8 @@ DrawnUi name and semantics; nothing here is a redesign, only an omission.
 | `LockRatio` | ported | Same `SmartMax`/`SmartMin` rule as C# (sign decides larger/smaller side, infinite side loses). |
 | `HorizontalFillRatio`/`VerticalFillRatio` | skipped | |
 | `ZIndex` | skipped | Children draw in declaration order. |
+| `FillGradient` | partial | Linear only, on the background of any control (`Type`, `Colors`, `Start/End*Ratio`). No radial/sweep, no `Light`, no `SkiaLabel.FillGradient` on glyphs, no `StrokeGradient`. |
+| `SkiaShell` | partial (React-level) | `Routes` (route -> JSX page factory), `GoToAsync`, `GoBackAsync`, `NavigationStack`, `CanGoBack`, nav bar with Back + title, `useShell()`. Not ported: engine-level shell, page transitions, modals, popups, toasts, tabs, hardware/browser back, `RegisterRoute` by type, `ShellLayout`/`RootLayout` tags, insets. |
 | Styles / `ConfigureStyles` | skipped | |
 | Animators core: `AnimatorBase` / `SkiaValueAnimator` / `RenderingAnimator` (`IOverlayEffect`), `Canvas.RegisterAnimator`/`AnimatingControls`, `PostAnimators` + `ExecutePostAnimators`, `Easing` (Linear/Cubic*) | ported | Frame-driven: a running animator keeps frames coming, idle canvas draws nothing. |
 | Touch feedback: `AnimationTapped="Ripple"` + `TouchEffectColor` + `AnimationTappedSpeed` on any control, `SkiaButton.ApplyEffect="Ripple"` (on Down), `PlayRippleAnimation`, `RippleAnimator`, `ClipEffects`/`CreateClip` | ported | Same numbers as C#: 500ms CubicIn, radius 300pt, opacity 0.20 fading over 1.15x progress. |

@@ -1,6 +1,6 @@
 import type { Canvas as SkCanvas, Path } from "canvaskit-wasm";
 import { Super } from "./Super";
-import { type Color, Colors, type LayoutOptions, SKRect, ScaledSize, type SkiaTouchAnimation, Thickness } from "./Types";
+import { type Color, Colors, type LayoutOptions, SKRect, ScaledSize, type SkiaGradient, type SkiaTouchAnimation, Thickness } from "./Types";
 import { type IOverlayEffect, RippleAnimator } from "./Animators";
 import type { Canvas } from "./Canvas";
 import {
@@ -35,6 +35,8 @@ export class SkiaControl {
    */
   LockRatio = 0;
   BackgroundColor?: Color;
+  /** Gradient painted as the background (over BackgroundColor). */
+  FillGradient?: SkiaGradient;
   IsVisible = true;
   Tag?: string;
   /** Extra points beyond the viewport a virtualized layout keeps realized (DrawnUi VirtualisationInflated). */
@@ -178,7 +180,7 @@ export class SkiaControl {
   Render(ctx: DrawingContext): void {
     if (!this.IsVisible) return;
     const own: DrawingContext = { ...ctx, Destination: this.DrawingRect };
-    if (this.BackgroundColor) this.PaintBackground(own);
+    if (this.BackgroundColor || this.FillGradient) this.PaintBackground(own);
     this.Paint(own);
     this.ExecutePostAnimators(own);
   }
@@ -199,13 +201,32 @@ export class SkiaControl {
     return path;
   }
 
-  /** Fills DrawingRect with BackgroundColor; shapes override for rounded corners etc. */
+  /** Fills DrawingRect with BackgroundColor / FillGradient; shapes override for rounded corners etc. */
   protected PaintBackground(ctx: DrawingContext): void {
-    const paint = new Super.CK.Paint();
-    paint.setColor(Super.CK.parseColorString(this.BackgroundColor!));
+    const paint = this.CreateBackgroundPaint(ctx.Destination);
     const r = ctx.Destination;
     ctx.Context.Canvas.drawRect(Super.CK.LTRBRect(r.Left, r.Top, r.Right, r.Bottom), paint);
     paint.delete();
+  }
+
+  /** Paint for the background: solid BackgroundColor, or FillGradient shader over the given rect. Caller deletes. */
+  protected CreateBackgroundPaint(rect: SKRect): import("canvaskit-wasm").Paint {
+    const CK = Super.CK;
+    const paint = new CK.Paint();
+    paint.setAntiAlias(true);
+    if (this.BackgroundColor) paint.setColor(Super.ParseColor(this.BackgroundColor));
+    const g = this.FillGradient;
+    if (g && g.Colors.length > 0) {
+      const colors = g.Colors.map((c) => Super.ParseColor(c));
+      const shader = CK.Shader.MakeLinearGradient(
+        [rect.Left + rect.Width * (g.StartXRatio ?? 0), rect.Top + rect.Height * (g.StartYRatio ?? 0)],
+        [rect.Left + rect.Width * (g.EndXRatio ?? 0), rect.Top + rect.Height * (g.EndYRatio ?? 1)],
+        colors, null, CK.TileMode.Clamp,
+      );
+      paint.setShader(shader);
+      shader.delete();
+    }
+    return paint;
   }
 
   /** Override to draw own content into ctx.Destination. */

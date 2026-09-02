@@ -20,12 +20,12 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx tsc --noEmit
-      - name: Build samples/helloworld (hosted at the domain root)
-        run: npx vite build samples/helloworld
+      - name: Build samples/demo (hosted at the domain root)
+        run: npx vite build samples/demo
         env:
           BASE_PATH: /
       - name: Deploy to Cloudflare Pages (helloreact.drawnui.net)
-        run: npx --yes wrangler@4 pages deploy dist/helloworld --project-name helloreact-drawnui --branch master --commit-dirty=true
+        run: npx --yes wrangler@4 pages deploy dist/demo --project-name helloreact-drawnui --branch master --commit-dirty=true
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

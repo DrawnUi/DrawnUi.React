@@ -36,6 +36,13 @@ Updated whenever the port deliberately diverges or finds something worth back-po
 - **React-only rule**: `ItemTemplate` must be a stable function reference (module-level or `useCallback`). A new arrow on
   every render is a new template → the pool is rebuilt each render (C# XAML sets `DataTemplate` once, so it never hits this).
 
+## Colors
+
+### Hex alpha position
+- **Both**: 8-digit hex is `#AARRGGBB` (MAUI `Color.FromArgb`), 4-digit is `#ARGB`. All color strings go through
+  `Super.ParseColor`; CanvasKit's own `parseColorString` (CSS `#RRGGBBAA`) is used only for `rgb()/rgba()` strings.
+  Web developers used to CSS must be told — `"#22FFFFFF"` is 13% white here, not opaque cyan.
+
 ## Rendering
 
 ### Redraw synchronously inside the resize callback

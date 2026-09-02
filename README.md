@@ -26,6 +26,7 @@ await Super.UseDrawnUi()
   - `src/core` — `Super` (startup, CanvasKit, fonts), `SkiaControl` (measure/arrange/render/gestures), `Canvas` (host, surface, frame loop, input), animators, value types.
   - `src/controls` — `SkiaLayout` (+ `SkiaStack`/`SkiaRow`/`SkiaLayer`), `SkiaLabel`, `SkiaHotspot`, `SkiaButton`.
   - `src/react` — reconciler host config + typed JSX tags + `<Canvas>` bridge component.
+- `samples/demo/` — the deployed demo: root menu + pages (`pages/ImagesPage.tsx`, `SvgPage.tsx`, `CellsPage.tsx` with `ContactCell.ts`) navigated by the React-level `SkiaShell`.
 - `samples/<name>/` — one folder per sample: `index.html`, `main.tsx`, two-line `vite.config.ts` (`defineSample`). Shared assets (fonts) in `samples/public`.
 - `dev/build-samples.mjs` — builds every sample into `dist/<name>/` + a `dist/index.html` list; used by the Pages workflow.
 
@@ -35,14 +36,14 @@ What is intentionally missing: see [SKIPPED.md](SKIPPED.md).
 
 ```
 npm install
-npm run dev              # samples/helloworld at http://localhost:5173
+npm run dev              # samples/demo at http://localhost:5173
 npx vite samples/<name>  # any other sample
 npm run build            # typecheck + build all samples into dist/<name>/
 ```
 
 ## Publishing
 
-Every push to `master` runs `.github/workflows/deploy.yml`: build `samples/helloworld`, deploy `dist/helloworld`
+Every push to `master` runs `.github/workflows/deploy.yml`: build `samples/demo`, deploy `dist/demo`
 to the Cloudflare Pages project `helloreact-drawnui` → **https://helloreact.drawnui.net**.
 
 Repository secrets used by the workflow:

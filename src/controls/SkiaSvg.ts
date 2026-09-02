@@ -149,7 +149,7 @@ export class SkiaSvg extends SkiaControl {
     if (overflows) canvas.clipRect(CK.LTRBRect(dest.Left, dest.Top, dest.Right, dest.Bottom), CK.ClipOp.Intersect, true);
     const paint = new CK.Paint();
     paint.setAntiAlias(true);
-    const tint = CK.parseColorString(this.TintColor);
+    const tint = Super.ParseColor(this.TintColor);
     if (tint[3] > 0) {
       const filter = CK.ColorFilter.MakeBlend(tint, CK.BlendMode.SrcIn);
       paint.setColorFilter(filter);

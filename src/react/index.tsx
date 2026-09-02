@@ -78,3 +78,6 @@ export type { SkiaControl };
 // One import for apps: React tags + every engine type (Colors, Thickness, Super, gestures, animators...).
 // The engine `Canvas` class is shadowed by the React <Canvas> above; reach it via "drawnui-react/core".
 export * from "../index";
+
+// React-level SkiaShell (routes, back nav bar, useShell())
+export * from "./SkiaShell";

@@ -56,7 +56,7 @@ export class SkiaButton extends SkiaLayout {
     const radius = 8 * ctx.Scale;
     const paint = new Super.CK.Paint();
     paint.setAntiAlias(true);
-    paint.setColor(Super.CK.parseColorString(this.BackgroundColor!));
+    paint.setColor(Super.ParseColor(this.BackgroundColor!));
     ctx.Context.Canvas.drawRRect(Super.CK.RRectXY(Super.CK.LTRBRect(r.Left, r.Top, r.Right, r.Bottom), radius, radius), paint);
     paint.delete();
   }

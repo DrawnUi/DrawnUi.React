@@ -4,10 +4,10 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "dev": "vite samples/helloworld",
+    "dev": "vite samples/demo",
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit && node dev/build-samples.mjs",
-    "preview": "vite preview samples/helloworld"
+    "preview": "vite preview samples/demo"
   },
   "dependencies": {
     "canvaskit-wasm": "^0.42.0",

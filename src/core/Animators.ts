@@ -227,7 +227,7 @@ export class RippleAnimator extends RenderingAnimator {
     RenderingAnimator.DrawWithClipping(context, control, () => {
       const paint = new Super.CK.Paint();
       paint.setAntiAlias(true);
-      const c = Super.CK.parseColorString(this.Color);
+      const c = Super.ParseColor(this.Color);
       paint.setColor(Super.CK.Color4f(c[0], c[1], c[2], this.Opacity));
       // Same as the .NET RippleAnimator: Diameter is passed as the circle radius.
       context.Context.Canvas.drawCircle(x, y, this.Diameter * context.Scale, paint);

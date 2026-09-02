@@ -74,6 +74,16 @@ export type DrawImageAlignment = "Start" | "Center" | "End";
 /** MAUI/DrawnUi ScrollOrientation. */
 export type ScrollOrientation = "Vertical" | "Horizontal" | "Both" | "Neither";
 
+/** DrawnUi SkiaGradient (Linear only): colors spread from Start to End, ratios of the control's rect. */
+export interface SkiaGradient {
+  Type: "Linear";
+  Colors: Color[];
+  StartXRatio?: number;
+  StartYRatio?: number;
+  EndXRatio?: number;
+  EndYRatio?: number;
+}
+
 /** DrawnUi RecyclingTemplate: Enabled = pool of cells for the visible range, Disabled = one view per item. */
 export type RecyclingTemplate = "Enabled" | "Disabled";
 
