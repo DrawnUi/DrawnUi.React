@@ -1,4 +1,5 @@
-import { type CSSProperties, type FC, type ReactNode, type Ref, useImperativeHandle, useLayoutEffect, useRef } from "react";
+import { type CSSProperties, type FC, type ReactNode, type Ref, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
+import type { AccessibilityNode } from "../core/Accessibility";
 import { Canvas as CanvasView } from "../core/Canvas";
 import type { SkiaControl } from "../core/SkiaControl";
 import type { SkiaLabel as SkiaLabelCtrl } from "../controls/SkiaLabel";
@@ -17,7 +18,7 @@ import { createDrawnRoot } from "./reconciler";
 /** Public settable properties of a control become its JSX props, same PascalCase names as C#. */
 type PropsOf<T> = Partial<{
   // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-  [K in keyof T as T[K] extends Function ? never : K extends "Children" | "Views" | "Parent" | "Spans" | "GridStructure" | "Rects" | "HasTapHandler" | "HasDecorations" | "LinesCount" | "Superview" | "DrawingRect" | "MeasuredSize" | "RenderingScale" | "NeedMeasure" | "_superview" | "HitBoxAuto" | "TotalDown" | "TotalTapped" | "TouchDown" | "PostAnimators" | "LoadedSource" | "IsLoading" | "DisplayRect" | "AspectScale" | "Content" | "ContentSize" | "ContentOffsetBounds" | "OverscrollDistance" | "OverScrolled" | "IsUserPanning" | "IsUserFocused" | "IsScrolling" | "IsTemplated" | "FirstVisibleIndex" | "LastVisibleIndex" | "DebugString" | "ChildrenFactory" | "ContextIndex" | "RenderObject" | "UsingCacheType" ? never : K]: T[K];
+  [K in keyof T as T[K] extends Function ? never : K extends "Children" | "Views" | "Parent" | "Spans" | "GridStructure" | "AccessibilityId" | "IsAccessibilityElement" | "Rects" | "HasTapHandler" | "HasDecorations" | "LinesCount" | "Superview" | "DrawingRect" | "MeasuredSize" | "RenderingScale" | "NeedMeasure" | "_superview" | "HitBoxAuto" | "TotalDown" | "TotalTapped" | "TouchDown" | "PostAnimators" | "LoadedSource" | "IsLoading" | "DisplayRect" | "AspectScale" | "Content" | "ContentSize" | "ContentOffsetBounds" | "OverscrollDistance" | "OverScrolled" | "IsUserPanning" | "IsUserFocused" | "IsScrolling" | "IsTemplated" | "FirstVisibleIndex" | "LastVisibleIndex" | "DebugString" | "ChildrenFactory" | "ContextIndex" | "RenderObject" | "UsingCacheType" ? never : K]: T[K];
 }>;
 
 /** `ref` receives the engine control instance (react-reconciler getPublicInstance). */
@@ -62,13 +63,15 @@ export function Canvas({ BackgroundColor, RenderingMode, Gestures, children, sty
   const ref = useRef<HTMLCanvasElement>(null);
   const view = useRef<CanvasView>(null);
   const root = useRef<ReturnType<typeof createDrawnRoot>>(null);
+  const [engine, setEngine] = useState<CanvasView | null>(null);
 
   useLayoutEffect(() => {
     const v = new CanvasView(ref.current!);
     if (RenderingMode) v.RenderingMode = RenderingMode;
     view.current = v;
     root.current = createDrawnRoot(v);
-    return () => { root.current?.unmount(); v.Dispose(); view.current = null; root.current = null; };
+    setEngine(v);
+    return () => { root.current?.unmount(); v.Dispose(); view.current = null; root.current = null; setEngine(null); };
     // RenderingMode is read once at surface creation, like DrawnUi.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -82,7 +85,61 @@ export function Canvas({ BackgroundColor, RenderingMode, Gestures, children, sty
     root.current!.render(children);
   });
 
-  return <canvas ref={ref} className={className} style={{ display: "block", width: "100%", height: "100%", ...style }} />;
+  // The drawn surface is aria-hidden; the overlay is the accessibility tree (DrawnUi.Blazor pattern).
+  return (
+    <div className={className} style={{ position: "relative", ...style }}>
+      <canvas ref={ref} aria-hidden style={{ display: "block", width: "100%", height: "100%" }} />
+      {engine && <AccessibilityOverlay view={engine} />}
+    </div>
+  );
+}
+
+const A11Y_CSS = `
+.drawnui-a11y-overlay{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+.drawnui-a11y-node{position:absolute;margin:0;padding:0;border:0;background:transparent;color:transparent;overflow:hidden;white-space:nowrap;pointer-events:none;font:inherit}
+.drawnui-a11y-node:focus{outline:none}
+.drawnui-a11y-node:focus-visible{outline:3px solid rgba(13,110,253,.85);outline-offset:1px;border-radius:3px}
+`;
+
+/**
+ * Invisible ARIA elements mirroring the accessible drawn controls, positioned over the canvas.
+ * Improvement over DrawnUi.Blazor: `pointer-events:none`, so hover and every pointer gesture still reach the canvas —
+ * keyboard (Tab / Enter / Space) and screen-reader activation arrive as DOM events and are routed back as a Tapped.
+ */
+function AccessibilityOverlay({ view }: { view: CanvasView }) {
+  const [nodes, setNodes] = useState<AccessibilityNode[]>(() => view.AccessibilityManager.Snapshot);
+  useEffect(() => {
+    const mgr = view.AccessibilityManager;
+    setNodes(mgr.Snapshot);
+    const off = mgr.OnChanged(() => setNodes(mgr.Snapshot));
+    const offLive = mgr.OnLiveRegionUpdated(() => { mgr.ForceRebuildOnNextFrame(); view.Update(); });
+    return () => { off(); offLive(); };
+  }, [view]);
+  if (nodes.length === 0) return null;
+  return (
+    <div className="drawnui-a11y-overlay">
+      <style>{A11Y_CSS}</style>
+      {nodes.map((n) => {
+        const pos: CSSProperties = { left: n.Rect.Left, top: n.Rect.Top, width: n.Rect.Width, height: n.Rect.Height };
+        const activate = () => n.Source.OnAccessibilityActivated();
+        return n.CanInteract ? (
+          <div key={n.Id} role={n.Role} aria-label={n.Label} title={n.Hint} aria-pressed={n.IsPressed} aria-live={n.Live as "polite" | "assertive" | undefined}
+            tabIndex={0} className="drawnui-a11y-node" style={{ ...pos, fontSize: 0, userSelect: "none" }}
+            onClick={activate}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); activate(); } }}
+            onFocus={() => { n.Source.OnAccessibilityFocused(true); n.Source.NotifyAccessibilityFocused(true); }}
+            onBlur={() => { n.Source.OnAccessibilityFocused(false); n.Source.NotifyAccessibilityFocused(false); }}>
+            {n.Label}
+          </div>
+        ) : (
+          // static text is exposed as real (transparent) text content; aria-label only for roles that need a name
+          <div key={n.Id} role={n.Role} aria-label={n.Role === "text" ? undefined : n.Label} title={n.Hint} aria-live={n.Live as "polite" | "assertive" | undefined} className="drawnui-a11y-node" style={pos}>
+            {n.Label}
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 export type { SkiaControl };

@@ -3,9 +3,8 @@ import { Super } from "./Super";
 import { type Color, Colors, type LayoutOptions, SKRect, ScaledSize, type SkiaCacheType, type SkiaGradient, type SkiaTouchAnimation, Thickness } from "./Types";
 import { type IOverlayEffect, RippleAnimator } from "./Animators";
 import type { Canvas } from "./Canvas";
-import {
-  ControlTappedEventArgs, GestureEventProcessingInfo, type LockTouch, SKPoint, SkiaGesturesInfo, type SkiaGesturesParameters,
-} from "./Gestures";
+import { Aria } from "./Accessibility";
+import { ControlTappedEventArgs, GestureEventProcessingInfo, type LockTouch, SKPoint, SkiaGesturesInfo, SkiaGesturesParameters, TouchActionEventArgs } from "./Gestures";
 
 /** Mirrors DrawnUi DrawingContext: ctx.Context.Canvas / Surface, ctx.Destination (pixels), ctx.Scale. */
 export interface DrawingContext {
@@ -239,7 +238,95 @@ export class SkiaControl {
     const y = availT + SkiaControl.Align(this.VerticalOptions, fullH, h);
     this.DrawingRect = SKRect.Create(x, y, w, h);
     this.OnLayoutChanged();
+    // DrawnUi OnLayoutReady: an accessible control registers itself on its first layout
+    if (!this.registeredWithAccessibility && this.IsAccessibilityElement) this.NotifyAccessibility();
   }
+
+  // ---- accessibility (DrawnUi ISkiaAccessibilityNode) ----
+  private static nextAccessibilityId = 1;
+  /** Stable identity for the DOM overlay. */
+  readonly AccessibilityId = SkiaControl.nextAccessibilityId++;
+  private registeredWithAccessibility = false;
+  private accessibilityRole?: string;
+  private accessibilityLabel?: string;
+  private accessibilityHint?: string;
+  private accessibilityCanInteract?: boolean;
+  private accessibilityIsPressed?: boolean;
+  private accessibilityLive?: string;
+
+  /**
+   * ARIA role; setting it exposes the control to assistive technology (use `Aria` constants). Unset = the class
+   * default (`SkiaLabel.DefaultAccessibilityRole` etc.), which is itself unset unless the app opts in.
+   */
+  get AccessibilityRole(): string | undefined { return this.accessibilityRole ?? (this.constructor as typeof SkiaControl).DefaultAccessibilityRole; }
+  set AccessibilityRole(v: string | undefined) { if (this.accessibilityRole !== v) { this.accessibilityRole = v; this.AccessibilityChanged(); } }
+  /** Per-class default role (React extension): e.g. `SkiaLabel.DefaultAccessibilityRole = Aria.RoleText` reads every label. */
+  static DefaultAccessibilityRole?: string;
+
+  /** Spoken label; unset = the control's own text (SkiaLabel.Text, SkiaButton.Text). */
+  get AccessibilityLabel(): string | undefined { return this.accessibilityLabel ?? this.DefaultAccessibilityLabel(); }
+  set AccessibilityLabel(v: string | undefined) { if (this.accessibilityLabel !== v) { this.accessibilityLabel = v; this.AccessibilityChanged(); } }
+  protected DefaultAccessibilityLabel(): string | undefined { return undefined; }
+
+  get AccessibilityHint(): string | undefined { return this.accessibilityHint; }
+  set AccessibilityHint(v: string | undefined) { if (this.accessibilityHint !== v) { this.accessibilityHint = v; this.AccessibilityChanged(); } }
+
+  /** Tab stop + activation; unset = true when the control handles Tapped. */
+  get AccessibilityCanInteract(): boolean { return this.accessibilityCanInteract ?? this.DefaultAccessibilityCanInteract(); }
+  set AccessibilityCanInteract(v: boolean) { if (this.accessibilityCanInteract !== v) { this.accessibilityCanInteract = v; this.AccessibilityChanged(); } }
+  protected DefaultAccessibilityCanInteract(): boolean { return !!this.Tapped; }
+
+  /** aria-pressed for toggles; undefined = not a toggle. */
+  get AccessibilityIsPressed(): boolean | undefined { return this.accessibilityIsPressed; }
+  set AccessibilityIsPressed(v: boolean | undefined) { if (this.accessibilityIsPressed !== v) { this.accessibilityIsPressed = v; this.AccessibilityChanged(); } }
+
+  /** aria-live: `Aria.LivePolite` / `Aria.LiveAssertive`; changes are announced immediately. */
+  get AccessibilityLive(): string | undefined { return this.accessibilityLive; }
+  set AccessibilityLive(v: string | undefined) { if (this.accessibilityLive !== v) { this.accessibilityLive = v; this.AccessibilityChanged(); } }
+
+  get IsAccessibilityElement(): boolean { const r = this.AccessibilityRole; return r != null && r !== Aria.RolePresentation; }
+
+  /** Hit rect in canvas pixels used to position the overlay element. */
+  GetAccessibilityPixelRect(): SKRect { return this.DrawingRect; }
+
+  /** Registers on first call, marks the snapshot dirty afterwards. */
+  NotifyAccessibility(): void {
+    if (!this.IsAccessibilityElement) return;
+    const mgr = this.Superview?.AccessibilityManager;
+    if (!mgr) return;
+    if (!this.registeredWithAccessibility) { mgr.Register(this); this.registeredWithAccessibility = true; }
+    else mgr.NotifyUpdated(this);
+  }
+
+  UnregisterAccessibility(): void {
+    this.Superview?.AccessibilityManager.Unregister(this);
+    this.registeredWithAccessibility = false;
+  }
+
+  AccessibilityChanged(): void {
+    if (!this.IsAccessibilityElement && this.registeredWithAccessibility) this.UnregisterAccessibility();
+    else this.NotifyAccessibility();
+  }
+
+  OnAccessibilityUnregistered(): void { this.registeredWithAccessibility = false; }
+
+  /** Platform layer (overlay click / Enter): injects a synthetic Tapped at the control's center into the gesture pipeline. */
+  OnAccessibilityActivated(): void {
+    const r = this.GetAccessibilityPixelRect();
+    const center = new SKPoint((r.Left + r.Right) / 2, (r.Top + r.Bottom) / 2);
+    const args = new TouchActionEventArgs();
+    args.Type = "Released";
+    args.Location = center;
+    args.StartingLocation = center;
+    args.Scale = this.RenderingScale;
+    this.OnSkiaGestureEvent(SkiaGesturesParameters.Create("Tapped", args), new GestureEventProcessingInfo(center));
+    this.Repaint();
+  }
+
+  /** Overlay focus arrives on / leaves this node (inputs may activate their sink here). */
+  OnAccessibilityFocused(_focused: boolean): void {}
+
+  NotifyAccessibilityFocused(focused: boolean): void { this.Superview?.AccessibilityManager.NotifyFocused(focused ? this : undefined); }
 
   /** DrawnUi SmartMax: larger of two sizes, an infinite one loses. */
   protected static SmartMax(a: number, b: number): number {

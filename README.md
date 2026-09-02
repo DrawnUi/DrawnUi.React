@@ -32,6 +32,25 @@ await Super.UseDrawnUi()
 
 What is intentionally missing: see [SKIPPED.md](SKIPPED.md).
 
+## Accessibility
+
+Same model as DrawnUi.Blazor: the `<canvas>` is `aria-hidden`, an invisible DOM overlay mirrors every
+accessible drawn control (`role`, `aria-label`, `title` hint, `aria-pressed`, `aria-live`, `tabindex`), rebuilt
+at most once per second from the arranged rects. Keyboard (Tab / Enter / Space) and screen-reader activation
+are routed back into the gesture pipeline as a `Tapped` on the control.
+
+Per control (C# names): `AccessibilityRole` (enables the node; use `Aria.*`), `AccessibilityLabel`
+(defaults to the control's text), `AccessibilityHint`, `AccessibilityCanInteract` (defaults to "has a
+`Tapped` handler"), `AccessibilityIsPressed`, `AccessibilityLive`. `Aria.RolePresentation` hides a control that
+would otherwise get a default role.
+
+App-wide opt-in (React extension): `SkiaLabel.DefaultAccessibilityRole = Aria.RoleText` and
+`SkiaButton.DefaultAccessibilityRole = Aria.RoleButton` (import the classes from `drawnui-react/core`) make every
+label readable and every button focusable without touching each control.
+
+The overlay has `pointer-events: none`, so hover and all pointer gestures still reach the canvas — the
+Blazor "accessible control loses hover" limitation does not apply.
+
 ## Run
 
 ```

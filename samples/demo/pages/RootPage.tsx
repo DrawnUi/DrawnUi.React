@@ -1,4 +1,4 @@
-import { Colors, SkiaLabel, SkiaScroll, SkiaShape, SkiaStack, SkiaSvg, Thickness, useShell } from "drawnui-react";
+import { Aria, Colors, SkiaLabel, SkiaScroll, SkiaShape, SkiaStack, SkiaSvg, Thickness, useShell } from "drawnui-react";
 
 const SAMPLES: { route: string; title: string; text: string }[] = [
   { route: "cells", title: "Recycled cells", text: "100 000 items in a SkiaScroll, RecyclingTemplate + MeasureFirst, UseCache=Image" },
@@ -15,18 +15,19 @@ export function RootPage() {
   return (
     <SkiaScroll Orientation="Vertical">
       <SkiaStack Spacing={24} Padding={new Thickness(24, 24, 24, 40)} HorizontalOptions="Center" MaximumWidthRequest={820}>
-        <SkiaSvg Source="images/drawnui.svg" WidthRequest={120} LockRatio={1} HorizontalOptions="Center" Margin={new Thickness(0, 16, 0, 0)} />
-        <SkiaLabel Text="DrawnUI for React" FontSize={48} FontFamily="FontTextBold" TextColor={Colors.White} HorizontalOptions="Center" />
+        <SkiaSvg Source="images/drawnui.svg" WidthRequest={120} LockRatio={1} HorizontalOptions="Center" Margin={new Thickness(0, 16, 0, 0)} AccessibilityRole={Aria.RoleImg} AccessibilityLabel="DrawnUI logo" />
+        <SkiaLabel Text="DrawnUI for React" FontSize={48} FontFamily="FontTextBold" TextColor={Colors.White} HorizontalOptions="Center" AccessibilityRole={Aria.RoleHeading} />
 
         {/* samples */}
-        <SkiaLabel Text="Snippets" FontSize={32} TextColor="#DEE2E6" Margin={new Thickness(0, 8, 0, 0)} />
+        <SkiaLabel Text="Snippets" FontSize={32} TextColor="#DEE2E6" Margin={new Thickness(0, 8, 0, 0)} AccessibilityRole={Aria.RoleHeading} />
         {SAMPLES.map((s) => (
-          <SkiaShape key={s.route} Type="Rectangle" CornerRadius={12} BackgroundColor="#2B3035" StrokeColor="#373B3E" StrokeWidth={1} AnimationTapped="Ripple" Tapped={() => void shell.GoToAsync(s.route)}>
+          <SkiaShape key={s.route} Type="Rectangle" CornerRadius={12} BackgroundColor="#2B3035" StrokeColor="#373B3E" StrokeWidth={1} AnimationTapped="Ripple" Tapped={() => void shell.GoToAsync(s.route)}
+            AccessibilityRole={Aria.RoleButton} AccessibilityLabel={s.title} AccessibilityHint={s.text}>
             <SkiaStack Spacing={6} Padding={new Thickness(24, 20, 56, 20)}>
-              <SkiaLabel Text={s.title} FontSize={24} FontFamily="FontTextBold" TextColor={Colors.White} />
-              <SkiaLabel Text={s.text} FontSize={14} TextColor="#ADB5BD" />
+              <SkiaLabel Text={s.title} FontSize={24} FontFamily="FontTextBold" TextColor={Colors.White} AccessibilityRole={Aria.RolePresentation} />
+              <SkiaLabel Text={s.text} FontSize={14} TextColor="#ADB5BD" AccessibilityRole={Aria.RolePresentation} />
             </SkiaStack>
-            <SkiaLabel Text="›" FontSize={28} TextColor="#6EA8FE" HorizontalOptions="End" VerticalOptions="Center" Margin={new Thickness(0, 0, 24, 0)} />
+            <SkiaLabel Text="›" FontSize={28} TextColor="#6EA8FE" HorizontalOptions="End" VerticalOptions="Center" Margin={new Thickness(0, 0, 24, 0)} AccessibilityRole={Aria.RolePresentation} />
           </SkiaShape>
         ))}
 

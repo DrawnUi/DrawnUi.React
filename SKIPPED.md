@@ -75,6 +75,7 @@ DrawnUi name and semantics; nothing here is a redesign, only an omission.
 | Area | Status | Notes |
 |---|---|---|
 | Custom `react-reconciler` renderer, PascalCase props mapped 1:1 to control properties | ported | |
+| Accessibility (`ISkiaAccessibilityNode` + `SkiaAccessibilityManager` + Blazor ARIA overlay) | ported | `AccessibilityRole/Label/Hint/CanInteract/IsPressed/Live`, `Aria` constants, `IsAccessibilityElement`, `GetAccessibilityPixelRect`, `NotifyAccessibility`, `OnAccessibilityActivated` (synthetic Tapped), `OnAccessibilityFocused`, snapshot rate-limited by `MinUpdateIntervalMs`, top-left reading order, `SkiaButton` hides its inner label. Extensions: per-class `DefaultAccessibilityRole`, label/interaction defaults derived from text / `Tapped`, `pointer-events:none` overlay, detached/off-canvas nodes pruned at rebuild (no explicit unregister on removal). Not ported: `WithAccessibility*` fluent helpers, `FocusChanged` event consumers, UIA/AT-SPI (browser only), `aria-level` for headings. |
 | React context bridging across the `<Canvas>` boundary | skipped | Contexts from the DOM tree are not visible inside the drawn tree. |
 | Refs to engine controls from JSX | skipped | `getPublicInstance` returns the control, `ref` not wired/typed. |
 | Fluent code-behind API (`.Assign`, `.OnTapped`, `.ObserveProperty`) | skipped | Engine classes are plain TS classes; React is the composition layer. |

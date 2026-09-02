@@ -10,6 +10,8 @@ import { CellsPage } from "./pages/CellsPage";
 import { ShapesPage } from "./pages/ShapesPage";
 import { TextPage } from "./pages/TextPage";
 import { LayoutsPage } from "./pages/LayoutsPage";
+import { Aria } from "drawnui-react";
+import { SkiaButton as SkiaButtonCtrl, SkiaLabel as SkiaLabelCtrl } from "drawnui-react/core";
 
 // Same startup shape as DrawnUi.Net / OpenTK: Super.UseDrawnUi().ConfigureFonts(...).BuildAsync()
 await Super.UseDrawnUi()
@@ -20,6 +22,10 @@ await Super.UseDrawnUi()
     .AddSymbols() // FontSymbols / FontSymbols2 (arrows, math, misc) shipped subsets, like DrawnUi.Blazor
     .AddEmojis()) // FontEmoji (Noto Color Emoji faces + hands subset)
   .BuildAsync();
+
+// Accessibility: every label is read as text, every button is a button (React extension; C# opts in per control).
+SkiaLabelCtrl.DefaultAccessibilityRole = Aria.RoleText;
+SkiaButtonCtrl.DefaultAccessibilityRole = Aria.RoleButton;
 
 const ROUTES = {
   images: () => <ImagesPage />,

@@ -44,6 +44,13 @@ export class SkiaLabel extends SkiaControl {
   /** Styled fragments; when not empty they replace `Text` (same precedence as C#). */
   readonly Spans: TextSpan[] = [];
 
+  /** Set to `Aria.RoleText` to expose every label to screen readers (React extension; C# is opt-in per control). */
+  static override DefaultAccessibilityRole?: string;
+  /** Like C# OnTextInternalChanged: the spoken label is the text (or the joined spans) unless AccessibilityLabel is set. */
+  protected override DefaultAccessibilityLabel(): string | undefined {
+    return this.Spans.length > 0 ? this.Spans.map((s) => s.Text).join("") : this.text || undefined;
+  }
+
   constructor() {
     super();
     this.UseCache = "Operations";

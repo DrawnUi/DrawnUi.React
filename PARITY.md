@@ -81,6 +81,31 @@ Updated whenever the port deliberately diverges or finds something worth back-po
   `Super.ParseColor`; CanvasKit's own `parseColorString` (CSS `#RRGGBBAA`) is used only for `rgb()/rgba()` strings.
   Web developers used to CSS must be told — `"#22FFFFFF"` is 13% white here, not opaque cyan.
 
+## Accessibility
+
+### Overlay does not capture pointer events
+- **C# (Blazor)**: the ARIA overlay elements sit above the canvas and receive clicks, so a control with
+  accessibility metadata stops getting `Pointer` (hover) gestures — documented limitation.
+- **React**: overlay elements have `pointer-events: none`; real pointers always reach the canvas, keyboard and
+  screen-reader activation arrive as DOM `click`/`keydown` on the focused element and are routed as a `Tapped`.
+  ATs that simulate a physical click at coordinates hit the canvas directly and work as well.
+- Opinion: back-port to Blazor — one CSS rule on `.xaml-a11y-element` (`pointer-events: none`) plus keeping
+  `tabindex`/`@onclick`/`@onkeydown` as they are; removes the hover limitation with no other change.
+
+### Default roles per class
+- **C#**: opt-in per control (`AccessibilityRole` null by default), `SkiaLabel` only syncs `AccessibilityLabel`.
+- **React**: same opt-in, plus `SkiaLabel.DefaultAccessibilityRole` / `SkiaButton.DefaultAccessibilityRole` statics
+  (unset by default) so an app can make every label/button accessible in two lines; `AccessibilityLabel` falls
+  back to the control text, `AccessibilityCanInteract` to "has a Tapped handler".
+- Opinion: worth back-porting as static defaults on `SkiaLabel`/`SkiaButton` — keeps the opt-in contract and gives
+  "readable labels" without touching every control.
+
+### Nodes pruned instead of unregistered
+- **C#**: controls unregister on detach/dispose/visibility change.
+- **React**: the snapshot rebuild drops nodes without a `Superview`, invisible, or fully outside the canvas
+  (off-screen scroll content stays out of the tab order); rects are re-read from `DrawingRect`, so they follow
+  scrolling. Behavioural difference: a removed node can linger up to `MinUpdateIntervalMs` in the DOM.
+
 ## Rendering
 
 ### Redraw synchronously inside the resize callback

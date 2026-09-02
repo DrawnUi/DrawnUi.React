@@ -46,11 +46,17 @@ export class SkiaButton extends SkiaLayout {
     this.frame.HorizontalOptions = "Fill";
     this.frame.VerticalOptions = "Fill";
     this.label.Tag = "BtnText";
+    this.label.AccessibilityRole = "presentation"; // the button is the accessible node, not its inner label (C# MainLabel.AccessibilityRole = null)
     this.label.HorizontalOptions = "Center";
     this.label.VerticalOptions = "Center";
     this.AddSubView(this.frame);
     this.AddSubView(this.label);
   }
+
+  /** Set to `Aria.RoleButton` to expose every button (React extension). */
+  static override DefaultAccessibilityRole?: string;
+  protected override DefaultAccessibilityLabel(): string | undefined { return this.Text || undefined; }
+  protected override DefaultAccessibilityCanInteract(): boolean { return !this.IsDisabled; }
 
   /** The button's own BackgroundColor/CornerRadius/Stroke are the frame's; the button itself paints nothing. */
   protected override PaintBackground(): void {}

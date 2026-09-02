@@ -2,6 +2,7 @@ import type { GrDirectContext, Surface, WebGLContextHandle } from "canvaskit-was
 import type { CachedObject, SkiaControl } from "./SkiaControl";
 import type { AnimatorBase } from "./Animators";
 import { Super } from "./Super";
+import { SkiaAccessibilityManager } from "./Accessibility";
 import { type Color, Colors, type RenderingModeType, SKRect } from "./Types";
 import {
   GestureEventProcessingInfo, type GesturesMode, SKPoint, SkiaGesturesParameters, TouchActionEventArgs,
@@ -27,6 +28,8 @@ export class Canvas {
   /** Frames per second over the last second of drawn frames. */
   FPS = 0;
   private frameTimes: number[] = [];
+  /** Registry + rate-limited snapshot of accessible controls, rendered by the DOM overlay (DrawnUi AccessibilityManager). */
+  readonly AccessibilityManager = new SkiaAccessibilityManager();
 
   private content?: SkiaControl;
   get Content(): SkiaControl | undefined { return this.content; }
@@ -126,6 +129,7 @@ export class Canvas {
       root.Arrange(new SKRect(0, 0, w, h), root.WidthRequest, root.HeightRequest, scale);
       root.Render({ Context: { Canvas: canvas, Surface: this.surface }, Destination: new SKRect(0, 0, w, h), Scale: scale });
     }
+    this.AccessibilityManager.OnFrameEnd(this.RenderingScale, this.Element.width, this.Element.height, () => this.Update());
     const now = performance.now();
     this.FrameTime = now - started;
     this.frameTimes.push(now);
