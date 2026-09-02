@@ -1,4 +1,4 @@
-import type { Surface } from "canvaskit-wasm";
+import type { GrDirectContext, Surface, WebGLContextHandle } from "canvaskit-wasm";
 import type { SkiaControl } from "./SkiaControl";
 import type { AnimatorBase } from "./Animators";
 import { Super } from "./Super";
@@ -33,6 +33,9 @@ export class Canvas {
   }
 
   private surface?: Surface;
+  /** GL context + GrContext live for the Canvas lifetime; only the on-screen surface is recreated on resize. */
+  private glHandle?: WebGLContextHandle;
+  private grContext?: GrDirectContext;
   private frameId = 0;
   private disposed = false;
   private readonly observer: ResizeObserver;
@@ -61,6 +64,27 @@ export class Canvas {
     this.surface = undefined;
   }
 
+  /** On-screen surface at the element's current pixel size, reusing the GL/GrContext when accelerated. */
+  private CreateSurface(w: number, h: number): Surface | undefined {
+    const CK = Super.CK;
+    if (this.RenderingMode === "Accelerated") {
+      if (!this.grContext) {
+        this.glHandle = CK.GetWebGLContext(this.Element);
+        this.grContext = (this.glHandle ? CK.MakeWebGLContext(this.glHandle) : null) ?? undefined;
+      }
+      if (this.grContext) {
+        const gl = CK.MakeOnScreenGLSurface(this.grContext, w, h, CK.ColorSpace.SRGB);
+        if (gl) return gl;
+      }
+    }
+    return CK.MakeSWCanvasSurface(this.Element) ?? undefined;
+  }
+
+  /**
+   * Resize = the browser wipes the bitmap when width/height change, so the new frame is drawn
+   * SYNCHRONOUSLY here. ResizeObserver callbacks run after layout and before paint, so the
+   * redrawn content lands in the same paint and no blank frame is ever shown while dragging.
+   */
   private OnResized(): void {
     const dpr = window.devicePixelRatio || 1;
     const w = Math.max(1, Math.round(this.Element.clientWidth * dpr));
@@ -70,11 +94,17 @@ export class Canvas {
     this.Element.width = w;
     this.Element.height = h;
     this.ReleaseSurface();
-    this.surface = (this.RenderingMode === "Accelerated"
-      ? Super.CK.MakeWebGLCanvasSurface(this.Element)
-      : null) ?? Super.CK.MakeSWCanvasSurface(this.Element) ?? undefined;
+    this.surface = this.CreateSurface(w, h);
     if (!this.surface) throw new Error("DrawnUi: cannot create surface");
-    this.Update();
+    this.DrawNow();
+  }
+
+  /** Draws one frame immediately (outside the rAF loop) and presents it. */
+  private DrawNow(): void {
+    const surface = this.surface;
+    if (!surface || this.disposed) return;
+    this.Draw(surface.getCanvas());
+    surface.flush();
   }
 
   private Draw(canvas: import("canvaskit-wasm").Canvas): void {
@@ -121,6 +151,9 @@ export class Canvas {
     this.observer.disconnect();
     this.Content = undefined;
     this.ReleaseSurface();
+    this.grContext?.delete();
+    this.grContext = undefined;
+    if (this.glHandle) { Super.CK.deleteContext(this.glHandle); this.glHandle = undefined; }
   }
 
   // ---- gestures: raw pointer -> TouchActionEventArgs -> recognized SkiaGesturesParameters -> queue ----
