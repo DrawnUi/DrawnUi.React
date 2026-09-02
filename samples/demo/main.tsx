@@ -17,6 +17,8 @@ import { LooksPage } from "./pages/LooksPage";
 import { SnappingPage } from "./pages/SnappingPage";
 import { AnimationsPage } from "./pages/AnimationsPage";
 import { ShellPage } from "./pages/ShellPage";
+import { EditorPage } from "./pages/EditorPage";
+import { KeyboardPage } from "./pages/KeyboardPage";
 import { Aria } from "drawnui-react";
 import { SkiaButton as SkiaButtonCtrl, SkiaLabel as SkiaLabelCtrl } from "drawnui-react/core";
 
@@ -48,8 +50,10 @@ const ROUTES = {
   snapping: () => <SnappingPage />,
   animations: () => <AnimationsPage />,
   shell: () => <ShellPage />,
+  editor: () => <EditorPage />,
+  keyboard: () => <KeyboardPage />,
 };
-const TITLES = { images: "Images", svg: "SVG", cells: "Recycled cells", shapes: "Shapes", text: "Text", layouts: "Layouts", a11y: "Accessibility", transforms: "Transforms", uneven: "Uneven cells", looks: "Common Controls", snapping: "Carousel & Drawer", animations: "Lottie & GIF", shell: "Shell" };
+const TITLES = { images: "Images", svg: "SVG", cells: "Recycled cells", shapes: "Shapes", text: "Text", layouts: "Layouts", a11y: "Accessibility", transforms: "Transforms", uneven: "Uneven cells", looks: "Common Controls", snapping: "Carousel & Drawer", animations: "Lottie & GIF", shell: "Shell", editor: "Editor", keyboard: "Keyboard Input" };
 
 function App() {
   const [view, setView] = useState<CanvasView | null>(null);

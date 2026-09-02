@@ -14,6 +14,8 @@ const SAMPLES: { route: string; title: string; text: string }[] = [
   { route: "snapping", title: "Carousel & Drawer", text: "SkiaCarousel (swipe, SidesOffset peek, SelectedIndex) and SkiaDrawer (drag from an edge, snap by velocity)" },
   { route: "animations", title: "Lottie & GIF", text: "SkiaLottie (Skottie: AutoPlay, Repeat, SpeedRatio, IsOn, ColorTint) and SkiaGif frames on the canvas frame loop" },
   { route: "shell", title: "Shell", text: "SkiaShell — page transitions, OpenPopupAsync, PushModalAsync (drawer), ShowToast" },
+  { route: "editor", title: "Editor", text: "SkiaEditor — drawn text input: caret, selection, placeholder, password, multiline, ControlStyle looks" },
+  { route: "keyboard", title: "Keyboard Input", text: "KeyboardManager — window-level KeyDown / KeyUp / KeyChar with modifier state, the Blazor sandbox probe" },
   { route: "transforms", title: "Transforms", text: "Rotation, Scale, Skew, Translation, Opacity — hit-testing through them, *ToAsync animations" },
   { route: "a11y", title: "Accessibility", text: "ARIA overlay over the canvas — roles, labels, hints, toggles, live regions, keyboard" },
 ];

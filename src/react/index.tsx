@@ -18,6 +18,7 @@ import type { SkiaButton as SkiaButtonCtrl } from "../controls/SkiaButton";
 import type { SkiaImage as SkiaImageCtrl } from "../controls/SkiaImage";
 import type { SkiaSvg as SkiaSvgCtrl } from "../controls/SkiaSvg";
 import type { SkiaBackdrop as SkiaBackdropCtrl } from "../controls/SkiaBackdrop";
+import type { SkiaEditor as SkiaEditorCtrl } from "../controls/SkiaEditor";
 import type { SkiaLottie as SkiaLottieCtrl } from "../controls/SkiaLottie";
 import type { SkiaGif as SkiaGifCtrl } from "../controls/SkiaGif";
 import { SkiaScroll as SkiaScrollCtrl } from "../controls/SkiaScroll";
@@ -29,7 +30,7 @@ import { createDrawnRoot } from "./reconciler";
 /** Public settable properties of a control become its JSX props, same PascalCase names as C#. */
 type PropsOf<T> = Partial<{
   // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-  [K in keyof T as T[K] extends Function ? never : K extends "Children" | "Views" | "Parent" | "Spans" | "GridStructure" | "AccessibilityId" | "IsAccessibilityElement" | "HasTransform" | "RenderTransformMatrix" | "RenderObjectPrevious" | "LastMeasuredIndex" | "ItemsInsertedAtStart" | "UsingControlStyle" | "Track" | "Thumb" | "FrameOn" | "FrameOff" | "ViewCheckOn" | "ViewOn" | "ViewText" | "Ratio" | "StartThumbX" | "EndThumbX" | "SnapPoints" | "CurrentPosition" | "CurrentSnap" | "ContentOffsetBounds" | "InTransition" | "CanAnimate" | "MaxIndex" | "ChildrenTotal" | "IsAtStart" | "IsAtEnd" | "ScrollProgress" | "ScrollAmount" | "TransitionProgress" | "LastIndex" | "ChildrenCount" | "Horizontal" | "Animator" | "Animation" | "IsPlaying" | "PlayWhenAvailable" | "TotalFrames" | "HasEffects" | "IsDisposed" | "Rects" | "HasTapHandler" | "HasDecorations" | "LinesCount" | "Superview" | "DrawingRect" | "MeasuredSize" | "RenderingScale" | "NeedMeasure" | "_superview" | "HitBoxAuto" | "TotalDown" | "TotalTapped" | "TouchDown" | "PostAnimators" | "LoadedSource" | "IsLoading" | "DisplayRect" | "AspectScale" | "Content" | "ContentSize" | "ContentOffsetBounds" | "OverscrollDistance" | "OverScrolled" | "IsUserPanning" | "IsUserFocused" | "IsScrolling" | "IsTemplated" | "FirstVisibleIndex" | "LastVisibleIndex" | "DebugString" | "ChildrenFactory" | "ContextIndex" | "RenderObject" | "UsingCacheType" ? never : K]: T[K];
+  [K in keyof T as T[K] extends Function ? never : K extends "Children" | "Views" | "Parent" | "Spans" | "GridStructure" | "AccessibilityId" | "IsAccessibilityElement" | "HasTransform" | "RenderTransformMatrix" | "RenderObjectPrevious" | "LastMeasuredIndex" | "ItemsInsertedAtStart" | "UsingControlStyle" | "Track" | "Thumb" | "FrameOn" | "FrameOff" | "ViewCheckOn" | "ViewOn" | "ViewText" | "Ratio" | "StartThumbX" | "EndThumbX" | "SnapPoints" | "CurrentPosition" | "CurrentSnap" | "ContentOffsetBounds" | "InTransition" | "CanAnimate" | "MaxIndex" | "ChildrenTotal" | "IsAtStart" | "IsAtEnd" | "ScrollProgress" | "ScrollAmount" | "TransitionProgress" | "LastIndex" | "ChildrenCount" | "Horizontal" | "Animator" | "Animation" | "IsPlaying" | "PlayWhenAvailable" | "TotalFrames" | "HasEffects" | "IsDisposed" | "Label" | "IsMultiline" | "HasSelection" | "LayoutVersion" | "LinesCount" | "MeasuredLineHeight" | "Focused" | "Rects" | "HasTapHandler" | "HasDecorations" | "LinesCount" | "Superview" | "DrawingRect" | "MeasuredSize" | "RenderingScale" | "NeedMeasure" | "_superview" | "HitBoxAuto" | "TotalDown" | "TotalTapped" | "TouchDown" | "PostAnimators" | "LoadedSource" | "IsLoading" | "DisplayRect" | "AspectScale" | "Content" | "ContentSize" | "ContentOffsetBounds" | "OverscrollDistance" | "OverScrolled" | "IsUserPanning" | "IsUserFocused" | "IsScrolling" | "IsTemplated" | "FirstVisibleIndex" | "LastVisibleIndex" | "DebugString" | "ChildrenFactory" | "ContextIndex" | "RenderObject" | "UsingCacheType" ? never : K]: T[K];
 }>;
 
 /** `ref` receives the engine control instance (react-reconciler getPublicInstance). */
@@ -54,6 +55,8 @@ export const SkiaImage = "SkiaImage" as unknown as FC<LeafProps<SkiaImageCtrl>>;
 export const SkiaSvg = "SkiaSvg" as unknown as FC<LeafProps<SkiaSvgCtrl>>;
 /** Blurs / tints what is painted beneath it (C# SkiaBackdrop); children draw first. */
 export const SkiaBackdrop = "SkiaBackdrop" as unknown as FC<LayoutProps<SkiaBackdropCtrl>>;
+/** Drawn text input (C# SkiaEditor): Text, PlaceholderText, MaxLines, IsPassword, ControlStyle, TextChanged / TextSubmitted. */
+export const SkiaEditor = "SkiaEditor" as unknown as FC<LeafProps<SkiaEditorCtrl>>;
 export const SkiaLottie = "SkiaLottie" as unknown as FC<LeafProps<SkiaLottieCtrl>>;
 export const SkiaGif = "SkiaGif" as unknown as FC<LeafProps<SkiaGifCtrl>>;
 export const SkiaScroll = "SkiaScroll" as unknown as FC<LayoutProps<SkiaScrollCtrl>>;

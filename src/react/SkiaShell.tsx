@@ -458,6 +458,7 @@ export const SkiaShell = forwardRef<ShellNavigation, SkiaShellProps>(function Sk
             <SkiaLayer HeightRequest={NavBarHeight} BackgroundColor={NavBarColor}>
               <SkiaButton Text="‹  Back" BackgroundColor="#00000000" TextColor="#6EA8FE" FontSize={16} VerticalOptions="Center" Margin={new Thickness(8, 0)} ApplyEffect="Ripple" Tapped={() => void GoBackAsync()} AccessibilityRole="button" AccessibilityLabel="Back" />
               <SkiaLabel Text={Titles?.[r] ?? r} FontSize={18} FontFamily="FontTextBold" TextColor={Colors.White} HorizontalOptions="Fill" HorizontalTextAlignment="Center" VerticalOptions="Center" MaxLines={1} Margin={new Thickness(96, 0)} AccessibilityRole="heading" />
+              <SkiaButton Text="Home" BackgroundColor="#00000000" TextColor="#6EA8FE" FontSize={16} HorizontalOptions="End" VerticalOptions="Center" Margin={new Thickness(0, 0, 8, 0)} ApplyEffect="Ripple" Tapped={() => void PopToRootAsync()} AccessibilityRole="button" AccessibilityLabel="Home" />
               <SkiaLayer HeightRequest={1} VerticalOptions="End" BackgroundColor="#343A40" />
             </SkiaLayer>
           </PageHost>

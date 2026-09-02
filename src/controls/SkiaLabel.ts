@@ -14,6 +14,11 @@ interface SpanFonts { Key: string; Main: Font; Fallbacks: Font[]; Ascent: number
 interface TextRun { Text: string; Font: Font; Width: number; Span?: TextSpan; Fonts: SpanFonts }
 /** One laid-out line: runs, total advance, max ascent above / descent below the baseline (pixels). */
 interface TextLine { Runs: TextRun[]; Width: number; Ascent: number; Descent: number }
+
+/** One code point of the laid-out text: its UTF-16 index/length in Text and its box in pixels relative to DrawingRect. */
+export interface GlyphBox { Index: number; Length: number; Line: number; Left: number; Top: number; Width: number; Height: number }
+/** A laid-out line: first text index, box in pixels relative to DrawingRect. */
+export interface LineBox { Line: number; Start: number; End: number; Left: number; Top: number; Width: number; Height: number }
 /** A wrap unit: a word (or glued span fragment) with its style. */
 interface Token { Text: string; Fonts: SpanFonts; Span?: TextSpan; SpaceBefore: boolean; TrailingSpace?: boolean }
 
@@ -338,11 +343,82 @@ export class SkiaLabel extends SkiaControl {
     let width = 0;
     for (const l of this.lines) width = Math.max(width, l.Width);
     const extra = this.EffectsExtra(scale);
+    this.LayoutVersion++;
     return ScaledSize.FromPixels(Math.ceil(width + extra.W) + px, Math.ceil(this.BlockHeight() + extra.H) + py, scale);
   }
 
   /** C# GradientByLines: FillGradient spans each line's bounds (default) instead of the whole text block. */
   GradientByLines = true;
+  /** C# KeepSpacesOnLineBreaks / NeedsGlyphPositions: accepted; glyph boxes are always available through GetGlyphBoxes. */
+  KeepSpacesOnLineBreaks = false;
+  NeedsGlyphPositions = false;
+  /** Bumped on every measure: consumers cache GetGlyphBoxes() against it. */
+  LayoutVersion = 0;
+  /** Height of the first laid-out line in pixels (C# MeasuredLineHeight); 0 before the first measure. */
+  get MeasuredLineHeight(): number { return this.lines.length ? this.LineHeightPx(this.lines[0]) : 0; }
+
+  /** Line origins relative to DrawingRect, same alignment math as Paint. */
+  private LineGeometry(): { x: number; y: number; w: number; h: number; text: string }[] {
+    const scale = this.RenderingScale, d = this.DrawingRect, p = this.padding;
+    const left = p.Left * scale, right = d.Width - p.Right * scale, top = p.Top * scale, bottom = d.Height - p.Bottom * scale;
+    const extra = this.EffectsExtra(scale);
+    const blockH = this.BlockHeight() + extra.H;
+    let y = top;
+    if (this.verticalTextAlignment === "Center") y = top + (bottom - top - blockH) / 2;
+    else if (this.verticalTextAlignment === "End") y = bottom - blockH;
+    y += extra.Stroke / 2;
+    const out: { x: number; y: number; w: number; h: number; text: string }[] = [];
+    for (const line of this.lines) {
+      const lh = this.LineHeightPx(line);
+      const lineW = line.Width + extra.W;
+      let x = left;
+      if (this.horizontalTextAlignment === "Center") x = left + (right - left - lineW) / 2;
+      else if (this.horizontalTextAlignment === "End") x = right - lineW;
+      x += extra.Stroke / 2;
+      out.push({ x, y, w: line.Width, h: lh, text: line.Runs.map((r) => r.Text).join("") });
+      y += lh * this.lineSpacing;
+    }
+    return out;
+  }
+
+  /** Laid-out lines with their text index range (a wrapped-away space or line break sits between two lines). */
+  GetLineBoxes(): LineBox[] {
+    const geo = this.LineGeometry();
+    const out: LineBox[] = [];
+    let cursor = 0;
+    geo.forEach((g, i) => {
+      let start = g.text.length ? this.text.indexOf(g.text, cursor) : cursor;
+      if (start < 0) start = cursor;
+      const end = start + g.text.length;
+      out.push({ Line: i, Start: start, End: end, Left: g.x, Top: g.y, Width: g.w, Height: g.h });
+      cursor = end;
+    });
+    return out;
+  }
+
+  /** Every code point of the laid-out text with its box (editor caret / selection / hit testing). */
+  GetGlyphBoxes(): GlyphBox[] {
+    const out: GlyphBox[] = [];
+    const geo = this.LineGeometry();
+    let cursor = 0;
+    this.lines.forEach((line, li) => {
+      const g = geo[li];
+      let start = g.text.length ? this.text.indexOf(g.text, cursor) : cursor;
+      if (start < 0) start = cursor;
+      let x = g.x, index = start;
+      for (const run of line.Runs) {
+        const cps = Array.from(run.Text);
+        const widths = run.Font.getGlyphWidths(run.Font.getGlyphIDs(run.Text, cps.length));
+        cps.forEach((cp, k) => {
+          const w = widths[k] ?? 0;
+          out.push({ Index: index, Length: cp.length, Line: li, Left: x, Top: g.y, Width: w, Height: g.h });
+          x += w; index += cp.length;
+        });
+      }
+      cursor = start + g.text.length;
+    });
+    return out;
+  }
   /** Outline around the glyphs, drawn under the fill (C# StrokeColor / StrokeWidth in points; Transparent = none). */
   StrokeColor: Color = Colors.Transparent;
   StrokeWidth = 1;
