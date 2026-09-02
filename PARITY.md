@@ -46,6 +46,12 @@ Updated whenever the port deliberately diverges or finds something worth back-po
   at the main font's width). Opinion: worth back-porting to .NET — a single fallback cannot cover arrows (Math) and
   ♥/★ (Symbols 2) at once, which is exactly the split `AddSymbols()` ships.
 
+### Markdown parser
+- C# `SkiaRichLabel` parses with CommonMark.NET; React ships a small hand-written parser (headings, lists, fenced
+  code, inline emphasis/code/links, escapes). Same span output rules (`SpanWithAttributes`), same style properties.
+  Code blocks: C# paints `ParagraphColor` across the full line width, React paints the span background only.
+  Not worth a dependency for the demo; swap in a CommonMark library if edge cases matter.
+
 ### Span decorations use estimated metrics
 - C# reads `UnderlinePosition` / `StrikeoutPosition` / `XHeight` from the SKFont metrics and falls back to
   1 px / half x-height when a face lacks them. CanvasKit exposes none of the three, so React always uses the

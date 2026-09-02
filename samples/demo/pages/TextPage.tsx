@@ -1,5 +1,21 @@
 import { useState } from "react";
-import { Colors, SkiaLabel, SkiaScroll, SkiaShape, SkiaStack, SkiaWrap, TextSpan, Thickness } from "drawnui-react";
+import { Colors, SkiaLabel, SkiaRichLabel, SkiaScroll, SkiaShape, SkiaStack, SkiaWrap, TextSpan, Thickness } from "drawnui-react";
+
+const MARKDOWN = `# Heading 1
+## Heading 2
+### Heading 3
+A paragraph with **bold**, *italic*, ~~strikethrough~~, \`inline code\` and a [tappable link](https://drawnui.net).
+Soft line breaks stay inside the paragraph.
+
+- Bullet item with **bold**
+- Second bullet
+1. Numbered item
+2. Another one, *emphasised*
+
+\`\`\`
+const label = new SkiaRichLabel();
+label.Text = "# Hello";
+\`\`\``;
 
 const LOREM = "DrawnUI draws every pixel itself: text is shaped and rasterized by Skia, so a label wraps by words, respects MaxLines with an ellipsis, aligns horizontally and vertically, and never leaves the canvas for a native view. This paragraph is long on purpose so it wraps across several lines at whatever width the layout gives it.";
 
@@ -17,6 +33,7 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
 /** SkiaLabel text engine: wrapping, MaxLines, alignment, spacing, weights, transforms. */
 export function TextPage() {
   const [tapped, setTapped] = useState("nothing yet");
+  const [link, setLink] = useState("none");
   return (
     <SkiaScroll Orientation="Vertical">
       <SkiaStack Spacing={16} Padding={new Thickness(16)} HorizontalOptions="Center" MaximumWidthRequest={720}>
@@ -47,6 +64,12 @@ export function TextPage() {
             <TextSpan Text=" that wraps with the rest of the paragraph like any other word." />
           </SkiaLabel>
           <SkiaLabel Text={"Last span tap: " + tapped} FontSize={13} TextColor="#ADB5BD" />
+        </Card>
+
+        <Card title="SkiaRichLabel — markdown in Text, rendered as spans">
+          <SkiaRichLabel FontSize={15} TextColor="#DEE2E6" HorizontalOptions="Fill" FontFamilyFallback="FontSymbols,FontSymbols2" LinkTapped={(_, url) => setLink(url)}
+            Text={MARKDOWN} />
+          <SkiaLabel Text={"Last link tapped: " + link} FontSize={13} TextColor="#ADB5BD" />
         </Card>
 
         <Card title="MaxLines={2} · TailTruncation (default)">

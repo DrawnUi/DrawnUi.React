@@ -16,6 +16,8 @@ export class TextSpan {
   readonly Rects: SKRect[] = [];
 
   Tapped?: (span: TextSpan, e: ControlTappedEventArgs) => void;
+  /** Free payload (SkiaRichLabel stores the link url here). */
+  Tag?: string;
   /** Listen to taps even without a Tapped handler. */
   ForceCaptureInput = false;
 

@@ -49,6 +49,7 @@ export class DrawnUiBuilder {
       if (!weights) { weights = new Map(); Super.Fonts.set(f.Alias, weights); }
       weights.set(f.Weight, face);
       Super.DefaultTypeface ??= face;
+      if (!Super.DefaultFontAlias) Super.DefaultFontAlias = f.Alias;
     }
     Super.DefaultTypeface ??= Super.CK.Typeface.GetDefault() ?? undefined;
   }
@@ -94,16 +95,24 @@ export class Super {
   }
 
   /** Typeface for an alias at a weight: exact, else the nearest registered weight, else the default face. */
+  /** Alias of the first registered font: what an empty FontFamily resolves to (weights included). */
+  static DefaultFontAlias = "";
+
   static GetTypeface(alias?: string, weight = 0): Typeface | null {
-    const weights = alias ? Super.Fonts.get(alias) : undefined;
+    return Super.ResolveTypeface(alias, weight).Typeface;
+  }
+
+  /** Nearest registered weight of the alias (empty alias = the first registered family); reports the weight actually used. */
+  private static ResolveTypeface(alias: string | undefined, weight: number): { Typeface: Typeface | null; Weight: number } {
+    const weights = Super.Fonts.get(alias || Super.DefaultFontAlias);
+    const target = weight > 0 ? weight : 400;
     if (weights && weights.size > 0) {
-      const target = weight > 0 ? weight : 400;
-      if (weights.has(target)) return weights.get(target)!;
+      if (weights.has(target)) return { Typeface: weights.get(target)!, Weight: target };
       let best: number | undefined;
       for (const w of weights.keys()) if (best === undefined || Math.abs(w - target) < Math.abs(best - target)) best = w;
-      return weights.get(best!)!;
+      return { Typeface: weights.get(best!)!, Weight: best! };
     }
-    return Super.DefaultTypeface ?? null;
+    return { Typeface: Super.DefaultTypeface ?? null, Weight: 400 };
   }
 
   /** Shared Font (typeface + pixel size + synthetic italic), cached across all labels. */
@@ -111,9 +120,12 @@ export class Super {
     const key = `${alias}|${weight}|${italic ? 1 : 0}|${sizePx}`;
     let font = Super.fontCache.get(key);
     if (!font) {
-      font = new Super.CK.Font(Super.GetTypeface(alias, weight), sizePx);
+      const resolved = Super.ResolveTypeface(alias, weight);
+      font = new Super.CK.Font(resolved.Typeface, sizePx);
       font.setSubpixel(true);
       if (italic) font.setSkewX(-0.25);
+      // no bold face registered: synthetic bold, like C# Font.Embolden = IsBold
+      if (weight >= 600 && resolved.Weight < 600) font.setEmbolden(true);
       Super.fontCache.set(key, font);
     }
     return font;

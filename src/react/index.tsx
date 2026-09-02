@@ -4,6 +4,7 @@ import { Canvas as CanvasView } from "../core/Canvas";
 import type { SkiaControl } from "../core/SkiaControl";
 import type { SkiaLabel as SkiaLabelCtrl } from "../controls/SkiaLabel";
 import type { TextSpan as TextSpanCtrl } from "../controls/TextSpan";
+import type { SkiaRichLabel as SkiaRichLabelCtrl } from "../controls/SkiaRichLabel";
 import type { SkiaLayout as SkiaLayoutCtrl } from "../controls/SkiaLayout";
 import type { SkiaHotspot as SkiaHotspotCtrl } from "../controls/SkiaHotspot";
 import type { SkiaButton as SkiaButtonCtrl } from "../controls/SkiaButton";
@@ -33,6 +34,8 @@ export const SkiaLayer = "SkiaLayer" as unknown as FC<LayoutProps<SkiaLayoutCtrl
 export const SkiaWrap = "SkiaWrap" as unknown as FC<LayoutProps<SkiaLayoutCtrl>>;
 export const SkiaGrid = "SkiaGrid" as unknown as FC<LayoutProps<SkiaLayoutCtrl>>;
 export const SkiaLabel = "SkiaLabel" as unknown as FC<LayoutProps<SkiaLabelCtrl>>;
+/** Markdown label (C# SkiaRichLabel): Text is markdown, rendered as spans; LinkTapped for [text](url). */
+export const SkiaRichLabel = "SkiaRichLabel" as unknown as FC<LeafProps<SkiaRichLabelCtrl>>;
 /** Child of <SkiaLabel>: a styled fragment (C# TextSpan). */
 export const TextSpan = "TextSpan" as unknown as FC<LeafProps<TextSpanCtrl>>;
 export const SkiaHotspot = "SkiaHotspot" as unknown as FC<LeafProps<SkiaHotspotCtrl>>;

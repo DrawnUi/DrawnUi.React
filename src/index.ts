@@ -10,6 +10,7 @@ export * from "./controls/SkiaLayout";
 export * from "./core/Accessibility";
 export * from "./controls/SkiaLabel";
 export * from "./controls/TextSpan";
+export * from "./controls/SkiaRichLabel";
 export * from "./controls/SkiaHotspot";
 export * from "./controls/SkiaShape";
 export * from "./controls/SkiaButton";
