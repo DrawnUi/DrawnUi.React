@@ -43,7 +43,7 @@ const ROUTES = {
   uneven: () => <UnevenCellsPage />,
   looks: () => <LooksPage />,
 };
-const TITLES = { images: "Images", svg: "SVG", cells: "Recycled cells", shapes: "Shapes", text: "Text", layouts: "Layouts", a11y: "Accessibility", transforms: "Transforms", uneven: "Uneven cells", looks: "Looks" };
+const TITLES = { images: "Images", svg: "SVG", cells: "Recycled cells", shapes: "Shapes", text: "Text", layouts: "Layouts", a11y: "Accessibility", transforms: "Transforms", uneven: "Uneven cells", looks: "Platform Looks" };
 
 function App() {
   const [view, setView] = useState<CanvasView | null>(null);
