@@ -15,7 +15,9 @@ await Super.UseDrawnUi()
   .ConfigureFonts((fonts) => fonts
     .AddFont("fonts/OpenSans-Regular.ttf", "FontText")
     .AddFont("fonts/OpenSans-Semibold.ttf", "FontText", 600) // FontAttributes="Bold" / FontWeight={600} pick this face
-    .AddFont("fonts/OpenSans-Semibold.ttf", "FontTextBold"))
+    .AddFont("fonts/OpenSans-Semibold.ttf", "FontTextBold")
+    .AddSymbols() // FontSymbols / FontSymbols2 (arrows, math, misc) shipped subsets, like DrawnUi.Blazor
+    .AddEmojis()) // FontEmoji (Noto Color Emoji faces + hands subset)
   .BuildAsync();
 
 const ROUTES = {

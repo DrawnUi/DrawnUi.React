@@ -1,4 +1,4 @@
-import { Colors, SkiaLabel, SkiaRow, SkiaScroll, SkiaShape, SkiaStack, Thickness } from "drawnui-react";
+import { Colors, SkiaLabel, SkiaScroll, SkiaShape, SkiaStack, SkiaWrap, Thickness } from "drawnui-react";
 import { CornerRadius, SkiaPoint } from "drawnui-react/core";
 
 const HEART = "M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z";
@@ -24,7 +24,7 @@ export function ShapesPage() {
         <SkiaLabel Text="SkiaShape" FontSize={24} TextColor={Colors.White} HorizontalOptions="Center" />
         <SkiaLabel Text="Stroke is drawn inside the bounds; children are clipped to the shape." FontSize={13} TextColor={Colors.LightGray} HorizontalOptions="Center" />
 
-        <SkiaRow Spacing={16} HorizontalOptions="Center">
+        <SkiaWrap Spacing={16} HorizontalOptions="Center" MaximumWidthRequest={680}>
           <Demo title='Rectangle CornerRadius={16}'>
             <SkiaShape Type="Rectangle" CornerRadius={16} BackgroundColor="#0D6EFD" StrokeColor={Colors.White} StrokeWidth={3} WidthRequest={110} HeightRequest={70} HorizontalOptions="Center" VerticalOptions="Center" />
           </Demo>
@@ -37,9 +37,6 @@ export function ShapesPage() {
           <Demo title="Ellipse">
             <SkiaShape Type="Ellipse" BackgroundColor="#DC3545" WidthRequest={120} HeightRequest={70} HorizontalOptions="Center" VerticalOptions="Center" />
           </Demo>
-        </SkiaRow>
-
-        <SkiaRow Spacing={16} HorizontalOptions="Center">
           <Demo title="Arc Value1=-90 Value2=270">
             <SkiaShape Type="Arc" Value1={-90} Value2={270} StrokeColor="#0DCAF0" StrokeWidth={8} WidthRequest={80} LockRatio={1} HorizontalOptions="Center" VerticalOptions="Center" />
           </Demo>
@@ -52,9 +49,6 @@ export function ShapesPage() {
           <Demo title="Path (SVG PathData)">
             <SkiaShape Type="Path" PathData={HEART} BackgroundColor="#E83E8C" WidthRequest={80} LockRatio={1} HorizontalOptions="Center" VerticalOptions="Center" />
           </Demo>
-        </SkiaRow>
-
-        <SkiaRow Spacing={16} HorizontalOptions="Center">
           <Demo title="Hollow: ClipBackgroundColor">
             <SkiaShape Type="Rectangle" CornerRadius={12} ClipBackgroundColor BackgroundColor="#0D6EFD" StrokeColor="#0D6EFD" StrokeWidth={3} WidthRequest={110} HeightRequest={70} HorizontalOptions="Center" VerticalOptions="Center" />
           </Demo>
@@ -70,7 +64,7 @@ export function ShapesPage() {
           <Demo title="Gradient fill">
             <SkiaShape Type="Rectangle" CornerRadius={35} FillGradient={{ Type: "Linear", Colors: ["#FF6B6B", "#FFD93D", "#4ECDC4"], EndXRatio: 1, EndYRatio: 0 }} WidthRequest={120} HeightRequest={70} HorizontalOptions="Center" VerticalOptions="Center" />
           </Demo>
-        </SkiaRow>
+        </SkiaWrap>
       </SkiaStack>
     </SkiaScroll>
   );

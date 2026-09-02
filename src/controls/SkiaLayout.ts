@@ -3,7 +3,7 @@ import { ViewsAdapter } from "../core/ViewsAdapter";
 import { type LayoutType, type MeasuringStrategy, type RecyclingTemplate, SKRect, ScaledSize, type ShapeType, Thickness } from "../core/Types";
 
 /**
- * Mirrors DrawnUi SkiaLayout (Absolute / Column / Row).
+ * Mirrors DrawnUi SkiaLayout (Absolute / Column / Row / Wrap).
  * Column/Row give children an infinite main axis (MAUI stack semantics: Fill on the main axis = auto-sized).
  *
  * Templated mode (ItemsSource + ItemTemplate) is a Column only: cells are created through the ViewsAdapter for
@@ -106,6 +106,8 @@ export class SkiaLayout extends SkiaControl {
     const gap = this.Spacing * scale;
     let cw = 0, ch = 0, n = 0;
 
+    if (this.Type === "Wrap") { const s = this.MeasureWrap(w, scale); return ScaledSize.FromPixels(s.w + px, s.h + py, scale); }
+
     for (const v of this.views) {
       if (!v.IsVisible) continue;
       let s: ScaledSize;
@@ -118,6 +120,29 @@ export class SkiaLayout extends SkiaControl {
     if (this.Type === "Column") ch += gaps;
     if (this.Type === "Row") cw += gaps;
     return ScaledSize.FromPixels(cw + px, ch + py, scale);
+  }
+
+  /** Wrap rows computed by the last measure: [childIndex, x, y, w, h] in pixels relative to the padded box. */
+  private wrapSlots: { view: SkiaControl; x: number; y: number; w: number; h: number }[] = [];
+
+  /** Flow children left to right, wrapping when the row overflows; Spacing applies between items and rows. */
+  private MeasureWrap(width: number, scale: number): { w: number; h: number } {
+    const gap = this.Spacing * scale;
+    this.wrapSlots = [];
+    let x = 0, y = 0, rowH = 0, maxW = 0;
+    const row: typeof this.wrapSlots = [];
+    const finishRow = () => { for (const s of row) s.h = rowH; row.length = 0; };
+    for (const v of this.views) {
+      if (!v.IsVisible) continue;
+      const s = v.Measure(width, Infinity, scale);
+      const cw = s.Pixels.Width, ch = s.Pixels.Height;
+      if (x > 0 && isFinite(width) && x + cw > width) { finishRow(); y += rowH + gap; x = 0; rowH = 0; }
+      const slot = { view: v, x, y, w: cw, h: ch };
+      this.wrapSlots.push(slot); row.push(slot);
+      x += cw + gap; rowH = Math.max(rowH, ch); maxW = Math.max(maxW, x - gap);
+    }
+    finishRow();
+    return { w: maxW, h: this.wrapSlots.length ? y + rowH : 0 };
   }
 
   /** Templated Column: content = padding + sum of item heights + gaps; width = the constraint (cells fill). */
@@ -182,6 +207,11 @@ export class SkiaLayout extends SkiaControl {
     const inner = new SKRect(r.Left + p.Left * scale, r.Top + p.Top * scale, r.Right - p.Right * scale, r.Bottom - p.Bottom * scale);
     const gap = this.Spacing * scale;
     let cursor = this.Type === "Row" ? inner.Left : inner.Top;
+
+    if (this.Type === "Wrap") {
+      for (const s of this.wrapSlots) s.view.Arrange(SKRect.Create(inner.Left + s.x, inner.Top + s.y, s.w, s.h), s.view.WidthRequest, s.view.HeightRequest, scale);
+      return;
+    }
 
     for (const v of this.views) {
       if (!v.IsVisible) continue;
@@ -264,4 +294,9 @@ export class SkiaRow extends SkiaLayout {
 /** SkiaLayout Type=Absolute + HorizontalOptions=Fill (DrawnUi alias). */
 export class SkiaLayer extends SkiaLayout {
   constructor() { super(); this.Type = "Absolute"; this.HorizontalOptions = "Fill"; }
+}
+
+/** SkiaLayout Type=Wrap + HorizontalOptions=Fill (DrawnUi alias): responsive flow of fixed-size children. */
+export class SkiaWrap extends SkiaLayout {
+  constructor() { super(); this.Type = "Wrap"; this.HorizontalOptions = "Fill"; }
 }

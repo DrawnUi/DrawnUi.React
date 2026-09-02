@@ -13,7 +13,7 @@ export function RootPage() {
   const shell = useShell();
   return (
     <SkiaScroll Orientation="Vertical">
-      <SkiaStack Spacing={24} Padding={new Thickness(24, 24, 24, 40)} HorizontalOptions="Center" WidthRequest={820}>
+      <SkiaStack Spacing={24} Padding={new Thickness(24, 24, 24, 40)} HorizontalOptions="Center" MaximumWidthRequest={820}>
         <SkiaSvg Source="images/drawnui.svg" WidthRequest={120} LockRatio={1} HorizontalOptions="Center" Margin={new Thickness(0, 16, 0, 0)} />
         <SkiaLabel Text="DrawnUI for React" FontSize={48} FontFamily="FontTextBold" TextColor={Colors.White} HorizontalOptions="Center" />
 
@@ -21,7 +21,7 @@ export function RootPage() {
         <SkiaLabel Text="Snippets" FontSize={32} TextColor="#DEE2E6" Margin={new Thickness(0, 8, 0, 0)} />
         {SAMPLES.map((s) => (
           <SkiaShape key={s.route} Type="Rectangle" CornerRadius={12} BackgroundColor="#2B3035" StrokeColor="#373B3E" StrokeWidth={1} AnimationTapped="Ripple" Tapped={() => void shell.GoToAsync(s.route)}>
-            <SkiaStack Spacing={6} Padding={new Thickness(24, 20)}>
+            <SkiaStack Spacing={6} Padding={new Thickness(24, 20, 56, 20)}>
               <SkiaLabel Text={s.title} FontSize={24} FontFamily="FontTextBold" TextColor={Colors.White} />
               <SkiaLabel Text={s.text} FontSize={14} TextColor="#ADB5BD" />
             </SkiaStack>

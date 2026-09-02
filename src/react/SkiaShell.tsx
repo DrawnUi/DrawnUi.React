@@ -67,7 +67,7 @@ export const SkiaShell = forwardRef<ShellNavigation, SkiaShellProps>(function Sk
         {route && (
           <SkiaLayer HeightRequest={NavBarHeight} BackgroundColor={NavBarColor}>
             <SkiaButton Text="‹  Back" BackgroundColor="#00000000" TextColor="#6EA8FE" FontSize={16} VerticalOptions="Center" Margin={new Thickness(8, 0)} ApplyEffect="Ripple" Tapped={() => void GoBackAsync()} />
-            <SkiaLabel Text={Titles?.[route] ?? route} FontSize={18} FontFamily="FontTextBold" TextColor={Colors.White} HorizontalOptions="Center" VerticalOptions="Center" />
+            <SkiaLabel Text={Titles?.[route] ?? route} FontSize={18} FontFamily="FontTextBold" TextColor={Colors.White} HorizontalOptions="Fill" HorizontalTextAlignment="Center" VerticalOptions="Center" MaxLines={1} Margin={new Thickness(96, 0)} />
             <SkiaLayer HeightRequest={1} VerticalOptions="End" BackgroundColor="#343A40" />
           </SkiaLayer>
         )}

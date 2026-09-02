@@ -4,7 +4,7 @@ import { ConcurrentRoot, DefaultEventPriority } from "react-reconciler/constants
 import type { Canvas } from "../core/Canvas";
 import { SkiaControl } from "../core/SkiaControl";
 import { SkiaLabel } from "../controls/SkiaLabel";
-import { SkiaLayer, SkiaLayout, SkiaRow, SkiaStack } from "../controls/SkiaLayout";
+import { SkiaLayer, SkiaLayout, SkiaRow, SkiaStack, SkiaWrap } from "../controls/SkiaLayout";
 import { SkiaHotspot } from "../controls/SkiaHotspot";
 import { SkiaButton } from "../controls/SkiaButton";
 import { SkiaImage } from "../controls/SkiaImage";
@@ -14,7 +14,7 @@ import { SkiaFrame, SkiaShape } from "../controls/SkiaShape";
 
 /** JSX tag name -> engine class. Add a control here to expose it to React. */
 export const Registry: Record<string, new () => SkiaControl> = {
-  SkiaLayout, SkiaStack, SkiaRow, SkiaLayer, SkiaLabel, SkiaHotspot, SkiaButton, SkiaImage, SkiaSvg, SkiaScroll, SkiaShape, SkiaFrame,
+  SkiaLayout, SkiaStack, SkiaRow, SkiaLayer, SkiaWrap, SkiaLabel, SkiaHotspot, SkiaButton, SkiaImage, SkiaSvg, SkiaScroll, SkiaShape, SkiaFrame,
 };
 
 type Props = Record<string, unknown>;

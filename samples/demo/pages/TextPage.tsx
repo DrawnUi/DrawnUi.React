@@ -1,4 +1,4 @@
-import { Colors, SkiaLabel, SkiaRow, SkiaScroll, SkiaShape, SkiaStack, Thickness } from "drawnui-react";
+import { Colors, SkiaLabel, SkiaScroll, SkiaShape, SkiaStack, SkiaWrap, Thickness } from "drawnui-react";
 
 const LOREM = "DrawnUI draws every pixel itself: text is shaped and rasterized by Skia, so a label wraps by words, respects MaxLines with an ellipsis, aligns horizontally and vertically, and never leaves the canvas for a native view. This paragraph is long on purpose so it wraps across several lines at whatever width the layout gives it.";
 
@@ -17,7 +17,7 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
 export function TextPage() {
   return (
     <SkiaScroll Orientation="Vertical">
-      <SkiaStack Spacing={16} Padding={new Thickness(16)} HorizontalOptions="Center" WidthRequest={720}>
+      <SkiaStack Spacing={16} Padding={new Thickness(16)} HorizontalOptions="Center" MaximumWidthRequest={720}>
         <SkiaLabel Text="SkiaLabel" FontSize={24} TextColor={Colors.White} HorizontalOptions="Center" />
 
         <Card title="Word wrap · HorizontalOptions=Fill">
@@ -33,25 +33,31 @@ export function TextPage() {
         </Card>
 
         <Card title="HorizontalTextAlignment Start / Center / End">
-          <SkiaRow Spacing={12} HorizontalOptions="Fill">
+          <SkiaWrap Spacing={12}>
             <SkiaLabel Text="Start aligned text wraps inside its own column" FontSize={13} TextColor="#DEE2E6" WidthRequest={215} HorizontalTextAlignment="Start" BackgroundColor="#22FFFFFF" Padding={new Thickness(6)} />
             <SkiaLabel Text="Center aligned text wraps inside its own column" FontSize={13} TextColor="#DEE2E6" WidthRequest={215} HorizontalTextAlignment="Center" BackgroundColor="#22FFFFFF" Padding={new Thickness(6)} />
             <SkiaLabel Text="End aligned text wraps inside its own column" FontSize={13} TextColor="#DEE2E6" WidthRequest={215} HorizontalTextAlignment="End" BackgroundColor="#22FFFFFF" Padding={new Thickness(6)} />
-          </SkiaRow>
+          </SkiaWrap>
         </Card>
 
         <Card title="VerticalTextAlignment in a 90pt box">
-          <SkiaRow Spacing={12} HorizontalOptions="Fill">
+          <SkiaWrap Spacing={12}>
             <SkiaLabel Text="Start" FontSize={14} TextColor="#DEE2E6" WidthRequest={215} HeightRequest={90} VerticalTextAlignment="Start" HorizontalTextAlignment="Center" BackgroundColor="#22FFFFFF" />
             <SkiaLabel Text="Center" FontSize={14} TextColor="#DEE2E6" WidthRequest={215} HeightRequest={90} VerticalTextAlignment="Center" HorizontalTextAlignment="Center" BackgroundColor="#22FFFFFF" />
             <SkiaLabel Text="End" FontSize={14} TextColor="#DEE2E6" WidthRequest={215} HeightRequest={90} VerticalTextAlignment="End" HorizontalTextAlignment="Center" BackgroundColor="#22FFFFFF" />
-          </SkiaRow>
+          </SkiaWrap>
+        </Card>
+
+        <Card title="FontFamilyFallback — symbols and emoji the text font lacks">
+          <SkiaLabel Text="Arrows ← ↑ → ↓ ⇒ ⇔  math ∑ ∞ ≈ ≠ ≤ ≥ √  misc ♥ ★ ✓ ✗ ⚠ via FontFamilyFallback=&quot;FontSymbols,FontSymbols2&quot;" FontSize={16} TextColor="#DEE2E6" FontFamilyFallback="FontSymbols,FontSymbols2" HorizontalOptions="Fill" />
+          <SkiaLabel Text="Emoji 😀 😎 🤖 😂 👍 🙌 via FontFamilyFallback=&quot;FontEmoji&quot; (Noto Color Emoji faces + hands subset)" FontSize={16} TextColor="#DEE2E6" FontFamilyFallback="FontEmoji" HorizontalOptions="Fill" />
+          <SkiaLabel Text="Without a fallback the same arrow → and emoji 😀 render as tofu" FontSize={16} TextColor="#ADB5BD" HorizontalOptions="Fill" />
         </Card>
 
         <Card title="FontAttributes / FontWeight (weights registered via ConfigureFonts)">
           <SkiaLabel Text="Regular 400 — the family default" FontSize={16} TextColor="#DEE2E6" />
-          <SkiaLabel Text="FontAttributes=Bold picks the nearest registered weight (600 Semibold)" FontSize={16} TextColor="#DEE2E6" FontAttributes="Bold" />
-          <SkiaLabel Text="FontAttributes=Italic is a synthetic skew when no italic face is registered" FontSize={16} TextColor="#DEE2E6" FontAttributes="Italic" />
+          <SkiaLabel Text="FontAttributes=Bold → nearest registered weight (600 Semibold)" FontSize={16} TextColor="#DEE2E6" FontAttributes="Bold" FontFamilyFallback="FontSymbols" />
+          <SkiaLabel Text="FontAttributes=Italic → synthetic skew when no italic face" FontSize={16} TextColor="#DEE2E6" FontAttributes="Italic" FontFamilyFallback="FontSymbols" />
           <SkiaLabel Text="FontAttributes=BoldItalic" FontSize={16} TextColor="#DEE2E6" FontAttributes="BoldItalic" />
           <SkiaLabel Text="FontWeight={600} explicit" FontSize={16} TextColor="#DEE2E6" FontWeight={600} />
         </Card>

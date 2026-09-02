@@ -23,6 +23,8 @@ Detailed per-feature omissions: [SKIPPED.md](SKIPPED.md). Live sample: https://h
 | 2026-09-02 | Caching | `UseCache` None/Operations/Image (+aliases), `CachedObject`, invalidation contract (`Update` stales caches up the tree, `Repaint` keeps them), `Measure` memo, `Canvas.DisposeObject` after flush, `Canvas.FrameTime`/`FPS`; cells sample cached as `Image`. A/B on the light demo cells: no measurable change (0.7 ms/frame both) — payoff expected on heavy cells |
 | 2026-09-02 | Demo shell | `samples/demo`: root menu (logo, gradient, buttons) + pages Images / SVG / Recycled cells; React-level `SkiaShell` (`Routes`, `GoToAsync`/`GoBackAsync`, nav bar with Back, `useShell()`); `FillGradient` (linear); colors parsed MAUI-style `#AARRGGBB` via `Super.ParseColor` |
 | 2026-09-02 | Recycled cells | Templated `SkiaLayout` (`ItemsSource`/`ItemTemplate`/`RecyclingTemplate`/`MeasureFirst`+`MeasureAll`), `ViewsAdapter` pool, `BindingContext` + `SkiaDynamicDrawnCell.SetContent`, `SkiaScroll.ScrollToIndex`, `FirstVisibleIndex`/`DebugString`; sample = Cells fiddle shape with 100 000 items |
+| 2026-09-02 | Glyph fallback | `SkiaLabel.FontFamilyFallback` chain (per-codepoint runs, spaces on main font), `ConfigureFonts` `AddSymbols()` / `AddEmojis()` with the Blazor Noto subsets (`FontSymbols`, `FontSymbols2`, `FontEmoji`); Text snippet card |
+| 2026-09-02 | Responsive demo | `MinimumWidthRequest`/`MaximumWidthRequest` (+Height), `SkiaLayout` Wrap + `SkiaWrap`; demo pages fluid on 390-px phones (verified in an iframe harness at 390 and 760): root cards, Images/Shapes wrap, Text alignment rows wrap, cells toolbar wraps at the bottom, nav title reserves Back space |
 | 2026-09-02 | Scrolling | `SkiaScroll` plain content: pan, deceleration fling cut at edges, rubber-band + spring bounce, wheel, `ScrollTo*`, `Scrolled`; physics classes `ScrollFlingAnimator`, `DecelerationTimingParameters`, `SpringWithVelocityAnimator`, `VelocityAccumulator`, `RubberBandUtils` |
 
 ## In progress
@@ -32,8 +34,8 @@ Detailed per-feature omissions: [SKIPPED.md](SKIPPED.md). Live sample: https://h
 ## Next
 
 1. ~~`SkiaShape`~~ done (Rectangle/Circle/Ellipse, `CornerRadius`, stroke, children clipped) → real `SkiaButton` templating (`BtnShape`/`BtnText`).
-2. `SkiaLabel` spans (`TextSpan`: color/size/bold/underline/strikeout/tap) + `FontFamilyFallback` for symbols/emoji; then `SkiaRichLabel` (markdown).
-3. `SkiaLayout` Grid, then Wrap.
+2. `SkiaLabel` spans (`TextSpan`: color/size/bold/underline/strikeout/tap); then `SkiaRichLabel` (markdown). ~~`FontFamilyFallback`~~ done.
+3. `SkiaLayout` Grid. ~~Wrap~~ done.
 4. `MeasureVisible` for uneven rows; `ImageDoubleBuffered` as a real double buffer.
 5. `SkiaLabel` wrapping, `MaxLines`, alignment, font weights.
 6. Transforms (`TranslationX/Y`, `Rotation`, `Scale`, `Opacity`) + gesture mapping through them.

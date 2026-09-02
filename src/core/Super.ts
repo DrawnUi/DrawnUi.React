@@ -1,9 +1,22 @@
 import CanvasKitInit, { type CanvasKit, type Font, type Typeface } from "canvaskit-wasm";
 import wasmUrl from "canvaskit-wasm/bin/canvaskit.wasm?url";
 
-/** Mirrors DrawnUi.Net IFontCollection: fonts.AddFont(source, alias[, weight]). */
+/** Mirrors DrawnUi.Net IFontCollection: fonts.AddFont(source, alias[, weight]), plus the Blazor-head AddSymbols/AddEmojis. */
 export class FontCollection {
+  /** Where the shipped subset fonts are served from (the demo copies them to public/fonts). */
+  static ContentRoot = "fonts/";
   readonly Fonts: { Source: string; Alias: string; Weight: number }[] = [];
+
+  /** Noto Sans Math + Symbols 2 subsets as "FontSymbols" / "FontSymbols2" (arrows, math, misc symbols) — DrawnUi.Blazor AddSymbols. */
+  AddSymbols(): FontCollection {
+    return this.AddFont(FontCollection.ContentRoot + "NotoSansMathSymbols-Subset.ttf", "FontSymbols")
+      .AddFont(FontCollection.ContentRoot + "NotoSansSymbols2-Subset.ttf", "FontSymbols2");
+  }
+
+  /** Noto Color Emoji subset (faces + hands) as "FontEmoji" — DrawnUi.Blazor AddEmojis. */
+  AddEmojis(): FontCollection {
+    return this.AddFont(FontCollection.ContentRoot + "NotoColorEmoji-Subset.ttf", "FontEmoji");
+  }
   /** Registers a face under an alias; weight 100..900 lets FontWeight / FontAttributes=Bold pick the right file. */
   AddFont(source: string, alias: string, weight = 400): FontCollection {
     this.Fonts.push({ Source: source, Alias: alias, Weight: weight });

@@ -59,6 +59,12 @@ export class SkiaControl {
   /** -1 = auto. */
   WidthRequest = -1;
   HeightRequest = -1;
+  /** Caps the available size (points); a Fill control fills only up to it and stays start-aligned, like DrawnUi. -1 = none. */
+  MaximumWidthRequest = -1;
+  MaximumHeightRequest = -1;
+  /** Floors the measured size (points). -1 = none. */
+  MinimumWidthRequest = -1;
+  MinimumHeightRequest = -1;
   Margin: Thickness = Thickness.Zero;
   /**
    * DrawnUi LockRatio: 0 = off; positive = square of the LARGER of the two sizes (requests or constraints),
@@ -170,7 +176,9 @@ export class SkiaControl {
     let w = widthConstraint - mx;
     let h = heightConstraint - my;
     if (this.WidthRequest >= 0) w = this.WidthRequest * scale;
+    else if (this.MaximumWidthRequest >= 0) w = Math.min(w, this.MaximumWidthRequest * scale);
     if (this.HeightRequest >= 0) h = this.HeightRequest * scale;
+    else if (this.MaximumHeightRequest >= 0) h = Math.min(h, this.MaximumHeightRequest * scale);
 
     let locked = false;
     if (this.LockRatio !== 0) {
@@ -180,8 +188,12 @@ export class SkiaControl {
 
     const content = this.MeasureAbsolute(w, h, scale);
 
-    const rw = locked || this.WidthRequest >= 0 ? w : this.HorizontalOptions === "Fill" && isFinite(w) ? w : content.Pixels.Width;
-    const rh = locked || this.HeightRequest >= 0 ? h : this.VerticalOptions === "Fill" && isFinite(h) ? h : content.Pixels.Height;
+    let rw = locked || this.WidthRequest >= 0 ? w : this.HorizontalOptions === "Fill" && isFinite(w) ? w : content.Pixels.Width;
+    let rh = locked || this.HeightRequest >= 0 ? h : this.VerticalOptions === "Fill" && isFinite(h) ? h : content.Pixels.Height;
+    if (this.MinimumWidthRequest >= 0) rw = Math.max(rw, this.MinimumWidthRequest * scale);
+    if (this.MinimumHeightRequest >= 0) rh = Math.max(rh, this.MinimumHeightRequest * scale);
+    if (this.MaximumWidthRequest >= 0 && this.WidthRequest < 0) rw = Math.min(rw, this.MaximumWidthRequest * scale);
+    if (this.MaximumHeightRequest >= 0 && this.HeightRequest < 0) rh = Math.min(rh, this.MaximumHeightRequest * scale);
 
     this.MeasuredSize = ScaledSize.FromPixels(rw + mx, rh + my, scale);
     this.NeedMeasure = false;
@@ -198,14 +210,19 @@ export class SkiaControl {
     const m = this.Margin;
     const availL = destination.Left + m.Left * scale;
     const availT = destination.Top + m.Top * scale;
-    const availW = destination.Width - m.HorizontalThickness * scale;
-    const availH = destination.Height - m.VerticalThickness * scale;
+    let availW = destination.Width - m.HorizontalThickness * scale;
+    let availH = destination.Height - m.VerticalThickness * scale;
+    // DrawnUi DefineAvailableSize: a Maximum*Request caps the available box; a Fill control then fills only that.
+    if (this.WidthRequest < 0 && this.MaximumWidthRequest >= 0) availW = Math.min(availW, this.MaximumWidthRequest * scale);
+    if (this.HeightRequest < 0 && this.MaximumHeightRequest >= 0) availH = Math.min(availH, this.MaximumHeightRequest * scale);
 
     const w = this.HorizontalOptions === "Fill" ? availW : Math.min(availW, this.MeasuredSize.Pixels.Width - m.HorizontalThickness * scale);
     const h = this.VerticalOptions === "Fill" ? availH : Math.min(availH, this.MeasuredSize.Pixels.Height - m.VerticalThickness * scale);
 
-    const x = availL + SkiaControl.Align(this.HorizontalOptions, availW, w);
-    const y = availT + SkiaControl.Align(this.VerticalOptions, availH, h);
+    // Alignment happens inside the ORIGINAL box (Center/End of a capped control still center/end in the parent).
+    const fullW = destination.Width - m.HorizontalThickness * scale, fullH = destination.Height - m.VerticalThickness * scale;
+    const x = availL + SkiaControl.Align(this.HorizontalOptions, fullW, w);
+    const y = availT + SkiaControl.Align(this.VerticalOptions, fullH, h);
     this.DrawingRect = SKRect.Create(x, y, w, h);
     this.OnLayoutChanged();
   }

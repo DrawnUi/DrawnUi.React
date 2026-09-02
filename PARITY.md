@@ -41,8 +41,17 @@ Updated whenever the port deliberately diverges or finds something worth back-po
 - **Both**: `ConfigureFonts(f => f.AddFont(source, alias, weight))`; `FontWeight`/`FontAttributes=Bold` resolve to the nearest
   registered weight of the alias (400 = default). React adds: italic without an italic face = synthetic skew (-0.25), the C#
   side has no synthetic italic. Defaults adopted from C#: `FontSize` 12, `TextColor` GreenYellow (unstyled text stays visible).
-- **React-only gap**: no glyph fallback yet — a symbol missing from the face renders as tofu instead of falling back
-  (C# `FontFamilyFallback` / `AutoFont`).
+- **`FontFamilyFallback` chain (React extension)**: C# takes ONE fallback alias; React accepts a comma-separated chain
+  (`"FontSymbols,FontSymbols2"`) tried in order per codepoint, and spaces are never moved to a fallback run (keeps word gaps
+  at the main font's width). Opinion: worth back-porting to .NET — a single fallback cannot cover arrows (Math) and
+  ♥/★ (Symbols 2) at once, which is exactly the split `AddSymbols()` ships.
+
+## Layout
+
+### `MaximumWidthRequest` / `MaximumHeightRequest`
+- Same as C# (1.10.5.18+): caps the measured size AND the arranged Fill box; alignment uses the parent's full box. Used by
+  the demo for responsive pages (`SkiaStack MaximumWidthRequest={720} HorizontalOptions="Center"`) — fluid below the cap,
+  fixed above it, no media queries.
 
 ## Lists
 
