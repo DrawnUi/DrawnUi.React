@@ -101,6 +101,7 @@ export class SkiaAccessibilityManager {
     for (const n of this.nodes) {
       if (!n.Superview) { this.nodes.delete(n); n.OnAccessibilityUnregistered(); continue; } // detached from the tree
       if (!n.IsVisible || !n.IsAccessibilityElement || n.AccessibilityRole === Aria.RolePresentation) continue;
+      if (AccessibilityManagerHiddenByAncestor(n)) continue; // e.g. the root page kept mounted under a pushed shell page
       const px = n.GetAccessibilityPixelRect();
       if (px.Width <= 0 || px.Height <= 0) continue;
       // nodes beyond the canvas stay in the tree (scroll content reachable with Tab, the overlay scrolls them into view);
@@ -129,4 +130,11 @@ export class SkiaAccessibilityManager {
     }
     return true;
   }
+}
+
+/** True when any ancestor is hidden (IsVisible false or Opacity 0): the subtree is not drawn, so it gets no nodes. */
+function AccessibilityManagerHiddenByAncestor(control: { Parent?: { IsVisible: boolean; Opacity: number; Parent?: unknown } }): boolean {
+  let p = control.Parent as { IsVisible: boolean; Opacity: number; Parent?: unknown } | undefined;
+  while (p) { if (!p.IsVisible || p.Opacity <= 0) return true; p = p.Parent as typeof p; }
+  return false;
 }

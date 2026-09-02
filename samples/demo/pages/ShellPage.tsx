@@ -85,9 +85,9 @@ export function ShellPage() {
           </SkiaWrap>
         </Card>
 
-        <Card title="Tabs — a nested SkiaShell with Tabs: per-tab navigation stacks, PopTabToRootAsync">
+        <Card title="Tabs — a nested SkiaShell with Tabs: per-tab navigation stacks, AnimateTabs (C# SkiaViewSwitcher slide + fade), PopTabToRootAsync">
           <SkiaLayer HeightRequest={300} HorizontalOptions="Fill" IsClippedToBounds>
-            <SkiaShell Routes={TAB_ROUTES} Titles={TAB_TITLES} Tabs={[{ route: "home", title: "Home" }, { route: "search", title: "Search" }, { route: "profile", title: "Profile" }]} UseBrowserHistory={false} NavBarHeight={44} />
+            <SkiaShell Routes={TAB_ROUTES} Titles={TAB_TITLES} Tabs={[{ route: "home", title: "Home" }, { route: "search", title: "Search" }, { route: "profile", title: "Profile" }]} UseBrowserHistory={false} NavBarHeight={44} AnimateTabs />
           </SkiaLayer>
         </Card>
 

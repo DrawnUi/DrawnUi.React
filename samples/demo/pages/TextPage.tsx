@@ -96,6 +96,15 @@ export function TextPage() {
           </SkiaWrap>
         </Card>
 
+        <Card title="StrokeColor / StrokeWidth, StrokeGradient, DropShadow* — outline under the fill, shadow below (C# DrawText order)">
+          <SkiaWrap Spacing={16}>
+            <SkiaLabel Text="Outlined" FontSize={32} FontFamily="FontTextBold" TextColor="#212529" StrokeColor="#FFC107" StrokeWidth={1.5} />
+            <SkiaLabel Text="Gradient stroke" FontSize={32} FontFamily="FontTextBold" TextColor="#212529" StrokeColor={Colors.White} StrokeWidth={2} StrokeGradient={{ Type: "Linear", Angle: 0, Colors: ["#0DCAF0", "#D63384"] }} />
+            <SkiaLabel Text="Drop shadow" FontSize={32} FontFamily="FontTextBold" TextColor="#DEE2E6" DropShadowColor="#000000" DropShadowSize={2} DropShadowOffsetX={3} DropShadowOffsetY={3} />
+            <SkiaLabel Text="Both + gradient fill" FontSize={32} FontFamily="FontTextBold" TextColor={Colors.White} FillGradient={{ Type: "Linear", Angle: 90, Colors: ["#FFC107", "#FD7E14"] }} StrokeColor="#3D2B00" StrokeWidth={1} DropShadowColor="#66000000" DropShadowSize={3} DropShadowOffsetX={2} DropShadowOffsetY={4} />
+          </SkiaWrap>
+        </Card>
+
         <Card title="FontFamilyFallback — symbols and emoji the text font lacks">
           <SkiaLabel Text="Arrows ← ↑ → ↓ ⇒ ⇔  math ∑ ∞ ≈ ≠ ≤ ≥ √  misc ♥ ★ ✓ ✗ ⚠ via FontFamilyFallback=&quot;FontSymbols,FontSymbols2&quot;" FontSize={16} TextColor="#DEE2E6" FontFamilyFallback="FontSymbols,FontSymbols2" HorizontalOptions="Fill" />
           <SkiaLabel Text="Emoji 😀 😎 🤖 😂 👍 🙌 via FontFamilyFallback=&quot;FontEmoji&quot; (Noto Color Emoji faces + hands subset)" FontSize={16} TextColor="#DEE2E6" FontFamilyFallback="FontEmoji" HorizontalOptions="Fill" />

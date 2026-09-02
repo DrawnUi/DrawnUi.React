@@ -3,7 +3,7 @@ import { type DrawingContext, SkiaControl } from "../core/SkiaControl";
 import { ControlTappedEventArgs, type GestureEventProcessingInfo, type SkiaGesturesParameters } from "../core/Gestures";
 import { Super } from "../core/Super";
 import {
-  type Color, Colors, type DrawTextAlignment, type FontAttributes, type LineBreakMode, ScaledSize, SKRect, type TextAlignment,
+  type Color, Colors, type DrawTextAlignment, type FontAttributes, type LineBreakMode, ScaledSize, SKRect, type SkiaGradient, type TextAlignment,
   type TextTransform, Thickness,
 } from "../core/Types";
 import { TextSpan } from "./TextSpan";
@@ -337,11 +337,31 @@ export class SkiaLabel extends SkiaControl {
     this.lines = this.text || this.Spans.length > 0 ? this.LayoutLines(widthConstraint - px, scale) : [];
     let width = 0;
     for (const l of this.lines) width = Math.max(width, l.Width);
-    return ScaledSize.FromPixels(Math.ceil(width) + px, Math.ceil(this.BlockHeight()) + py, scale);
+    const extra = this.EffectsExtra(scale);
+    return ScaledSize.FromPixels(Math.ceil(width + extra.W) + px, Math.ceil(this.BlockHeight() + extra.H) + py, scale);
   }
 
   /** C# GradientByLines: FillGradient spans each line's bounds (default) instead of the whole text block. */
   GradientByLines = true;
+  /** Outline around the glyphs, drawn under the fill (C# StrokeColor / StrokeWidth in points; Transparent = none). */
+  StrokeColor: Color = Colors.Transparent;
+  StrokeWidth = 1;
+  StrokeGradient?: SkiaGradient;
+  /** Drop shadow: a stroked copy of the text offset by DropShadowOffsetX/Y points (C# DropShadow*). */
+  DropShadowColor: Color = Colors.Transparent;
+  DropShadowSize = 2;
+  DropShadowOffsetX = 2;
+  DropShadowOffsetY = 2;
+
+  private HasStroke(): boolean { return this.StrokeWidth > 0 && this.StrokeColor !== Colors.Transparent; }
+  private HasDropShadow(): boolean { return this.DropShadowSize > 0 && this.DropShadowColor !== Colors.Transparent; }
+  /** C# measurement: stroke adds StrokeWidth*2 on each axis, the shadow adds DropShadowSize + offset (pixels). */
+  private EffectsExtra(scale: number): { W: number; H: number; Stroke: number } {
+    const stroke = this.HasStroke() ? this.StrokeWidth * 2 * scale : 0;
+    const sw = this.HasDropShadow() ? (this.DropShadowSize + this.DropShadowOffsetX) * scale : 0;
+    const sh = this.HasDropShadow() ? (this.DropShadowSize + this.DropShadowOffsetY) * scale : 0;
+    return { W: stroke + sw, H: stroke + sh, Stroke: stroke };
+  }
   /** C# SkiaLabel.SetupBackgroundPaint: no BackgroundColor = no background, the gradient goes on the glyphs. */
   protected override FillGradientPaintsBackground(): boolean { return !!this.BackgroundColor; }
 
@@ -352,10 +372,18 @@ export class SkiaLabel extends SkiaControl {
     const p = this.padding;
     const left = d.Left + p.Left * scale, right = d.Right - p.Right * scale;
     const top = d.Top + p.Top * scale, bottom = d.Bottom - p.Bottom * scale;
-    const blockH = this.BlockHeight();
+    const extra = this.EffectsExtra(scale);
+    const blockH = this.BlockHeight() + extra.H;
     let y = top;
     if (this.verticalTextAlignment === "Center") y = top + (bottom - top - blockH) / 2;
     else if (this.verticalTextAlignment === "End") y = bottom - blockH;
+    // C#: the glyphs sit strokeOffset in from the left/top of the inflated box, the shadow band stays below/right
+    y += extra.Stroke / 2;
+    const CKp = Super.CK;
+    let strokePaint: InstanceType<typeof CKp.Paint> | undefined, shadowPaint: InstanceType<typeof CKp.Paint> | undefined;
+    if (this.HasStroke()) { strokePaint = new CKp.Paint(); strokePaint.setAntiAlias(true); strokePaint.setStyle(CKp.PaintStyle.Stroke); strokePaint.setStrokeWidth(this.StrokeWidth * 2 * scale); strokePaint.setColor(Super.ParseColor(this.StrokeColor)); }
+    if (this.HasDropShadow()) { shadowPaint = new CKp.Paint(); shadowPaint.setAntiAlias(true); shadowPaint.setStyle(CKp.PaintStyle.Stroke); shadowPaint.setStrokeWidth(this.DropShadowSize * 2 * scale); shadowPaint.setColor(Super.ParseColor(this.DropShadowColor)); }
+    const shadowDx = Math.trunc(this.DropShadowOffsetX * scale), shadowDy = Math.trunc(this.DropShadowOffsetY * scale);
 
     for (const s of this.Spans) s.Rects.length = 0;
 
@@ -378,12 +406,15 @@ export class SkiaLabel extends SkiaControl {
     const textRect = new SKRect(left, top, right, bottom);
     for (const line of this.lines) {
       const lh = this.LineHeightPx(line);
+      const lineW = line.Width + extra.W;
       let x = left;
-      if (this.horizontalTextAlignment === "Center") x = left + (right - left - line.Width) / 2;
-      else if (this.horizontalTextAlignment === "End") x = right - line.Width;
+      if (this.horizontalTextAlignment === "Center") x = left + (right - left - lineW) / 2;
+      else if (this.horizontalTextAlignment === "End") x = right - lineW;
+      x += extra.Stroke / 2;
       const baseline = y + line.Ascent;
       // C# paintDefault gets the gradient over rectDraw, or over line.Bounds per line (GradientByLines)
       const gradientRect = gradient ? (this.GradientByLines ? new SKRect(x, y, x + line.Width, y + lh) : textRect) : undefined;
+      if (strokePaint && this.StrokeGradient) this.SetupGradient(strokePaint, this.StrokeGradient, gradientRect ?? new SKRect(x, y, x + line.Width, y + lh));
       for (const run of line.Runs) {
         const span = run.Span;
         if (span) {
@@ -392,6 +423,9 @@ export class SkiaLabel extends SkiaControl {
         }
         const color = span?.TextColor ?? this.textColor;
         if (run.Text) {
+          // C# DrawText order: drop shadow, stroke, fill
+          if (shadowPaint) canvas.drawText(run.Text, x + shadowDx, baseline + shadowDy, shadowPaint, run.Font);
+          if (strokePaint) canvas.drawText(run.Text, x, baseline, strokePaint, run.Font);
           const paint = paintFor(color);
           if (gradient && gradientRect) this.SetupGradient(paint, gradient, gradientRect);
           canvas.drawText(run.Text, x, baseline, paint, run.Font);
@@ -414,6 +448,7 @@ export class SkiaLabel extends SkiaControl {
       y += lh * this.lineSpacing;
     }
     for (const paint of paints.values()) paint.delete();
+    strokePaint?.delete(); shadowPaint?.delete();
   }
 
   // ---- span taps (port of C# SkiaLabel.ProcessGestures) ----

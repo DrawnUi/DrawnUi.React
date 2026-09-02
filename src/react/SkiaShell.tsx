@@ -1,5 +1,6 @@
 import { createContext, forwardRef, type ReactNode, useCallback, useContext, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { Colors, Thickness } from "../core/Types";
+import { Easing } from "../core/Easing";
 import type { SkiaControl } from "../core/SkiaControl";
 import type { SkiaDrawer as SkiaDrawerCtrl } from "../controls/SkiaDrawer";
 import type { ControlTappedEventArgs } from "../core/Gestures";
@@ -86,7 +87,14 @@ export interface SkiaShellProps {
   TabBarColor?: string;
   /** Mirror pages in the URL hash (#/route/route) and honour the browser back button (React extension, default true). */
   UseBrowserHistory?: boolean;
+  /** Slide + fade between tabs (C# SkiaViewSwitcher.AnimateTabs, default false). */
+  AnimateTabs?: boolean;
+  /** Tab switch duration in ms (C# TabsAnimationSpeed). */
+  TabsAnimationSpeed?: number;
 }
+
+/** C# SkiaViewSwitcher.Custom easing (back-ease, side coefficient 0.55) used for tab switches. */
+const TabsEasing = new Easing((x) => (x - 1) * (x - 1) * ((0.55 + 1) * (x - 1) + 0.55) + 1);
 
 /** C# SkiaShell static defaults (mutable). */
 export const ShellDefaults = {
@@ -143,10 +151,13 @@ const HISTORY_KEY = "drawnui-shell";
  * button behaves like C# GoBack (popup, then modal, then page). Navigation via ref or useShell().
  */
 export const SkiaShell = forwardRef<ShellNavigation, SkiaShellProps>(function SkiaShell(
-  { Routes, children, NavBarHeight = 56, NavBarColor = "#212529", Titles, PagesAnimationSpeed = 200, PageBackgroundColor = "#212529", Tabs, TabBarHeight = 56, TabBarColor = "#212529", UseBrowserHistory = true }, ref,
+  { Routes, children, NavBarHeight = 56, NavBarColor = "#212529", Titles, PagesAnimationSpeed = 200, PageBackgroundColor = "#212529", Tabs, TabBarHeight = 56, TabBarColor = "#212529", UseBrowserHistory = true, AnimateTabs = false, TabsAnimationSpeed = 150 }, ref,
 ) {
   const hasTabs = !!Tabs && Tabs.length > 0;
   const [selectedTab, setSelectedTab] = useState(0);
+  /** The tab root leaving during an animated switch (C# PreviousVisibleView) and the slide direction. */
+  const [tabTransition, setTabTransition] = useState<{ from: number; dir: 1 | -1 } | null>(null);
+  const tabRoots = useRef(new Map<number, SkiaControl>());
   const [stacks, setStacks] = useState<string[][]>(() => [[]]);
   const stack = stacks[selectedTab] ?? [];
   const setStack = useCallback((update: (s: string[]) => string[]) => setStacks((all) => { const next = all.slice(); next[selectedTab] = update(next[selectedTab] ?? []); return next; }), [selectedTab]);
@@ -356,7 +367,29 @@ export const SkiaShell = forwardRef<ShellNavigation, SkiaShellProps>(function Sk
   }, [historyOn]);
 
   const PopTabToRootAsync = useCallback(async () => { setLeaving(null); setStack(() => []); }, [setStack]);
-  const SelectTabAsync = useCallback(async (index: number) => { if (!hasTabs) return; setLeaving(null); setSelectedTab(Math.max(0, Math.min(Tabs!.length - 1, index))); }, [hasTabs, Tabs]);
+  const SelectTabAsync = useCallback(async (index: number) => {
+    if (!hasTabs) return;
+    const to = Math.max(0, Math.min(Tabs!.length - 1, index));
+    const from = live.current.selectedTab;
+    setLeaving(null);
+    if (to === from) return;
+    if (!AnimateTabs) { setSelectedTab(to); return; }
+    // C# SelectRightTab / SelectLeftTab: the new root slides in from 0.75 width with a fade, the old one slides out
+    const dir: 1 | -1 = to > from ? 1 : -1;
+    setTabTransition({ from, dir });
+    setSelectedTab(to);
+    const next = await WaitFor(() => tabRoots.current.get(to));
+    const prev = tabRoots.current.get(from);
+    if (next) {
+      const w = CanvasWidthPts(next);
+      await AnimateWithTimeout(Promise.all([
+        next.TranslateToAsync(0, 0, TabsAnimationSpeed, TabsEasing),
+        next.FadeToAsync(1, TabsAnimationSpeed, Easing.Linear),
+        prev ? prev.TranslateToAsync(-dir * w, 0, TabsAnimationSpeed, TabsEasing) : Promise.resolve(),
+      ]), TabsAnimationSpeed + 500);
+    }
+    setTabTransition(null);
+  }, [hasTabs, Tabs, AnimateTabs, TabsAnimationSpeed]);
 
   // popstate: the browser popped OUR last entry (back) — or moved forward to a hash we can rebuild
   useEffect(() => {
@@ -403,11 +436,21 @@ export const SkiaShell = forwardRef<ShellNavigation, SkiaShellProps>(function Sk
   const transitioning = transitions > 0 || leaving !== null;
   const rootBottom = hasTabs ? TabBarHeight : 0;
   const rootNode = hasTabs ? Routes[Tabs![selectedTab]?.route]?.() : children;
+  const entering = tabTransition ? { TranslationX: tabTransition.dir * 0.75 * (typeof window !== "undefined" ? window.innerWidth : 0), Opacity: 0.001, ZIndex: 1 } : {};
 
   return (
     <ShellContext.Provider value={nav}>
       <SkiaLayer VerticalOptions="Fill">
-        <SkiaLayer VerticalOptions="Fill" Margin={new Thickness(0, 0, 0, rootBottom)} IsVisible={visiblePages.length === 0 || transitioning}>{rootNode}</SkiaLayer>
+        {tabTransition && (
+          <SkiaLayer key={`tab-leaving-${tabTransition.from}`} VerticalOptions="Fill" Margin={new Thickness(0, 0, 0, rootBottom)} ZIndex={0} BackgroundColor={PageBackgroundColor}
+            ref={(c: SkiaControl | null) => { if (c) tabRoots.current.set(tabTransition.from, c); }}>
+            {Routes[Tabs![tabTransition.from]?.route]?.()}
+          </SkiaLayer>
+        )}
+        <SkiaLayer key={hasTabs ? `tab-${selectedTab}` : "root"} VerticalOptions="Fill" Margin={new Thickness(0, 0, 0, rootBottom)} IsVisible={visiblePages.length === 0 || transitioning} BackgroundColor={hasTabs ? PageBackgroundColor : undefined} {...entering}
+          ref={(c: SkiaControl | null) => { if (c) tabRoots.current.set(selectedTab, c); }}>
+          {rootNode}
+        </SkiaLayer>
         {visiblePages.map((r, i) => (
           <PageHost key={`${selectedTab}:${r}#${i}`} route={r} speed={PagesAnimationSpeed} visible={r === topRoute || transitioning} background={PageBackgroundColor} bottom={rootBottom}
             register={(c) => { if (c) pageCtrls.current.set(r, c); else pageCtrls.current.delete(r); }}>
