@@ -18,6 +18,8 @@ export class SkiaButton extends SkiaLayout {
   TextColor: Color = Colors.White;
   FontSize = 15;
   FontFamily = "";
+  /** Glyph fallback chain for the label (React extension, same semantics as SkiaLabel.FontFamilyFallback). */
+  FontFamilyFallback = "";
   /** Frame corner radius, points (DrawnUi default look uses 8). */
   CornerRadius: CornerRadius | number = 8;
   StrokeColor: Color = Colors.Transparent;
@@ -70,6 +72,7 @@ export class SkiaButton extends SkiaLayout {
     this.label.TextColor = this.TextColor;
     this.label.FontSize = this.FontSize;
     this.label.FontFamily = this.FontFamily;
+    this.label.FontFamilyFallback = this.FontFamilyFallback;
     // Size comes from the label + Padding; the Fill frame follows whatever the button is arranged to.
     const px = this.Padding.HorizontalThickness * scale, py = this.Padding.VerticalThickness * scale;
     const l = this.label.Measure(isFinite(w) ? w - px : w, isFinite(h) ? h - py : h, scale);

@@ -6,7 +6,7 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
   return (
     <SkiaShape Type="Rectangle" CornerRadius={8} BackgroundColor="#2B3035" HorizontalOptions="Fill" AccessibilityRole={Aria.RoleGroup} AccessibilityLabel={title}>
       <SkiaStack Spacing={10} Padding={new Thickness(16, 12)}>
-        <SkiaLabel Text={title} FontSize={12} TextColor="#6EA8FE" FontAttributes="Bold" TextTransform="Uppercase" AccessibilityRole={Aria.RoleHeading} />
+        <SkiaLabel Text={title} FontSize={12} TextColor="#6EA8FE" FontAttributes="Bold" TextTransform="Uppercase" FontFamilyFallback="FontSymbols,FontSymbols2" AccessibilityRole={Aria.RoleHeading} />
         {children}
       </SkiaStack>
     </SkiaShape>
@@ -50,7 +50,7 @@ export function AccessibilityPage() {
         <Card title="Buttons — label from Text, hint, custom label, disabled">
           <SkiaWrap Spacing={8}>
             <SkiaButton Text={`Tapped ${count}×`} BackgroundColor="#0D6EFD" AccessibilityHint="Increments the counter" Tapped={() => { setCount((c) => c + 1); setLastActivated("counter"); }} />
-            <SkiaButton Text="★" FontSize={18} BackgroundColor="#6610F2" WidthRequest={48} AccessibilityLabel="Favorite" AccessibilityHint="Icon-only button: AccessibilityLabel replaces the glyph" Tapped={() => setLastActivated("favorite")} />
+            <SkiaButton Text="★" FontSize={18} FontFamilyFallback="FontSymbols,FontSymbols2" BackgroundColor="#6610F2" WidthRequest={48} AccessibilityLabel="Favorite" AccessibilityHint="Icon-only button: AccessibilityLabel replaces the glyph" Tapped={() => setLastActivated("favorite")} />
             <SkiaButton Text="Disabled" BackgroundColor="#495057" IsDisabled AccessibilityHint="IsDisabled: no tab stop, not activatable" />
           </SkiaWrap>
         </Card>
