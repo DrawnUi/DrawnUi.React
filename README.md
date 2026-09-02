@@ -12,9 +12,10 @@ await Super.UseDrawnUi()
   .ConfigureFonts((fonts) => fonts.AddFont("fonts/OpenSans-Regular.ttf", "FontText"))
   .BuildAsync();
 
-<Canvas BackgroundColor={Colors.DarkSlateBlue} RenderingMode="Accelerated">
+<Canvas BackgroundColor={Colors.DarkSlateBlue} RenderingMode="Accelerated" Gestures="Enabled">
   <SkiaStack Spacing={8} Padding={new Thickness(16)} VerticalOptions="Center">
     <SkiaLabel Text="Hello World" FontSize={32} TextColor={Colors.White} HorizontalOptions="Center" />
+    <SkiaButton Text="Tap me" HorizontalOptions="Center" Tapped={() => setCount((c) => c + 1)} />
   </SkiaStack>
 </Canvas>
 ```
@@ -22,7 +23,8 @@ await Super.UseDrawnUi()
 ## Layout
 
 - `src/drawnui/core` — `Super` (startup, CanvasKit, fonts), `SkiaControl` (measure/arrange/render), `Canvas` (host, surface, frame loop), value types.
-- `src/drawnui/controls` — `SkiaLayout` (+ `SkiaStack`/`SkiaRow`/`SkiaLayer`), `SkiaLabel`.
+- `src/drawnui/core/Gestures.ts` — gesture value types (`SkiaGesturesParameters`, `GestureEventProcessingInfo`, ...); raw input lives in `Canvas`.
+- `src/drawnui/controls` — `SkiaLayout` (+ `SkiaStack`/`SkiaRow`/`SkiaLayer`), `SkiaLabel`, `SkiaHotspot`, `SkiaButton`.
 - `src/drawnui/react` — reconciler host config + typed JSX tags + `<Canvas>` bridge component.
 - `src/sample` — hello world.
 

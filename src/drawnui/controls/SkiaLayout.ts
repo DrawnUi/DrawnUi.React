@@ -20,6 +20,8 @@ export class SkiaLayout extends SkiaControl {
     for (const v of value) this.AddSubView(v);
   }
 
+  protected override GetGestureListeners(): readonly SkiaControl[] { return this.views; }
+
   AddSubView(control: SkiaControl): void { this.InsertSubView(this.views.length, control); }
 
   InsertSubView(index: number, control: SkiaControl): void {

@@ -2,6 +2,9 @@ import type { Canvas as SkCanvas } from "canvaskit-wasm";
 import { Super } from "./Super";
 import { type Color, type LayoutOptions, SKRect, ScaledSize, Thickness } from "./Types";
 import type { Canvas } from "./Canvas";
+import {
+  ControlTappedEventArgs, GestureEventProcessingInfo, type LockTouch, SKPoint, SkiaGesturesInfo, type SkiaGesturesParameters,
+} from "./Gestures";
 
 /** Mirrors DrawnUi DrawingContext: ctx.Context.Canvas, ctx.Destination (pixels), ctx.Scale. */
 export interface DrawingContext {
@@ -14,7 +17,8 @@ export interface DrawingContext {
  * Base of every drawn control. Same contract as DrawnUi SkiaControl:
  * Measure(constraints px, scale) -> MeasuredSize (includes Margin),
  * Arrange(destination px) -> DrawingRect,
- * Render(ctx) -> background + Paint(ctx).
+ * Render(ctx) -> background + Paint(ctx),
+ * ProcessGestures(args, apply) -> consumer or null.
  */
 export class SkiaControl {
   // ---- layout properties (points) ----
@@ -27,6 +31,19 @@ export class SkiaControl {
   BackgroundColor?: Color;
   IsVisible = true;
   Tag?: string;
+
+  // ---- gesture properties ----
+  /** Control itself ignores input (things below it still get it). */
+  InputTransparent = false;
+  /** Consume every gesture that lands on this control so nothing below (z-order) receives it. */
+  BlockGesturesBelow = false;
+  LockChildrenGestures: LockTouch = "Disabled";
+
+  // ---- gesture events (single handler each; C# events map to one callback prop) ----
+  Tapped?: (sender: SkiaControl, e: ControlTappedEventArgs) => void;
+  ChildTapped?: (sender: SkiaControl, e: ControlTappedEventArgs) => void;
+  /** Raw gesture hook: set e.Consumed = true to stop propagation (not for Up). */
+  ConsumeGestures?: (sender: SkiaControl, e: SkiaGesturesInfo) => void;
 
   // ---- tree ----
   Parent?: SkiaControl;
@@ -55,8 +72,8 @@ export class SkiaControl {
 
     const content = this.MeasureAbsolute(w, h, scale);
 
-    let rw = this.WidthRequest >= 0 ? w : this.HorizontalOptions === "Fill" && isFinite(w) ? w : content.Pixels.Width;
-    let rh = this.HeightRequest >= 0 ? h : this.VerticalOptions === "Fill" && isFinite(h) ? h : content.Pixels.Height;
+    const rw = this.WidthRequest >= 0 ? w : this.HorizontalOptions === "Fill" && isFinite(w) ? w : content.Pixels.Width;
+    const rh = this.HeightRequest >= 0 ? h : this.VerticalOptions === "Fill" && isFinite(h) ? h : content.Pixels.Height;
 
     this.MeasuredSize = ScaledSize.FromPixels(rw + mx, rh + my, scale);
     this.NeedMeasure = false;
@@ -98,14 +115,17 @@ export class SkiaControl {
   Render(ctx: DrawingContext): void {
     if (!this.IsVisible) return;
     const own: DrawingContext = { ...ctx, Destination: this.DrawingRect };
-    if (this.BackgroundColor) {
-      const paint = new Super.CK.Paint();
-      paint.setColor(Super.CK.parseColorString(this.BackgroundColor));
-      const r = this.DrawingRect;
-      ctx.Context.Canvas.drawRect(Super.CK.LTRBRect(r.Left, r.Top, r.Right, r.Bottom), paint);
-      paint.delete();
-    }
+    if (this.BackgroundColor) this.PaintBackground(own);
     this.Paint(own);
+  }
+
+  /** Fills DrawingRect with BackgroundColor; shapes override for rounded corners etc. */
+  protected PaintBackground(ctx: DrawingContext): void {
+    const paint = new Super.CK.Paint();
+    paint.setColor(Super.CK.parseColorString(this.BackgroundColor!));
+    const r = ctx.Destination;
+    ctx.Context.Canvas.drawRect(Super.CK.LTRBRect(r.Left, r.Top, r.Right, r.Bottom), paint);
+    paint.delete();
   }
 
   /** Override to draw own content into ctx.Destination. */
@@ -127,5 +147,87 @@ export class SkiaControl {
     this.NeedMeasure = true;
     if (this.Parent) this.Parent.InvalidateMeasure();
     else this.Superview?.Update();
+  }
+
+  // ---- gestures (same names as DrawnUi) ----
+
+  /** Hit rect in pixels (no transforms in this port, so it is DrawingRect). */
+  get HitBoxAuto(): SKRect { return this.DrawingRect; }
+
+  HitIsInside(x: number, y: number): boolean {
+    const r = this.HitBoxAuto;
+    return x >= r.Left && x < r.Right && y >= r.Top && y < r.Bottom;
+  }
+
+  IsGestureForChild(child: SkiaControl, point: SKPoint): boolean {
+    return child.HitIsInside(point.X, point.Y);
+  }
+
+  /** Children that may receive gestures, top-most LAST (layouts return their Views). */
+  protected GetGestureListeners(): readonly SkiaControl[] { return SkiaControl.NoListeners; }
+  private static readonly NoListeners: readonly SkiaControl[] = [];
+
+  /** ISkiaGestureListener entry, same as DrawnUi: routes to ProcessGestures. */
+  OnSkiaGestureEvent(args: SkiaGesturesParameters, apply: GestureEventProcessingInfo): SkiaControl | null {
+    return this.ProcessGestures(args, apply);
+  }
+
+  protected CheckChildrenGesturesLocked(type: SkiaGesturesParameters["Type"]): boolean {
+    switch (this.LockChildrenGestures) {
+      case "Enabled": return true;
+      case "PassNone": return true;
+      case "PassTap": return type !== "Tapped";
+      case "PassTapAndLongPress": return type !== "Tapped" && type !== "LongPressing";
+      default: return false;
+    }
+  }
+
+  /**
+   * Port of DrawnUi SkiaControl.ProcessGestures (non-render-tree branch):
+   * ConsumeGestures hook -> children top-most first -> own Tapped. Returns the consumer or null.
+   */
+  ProcessGestures(args: SkiaGesturesParameters, apply: GestureEventProcessingInfo): SkiaControl | null {
+    if (!this.Superview) return null;
+
+    const consumedDefault = this.BlockGesturesBelow ? this : null;
+
+    if (this.ConsumeGestures) {
+      const sent = new SkiaGesturesInfo(args, apply);
+      this.ConsumeGestures(this, sent);
+      if (args.Type !== "Up" && sent.Consumed) return this;
+    }
+
+    if (this.CheckChildrenGesturesLocked(args.Type)) return consumedDefault;
+
+    let consumed: SkiaControl | null = null;
+    const wasConsumed = apply.AlreadyConsumed;
+    const point = new SKPoint(apply.MappedLocation.X + apply.ChildOffset.X, apply.MappedLocation.Y + apply.ChildOffset.Y);
+    const listeners = this.GetGestureListeners();
+
+    for (let i = listeners.length - 1; i >= 0; i--) {
+      const listener = listeners[i];
+      if (!listener.IsVisible || listener.InputTransparent) continue;
+      if (!this.IsGestureForChild(listener, point)) continue;
+
+      let breakForChild: SkiaControl | null = null;
+      if (args.Type === "Tapped") {
+        if (this.ChildTapped) { breakForChild = listener; this.ChildTapped(this, new ControlTappedEventArgs(listener, args, apply)); }
+      }
+      consumed = listener.OnSkiaGestureEvent(args, new GestureEventProcessingInfo(apply.MappedLocation, apply.ChildOffset, apply.ChildOffsetDirect, wasConsumed));
+      if (consumed) break;
+      if (breakForChild) { consumed = breakForChild; break; }
+    }
+    if (wasConsumed) consumed = wasConsumed;
+
+    if (args.Type === "Tapped" && !consumed && this.SendTapped(args, apply)) return this;
+
+    return consumed ?? consumedDefault;
+  }
+
+  /** Fires Tapped; true when a handler existed (= consumed), like DrawnUi SendTapped. */
+  protected SendTapped(args: SkiaGesturesParameters, apply: GestureEventProcessingInfo): boolean {
+    if (!this.Tapped) return false;
+    this.Tapped(this, new ControlTappedEventArgs(this, args, apply));
+    return true;
   }
 }

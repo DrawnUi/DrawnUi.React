@@ -9,7 +9,9 @@ DrawnUi name and semantics; nothing here is a redesign, only an omission.
 |---|---|---|
 | Caching (`UseCache`, SkPicture/Image/GPU caches, double buffering) | skipped | Every dirty frame re-measures, re-arranges and re-paints the whole tree. |
 | Incremental invalidation / dirty regions | skipped | `Update()` / `InvalidateMeasure()` / `Repaint()` all just request a full frame. |
-| Gestures (`Canvas.Gestures`, `OnTapped`, `ProcessGestures`, hit testing) | skipped | Sample proves reactivity through a DOM button instead. |
+| Gestures core: `Canvas.Gestures` (Disabled/Enabled/Lock), `ProcessGestures(args, apply)`, `ConsumeGestures`, `Tapped`/`ChildTapped`, `InputTransparent`, `BlockGesturesBelow`, `LockChildrenGestures`, `HitBoxAuto`/`HitIsInside`/`IsGestureForChild`, `SkiaGesturesParameters`/`GestureEventProcessingInfo`/`SkiaGesturesInfo`/`ControlTappedEventArgs` | ported | Pointer events -> per-pointer `OnTouchAction` state machine (port of DrawnUi.Blazor) -> Down/Panning/Tapped/Up, queued and processed at frame start. Tap slop = 16pt like AppoMobi TouchEffect. |
+| Gestures: `LongPressing`, `Wheel`, `Pointer` (hover), multi-touch pinch, velocity, `SoftLock`, `AddGestures` attached props, `OnGestures` delegate, transform-aware mapping (`HasTransform`, cache offsets `TranslateInputCoords`) | skipped | Enum members exist for parity, never produced. `ChildOffset` is always zero (no caches/transforms yet). |
+| C# multi-subscriber `event`s | changed shape | One callback per event prop (`Tapped={fn}`), same names. `Command*` (ICommand) variants not ported. |
 | `Opacity`, `Rotation`, `TranslationX/Y`, `Scale`, transforms | skipped | |
 | Clipping to bounds, `ClipEffect`, `IsClippedToBounds` | skipped | Children can overflow their parent. |
 | `Padding` on base `SkiaControl` | skipped | Only `SkiaLayout.Padding` exists. |
@@ -30,7 +32,7 @@ DrawnUi name and semantics; nothing here is a redesign, only an omission.
 | Area | Status | Notes |
 |---|---|---|
 | `RenderingMode` | partial | `Accelerated` (WebGL) with automatic fallback to software; read once at first surface creation. |
-| `Gestures` param | skipped | |
+| `Gestures` param | ported | Enabled applies `touch-action:none; user-select:none`; Lock also blocks `touchmove` default. |
 | Keyboard, focus (`FocusedChild`) | skipped | |
 | FPS / rendering stats (`Super.EnableRenderingStats`, `SkiaLabelFps`) | skipped | |
 | Insets / safe areas | skipped | N/A in browser for now. |
@@ -42,7 +44,9 @@ DrawnUi name and semantics; nothing here is a redesign, only an omission.
 | `SkiaLayout` Absolute / Column / Row (+ `SkiaStack`, `SkiaRow`, `SkiaLayer`) | ported | `Spacing`, `Padding`, `Children`/`Views`, `AddSubView`/`RemoveSubView`/`InsertSubView`. |
 | `SkiaLayout` Grid / Wrap, `Split`, `ItemsSource`/`ItemTemplate`, recycling, virtualization | skipped | |
 | `SkiaLabel` | partial | Single line, `Text`, `FontSize`, `TextColor`, `FontFamily`. No wrap, `MaxLines`, alignment, spans, `AutoSize`, font weight. |
-| `SkiaShape`, `SkiaImage`, `SkiaSvg`, `SkiaButton`, `SkiaScroll`, everything else | skipped | |
+| `SkiaHotspot` | ported | Fill/Fill, `Tapped`, `Down`, `Up`, `LockPanning`, `TouchDown`; consumes only Tapped like the C# one. No `AnimationTapped`/ripple/shimmer. |
+| `SkiaButton` | partial | Default look only: rounded frame radius 8 (hardcoded like the C# default content), centered label, `Text`/`TextColor`/`FontSize`/`FontFamily`/`BackgroundColor`/`IsPressed`/`IsDisabled`/`LockPanning`, `Tapped`/`Down`/`Up`. Pressed = 20% black overlay, no animation. No `ButtonStyle` platform looks, icons, `TextCase`, elevation, shimmer, `BtnText`/`BtnShape` templating. |
+| `SkiaShape`, `SkiaImage`, `SkiaSvg`, `SkiaScroll`, everything else | skipped | |
 
 ## Startup
 

@@ -3,13 +3,16 @@ import { Canvas as CanvasView } from "../core/Canvas";
 import type { SkiaControl } from "../core/SkiaControl";
 import type { SkiaLabel as SkiaLabelCtrl } from "../controls/SkiaLabel";
 import type { SkiaLayout as SkiaLayoutCtrl } from "../controls/SkiaLayout";
+import type { SkiaHotspot as SkiaHotspotCtrl } from "../controls/SkiaHotspot";
+import type { SkiaButton as SkiaButtonCtrl } from "../controls/SkiaButton";
 import type { Color, RenderingModeType } from "../core/Types";
+import type { GesturesMode } from "../core/Gestures";
 import { createDrawnRoot } from "./reconciler";
 
 /** Public settable properties of a control become its JSX props, same PascalCase names as C#. */
 type PropsOf<T> = Partial<{
   // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-  [K in keyof T as T[K] extends Function ? never : K extends "Children" | "Views" | "Parent" | "Superview" | "DrawingRect" | "MeasuredSize" | "RenderingScale" | "NeedMeasure" | "_superview" ? never : K]: T[K];
+  [K in keyof T as T[K] extends Function ? never : K extends "Children" | "Views" | "Parent" | "Superview" | "DrawingRect" | "MeasuredSize" | "RenderingScale" | "NeedMeasure" | "_superview" | "HitBoxAuto" | "TotalDown" | "TotalTapped" | "TouchDown" ? never : K]: T[K];
 }>;
 
 type LeafProps<T> = PropsOf<T>;
@@ -21,10 +24,14 @@ export const SkiaStack = "SkiaStack" as unknown as FC<LayoutProps<SkiaLayoutCtrl
 export const SkiaRow = "SkiaRow" as unknown as FC<LayoutProps<SkiaLayoutCtrl>>;
 export const SkiaLayer = "SkiaLayer" as unknown as FC<LayoutProps<SkiaLayoutCtrl>>;
 export const SkiaLabel = "SkiaLabel" as unknown as FC<LeafProps<SkiaLabelCtrl>>;
+export const SkiaHotspot = "SkiaHotspot" as unknown as FC<LeafProps<SkiaHotspotCtrl>>;
+export const SkiaButton = "SkiaButton" as unknown as FC<LeafProps<SkiaButtonCtrl>>;
 
 export interface CanvasProps {
   BackgroundColor?: Color;
   RenderingMode?: RenderingModeType;
+  /** Disabled (default) / Enabled / Lock, like DrawnUi Canvas.Gestures. */
+  Gestures?: GesturesMode;
   children?: ReactNode;
   style?: CSSProperties;
   className?: string;
@@ -34,7 +41,7 @@ export interface CanvasProps {
  * Mirrors DrawnUi Canvas: the bridge between the DOM (react-dom) and the drawn tree (DrawnUi reconciler).
  * Requires Super.UseDrawnUi()...BuildAsync() to have completed.
  */
-export function Canvas({ BackgroundColor, RenderingMode, children, style, className }: CanvasProps) {
+export function Canvas({ BackgroundColor, RenderingMode, Gestures, children, style, className }: CanvasProps) {
   const ref = useRef<HTMLCanvasElement>(null);
   const view = useRef<CanvasView>(null);
   const root = useRef<ReturnType<typeof createDrawnRoot>>(null);
@@ -52,6 +59,7 @@ export function Canvas({ BackgroundColor, RenderingMode, children, style, classN
   useLayoutEffect(() => {
     const v = view.current!;
     if (BackgroundColor !== undefined && v.BackgroundColor !== BackgroundColor) { v.BackgroundColor = BackgroundColor; v.Update(); }
+    v.Gestures = Gestures ?? "Disabled";
     root.current!.render(children);
   });
 

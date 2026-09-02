@@ -5,22 +5,27 @@ import type { Canvas } from "../core/Canvas";
 import { SkiaControl } from "../core/SkiaControl";
 import { SkiaLabel } from "../controls/SkiaLabel";
 import { SkiaLayer, SkiaLayout, SkiaRow, SkiaStack } from "../controls/SkiaLayout";
+import { SkiaHotspot } from "../controls/SkiaHotspot";
+import { SkiaButton } from "../controls/SkiaButton";
 
 /** JSX tag name -> engine class. Add a control here to expose it to React. */
 export const Registry: Record<string, new () => SkiaControl> = {
-  SkiaLayout, SkiaStack, SkiaRow, SkiaLayer, SkiaLabel,
+  SkiaLayout, SkiaStack, SkiaRow, SkiaLayer, SkiaLabel, SkiaHotspot, SkiaButton,
 };
 
 type Props = Record<string, unknown>;
 const SKIP = new Set(["children", "key", "ref"]);
 
-/** Assigns changed props straight onto the control (same names as the C# properties). */
+/**
+ * Assigns changed props straight onto the control (same names as the C# properties).
+ * Handler props (functions) are swapped without invalidating: inline arrows change identity every render.
+ */
 function applyProps(inst: SkiaControl, prev: Props | null, next: Props): void {
   let changed = false;
   for (const k in next) {
     if (SKIP.has(k) || (prev && prev[k] === next[k])) continue;
     (inst as unknown as Props)[k] = next[k];
-    changed = true;
+    if (typeof next[k] !== "function") changed = true;
   }
   if (prev) for (const k in prev) if (!SKIP.has(k) && !(k in next)) {
     (inst as unknown as Props)[k] = (new (inst.constructor as new () => SkiaControl)() as unknown as Props)[k];
