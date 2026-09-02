@@ -1,5 +1,7 @@
-import CanvasKitInit, { type CanvasKit, type Font, type Typeface } from "canvaskit-wasm";
-import wasmUrl from "canvaskit-wasm/bin/canvaskit.wasm?url";
+// the "full" build: same API plus Skottie (SkiaLottie) and the paragraph module; +0.9 MB raw over the default build
+import CanvasKitInit from "canvaskit-wasm/bin/full/canvaskit.js";
+import type { CanvasKit, Font, Typeface } from "canvaskit-wasm";
+import wasmUrl from "canvaskit-wasm/bin/full/canvaskit.wasm?url";
 
 /** Mirrors DrawnUi.Net IFontCollection: fonts.AddFont(source, alias[, weight]), plus the Blazor-head AddSymbols/AddEmojis. */
 export class FontCollection {

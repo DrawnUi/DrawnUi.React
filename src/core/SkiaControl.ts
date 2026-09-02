@@ -99,12 +99,24 @@ export class SkiaControl {
   Opacity = 1;
   /** Clip everything this control draws (content, children, effects per ClipEffects) to its DrawingRect. */
   IsClippedToBounds = false;
+  /** Paint-time offset in points (C# Left/Top: moves the cached output without a matrix; here a plain translate). */
+  Left = 0;
+  Top = 0;
+  private zIndex = 0;
+  /** Drawing order among siblings: higher draws later (on top) and receives gestures first (C# ZIndex). */
+  get ZIndex(): number { return this.zIndex; }
+  set ZIndex(v: number) { if (this.zIndex !== v) { this.zIndex = v; this.Parent?.InvalidateViewsOrder(); this.RepaintComposition(); } }
+  /** A layout re-sorts its children by ZIndex on the next draw (C# _orderedChildren reset). */
+  InvalidateViewsOrder(): void {}
+  /** Fraction of the available box a Fill control takes (C# DefineAvailableSize); alignment stays inside the full box. */
+  HorizontalFillRatio = 1;
+  VerticalFillRatio = 1;
 
   /** Sets ScaleX and ScaleY together (MAUI Scale). */
   get Scale(): number { return this.ScaleX; }
   set Scale(v: number) { this.ScaleX = v; this.ScaleY = v; }
   get HasTransform(): boolean {
-    return this.TranslationX !== 0 || this.TranslationY !== 0 || this.Rotation !== 0 || this.ScaleX !== 1 || this.ScaleY !== 1 || this.SkewX !== 0 || this.SkewY !== 0;
+    return this.TranslationX !== 0 || this.TranslationY !== 0 || this.Left !== 0 || this.Top !== 0 || this.Rotation !== 0 || this.ScaleX !== 1 || this.ScaleY !== 1 || this.SkewX !== 0 || this.SkewY !== 0;
   }
   /** Matrix applied at the last render (canvas space), undefined when none; gestures map through its inverse. */
   RenderTransformMatrix?: number[];
@@ -257,6 +269,8 @@ export class SkiaControl {
     // DrawnUi DefineAvailableSize: a Maximum*Request caps the available box; a Fill control then fills only that.
     if (this.WidthRequest < 0 && this.MaximumWidthRequest >= 0) availW = Math.min(availW, this.MaximumWidthRequest * scale);
     if (this.HeightRequest < 0 && this.MaximumHeightRequest >= 0) availH = Math.min(availH, this.MaximumHeightRequest * scale);
+    if (this.HorizontalFillRatio !== 1) availW = Math.ceil(availW * this.HorizontalFillRatio);
+    if (this.VerticalFillRatio !== 1) availH = Math.ceil(availH * this.VerticalFillRatio);
 
     const w = this.HorizontalOptions === "Fill" ? availW : Math.min(availW, this.MeasuredSize.Pixels.Width - m.HorizontalThickness * scale);
     const h = this.VerticalOptions === "Fill" ? availH : Math.min(availH, this.MeasuredSize.Pixels.Height - m.VerticalThickness * scale);
@@ -448,7 +462,7 @@ export class SkiaControl {
   /** Port of DrawnUi ApplyTransforms: T(-pivot) · rotation · scale/skew · T(pivot) · translation, in canvas pixels. */
   protected CreateRenderTransformMatrix(destination: SKRect, scale: number): number[] {
     const M = Super.CK.Matrix;
-    const moveX = this.TranslationX * scale, moveY = this.TranslationY * scale;
+    const moveX = (this.TranslationX + this.Left) * scale, moveY = (this.TranslationY + this.Top) * scale;
     if (this.Rotation === 0 && this.ScaleX === 1 && this.ScaleY === 1 && this.SkewX === 0 && this.SkewY === 0) return M.translated(moveX, moveY);
     const px = destination.Left + destination.Width * this.AnchorX;
     const py = destination.Top + destination.Height * this.AnchorY;
@@ -592,18 +606,89 @@ export class SkiaControl {
     const paint = new CK.Paint();
     paint.setAntiAlias(true);
     if (this.BackgroundColor) paint.setColor(Super.ParseColor(this.BackgroundColor));
-    const g = this.FillGradient;
-    if (g && g.Colors.length > 0) {
-      const colors = g.Colors.map((c) => Super.ParseColor(c));
-      const shader = CK.Shader.MakeLinearGradient(
-        [rect.Left + rect.Width * (g.StartXRatio ?? 0), rect.Top + rect.Height * (g.StartYRatio ?? 0)],
-        [rect.Left + rect.Width * (g.EndXRatio ?? 0), rect.Top + rect.Height * (g.EndYRatio ?? 1)],
-        colors, null, CK.TileMode.Clamp,
-      );
-      paint.setShader(shader);
-      shader.delete();
-    }
+    if (this.FillGradient) this.SetupGradient(paint, this.FillGradient, rect);
     return paint;
+  }
+
+  /** C# SetupGradient: white base color, the gradient's BlendMode and shader on the paint. */
+  SetupGradient(paint: import("canvaskit-wasm").Paint, gradient: SkiaGradient, rect: SKRect): boolean {
+    const shader = this.CreateGradient(rect, gradient);
+    if (!shader) return false;
+    const CK = Super.CK;
+    paint.setColor(CK.WHITE);
+    const blend = gradient.BlendMode ? (CK.BlendMode as unknown as Record<string, import("canvaskit-wasm").BlendMode>)[gradient.BlendMode] : undefined;
+    if (blend) paint.setBlendMode(blend);
+    paint.setShader(shader);
+    shader.delete();
+    return true;
+  }
+
+  /** Port of C# CreateGradient: Linear / Circular / Oval / Sweep shader over the rect (pixels); null for None. */
+  CreateGradient(rect: SKRect, g: SkiaGradient): import("canvaskit-wasm").Shader | null {
+    const type = g.Type ?? "Linear";
+    if (type === "None" || !g.Colors || g.Colors.length === 0) return null;
+    const CK = Super.CK;
+    const light = g.Light ?? 1, opacity = g.Opacity ?? 1;
+    const colors = g.Colors.map((c) => {
+      const p = Super.ParseColor(c);
+      let rgb: [number, number, number] = [p[0], p[1], p[2]];
+      if (light !== 1) rgb = SkiaControl.AdjustLightness(rgb, light);
+      return Float32Array.of(rgb[0], rgb[1], rgb[2], p[3] * opacity);
+    });
+    const positions = g.ColorPositions && g.ColorPositions.length === colors.length ? g.ColorPositions : null;
+    const tile = (CK.TileMode as unknown as Record<string, import("canvaskit-wasm").TileMode>)[g.TileMode ?? "Clamp"] ?? CK.TileMode.Clamp;
+    switch (type) {
+      case "Sweep":
+        return CK.Shader.MakeSweepGradient(rect.Left + rect.Width / 2, rect.Top + rect.Height / 2, colors, positions, tile, null, 0, this.Value1, this.Value1 + (this.Value2 || 360));
+      case "Circular": case "Conical": case "Oval": {
+        const cx = rect.Left + (g.StartXRatio ?? 0) * rect.Width, cy = rect.Top + (g.StartYRatio ?? 0) * rect.Height;
+        if (type !== "Oval") return CK.Shader.MakeRadialGradient([cx, cy], Math.min(rect.Width / 2, rect.Height / 2), colors, positions, tile);
+        const scaleX = rect.Width >= rect.Height ? 1 : rect.Width / rect.Height;
+        const scaleY = rect.Height >= rect.Width ? 1 : rect.Height / rect.Width;
+        return CK.Shader.MakeRadialGradient([cx, cy], Math.max(rect.Width / 2, rect.Height / 2), colors, positions, tile, CK.Matrix.scaled(scaleX, scaleY, cx, cy));
+      }
+      default: {
+        let sx = g.StartXRatio ?? 0, sy = g.StartYRatio ?? 0, ex = g.EndXRatio ?? 0, ey = g.EndYRatio ?? 1;
+        if (g.Angle != null) [sx, sy, ex, ey] = SkiaControl.LinearGradientAngleToPoints(g.Angle);
+        return CK.Shader.MakeLinearGradient([rect.Left + rect.Width * sx, rect.Top + rect.Height * sy], [rect.Left + rect.Width * ex, rect.Top + rect.Height * ey], colors, positions, tile);
+      }
+    }
+  }
+
+  /** C# SkiaGradient.LinearGradientAngleToPoints (CSS angle -> start/end ratios). */
+  static LinearGradientAngleToPoints(direction: number): [number, number, number, number] {
+    direction -= 90;
+    if (direction < 0) direction = 360 + direction;
+    if (direction > 360) direction = 360;
+    const eps = Math.pow(2, -52);
+    const angle = direction % 360;
+    const rad = (d: number) => (d * Math.PI) / 180;
+    let sx = Math.cos(rad(180 - angle)), sy = Math.sin(rad(180 - angle)), ex = Math.cos(rad(360 - angle)), ey = Math.sin(rad(360 - angle));
+    if (sx <= 0 || Math.abs(sx) <= eps) sx = 0;
+    if (sy <= 0 || Math.abs(sy) <= eps) sy = 0;
+    if (ex <= 0 || Math.abs(ex) <= eps) ex = 0;
+    if (ey <= 0 || Math.abs(ey) <= eps) ey = 0;
+    return [sx, sy, ex, ey];
+  }
+
+  /** C# MakeDarker / MakeLighter: HSL lightness scaled down (light < 1) or pushed toward white (light > 1). */
+  static AdjustLightness(rgb: [number, number, number], light: number): [number, number, number] {
+    const [r, g, b] = rgb;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    let h = 0, s = 0;
+    let l = (max + min) / 2;
+    if (max !== min) {
+      const d = max - min;
+      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+      if (max === r) h = (g - b) / d + (g < b ? 6 : 0); else if (max === g) h = (b - r) / d + 2; else h = (r - g) / d + 4;
+      h /= 6;
+    }
+    l = light < 1 ? l * light : l + (1 - l) * (light - 1);
+    l = Math.max(0, Math.min(1, l));
+    if (s === 0) return [l, l, l];
+    const hue = (p: number, q: number, t: number) => { if (t < 0) t += 1; if (t > 1) t -= 1; if (t < 1 / 6) return p + (q - p) * 6 * t; if (t < 1 / 2) return q; if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6; return p; };
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s, p = 2 * l - q;
+    return [hue(p, q, h + 1 / 3), hue(p, q, h), hue(p, q, h - 1 / 3)];
   }
 
   /** Override to draw own content into ctx.Destination. */

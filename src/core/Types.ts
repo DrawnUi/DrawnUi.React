@@ -140,14 +140,30 @@ export type ScrollOrientation = "Vertical" | "Horizontal" | "Both" | "Neither";
  */
 export type SkiaCacheType = "None" | "Operations" | "OperationsFull" | "Image" | "ImageDoubleBuffered" | "ImageComposite" | "ImageCompositeGPU" | "GPU";
 
-/** DrawnUi SkiaGradient (Linear only): colors spread from Start to End, ratios of the control's rect. */
+/** DrawnUi GradientType (Conical accepted, drawn as Circular). */
+export type GradientType = "None" | "Linear" | "Circular" | "Oval" | "Sweep" | "Conical";
+/** SKShaderTileMode. */
+export type ShaderTileMode = "Clamp" | "Repeat" | "Mirror" | "Decal";
+
+/**
+ * DrawnUi SkiaGradient: colors spread over the control's rect. Linear from Start to End (ratios, or `Angle` in CSS
+ * degrees), Circular / Oval centered at Start, Sweep around the center (Value1 start angle, Value2 sweep on the
+ * control). `ColorPositions` (0..1, one per color), `TileMode`, `Light` (< 1 darker, > 1 lighter), `Opacity`, `BlendMode`.
+ */
 export interface SkiaGradient {
-  Type: "Linear";
+  Type?: GradientType;
   Colors: Color[];
+  ColorPositions?: number[];
   StartXRatio?: number;
   StartYRatio?: number;
   EndXRatio?: number;
   EndYRatio?: number;
+  /** CSS-style angle in degrees; overrides the Start/End ratios for Linear. */
+  Angle?: number;
+  TileMode?: ShaderTileMode;
+  Light?: number;
+  Opacity?: number;
+  BlendMode?: string;
 }
 
 /** DrawnUi RecyclingTemplate: Enabled = pool of cells for the visible range, Disabled = one view per item. */

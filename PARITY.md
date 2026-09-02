@@ -191,3 +191,15 @@ Updated whenever the port deliberately diverges or finds something worth back-po
 - **.NET**: only `GoNext`/`GoPrev` interrupt; a plain `SelectedIndex` set during `_isSnapping` is ignored by `OnSelectedIndexChanged` and the carousel ends on the old target while the property says otherwise.
 - **Opinion**: back-port; call `InterruptSnapping()` from the `SelectedIndex` property changed handler.
 
+## Animated frames
+
+### Animator initialized on the first layout only
+- **React**: `AnimatedFramesRenderer.OnLayoutChanged` runs on every frame (Arrange is per frame here), so the animator is created / auto-started only on the first layout; later `SetAnimation` calls initialize explicitly.
+- **.NET**: `OnLayoutChanged` fires only on a real layout change, so `InitializeAnimator` + `Start` on every call is harmless.
+- **Opinion**: no action for .NET; note for anyone porting the control to a per-frame-arrange engine.
+
+### Overlay animators stale the ancestors' caches while running
+- **React**: `RenderingAnimator.TickFrame` marks every ancestor cache dirty on each tick, so a ripple on a button inside a `UseCache=Image` card is drawn (the card re-records for the ~500 ms of the effect).
+- **.NET**: the effect invalidates the parent through the regular `Update`/`Repaint` path.
+- **Opinion**: same outcome; noted because the React cache model had to add it explicitly.
+

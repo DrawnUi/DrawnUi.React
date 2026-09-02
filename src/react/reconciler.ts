@@ -18,6 +18,8 @@ import { SkiaHotspot } from "../controls/SkiaHotspot";
 import { SkiaButton } from "../controls/SkiaButton";
 import { SkiaImage } from "../controls/SkiaImage";
 import { SkiaSvg } from "../controls/SkiaSvg";
+import { SkiaLottie } from "../controls/SkiaLottie";
+import { SkiaGif } from "../controls/SkiaGif";
 import { SkiaScroll } from "../controls/SkiaScroll";
 import { SkiaFrame, SkiaShape } from "../controls/SkiaShape";
 
@@ -26,7 +28,7 @@ type HostInstance = SkiaControl | TextSpan;
 
 /** JSX tag name -> engine class. Add a control here to expose it to React. */
 export const Registry: Record<string, new () => HostInstance> = {
-  SkiaLayout, SkiaStack, SkiaRow, SkiaLayer, SkiaWrap, SkiaGrid, SkiaLabel, SkiaRichLabel, TextSpan, SkiaHotspot, SkiaButton, SkiaImage, SkiaSvg, SkiaScroll, SkiaShape, SkiaFrame,
+  SkiaLayout, SkiaStack, SkiaRow, SkiaLayer, SkiaWrap, SkiaGrid, SkiaLabel, SkiaRichLabel, TextSpan, SkiaHotspot, SkiaButton, SkiaImage, SkiaSvg, SkiaLottie, SkiaGif, SkiaScroll, SkiaShape, SkiaFrame,
   SkiaSwitch, SkiaCheckbox, SkiaRadioButton, SkiaProgress, SkiaSlider, SkiaCarousel, SkiaDrawer,
 };
 

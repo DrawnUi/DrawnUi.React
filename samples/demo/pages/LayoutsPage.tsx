@@ -76,6 +76,20 @@ export function LayoutsPage() {
         </Card>
 
         <SkiaLabel Text="Column · SkiaStack" FontSize={20} TextColor={Colors.White} HorizontalOptions="Center" Margin={new Thickness(0, 8, 0, 0)} />
+        <Card title="ZIndex draws later (on top); HorizontalFillRatio/VerticalFillRatio = fraction of the box; Left/Top nudge the drawn output">
+          <SkiaLayer HeightRequest={120} BackgroundColor="#212529" HorizontalOptions="Fill">
+            <SkiaShape Type="Rectangle" CornerRadius={8} BackgroundColor="#0D6EFD" HorizontalOptions="Fill" VerticalOptions="Fill" HorizontalFillRatio={0.5} VerticalFillRatio={0.75} ZIndex={2}>
+              <SkiaLabel Text="ZIndex=2 · FillRatio 0.5 × 0.75" FontSize={12} TextColor={Colors.White} HorizontalOptions="Center" VerticalOptions="Center" />
+            </SkiaShape>
+            <SkiaShape Type="Rectangle" CornerRadius={8} BackgroundColor="#D63384" WidthRequest={220} HeightRequest={70} Margin={new Thickness(120, 30, 0, 0)} ZIndex={1}>
+              <SkiaLabel Text="ZIndex=1, declared second" FontSize={12} TextColor={Colors.White} HorizontalOptions="Center" VerticalOptions="Center" />
+            </SkiaShape>
+            <SkiaShape Type="Rectangle" CornerRadius={8} BackgroundColor="#20C997" WidthRequest={160} HeightRequest={50} HorizontalOptions="End" VerticalOptions="End" Left={-20} Top={-10} ZIndex={3}>
+              <SkiaLabel Text="Left=-20 Top=-10 · ZIndex=3" FontSize={11} TextColor="#1A1A2E" HorizontalOptions="Center" VerticalOptions="Center" />
+            </SkiaShape>
+          </SkiaLayer>
+        </Card>
+
         <Card title="Vertical stack, Spacing between children, each child aligns horizontally on its own">
           <SkiaStack Spacing={6} BackgroundColor="#1F2937" Padding={new Thickness(8)}>
             <Box text="Start (default)" color="#0D6EFD" />

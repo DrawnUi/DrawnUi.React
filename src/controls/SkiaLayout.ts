@@ -177,13 +177,27 @@ export class SkiaLayout extends SkiaControl {
     for (const v of value) this.AddSubView(v);
   }
 
-  protected override GetGestureListeners(): readonly SkiaControl[] { return this.Views; }
+  private orderedViews?: SkiaControl[];
+  /** Static children sorted by ZIndex (stable), computed once per change (C# GetOrderedSubviews). */
+  protected GetOrderedSubviews(): readonly SkiaControl[] {
+    if (this.IsTemplated) return this.Views;
+    if (!this.orderedViews) {
+      let sorted = false;
+      for (let i = 1; i < this.views.length && !sorted; i++) if (this.views[i].ZIndex !== this.views[0].ZIndex) sorted = true;
+      this.orderedViews = sorted ? this.views.map((v, i) => ({ v, i })).sort((a, b) => a.v.ZIndex - b.v.ZIndex || a.i - b.i).map((x) => x.v) : this.views;
+    }
+    return this.orderedViews;
+  }
+  override InvalidateViewsOrder(): void { this.orderedViews = undefined; }
+
+  protected override GetGestureListeners(): readonly SkiaControl[] { return this.GetOrderedSubviews(); }
 
   override AddSubView(control: SkiaControl): void { this.InsertSubView(this.views.length, control); }
 
   override InsertSubView(index: number, control: SkiaControl): void {
     control.Parent = this;
     this.views.splice(index, 0, control);
+    this.orderedViews = undefined;
     this.InvalidateMeasure();
   }
 
@@ -191,6 +205,7 @@ export class SkiaLayout extends SkiaControl {
     const i = this.views.indexOf(control);
     if (i < 0) return;
     this.views.splice(i, 1);
+    this.orderedViews = undefined;
     control.Parent = undefined;
     this.InvalidateMeasure();
   }
@@ -432,7 +447,7 @@ export class SkiaLayout extends SkiaControl {
 
   protected override Paint(ctx: DrawingContext): void {
     if (this.IsTemplated) { this.PaintTemplated(ctx); return; }
-    for (const v of this.views) v.Render(ctx);
+    for (const v of this.GetOrderedSubviews()) v.Render(ctx);
   }
 
   /** Realizes, binds, arranges and draws only the cells intersecting the visible viewport (+ inflation). */

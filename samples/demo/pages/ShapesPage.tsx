@@ -24,6 +24,28 @@ export function ShapesPage() {
         <SkiaLabel Text="SkiaShape" FontSize={24} TextColor={Colors.White} HorizontalOptions="Center" />
         <SkiaLabel Text="Stroke is drawn inside the bounds; children are clipped to the shape." FontSize={13} TextColor={Colors.LightGray} HorizontalOptions="Center" />
 
+        <SkiaLabel Text="FillGradient / StrokeGradient" FontSize={20} TextColor={Colors.White} HorizontalOptions="Center" Margin={new Thickness(0, 8, 0, 0)} />
+        <SkiaWrap Spacing={16} HorizontalOptions="Center" MaximumWidthRequest={680}>
+          <Demo title="Linear · Angle={45}">
+            <SkiaShape Type="Rectangle" CornerRadius={12} WidthRequest={110} HeightRequest={70} HorizontalOptions="Center" VerticalOptions="Center" FillGradient={{ Type: "Linear", Angle: 45, Colors: ["#0D6EFD", "#D63384"] }} />
+          </Demo>
+          <Demo title="Circular at (0.5, 0.5)">
+            <SkiaShape Type="Circle" WidthRequest={80} LockRatio={1} HorizontalOptions="Center" VerticalOptions="Center" FillGradient={{ Type: "Circular", StartXRatio: 0.5, StartYRatio: 0.5, Colors: ["#FFFFFF", "#0D6EFD", "#0A2A6B"], ColorPositions: [0, 0.6, 1] }} />
+          </Demo>
+          <Demo title="Oval · Light={1.4}">
+            <SkiaShape Type="Ellipse" WidthRequest={120} HeightRequest={60} HorizontalOptions="Center" VerticalOptions="Center" FillGradient={{ Type: "Oval", StartXRatio: 0.5, StartYRatio: 0.5, Light: 1.4, Colors: ["#20C997", "#0F3460"] }} />
+          </Demo>
+          <Demo title="Sweep · TileMode Repeat">
+            <SkiaShape Type="Circle" WidthRequest={80} LockRatio={1} HorizontalOptions="Center" VerticalOptions="Center" FillGradient={{ Type: "Sweep", Colors: ["#E94560", "#FFC107", "#20C997", "#0D6EFD", "#E94560"] }} />
+          </Demo>
+          <Demo title="StrokeGradient · StrokeWidth 8">
+            <SkiaShape Type="Rectangle" CornerRadius={16} WidthRequest={110} HeightRequest={70} HorizontalOptions="Center" VerticalOptions="Center" StrokeWidth={8} ClipBackgroundColor StrokeGradient={{ Type: "Linear", StartXRatio: 0, EndXRatio: 1, EndYRatio: 0, Colors: ["#FFC107", "#D63384"] }} />
+          </Demo>
+          <Demo title="Opacity={0.5} on a label background">
+            <SkiaLabel Text="gradient bg" FontSize={16} TextColor={Colors.White} Padding={new Thickness(12, 8)} HorizontalOptions="Center" VerticalOptions="Center" FillGradient={{ Type: "Linear", Angle: 90, Opacity: 0.5, Colors: ["#6610F2", "#0DCAF0"] }} />
+          </Demo>
+        </SkiaWrap>
+
         <SkiaLabel Text="Shadows" FontSize={20} TextColor={Colors.White} HorizontalOptions="Center" Margin={new Thickness(0, 8, 0, 0)} />
         <SkiaWrap Spacing={16} HorizontalOptions="Center" MaximumWidthRequest={680}>
           <Demo title="Shadows=[{Y:4, Blur:6, Opacity:.5}]">

@@ -1,7 +1,7 @@
 import type { Path } from "canvaskit-wasm";
 import { type DrawingContext } from "../core/SkiaControl";
 import { Super } from "../core/Super";
-import { type Color, Colors, CornerRadius, SKRect, type ShapeType, SkiaShadow, type SkiaPoint, type StrokeCap, Thickness } from "../core/Types";
+import { type Color, Colors, CornerRadius, SKRect, type ShapeType, type SkiaGradient, SkiaShadow, type SkiaPoint, type StrokeCap, Thickness } from "../core/Types";
 import { SkiaLayout } from "./SkiaLayout";
 
 /**
@@ -20,6 +20,8 @@ export class SkiaShape extends SkiaLayout {
   StrokeWidth = 0;
   StrokeColor: Color = Colors.Gray;
   StrokeCap: StrokeCap = "Round";
+  /** Gradient painted along the stroke instead of StrokeColor (C# StrokeGradient). */
+  StrokeGradient?: SkiaGradient;
   /** Hollow shape: the background is not filled, only the stroke (and children) are drawn. */
   ClipBackgroundColor = false;
   /** Polygon / Line vertices as ratios (0..1) of the shape rect. */
@@ -194,6 +196,7 @@ export class SkiaShape extends SkiaLayout {
       paint.setStyle(CK.PaintStyle.Stroke);
       paint.setStrokeWidth(Math.max(1, this.StrokePixels(ctx.Scale)));
       paint.setColor(Super.ParseColor(this.StrokeColor));
+      if (this.StrokeGradient) this.SetupGradient(paint, this.StrokeGradient, rect);
       paint.setStrokeCap(this.StrokeCap === "Butt" ? CK.StrokeCap.Butt : this.StrokeCap === "Square" ? CK.StrokeCap.Square : CK.StrokeCap.Round);
       paint.setStrokeJoin(this.StrokeCap === "Round" ? CK.StrokeJoin.Round : CK.StrokeJoin.Miter);
       canvas.drawPath(path, paint);
