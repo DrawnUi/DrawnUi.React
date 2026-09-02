@@ -11,6 +11,8 @@ import { SkiaCheckbox } from "../controls/SkiaCheckbox";
 import { SkiaRadioButton } from "../controls/SkiaRadioButton";
 import { SkiaProgress } from "../controls/SkiaProgress";
 import { SkiaSlider } from "../controls/SkiaSlider";
+import { SkiaCarousel } from "../controls/SkiaCarousel";
+import { SkiaDrawer } from "../controls/SkiaDrawer";
 import { SkiaGrid, SkiaLayer, SkiaLayout, SkiaRow, SkiaStack, SkiaWrap } from "../controls/SkiaLayout";
 import { SkiaHotspot } from "../controls/SkiaHotspot";
 import { SkiaButton } from "../controls/SkiaButton";
@@ -25,7 +27,7 @@ type HostInstance = SkiaControl | TextSpan;
 /** JSX tag name -> engine class. Add a control here to expose it to React. */
 export const Registry: Record<string, new () => HostInstance> = {
   SkiaLayout, SkiaStack, SkiaRow, SkiaLayer, SkiaWrap, SkiaGrid, SkiaLabel, SkiaRichLabel, TextSpan, SkiaHotspot, SkiaButton, SkiaImage, SkiaSvg, SkiaScroll, SkiaShape, SkiaFrame,
-  SkiaSwitch, SkiaCheckbox, SkiaRadioButton, SkiaProgress, SkiaSlider,
+  SkiaSwitch, SkiaCheckbox, SkiaRadioButton, SkiaProgress, SkiaSlider, SkiaCarousel, SkiaDrawer,
 };
 
 type Props = Record<string, unknown>;

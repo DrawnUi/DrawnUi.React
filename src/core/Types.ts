@@ -78,6 +78,9 @@ export type FontAttributes = "None" | "Bold" | "Italic" | "BoldItalic";
 /** MAUI TextTransform. */
 export type TextTransform = "None" | "Lowercase" | "Uppercase" | "Titlecase";
 
+/** DrawnUi DrawerDirection: the edge a SkiaDrawer slides from. */
+export type DrawerDirection = "FromBottom" | "FromTop" | "FromLeft" | "FromRight";
+
 /** DrawnUi LayoutType. */
 export type LayoutType = "Absolute" | "Column" | "Row" | "Wrap" | "Grid";
 /** DrawnUi SkiaShadow: a drop shadow painted with the shape (offset and blur in points; Color alpha 1 = use Opacity). */

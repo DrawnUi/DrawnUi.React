@@ -14,6 +14,7 @@ import { AccessibilityPage } from "./pages/AccessibilityPage";
 import { TransformsPage } from "./pages/TransformsPage";
 import { UnevenCellsPage } from "./pages/UnevenCellsPage";
 import { LooksPage } from "./pages/LooksPage";
+import { SnappingPage } from "./pages/SnappingPage";
 import { Aria } from "drawnui-react";
 import { SkiaButton as SkiaButtonCtrl, SkiaLabel as SkiaLabelCtrl } from "drawnui-react/core";
 
@@ -42,8 +43,9 @@ const ROUTES = {
   transforms: () => <TransformsPage />,
   uneven: () => <UnevenCellsPage />,
   looks: () => <LooksPage />,
+  snapping: () => <SnappingPage />,
 };
-const TITLES = { images: "Images", svg: "SVG", cells: "Recycled cells", shapes: "Shapes", text: "Text", layouts: "Layouts", a11y: "Accessibility", transforms: "Transforms", uneven: "Uneven cells", looks: "Platform Looks" };
+const TITLES = { images: "Images", svg: "SVG", cells: "Recycled cells", shapes: "Shapes", text: "Text", layouts: "Layouts", a11y: "Accessibility", transforms: "Transforms", uneven: "Uneven cells", looks: "Platform Looks", snapping: "Carousel & Drawer" };
 
 function App() {
   const [view, setView] = useState<CanvasView | null>(null);

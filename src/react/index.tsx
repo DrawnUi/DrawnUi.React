@@ -10,6 +10,8 @@ import type { SkiaCheckbox as SkiaCheckboxCtrl } from "../controls/SkiaCheckbox"
 import type { SkiaRadioButton as SkiaRadioButtonCtrl } from "../controls/SkiaRadioButton";
 import type { SkiaProgress as SkiaProgressCtrl } from "../controls/SkiaProgress";
 import type { SkiaSlider as SkiaSliderCtrl } from "../controls/SkiaSlider";
+import type { SkiaCarousel as SkiaCarouselCtrl } from "../controls/SkiaCarousel";
+import type { SkiaDrawer as SkiaDrawerCtrl } from "../controls/SkiaDrawer";
 import type { SkiaLayout as SkiaLayoutCtrl } from "../controls/SkiaLayout";
 import type { SkiaHotspot as SkiaHotspotCtrl } from "../controls/SkiaHotspot";
 import type { SkiaButton as SkiaButtonCtrl } from "../controls/SkiaButton";
@@ -24,7 +26,7 @@ import { createDrawnRoot } from "./reconciler";
 /** Public settable properties of a control become its JSX props, same PascalCase names as C#. */
 type PropsOf<T> = Partial<{
   // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-  [K in keyof T as T[K] extends Function ? never : K extends "Children" | "Views" | "Parent" | "Spans" | "GridStructure" | "AccessibilityId" | "IsAccessibilityElement" | "HasTransform" | "RenderTransformMatrix" | "RenderObjectPrevious" | "LastMeasuredIndex" | "ItemsInsertedAtStart" | "UsingControlStyle" | "Track" | "Thumb" | "FrameOn" | "FrameOff" | "ViewCheckOn" | "ViewOn" | "ViewText" | "Ratio" | "StartThumbX" | "EndThumbX" | "Rects" | "HasTapHandler" | "HasDecorations" | "LinesCount" | "Superview" | "DrawingRect" | "MeasuredSize" | "RenderingScale" | "NeedMeasure" | "_superview" | "HitBoxAuto" | "TotalDown" | "TotalTapped" | "TouchDown" | "PostAnimators" | "LoadedSource" | "IsLoading" | "DisplayRect" | "AspectScale" | "Content" | "ContentSize" | "ContentOffsetBounds" | "OverscrollDistance" | "OverScrolled" | "IsUserPanning" | "IsUserFocused" | "IsScrolling" | "IsTemplated" | "FirstVisibleIndex" | "LastVisibleIndex" | "DebugString" | "ChildrenFactory" | "ContextIndex" | "RenderObject" | "UsingCacheType" ? never : K]: T[K];
+  [K in keyof T as T[K] extends Function ? never : K extends "Children" | "Views" | "Parent" | "Spans" | "GridStructure" | "AccessibilityId" | "IsAccessibilityElement" | "HasTransform" | "RenderTransformMatrix" | "RenderObjectPrevious" | "LastMeasuredIndex" | "ItemsInsertedAtStart" | "UsingControlStyle" | "Track" | "Thumb" | "FrameOn" | "FrameOff" | "ViewCheckOn" | "ViewOn" | "ViewText" | "Ratio" | "StartThumbX" | "EndThumbX" | "SnapPoints" | "CurrentPosition" | "CurrentSnap" | "ContentOffsetBounds" | "InTransition" | "CanAnimate" | "MaxIndex" | "ChildrenTotal" | "IsAtStart" | "IsAtEnd" | "ScrollProgress" | "Horizontal" | "Rects" | "HasTapHandler" | "HasDecorations" | "LinesCount" | "Superview" | "DrawingRect" | "MeasuredSize" | "RenderingScale" | "NeedMeasure" | "_superview" | "HitBoxAuto" | "TotalDown" | "TotalTapped" | "TouchDown" | "PostAnimators" | "LoadedSource" | "IsLoading" | "DisplayRect" | "AspectScale" | "Content" | "ContentSize" | "ContentOffsetBounds" | "OverscrollDistance" | "OverScrolled" | "IsUserPanning" | "IsUserFocused" | "IsScrolling" | "IsTemplated" | "FirstVisibleIndex" | "LastVisibleIndex" | "DebugString" | "ChildrenFactory" | "ContextIndex" | "RenderObject" | "UsingCacheType" ? never : K]: T[K];
 }>;
 
 /** `ref` receives the engine control instance (react-reconciler getPublicInstance). */
@@ -55,6 +57,8 @@ export const SkiaCheckbox = "SkiaCheckbox" as unknown as FC<LeafProps<SkiaCheckb
 export const SkiaRadioButton = "SkiaRadioButton" as unknown as FC<LeafProps<SkiaRadioButtonCtrl>>;
 export const SkiaProgress = "SkiaProgress" as unknown as FC<LeafProps<SkiaProgressCtrl>>;
 export const SkiaSlider = "SkiaSlider" as unknown as FC<LeafProps<SkiaSliderCtrl>>;
+export const SkiaCarousel = "SkiaCarousel" as unknown as FC<LayoutProps<SkiaCarouselCtrl>>;
+export const SkiaDrawer = "SkiaDrawer" as unknown as FC<LayoutProps<SkiaDrawerCtrl>>;
 
 export interface CanvasProps {
   BackgroundColor?: Color;
