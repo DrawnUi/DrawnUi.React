@@ -1,7 +1,7 @@
 import { Colors, SkiaImage, SkiaLabel, SkiaRow, SkiaScroll, SkiaStack, Thickness } from "drawnui-react";
 import type { TransformAspect } from "drawnui-react/core";
 
-const ASPECTS: TransformAspect[] = ["AspectCover", "AspectFit", "Fill", "AspectFill", "Fit", "None"];
+const ASPECTS: TransformAspect[] = ["AspectCover", "AspectFit", "AspectFill", "AspectFitFill", "Fill", "Fit", "FitFill", "Cover", "None"];
 
 /** SkiaImage: one source, every TransformAspect side by side (default is AspectCover = crop to fill). */
 export function ImagesPage() {
