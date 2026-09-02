@@ -91,16 +91,29 @@ export function ShellPage() {
           </SkiaLayer>
         </Card>
 
-        <Card title="SkiaBackdrop — Blur={8} over an image, children drawn first, BackgroundColor tint">
-          {/* UseCache=Image: the backdrop snapshots the layer's own offscreen surface (a picture-recording parent has nothing to snapshot yet) */}
-          <SkiaLayer HeightRequest={160} HorizontalOptions="Fill" IsClippedToBounds UseCache="Image">
-            <SkiaImage Source="images/baboon.jpg" Aspect="AspectCover" HorizontalOptions="Fill" VerticalOptions="Fill" />
-            {/* children of a backdrop are blurred with it (C# draws them first): the caption sits on top as a sibling */}
-            <SkiaBackdrop Blur={8} BackgroundColor="#33000000" WidthRequest={260} HeightRequest={100} HorizontalOptions="Center" VerticalOptions="Center" />
-            <SkiaLabel Text="frosted glass" FontSize={22} FontFamily="FontTextBold" TextColor={Colors.White} HorizontalOptions="Center" VerticalOptions="Center" />
-            <SkiaBackdrop Blur={0} Brightness={0.5} WidthRequest={110} HeightRequest={60} HorizontalOptions="End" VerticalOptions="End" Margin={new Thickness(12)}>
-              <SkiaLabel Text="Brightness 0.5" FontSize={12} TextColor={Colors.White} HorizontalOptions="Center" VerticalOptions="Center" />
-            </SkiaBackdrop>
+        <Card title="SkiaBackdrop — the Sandbox MainPageBackdrop frosted glass, same tree">
+          {/* Sandbox: scroll content UseCache=Image (the backdrop snapshots that offscreen surface), baboon, then a 200x200 composition */}
+          <SkiaLayer HeightRequest={260} HorizontalOptions="Fill" IsClippedToBounds UseCache="Image" BackgroundColor="#F5F5F5" Padding={new Thickness(24)}>
+            <SkiaImage Source="images/baboon.jpg" Aspect="AspectCover" BackgroundColor="Green" HorizontalOptions="Fill" VerticalOptions="Fill" />
+            <SkiaLayer WidthRequest={200} HeightRequest={200} HorizontalOptions="Center" VerticalOptions="Center">
+              {/* static shadow + texture, cached */}
+              <SkiaLayer Padding={new Thickness(16)} HorizontalOptions="Fill" VerticalOptions="Fill" UseCache="Image" ZIndex={-1}>
+                <SkiaShape Type="Rectangle" BackgroundColor="#22DDDDDD" CornerRadius={16} StrokeColor="Red" StrokeWidth={2} HorizontalOptions="Fill" VerticalOptions="Fill"
+                  StrokeGradient={{ Type: "Linear", StartXRatio: 0, StartYRatio: 0, EndXRatio: 1, EndYRatio: 1, Colors: ["#66FFFFFF", "#66999999"] }}>
+                  <SkiaImage Source="images/glass2.jpg" Aspect="AspectCover" Opacity={0.15} HorizontalOptions="Fill" VerticalOptions="Fill" />
+                </SkiaShape>
+              </SkiaLayer>
+              {/* BACKDROP */}
+              <SkiaShape Type="Rectangle" Margin={new Thickness(16)} BackgroundColor="#66FFFFFF" ClipBackgroundColor CornerRadius={19} HorizontalOptions="Fill" VerticalOptions="Fill"
+                Shadows={[{ X: 4, Y: 4, Blur: 3, Opacity: 1, Color: "#44000000" }]}>
+                <SkiaLayer>
+                  <SkiaBackdrop Blur={10} UseContext HorizontalOptions="Fill" VerticalOptions="Fill" ZIndex={-1} />
+                  <SkiaLayer Padding={new Thickness(8)} HorizontalOptions="Fill" VerticalOptions="Fill">
+                    <SkiaLabel Text="Wonnabe Frosted Glass" FontSize={20} TextColor="#EFEFEF" HorizontalOptions="Center" HorizontalTextAlignment="Center" VerticalOptions="Center" />
+                  </SkiaLayer>
+                </SkiaLayer>
+              </SkiaShape>
+            </SkiaLayer>
           </SkiaLayer>
         </Card>
 

@@ -8,8 +8,7 @@ import { SkiaLayout } from "./SkiaLayout";
  * Mirrors DrawnUi SkiaBackdrop: draws what is already painted beneath its box through `Blur` (points, default 5)
  * and `Brightness` (gamma, 1 = unchanged), tinted by `BackgroundColor`; children draw first and are blurred too.
  * The snapshot comes from the surface being drawn (`UseContext`) or the on-screen surface. Not cached (re-blurs
- * on every frame it is drawn in). Under an Operations (picture) cache only the tint can be drawn: give the parent
- * UseCache=Image (offscreen surface) or None.
+ * on every frame it is drawn in; inside a cached parent it is re-recorded with that parent).
  */
 export class SkiaBackdrop extends SkiaLayout {
   Blur = 5;
@@ -18,7 +17,6 @@ export class SkiaBackdrop extends SkiaLayout {
   UseContext = true;
 
   private snapshot?: Image;
-  private static warnedRecording = false;
 
   constructor() {
     super();
@@ -43,23 +41,15 @@ export class SkiaBackdrop extends SkiaLayout {
     super.Paint(ctx); // children
     if (this.BackgroundColor) { const paint = this.CreateBackgroundPaint(d); canvas.drawRect(CK.LTRBRect(d.Left, d.Top, d.Right, d.Bottom), paint); paint.delete(); }
     if (!this.HasEffects) return;
-    // The surface being drawn into: an Image cache surface (translated to its own origin, so the box is mapped through
-    // the canvas matrix) or the on-screen surface. While a picture is being RECORDED (an Operations cache above)
-    // nothing is on any surface yet, so only the tint is drawn: put the backdrop under UseCache=Image or None.
-    if (ctx.Context.Recording) {
-      if (!SkiaBackdrop.warnedRecording) { SkiaBackdrop.warnedRecording = true; console.warn("[SkiaBackdrop] inside an Operations cache: blur needs a parent with UseCache=Image or None"); }
-      return;
-    }
+    // C# UseContext: snapshot the surface the pixels end up on — the on-screen surface or the nearest Image cache
+    // surface (Origin = its top-left in canvas pixels). Content beneath is already there because caches are recorded
+    // inline while the parent paints, so this also works while an Operations picture is being recorded.
     const surface = this.UseContext ? ctx.Context.Surface : this.Superview?.Surface;
     if (!surface) return;
     surface.flush();
-    let sl = d.Left, st = d.Top, sr = d.Right, sb = d.Bottom;
-    if (surface === ctx.Context.Surface) {
-      const m = canvas.getTotalMatrix();
-      const p = CK.Matrix.mapPoints(m, [d.Left, d.Top, d.Right, d.Bottom]);
-      sl = Math.min(p[0], p[2]); sr = Math.max(p[0], p[2]); st = Math.min(p[1], p[3]); sb = Math.max(p[1], p[3]);
-    }
-    const l = Math.floor(sl), t = Math.floor(st), r = Math.ceil(sr), b = Math.ceil(sb);
+    const origin = this.UseContext ? ctx.Context.Origin : undefined;
+    const ox = origin?.X ?? 0, oy = origin?.Y ?? 0;
+    const l = Math.floor(d.Left - ox), t = Math.floor(d.Top - oy), r = Math.ceil(d.Right - ox), b = Math.ceil(d.Bottom - oy);
     // whole-surface snapshot, sub-rect on draw: a bounded snapshot of a GPU surface is not origin-safe in CanvasKit
     const image = surface.makeImageSnapshot();
     if (!image) return;
@@ -76,6 +66,9 @@ export class SkiaBackdrop extends SkiaLayout {
     const kill = this.snapshot;
     this.snapshot = image;
     kill?.delete();
+    // What is beneath may change without invalidating this branch (an image that loads later, a sibling animating):
+    // stale the ancestors' caches for the NEXT frame, after the current record has finished, without asking for one.
+    queueMicrotask(() => { let p = this.Parent; while (p) { p.InvalidateCache(); p = p.Parent; } });
   }
 
   protected override OnDisposing(): void { this.snapshot?.delete(); this.snapshot = undefined; }

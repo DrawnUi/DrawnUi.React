@@ -205,8 +205,7 @@ Updated whenever the port deliberately diverges or finds something worth back-po
 
 ## SkiaBackdrop
 
-### No snapshot while a picture is being recorded
-- **React**: inside an Operations (SkPicture) cache the backdrop draws only its tint and warns once; the snapshot of the previous on-screen frame was tried and rejected — the box overlaps its own previous output, so the stale content feeds back into itself forever.
-- **.NET**: `UseContext` snapshots `ctx.Context.Surface`; a backdrop recorded into a cached parent's picture has the same problem (the surface has not received the parent's content yet).
-- **Opinion**: document it in .NET too, or make `SkiaBackdrop` invalidate an Operations-caching ancestor to `Image` when it is attached.
-
+### Ancestor caches staled after every backdrop paint
+- **React**: a backdrop recorded into a cached parent (the demo card is a SkiaShape with the default Operations cache) kept a snapshot taken before the baboon image had loaded: the image's invalidation climbs its own branch and never reaches the sibling shape. After each paint the backdrop marks its ancestors' caches stale (microtask, no frame requested), so the next frame for any reason re-records it.
+- **.NET**: the same tree in `MainPageBackdrop` works because the sandbox content loads before the first record or the page redraws for other reasons; a late-loading sibling would leave the same stale snapshot.
+- **Opinion**: consider the same "stale ancestors after paint" in `SkiaBackdrop.Paint`; it costs nothing while the canvas is idle.

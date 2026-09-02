@@ -9,8 +9,12 @@ import { ControlTappedEventArgs, GestureEventProcessingInfo, type LockTouch, SKP
 
 /** Mirrors DrawnUi DrawingContext: ctx.Context.Canvas / Surface, ctx.Destination (pixels), ctx.Scale. */
 export interface DrawingContext {
-  /** Recording = the canvas records a picture (Operations cache): nothing reaches a surface until it is replayed. */
-  Context: { Canvas: SkCanvas; Surface?: Surface; Recording?: boolean };
+  /**
+   * Surface = where the pixels end up (an Image cache surface or the on-screen one), Origin = that surface's top-left
+   * in canvas pixels (caches are translated to their own origin), Recording = the canvas records a picture
+   * (Operations cache) that is replayed on Surface later.
+   */
+  Context: { Canvas: SkCanvas; Surface?: Surface; Origin?: { X: number; Y: number }; Recording?: boolean };
   Destination: SKRect;
   Scale: number;
 }
@@ -548,7 +552,7 @@ export class SkiaControl {
       const canvas = offscreen.getCanvas();
       canvas.clear(CK.TRANSPARENT);
       canvas.translate(-r.Left, -r.Top);
-      this.PaintContent({ ...ctx, Context: { Canvas: canvas, Surface: offscreen } });
+      this.PaintContent({ ...ctx, Context: { Canvas: canvas, Surface: offscreen, Origin: { X: r.Left, Y: r.Top } } });
       const image = offscreen.makeImageSnapshot();
       offscreen.delete();
       this.RenderObject = new CachedObject(cacheType, r, ctx.Scale, undefined, image);
