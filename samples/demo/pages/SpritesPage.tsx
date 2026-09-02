@@ -84,7 +84,7 @@ export function SpritesPage() {
             <SkiaSprite ref={sprite} Source="anims/BlueWarrior/Warrior_Idle.png" Columns={8} Rows={1} FramesPerSecond={fps} Repeat={-1} WidthRequest={160} HeightRequest={160} BackgroundColor="#212529" UseCache="Image"
               Success={(s) => setInfo(`${s.TotalFrames} frames · ${s.FrameWidth}×${s.FrameHeight} px · ${Math.round(s.DurationMs)} ms`)} Error={(_, e) => setInfo(`error: ${e.message}`)} />
             <SkiaSprite Source="anims/RedWarrior/Warrior_Attack1.png" Columns={4} Rows={1} FramesPerSecond={8} Repeat={-1} WidthRequest={160} HeightRequest={160} BackgroundColor="#212529" UseCache="Image" />
-            <SkiaSprite Source="anims/Trees/Tree1.png" Columns={12} Rows={1} FramesPerSecond={6} Repeat={-1} WidthRequest={160} HeightRequest={160} BackgroundColor="#212529" UseCache="Image" />
+            <SkiaSprite Source="anims/Trees/Tree1.png" Columns={8} Rows={1} FramesPerSecond={6} Repeat={-1} WidthRequest={160} HeightRequest={160} BackgroundColor="#212529" UseCache="Image" />
             <SkiaStack Spacing={8} VerticalOptions="Center" HorizontalOptions="Fill">
               <SkiaWrap Spacing={8}>
                 <SkiaButton Text={playing ? "Pause" : "Play"} BackgroundColor="#0D6EFD" FontSize={13} Tapped={() => { const s = sprite.current; if (!s) return; if (s.IsPlaying) { s.Stop(); setPlaying(false); } else { s.Start(); setPlaying(true); } }} />
@@ -101,8 +101,8 @@ export function SpritesPage() {
             {Array.from({ length: COLS * ROWS }, (_, i) => (
               <SkiaShape key={i} Type="Rectangle" WidthRequest={TILE} HeightRequest={TILE} BackgroundColor={((i % COLS) + Math.floor(i / COLS)) % 2 === 0 ? "#2D6A4F" : "#40916C"} Margin={new Thickness((i % COLS) * TILE, Math.floor(i / COLS) * TILE, 0, 0)} />
             ))}
-            <SkiaSprite Source="anims/Trees/Tree1.png" Columns={12} Rows={1} FramesPerSecond={6} Repeat={-1} WidthRequest={TILE} HeightRequest={TILE} Margin={new Thickness(5 * TILE, 0, 0, 0)} UseCache="Image" />
-            <SkiaSprite Source="anims/Trees/Tree2.png" Columns={12} Rows={1} FramesPerSecond={5} Repeat={-1} WidthRequest={TILE} HeightRequest={TILE} Margin={new Thickness(7 * TILE, 2 * TILE, 0, 0)} UseCache="Image" />
+            <SkiaSprite Source="anims/Trees/Tree1.png" Columns={8} Rows={1} FramesPerSecond={6} Repeat={-1} WidthRequest={TILE} HeightRequest={TILE} Margin={new Thickness(5 * TILE, 0, 0, 0)} UseCache="Image" />
+            <SkiaSprite Source="anims/Trees/Tree2.png" Columns={8} Rows={1} FramesPerSecond={5} Repeat={-1} WidthRequest={TILE} HeightRequest={TILE} Margin={new Thickness(7 * TILE, 2 * TILE, 0, 0)} UseCache="Image" />
             <SkiaSprite Source="anims/RedWarrior/Warrior_Idle.png" Columns={8} Rows={1} FramesPerSecond={15} Repeat={-1} WidthRequest={TILE} HeightRequest={TILE} Margin={new Thickness(6 * TILE, 3 * TILE, 0, 0)} ScaleX={-1} UseCache="Image" ZIndex={9} />
             {/* the player (WarriorSprite) is added to this layer from code */}
             <SkiaLayer ref={board} WidthRequest={COLS * TILE} HeightRequest={ROWS * TILE} />
