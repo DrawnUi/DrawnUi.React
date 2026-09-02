@@ -35,9 +35,21 @@ What is intentionally missing: see [SKIPPED.md](SKIPPED.md).
 
 ```
 npm install
-npm run dev            # samples/helloworld at http://localhost:5173
+npm run dev              # samples/helloworld at http://localhost:5173
 npx vite samples/<name>  # any other sample
-npm run build          # typecheck + build all samples into dist/
+npm run build            # typecheck + build all samples into dist/<name>/
 ```
 
-Samples are published to GitHub Pages on every push to `master` (`.github/workflows/pages.yml`).
+## Publishing
+
+Every push to `master` runs `.github/workflows/deploy.yml`: build `samples/helloworld`, deploy `dist/helloworld`
+to the Cloudflare Pages project `helloreact-drawnui` → **https://helloreact.drawnui.net**.
+
+Repository secrets used by the workflow:
+
+| Secret | What it is | Where to get it |
+|---|---|---|
+| `CLOUDFLARE_API_TOKEN` | Cloudflare API token with **Account → Cloudflare Pages → Edit** (deploy needs nothing else). | dash.cloudflare.com → My Profile → API Tokens → Create Token → "Edit Cloudflare Workers" template or custom with the Pages permission; copy the value once. Set with `gh secret set CLOUDFLARE_API_TOKEN --repo DrawnUi/DrawnUi.React` (paste the value on stdin). |
+| `CLOUDFLARE_ACCOUNT_ID` | The Cloudflare account that owns the Pages project. | dash.cloudflare.com → any zone → Overview → right column "Account ID", or `npx wrangler whoami`. `gh secret set CLOUDFLARE_ACCOUNT_ID --repo DrawnUi/DrawnUi.React`. |
+
+Adding another published sample = one more `wrangler pages deploy dist/<name> --project-name <project>` step and a Pages project + custom domain for it.

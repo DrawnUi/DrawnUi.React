@@ -7,7 +7,8 @@ import { defineConfig } from "vite";
  * index.html + main.tsx + a two-line vite.config.ts calling defineSample(import.meta.url).
  * - "drawnui-react" resolves to the library source in src/ (no build step while developing)
  * - fonts/images shared by all samples live in samples/public
- * - BASE_PATH (e.g. /DrawnUi.React/) is prepended by CI for GitHub Pages; each sample is served under <base><name>/
+ * - BASE_PATH is the public base of THIS sample ("/" by default = sample hosted at a domain root;
+ *   dev/build-samples.mjs sets "<site>/<name>/" when building the multi-sample list site)
  */
 export function defineSample(configFileUrl: string) {
   const sampleDir = fileURLToPath(new URL(".", configFileUrl));
@@ -16,7 +17,7 @@ export function defineSample(configFileUrl: string) {
   const base = (process.env.BASE_PATH ?? "/").replace(/\/?$/, "/");
   return defineConfig({
     root: sampleDir,
-    base: `${base}${name}/`,
+    base,
     publicDir: fileURLToPath(new URL("./public", import.meta.url)),
     plugins: [react()],
     resolve: {

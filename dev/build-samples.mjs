@@ -11,7 +11,7 @@ const samples = readdirSync("samples", { withFileTypes: true })
 
 for (const name of samples) {
   console.log(`\n=== building sample: ${name} ===`);
-  execSync(`npx vite build samples/${name}`, { stdio: "inherit", env: { ...process.env, BASE_PATH: base } });
+  execSync(`npx vite build samples/${name}`, { stdio: "inherit", env: { ...process.env, BASE_PATH: `${base}${name}/` } });
 }
 
 mkdirSync("dist", { recursive: true });
