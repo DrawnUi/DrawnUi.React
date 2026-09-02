@@ -109,7 +109,7 @@ export const ShellDefaults = {
   TabColor: "#ADB5BD",
 };
 
-interface Overlay { id: number; node: ReactNode; ctrl?: SkiaControl; drawer?: SkiaDrawerCtrl; content?: SkiaControl; closing?: boolean; history?: boolean }
+interface Overlay { id: number; node: ReactNode; ctrl?: SkiaControl; drawer?: SkiaDrawerCtrl; content?: SkiaControl; closing?: boolean; history?: boolean; animated?: boolean }
 type HistoryKind = "page" | "popup" | "modal";
 
 /** Canvas width in points for a control (page slide distance); falls back to the window. */
@@ -209,7 +209,7 @@ export const SkiaShell = forwardRef<ShellNavigation, SkiaShellProps>(function Sk
   const closePopupNow = useCallback(async (p: Overlay, animated: boolean) => {
     if (p.closing) return;
     p.closing = true;
-    if (animated && p.ctrl && p.content) {
+    if (animated && p.animated !== false && p.ctrl && p.content) {
       await AnimateWithTimeout(Promise.all([p.ctrl.FadeToAsync(0, ShellDefaults.PopupsAnimationSpeed), p.content.ScaleToAsync(0, 0, ShellDefaults.PopupsAnimationSpeed)]));
     }
     setPopups((list) => list.filter((x) => x !== p));
@@ -222,7 +222,7 @@ export const SkiaShell = forwardRef<ShellNavigation, SkiaShellProps>(function Sk
 
   const OpenPopupAsync = useCallback(async (content: ReactNode, options?: PopupOptions) => {
     const animated = options?.animated ?? true;
-    const entry: Overlay = { id: nextId.current++, node: null };
+    const entry: Overlay = { id: nextId.current++, node: null, animated };
     const closeWhenBackgroundTapped = options?.closeWhenBackgroundTapped ?? true;
     const showOverlay = options?.showOverlay ?? true;
     const overlay = options?.backgroundColor ?? ShellDefaults.PopupBackgroundColor;
