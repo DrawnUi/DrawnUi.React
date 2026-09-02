@@ -67,3 +67,7 @@ export function Canvas({ BackgroundColor, RenderingMode, Gestures, children, sty
 }
 
 export type { SkiaControl };
+
+// One import for apps: React tags + every engine type (Colors, Thickness, Super, gestures, animators...).
+// The engine `Canvas` class is shadowed by the React <Canvas> above; reach it via "drawnui-react/core".
+export * from "../index";

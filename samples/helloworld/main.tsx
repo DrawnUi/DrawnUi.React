@@ -1,7 +1,6 @@
 import { StrictMode, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Colors, Super, Thickness } from "../drawnui";
-import { Canvas, SkiaButton, SkiaLabel, SkiaLayer, SkiaStack } from "../drawnui/react";
+import { Canvas, Colors, SkiaButton, SkiaLabel, SkiaLayer, SkiaStack, Super, Thickness } from "drawnui-react";
 
 // Same startup shape as DrawnUi.Net / OpenTK: Super.UseDrawnUi().ConfigureFonts(...).BuildAsync()
 await Super.UseDrawnUi()

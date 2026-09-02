@@ -22,11 +22,12 @@ await Super.UseDrawnUi()
 
 ## Layout
 
-- `src/drawnui/core` — `Super` (startup, CanvasKit, fonts), `SkiaControl` (measure/arrange/render), `Canvas` (host, surface, frame loop), value types.
-- `src/drawnui/core/Gestures.ts` — gesture value types (`SkiaGesturesParameters`, `GestureEventProcessingInfo`, ...); raw input lives in `Canvas`.
-- `src/drawnui/controls` — `SkiaLayout` (+ `SkiaStack`/`SkiaRow`/`SkiaLayer`), `SkiaLabel`, `SkiaHotspot`, `SkiaButton`.
-- `src/drawnui/react` — reconciler host config + typed JSX tags + `<Canvas>` bridge component.
-- `src/sample` — hello world.
+- `src/` — the library, imported by samples as `drawnui-react` (React tags + all engine types) or `drawnui-react/core` (engine only).
+  - `src/core` — `Super` (startup, CanvasKit, fonts), `SkiaControl` (measure/arrange/render/gestures), `Canvas` (host, surface, frame loop, input), animators, value types.
+  - `src/controls` — `SkiaLayout` (+ `SkiaStack`/`SkiaRow`/`SkiaLayer`), `SkiaLabel`, `SkiaHotspot`, `SkiaButton`.
+  - `src/react` — reconciler host config + typed JSX tags + `<Canvas>` bridge component.
+- `samples/<name>/` — one folder per sample: `index.html`, `main.tsx`, two-line `vite.config.ts` (`defineSample`). Shared assets (fonts) in `samples/public`.
+- `dev/build-samples.mjs` — builds every sample into `dist/<name>/` + a `dist/index.html` list; used by the Pages workflow.
 
 What is intentionally missing: see [SKIPPED.md](SKIPPED.md).
 
@@ -34,5 +35,9 @@ What is intentionally missing: see [SKIPPED.md](SKIPPED.md).
 
 ```
 npm install
-npm run dev
+npm run dev            # samples/helloworld at http://localhost:5173
+npx vite samples/<name>  # any other sample
+npm run build          # typecheck + build all samples into dist/
 ```
+
+Samples are published to GitHub Pages on every push to `master` (`.github/workflows/pages.yml`).

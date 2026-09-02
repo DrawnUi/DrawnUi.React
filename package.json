@@ -4,9 +4,10 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "dev": "vite samples/helloworld",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit && node dev/build-samples.mjs",
+    "preview": "vite preview samples/helloworld"
   },
   "dependencies": {
     "canvaskit-wasm": "^0.42.0",
@@ -15,6 +16,7 @@
     "react-reconciler": "^0.33.0"
   },
   "devDependencies": {
+    "@types/node": "^24.0.0",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@types/react-reconciler": "^0.32.0",
