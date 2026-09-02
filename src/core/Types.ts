@@ -74,6 +74,13 @@ export type DrawImageAlignment = "Start" | "Center" | "End";
 /** MAUI/DrawnUi ScrollOrientation. */
 export type ScrollOrientation = "Vertical" | "Horizontal" | "Both" | "Neither";
 
+/**
+ * DrawnUi SkiaCacheType. Operations = recorded draw commands (SkPicture) replayed each frame;
+ * Image = offscreen surface snapshot blitted each frame (GPU-backed when the canvas is WebGL).
+ * GPU / ImageDoubleBuffered / ImageComposite / ImageCompositeGPU are accepted and currently resolve to Image.
+ */
+export type SkiaCacheType = "None" | "Operations" | "OperationsFull" | "Image" | "ImageDoubleBuffered" | "ImageComposite" | "ImageCompositeGPU" | "GPU";
+
 /** DrawnUi SkiaGradient (Linear only): colors spread from Start to End, ratios of the control's rect. */
 export interface SkiaGradient {
   Type: "Linear";

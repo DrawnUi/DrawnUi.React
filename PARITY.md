@@ -27,6 +27,14 @@ Updated whenever the port deliberately diverges or finds something worth back-po
   frames; each new `ScrollTo` stops the previous one — a fast spin collapses to roughly one step.
 - **Opinion — adopt in .NET: yes**, same shape: `var from = _animatorFlingY.IsRunning ? _animatorFlingY.Parameters.Destination : ViewportOffsetY`.
 
+## Caching
+
+### Text properties invalidate like bindable properties
+- **Both**: `SkiaLabel.Text/FontSize/TextColor/FontFamily` are accessors that call `Update()` (C#: BindableProperty
+  changed callbacks). Plain public fields on other controls do NOT invalidate when assigned directly — React props go
+  through `applyProps` which calls `Update()`, but engine-level code must call `Update()` itself after mutating a field.
+  Converting the remaining hot properties to accessors is pending.
+
 ## Lists
 
 ### Recycled cells contract

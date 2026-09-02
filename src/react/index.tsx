@@ -1,4 +1,4 @@
-import { type CSSProperties, type FC, type ReactNode, type Ref, useLayoutEffect, useRef } from "react";
+import { type CSSProperties, type FC, type ReactNode, type Ref, useImperativeHandle, useLayoutEffect, useRef } from "react";
 import { Canvas as CanvasView } from "../core/Canvas";
 import type { SkiaControl } from "../core/SkiaControl";
 import type { SkiaLabel as SkiaLabelCtrl } from "../controls/SkiaLabel";
@@ -15,7 +15,7 @@ import { createDrawnRoot } from "./reconciler";
 /** Public settable properties of a control become its JSX props, same PascalCase names as C#. */
 type PropsOf<T> = Partial<{
   // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-  [K in keyof T as T[K] extends Function ? never : K extends "Children" | "Views" | "Parent" | "Superview" | "DrawingRect" | "MeasuredSize" | "RenderingScale" | "NeedMeasure" | "_superview" | "HitBoxAuto" | "TotalDown" | "TotalTapped" | "TouchDown" | "PostAnimators" | "LoadedSource" | "IsLoading" | "DisplayRect" | "AspectScale" | "Content" | "ContentSize" | "ContentOffsetBounds" | "OverscrollDistance" | "OverScrolled" | "IsUserPanning" | "IsUserFocused" | "IsScrolling" | "IsTemplated" | "FirstVisibleIndex" | "LastVisibleIndex" | "DebugString" | "ChildrenFactory" | "ContextIndex" ? never : K]: T[K];
+  [K in keyof T as T[K] extends Function ? never : K extends "Children" | "Views" | "Parent" | "Superview" | "DrawingRect" | "MeasuredSize" | "RenderingScale" | "NeedMeasure" | "_superview" | "HitBoxAuto" | "TotalDown" | "TotalTapped" | "TouchDown" | "PostAnimators" | "LoadedSource" | "IsLoading" | "DisplayRect" | "AspectScale" | "Content" | "ContentSize" | "ContentOffsetBounds" | "OverscrollDistance" | "OverScrolled" | "IsUserPanning" | "IsUserFocused" | "IsScrolling" | "IsTemplated" | "FirstVisibleIndex" | "LastVisibleIndex" | "DebugString" | "ChildrenFactory" | "ContextIndex" | "RenderObject" | "UsingCacheType" ? never : K]: T[K];
 }>;
 
 /** `ref` receives the engine control instance (react-reconciler getPublicInstance). */
@@ -42,13 +42,15 @@ export interface CanvasProps {
   children?: ReactNode;
   style?: CSSProperties;
   className?: string;
+  /** Receives the engine Canvas (FPS, FrameTime, RenderingScale...). */
+  ref?: Ref<CanvasView>;
 }
 
 /**
  * Mirrors DrawnUi Canvas: the bridge between the DOM (react-dom) and the drawn tree (DrawnUi reconciler).
  * Requires Super.UseDrawnUi()...BuildAsync() to have completed.
  */
-export function Canvas({ BackgroundColor, RenderingMode, Gestures, children, style, className }: CanvasProps) {
+export function Canvas({ BackgroundColor, RenderingMode, Gestures, children, style, className, ref: viewRef }: CanvasProps) {
   const ref = useRef<HTMLCanvasElement>(null);
   const view = useRef<CanvasView>(null);
   const root = useRef<ReturnType<typeof createDrawnRoot>>(null);
@@ -62,6 +64,8 @@ export function Canvas({ BackgroundColor, RenderingMode, Gestures, children, sty
     // RenderingMode is read once at surface creation, like DrawnUi.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // After the effect above, so the handle resolves to the created view.
+  useImperativeHandle(viewRef, () => view.current!, []);
 
   useLayoutEffect(() => {
     const v = view.current!;

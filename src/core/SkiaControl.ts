@@ -1,17 +1,48 @@
-import type { Canvas as SkCanvas, Path } from "canvaskit-wasm";
+import type { Canvas as SkCanvas, Image, Path, SkPicture, Surface } from "canvaskit-wasm";
 import { Super } from "./Super";
-import { type Color, Colors, type LayoutOptions, SKRect, ScaledSize, type SkiaGradient, type SkiaTouchAnimation, Thickness } from "./Types";
+import { type Color, Colors, type LayoutOptions, SKRect, ScaledSize, type SkiaCacheType, type SkiaGradient, type SkiaTouchAnimation, Thickness } from "./Types";
 import { type IOverlayEffect, RippleAnimator } from "./Animators";
 import type { Canvas } from "./Canvas";
 import {
   ControlTappedEventArgs, GestureEventProcessingInfo, type LockTouch, SKPoint, SkiaGesturesInfo, type SkiaGesturesParameters,
 } from "./Gestures";
 
-/** Mirrors DrawnUi DrawingContext: ctx.Context.Canvas, ctx.Destination (pixels), ctx.Scale. */
+/** Mirrors DrawnUi DrawingContext: ctx.Context.Canvas / Surface, ctx.Destination (pixels), ctx.Scale. */
 export interface DrawingContext {
-  Context: { Canvas: SkCanvas };
+  Context: { Canvas: SkCanvas; Surface?: Surface };
   Destination: SKRect;
   Scale: number;
+}
+
+/** Mirrors DrawnUi CachedObject: what a cached control replays instead of repainting. */
+export class CachedObject {
+  constructor(
+    readonly Type: SkiaCacheType,
+    /** Rect the content was recorded for, canvas pixels at recording time. */
+    readonly Bounds: SKRect,
+    readonly Scale: number,
+    readonly Picture?: SkPicture,
+    readonly Image?: Image,
+  ) {}
+
+  /** Replays the cache with its top-left moved to (left, top). */
+  Draw(canvas: SkCanvas, left: number, top: number): void {
+    const CK = Super.CK;
+    if (this.Image) {
+      // Nearest sampling: a cached bitmap is blitted 1:1, never resampled.
+      canvas.drawImageOptions(this.Image, left, top, CK.FilterMode.Nearest, CK.MipmapMode.None, null);
+    } else if (this.Picture) {
+      const saved = canvas.save();
+      canvas.translate(left - this.Bounds.Left, top - this.Bounds.Top);
+      canvas.drawPicture(this.Picture);
+      canvas.restoreToCount(saved);
+    }
+  }
+
+  Dispose(): void {
+    this.Picture?.delete();
+    this.Image?.delete();
+  }
 }
 
 /**
@@ -56,6 +87,22 @@ export class SkiaControl {
   /** Override to react to a new BindingContext (DrawnUi ContextPropertyChanged / cell SetContent). */
   protected OnBindingContextChanged(): void {}
 
+  // ---- caching (same names as DrawnUi) ----
+  /** What to cache for this subtree; see SkiaCacheType. Layouts default to None, SkiaLabel/SkiaSvg to Operations. */
+  UseCache: SkiaCacheType = "None";
+  /** The cache type actually applied (None while caching is disabled globally). */
+  get UsingCacheType(): SkiaCacheType {
+    if (!Super.CacheEnabled) return "None";
+    switch (this.UseCache) {
+      case "None": return "None";
+      case "Operations": case "OperationsFull": return "Operations";
+      default: return "Image"; // Image, GPU, ImageDoubleBuffered, ImageComposite(GPU) -> single offscreen image for now
+    }
+  }
+  /** Current cache, if any. */
+  RenderObject?: CachedObject;
+  private cacheDirty = true;
+
   // ---- gesture properties ----
   /** Control itself ignores input (things below it still get it). */
   InputTransparent = false;
@@ -98,8 +145,21 @@ export class SkiaControl {
   RenderingScale = 1;
   NeedMeasure = true;
 
-  /** Public non-virtual entry like DrawnUi: applies Margin/requests, then MeasureAbsolute for content. */
+  private lastWidthConstraint = NaN;
+  private lastHeightConstraint = NaN;
+
+  /**
+   * Public non-virtual entry like DrawnUi: applies Margin/requests, then MeasureAbsolute for content.
+   * A control that was not invalidated and gets the same constraints + scale returns its previous size —
+   * this is what keeps a cached tree from re-measuring text every frame.
+   */
   Measure(widthConstraint: number, heightConstraint: number, scale: number): ScaledSize {
+    if (!this.NeedMeasure && this.RenderingScale === scale
+      && Object.is(this.lastWidthConstraint, widthConstraint) && Object.is(this.lastHeightConstraint, heightConstraint)) {
+      return this.MeasuredSize;
+    }
+    this.lastWidthConstraint = widthConstraint;
+    this.lastHeightConstraint = heightConstraint;
     this.RenderingScale = scale;
     const mx = this.Margin.HorizontalThickness * scale;
     const my = this.Margin.VerticalThickness * scale;
@@ -176,14 +236,71 @@ export class SkiaControl {
     return new SKRect(Math.max(r.Left, p.Left), Math.max(r.Top, p.Top), Math.min(r.Right, p.Right), Math.min(r.Bottom, p.Bottom));
   }
 
-  /** Draws background then Paint(). */
+  /** Draws the control: from its cache when it has one, else background + Paint(); overlays always live. */
   Render(ctx: DrawingContext): void {
     if (!this.IsVisible) return;
     const own: DrawingContext = { ...ctx, Destination: this.DrawingRect };
-    if (this.BackgroundColor || this.FillGradient) this.PaintBackground(own);
-    this.Paint(own);
+    const cacheType = this.UsingCacheType;
+    if (cacheType === "None") {
+      this.DestroyRenderingObject();
+      this.PaintContent(own);
+    } else {
+      const r = this.DrawingRect;
+      const stale = this.cacheDirty || !this.RenderObject || this.RenderObject.Type !== cacheType
+        || this.RenderObject.Scale !== ctx.Scale
+        || Math.round(this.RenderObject.Bounds.Width) !== Math.round(r.Width) || Math.round(this.RenderObject.Bounds.Height) !== Math.round(r.Height);
+      if (stale) this.CreateRenderingObject(own, cacheType);
+      this.RenderObject?.Draw(ctx.Context.Canvas, r.Left, r.Top);
+    }
     this.ExecutePostAnimators(own);
   }
+
+  /** Background + Paint(): the part of the control that a cache captures. */
+  protected PaintContent(ctx: DrawingContext): void {
+    if (this.BackgroundColor || this.FillGradient) this.PaintBackground(ctx);
+    this.Paint(ctx);
+  }
+
+  /** Records/renders the content into a new CachedObject for the current DrawingRect. */
+  protected CreateRenderingObject(ctx: DrawingContext, cacheType: SkiaCacheType): void {
+    const CK = Super.CK;
+    const r = this.DrawingRect;
+    const w = Math.max(1, Math.round(r.Width)), h = Math.max(1, Math.round(r.Height));
+    this.DestroyRenderingObject();
+    if (cacheType === "Operations") {
+      const recorder = new CK.PictureRecorder();
+      const canvas = recorder.beginRecording(CK.LTRBRect(r.Left, r.Top, r.Right, r.Bottom));
+      this.PaintContent({ ...ctx, Context: { ...ctx.Context, Canvas: canvas } });
+      const picture = recorder.finishRecordingAsPicture();
+      recorder.delete();
+      this.RenderObject = new CachedObject("Operations", r, ctx.Scale, picture);
+    } else {
+      const main = ctx.Context.Surface;
+      if (!main) { this.PaintContent(ctx); return; } // no surface to derive from (e.g. recording): draw live
+      const offscreen = main.makeSurface({ ...main.imageInfo(), width: w, height: h });
+      if (!offscreen) { this.PaintContent(ctx); return; }
+      const canvas = offscreen.getCanvas();
+      canvas.clear(CK.TRANSPARENT);
+      canvas.translate(-r.Left, -r.Top);
+      this.PaintContent({ ...ctx, Context: { Canvas: canvas, Surface: offscreen } });
+      const image = offscreen.makeImageSnapshot();
+      offscreen.delete();
+      this.RenderObject = new CachedObject("Image", r, ctx.Scale, undefined, image);
+    }
+    this.cacheDirty = false;
+  }
+
+  /** Drops the cache (disposed after the frame, never mid-draw). */
+  DestroyRenderingObject(): void {
+    const old = this.RenderObject;
+    if (!old) return;
+    this.RenderObject = undefined;
+    const sv = this.Superview;
+    if (sv) sv.DisposeObject(old); else old.Dispose();
+  }
+
+  /** Marks the cache stale; re-recorded on the next frame. */
+  InvalidateCache(): void { this.cacheDirty = true; }
 
   /** Draws PostAnimators above content; an effect returning true asks for another frame. */
   ExecutePostAnimators(ctx: DrawingContext): void {
@@ -234,18 +351,20 @@ export class SkiaControl {
 
   // ---- invalidation (same names as DrawnUi) ----
 
-  /** Content changed: remeasure + redraw. */
+  /** Content changed: cache invalidated + remeasure + redraw (bubbles to every ancestor, whose caches go stale too). */
   Update(): void {
     this.InvalidateMeasure();
   }
 
-  /** Redraw without remeasure. */
+  /** Redraw without remeasure and WITHOUT dropping caches (position/overlay changes). */
   Repaint(): void {
     this.Superview?.Update();
   }
 
+  /** Size or content may have changed: this control and all ancestors remeasure and re-record. */
   InvalidateMeasure(): void {
     this.NeedMeasure = true;
+    this.cacheDirty = true;
     if (this.Parent) this.Parent.InvalidateMeasure();
     else this.Superview?.Update();
   }

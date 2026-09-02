@@ -1,6 +1,8 @@
-import { StrictMode } from "react";
+import { StrictMode, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Canvas, Colors, SkiaShell, Super } from "drawnui-react";
+import type { Canvas as CanvasView } from "drawnui-react/core";
+import { CanvasViewContext } from "./pages/canvasView";
 import { RootPage } from "./pages/RootPage";
 import { ImagesPage } from "./pages/ImagesPage";
 import { SvgPage } from "./pages/SvgPage";
@@ -19,11 +21,14 @@ const ROUTES = {
 const TITLES = { images: "Images", svg: "SVG", cells: "Recycled cells" };
 
 function App() {
+  const [view, setView] = useState<CanvasView | null>(null);
   return (
-    <Canvas BackgroundColor={Colors.DarkSlateBlue} RenderingMode="Accelerated" Gestures="Enabled" style={{ height: "100vh" }}>
-      <SkiaShell Routes={ROUTES} Titles={TITLES}>
-        <RootPage />
-      </SkiaShell>
+    <Canvas ref={setView} BackgroundColor={Colors.DarkSlateBlue} RenderingMode="Accelerated" Gestures="Enabled" style={{ height: "100vh" }}>
+      <CanvasViewContext.Provider value={view}>
+        <SkiaShell Routes={ROUTES} Titles={TITLES}>
+          <RootPage />
+        </SkiaShell>
+      </CanvasViewContext.Provider>
     </Canvas>
   );
 }

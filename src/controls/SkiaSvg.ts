@@ -26,6 +26,11 @@ export class SkiaSvg extends SkiaControl {
   private svgString = "";
   private loadGeneration = 0;
   private element?: HTMLImageElement;
+
+  constructor() {
+    super();
+    this.UseCache = "Operations"; // DrawnUi default for SkiaSvg
+  }
   private intrinsic = { Width: 0, Height: 0 };
   private raster?: Image;
   private rasterKey = "";

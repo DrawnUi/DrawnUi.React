@@ -18,6 +18,7 @@ Detailed per-feature omissions: [SKIPPED.md](SKIPPED.md). Live sample: https://h
 | 2026-09-02 | Images | `SkiaImage` (all `TransformAspect` but Tile, alignments, `Success`/`Error`), `SkiaImageManager` cache/preload |
 | 2026-09-02 | SVG | `SkiaSvg` (browser-decoded, rasterized per displayed size, `TintColor`) |
 | 2026-09-02 | Infra | repo layout `src/` + `samples/<name>/`, Cloudflare Pages deploy on push (`.github/workflows/deploy.yml`) |
+| 2026-09-02 | Caching | `UseCache` None/Operations/Image (+aliases), `CachedObject`, invalidation contract (`Update` stales caches up the tree, `Repaint` keeps them), `Measure` memo, `Canvas.DisposeObject` after flush, `Canvas.FrameTime`/`FPS`; cells sample cached as `Image`. A/B on the light demo cells: no measurable change (0.7 ms/frame both) — payoff expected on heavy cells |
 | 2026-09-02 | Demo shell | `samples/demo`: root menu (logo, gradient, buttons) + pages Images / SVG / Recycled cells; React-level `SkiaShell` (`Routes`, `GoToAsync`/`GoBackAsync`, nav bar with Back, `useShell()`); `FillGradient` (linear); colors parsed MAUI-style `#AARRGGBB` via `Super.ParseColor` |
 | 2026-09-02 | Recycled cells | Templated `SkiaLayout` (`ItemsSource`/`ItemTemplate`/`RecyclingTemplate`/`MeasureFirst`+`MeasureAll`), `ViewsAdapter` pool, `BindingContext` + `SkiaDynamicDrawnCell.SetContent`, `SkiaScroll.ScrollToIndex`, `FirstVisibleIndex`/`DebugString`; sample = Cells fiddle shape with 100 000 items |
 | 2026-09-02 | Scrolling | `SkiaScroll` plain content: pan, deceleration fling cut at edges, rubber-band + spring bounce, wheel, `ScrollTo*`, `Scrolled`; physics classes `ScrollFlingAnimator`, `DecelerationTimingParameters`, `SpringWithVelocityAnimator`, `VelocityAccumulator`, `RubberBandUtils` |
@@ -28,9 +29,9 @@ Detailed per-feature omissions: [SKIPPED.md](SKIPPED.md). Live sample: https://h
 
 ## Next
 
-1. `UseCache` (`Image`/`Operations`) — cells cached like the C# recipes; then `MeasureVisible` for uneven rows.
-2. `SkiaShape` (Rectangle/Circle/Ellipse, `CornerRadius`, stroke, children clipped) → real `SkiaButton` templating (`BtnShape`/`BtnText`).
-3. `SkiaLayout` Grid, then Wrap (Grid also removes the fixed-height header workaround in the sample).
+1. `SkiaShape` (Rectangle/Circle/Ellipse, `CornerRadius`, stroke, children clipped) → real `SkiaButton` templating (`BtnShape`/`BtnText`).
+2. `SkiaLayout` Grid, then Wrap.
+3. `MeasureVisible` for uneven rows; `ImageDoubleBuffered` as a real double buffer.
 5. `SkiaLabel` wrapping, `MaxLines`, alignment, font weights.
 6. Transforms (`TranslationX/Y`, `Rotation`, `Scale`, `Opacity`) + gesture mapping through them.
 7. `MeasureVisible` + virtualization, windowed `ItemsSource`.

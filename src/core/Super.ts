@@ -44,6 +44,9 @@ export class Super {
 
   static UseDrawnUi(): DrawnUiBuilder { return new DrawnUiBuilder(); }
 
+  /** Master switch: false makes every control render uncached (DrawnUi Super.CacheEnabled). */
+  static CacheEnabled = true;
+
   private static readonly colorCache = new Map<string, Float32Array>();
 
   /**

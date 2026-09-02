@@ -1,5 +1,5 @@
 import type { GrDirectContext, Surface, WebGLContextHandle } from "canvaskit-wasm";
-import type { SkiaControl } from "./SkiaControl";
+import type { CachedObject, SkiaControl } from "./SkiaControl";
 import type { AnimatorBase } from "./Animators";
 import { Super } from "./Super";
 import { type Color, Colors, type RenderingModeType, SKRect } from "./Types";
@@ -22,6 +22,11 @@ export class Canvas {
   /** Accelerated = WebGL surface, Default = software. Read once at first frame. */
   RenderingMode: RenderingModeType = "Accelerated";
   RenderingScale = 1;
+  /** Duration of the last Draw in ms (measure + arrange + render, excluding GPU flush). */
+  FrameTime = 0;
+  /** Frames per second over the last second of drawn frames. */
+  FPS = 0;
+  private frameTimes: number[] = [];
 
   private content?: SkiaControl;
   get Content(): SkiaControl | undefined { return this.content; }
@@ -53,7 +58,7 @@ export class Canvas {
     const surface = this.surface;
     this.frameId = surface.requestAnimationFrame((c) => {
       this.frameId = 0;
-      if (this.surface === surface && !this.disposed) this.Draw(c);
+      if (this.surface === surface && !this.disposed) { this.Draw(c); surface.flush(); this.DrainDisposeQueue(); }
     });
   }
 
@@ -105,11 +110,13 @@ export class Canvas {
     if (!surface || this.disposed) return;
     this.Draw(surface.getCanvas());
     surface.flush();
+    this.DrainDisposeQueue();
   }
 
   private Draw(canvas: import("canvaskit-wasm").Canvas): void {
+    const started = performance.now();
     this.ProcessPendingGestures();
-    const executed = this.ExecuteAnimators(Math.round(performance.now() * 1_000_000));
+    const executed = this.ExecuteAnimators(Math.round(started * 1_000_000));
     canvas.clear(Super.ParseColor(this.BackgroundColor));
     const root = this.content;
     if (root) {
@@ -117,9 +124,27 @@ export class Canvas {
       const w = this.Element.width, h = this.Element.height;
       root.Measure(w, h, scale);
       root.Arrange(new SKRect(0, 0, w, h), root.WidthRequest, root.HeightRequest, scale);
-      root.Render({ Context: { Canvas: canvas }, Destination: new SKRect(0, 0, w, h), Scale: scale });
+      root.Render({ Context: { Canvas: canvas, Surface: this.surface }, Destination: new SKRect(0, 0, w, h), Scale: scale });
     }
+    const now = performance.now();
+    this.FrameTime = now - started;
+    this.frameTimes.push(now);
+    while (this.frameTimes.length && this.frameTimes[0] < now - 1000) this.frameTimes.shift();
+    this.FPS = this.frameTimes.length;
     if (executed > 0) this.Update(); // animators running: keep frames coming
+  }
+
+  // ---- deferred disposal (DrawnUi DisposeObject: never delete Skia objects mid-frame) ----
+
+  private readonly disposeQueue: CachedObject[] = [];
+
+  /** Queues a cache for deletion after the current frame has been flushed. */
+  DisposeObject(obj: CachedObject): void { this.disposeQueue.push(obj); }
+
+  private DrainDisposeQueue(): void {
+    if (this.disposeQueue.length === 0) return;
+    for (const o of this.disposeQueue) o.Dispose();
+    this.disposeQueue.length = 0;
   }
 
   // ---- animators (DrawnView.AnimatingControls) ----

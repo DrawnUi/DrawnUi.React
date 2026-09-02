@@ -12,6 +12,7 @@ export class ContactCell extends SkiaDynamicDrawnCell {
     this.Spacing = 12;
     this.Padding = new Thickness(12, 10);
     this.BackgroundColor = "#111827";
+    this.UseCache = "Image"; // the DrawnUi cell recipe: one bitmap per cell, blitted while scrolling
     this.AnimationTapped = "Ripple";
     this.Tapped = () => onTap(this.BindingContext as number);
 

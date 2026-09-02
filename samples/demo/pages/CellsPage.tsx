@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { Colors, SkiaButton, SkiaLabel, SkiaLayer, SkiaScroll, SkiaStack, Thickness } from "drawnui-react";
 import type { SkiaLayout as SkiaLayoutCtrl, SkiaScroll as SkiaScrollCtrl } from "drawnui-react/core";
+import { useCanvasView } from "./canvasView";
 import { ContactCell } from "./ContactCell";
 
 // Huge data source, like the "Cells" fiddle: 100 000 items, only the visible cells exist.
@@ -13,6 +14,7 @@ export function CellsPage() {
   const [debug, setDebug] = useState("");
   const scroll = useRef<SkiaScrollCtrl>(null);
   const feed = useRef<SkiaLayoutCtrl>(null);
+  const view = useCanvasView();
   // ItemTemplate must be a stable reference: a new function on every render would rebuild the whole cell pool.
   const template = useCallback(() => new ContactCell(setLastTapped), []);
   const jump = (index: number, option: "Start" | "End" = "Start") => scroll.current?.ScrollToIndex(index, true, option);
@@ -21,7 +23,7 @@ export function CellsPage() {
     <SkiaLayer VerticalOptions="Fill">
       <SkiaLabel Text={`100 000 items, RecyclingTemplate=Enabled, MeasureFirst · last cell tapped: ${lastTapped || "-"}`} FontSize={13} TextColor={Colors.LightGray} HorizontalOptions="Center" Margin={new Thickness(0, 10, 0, 0)} />
 
-      <SkiaScroll ref={scroll} Orientation="Vertical" Margin={new Thickness(0, STATUS_HEIGHT, 0, 0)} Scrolled={() => setDebug(feed.current?.DebugString ?? "")}>
+      <SkiaScroll ref={scroll} Orientation="Vertical" Margin={new Thickness(0, STATUS_HEIGHT, 0, 0)} Scrolled={() => setDebug(`${feed.current?.DebugString ?? ""} · ${view?.FrameTime.toFixed(1) ?? "?"} ms · ${view?.FPS ?? "?"} fps`)}>
         <SkiaStack
           ref={feed}
           ItemsSource={ITEMS}

@@ -3,14 +3,29 @@ import { type DrawingContext, SkiaControl } from "../core/SkiaControl";
 import { Super } from "../core/Super";
 import { type Color, Colors, ScaledSize } from "../core/Types";
 
-/** Mirrors DrawnUi SkiaLabel: single-line text. */
+/** Mirrors DrawnUi SkiaLabel: single-line text. Cached as Operations by default, like DrawnUi. */
 export class SkiaLabel extends SkiaControl {
-  Text = "";
+  private text = "";
+  private fontSize = 14;
+  private textColor: Color = Colors.Black;
+  private fontFamily = "";
+
+  constructor() {
+    super();
+    this.UseCache = "Operations";
+  }
+
+  // Setting a text property invalidates like a DrawnUi bindable property (cache + measure, bubbling up).
+  get Text(): string { return this.text; }
+  set Text(v: string) { if (this.text !== v) { this.text = v; this.Update(); } }
   /** Points. */
-  FontSize = 14;
-  TextColor: Color = Colors.Black;
+  get FontSize(): number { return this.fontSize; }
+  set FontSize(v: number) { if (this.fontSize !== v) { this.fontSize = v; this.Update(); } }
+  get TextColor(): Color { return this.textColor; }
+  set TextColor(v: Color) { if (this.textColor !== v) { this.textColor = v; this.Update(); } }
   /** Alias registered via ConfigureFonts; empty = default typeface. */
-  FontFamily = "";
+  get FontFamily(): string { return this.fontFamily; }
+  set FontFamily(v: string) { if (this.fontFamily !== v) { this.fontFamily = v; this.Update(); } }
 
   private font?: Font;
   private fontKey = "";
