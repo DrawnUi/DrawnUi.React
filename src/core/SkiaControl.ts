@@ -390,6 +390,19 @@ export class SkiaControl {
   }
 
   /** Draws the control: from its cache when it has one, else background + Paint(); overlays always live. */
+  /**
+   * Pixels the control paints OUTSIDE its DrawingRect (shadows, effects): caches record that much more and the
+   * blit is offset accordingly (DrawnUi ComputeEffectsMargin / GetRenderingExpandPixels). Base: nothing.
+   */
+  protected ComputeEffectsMargin(_scale: number): Thickness { return Thickness.Zero; }
+
+  /** DrawingRect grown by the effects margin, in pixels — the rect a cache is recorded for. */
+  protected ExpandedCacheRect(scale: number): SKRect {
+    const r = this.DrawingRect, m = this.ComputeEffectsMargin(scale);
+    if (m.Left === 0 && m.Top === 0 && m.Right === 0 && m.Bottom === 0) return r;
+    return new SKRect(r.Left - Math.ceil(m.Left), r.Top - Math.ceil(m.Top), r.Right + Math.ceil(m.Right), r.Bottom + Math.ceil(m.Bottom));
+  }
+
   Render(ctx: DrawingContext): void {
     if (!this.IsVisible || this.Opacity <= 0) return;
     const canvas = ctx.Context.Canvas;
@@ -450,7 +463,7 @@ export class SkiaControl {
       this.DestroyRenderingObject();
       this.PaintContent(own);
     } else {
-      const r = this.DrawingRect;
+      const r = this.ExpandedCacheRect(ctx.Scale);
       const stale = this.cacheDirty || !this.RenderObject || this.RenderObject.Type !== cacheType
         || this.RenderObject.Scale !== ctx.Scale
         || Math.round(this.RenderObject.Bounds.Width) !== Math.round(r.Width) || Math.round(this.RenderObject.Bounds.Height) !== Math.round(r.Height);
@@ -464,9 +477,11 @@ export class SkiaControl {
 
   /** Background + Paint(): the part of the control that a cache captures. */
   protected PaintContent(ctx: DrawingContext): void {
-    if (this.BackgroundColor || this.FillGradient) this.PaintBackground(ctx);
+    if (this.BackgroundColor || this.FillGradient || this.PaintsBackgroundWithoutColor()) this.PaintBackground(ctx);
     this.Paint(ctx);
   }
+  /** Subclasses whose PaintBackground has something to draw without a BackgroundColor (shape shadows). */
+  protected PaintsBackgroundWithoutColor(): boolean { return false; }
 
   /**
    * ImageDoubleBuffered: the last cache is kept while a new one is produced and shown when producing fails
@@ -480,7 +495,7 @@ export class SkiaControl {
   /** Records/renders the content into a new CachedObject for the current DrawingRect. */
   protected CreateRenderingObject(ctx: DrawingContext, cacheType: SkiaCacheType): void {
     const CK = Super.CK;
-    const r = this.DrawingRect;
+    const r = this.ExpandedCacheRect(ctx.Scale); // includes what shadows/effects paint outside the box
     const w = Math.max(1, Math.round(r.Width)), h = Math.max(1, Math.round(r.Height));
     if (cacheType === "ImageDoubleBuffered") {
       // keep the previous frame as the fallback until the new cache exists

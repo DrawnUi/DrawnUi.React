@@ -24,6 +24,23 @@ export function ShapesPage() {
         <SkiaLabel Text="SkiaShape" FontSize={24} TextColor={Colors.White} HorizontalOptions="Center" />
         <SkiaLabel Text="Stroke is drawn inside the bounds; children are clipped to the shape." FontSize={13} TextColor={Colors.LightGray} HorizontalOptions="Center" />
 
+        <SkiaLabel Text="Shadows" FontSize={20} TextColor={Colors.White} HorizontalOptions="Center" Margin={new Thickness(0, 8, 0, 0)} />
+        <SkiaWrap Spacing={16} HorizontalOptions="Center" MaximumWidthRequest={680}>
+          <Demo title="Shadows=[{Y:4, Blur:6, Opacity:.5}]">
+            <SkiaShape Type="Rectangle" CornerRadius={12} BackgroundColor="#FFFFFF" WidthRequest={100} HeightRequest={60} HorizontalOptions="Center" VerticalOptions="Center" Shadows={[{ X: 0, Y: 4, Blur: 6, Opacity: 0.5, Color: Colors.Black }]} />
+          </Demo>
+          <Demo title="Colored, offset X">
+            <SkiaShape Type="Circle" BackgroundColor="#FFC107" WidthRequest={64} LockRatio={1} HorizontalOptions="Center" VerticalOptions="Center" Shadows={[{ X: 6, Y: 6, Blur: 4, Opacity: 0.8, Color: "#6610F2" }]} />
+          </Demo>
+          <Demo title="Two shadows (glow + drop)">
+            <SkiaShape Type="Rectangle" CornerRadius={30} BackgroundColor="#20C997" WidthRequest={110} HeightRequest={60} HorizontalOptions="Center" VerticalOptions="Center" Shadows={[{ X: 0, Y: 0, Blur: 10, Opacity: 0.9, Color: "#20C997" }, { X: 0, Y: 6, Blur: 4, Opacity: 0.6, Color: Colors.Black }]} />
+          </Demo>
+          <Demo title="ShadowOnly + hollow ClipBackgroundColor">
+            <SkiaShape Type="Rectangle" CornerRadius={12} ClipBackgroundColor StrokeColor="#FFFFFF" StrokeWidth={2} WidthRequest={100} HeightRequest={60} HorizontalOptions="Center" VerticalOptions="Center" Shadows={[{ X: 0, Y: 5, Blur: 5, Opacity: 0.7, Color: Colors.Black }]} />
+          </Demo>
+        </SkiaWrap>
+
+        <SkiaLabel Text="Types" FontSize={20} TextColor={Colors.White} HorizontalOptions="Center" Margin={new Thickness(0, 8, 0, 0)} />
         <SkiaWrap Spacing={16} HorizontalOptions="Center" MaximumWidthRequest={680}>
           <Demo title='Rectangle CornerRadius={16}'>
             <SkiaShape Type="Rectangle" CornerRadius={16} BackgroundColor="#0D6EFD" StrokeColor={Colors.White} StrokeWidth={3} WidthRequest={110} HeightRequest={70} HorizontalOptions="Center" VerticalOptions="Center" />

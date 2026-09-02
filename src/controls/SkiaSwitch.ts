@@ -1,4 +1,4 @@
-import { type Color, Colors, Thickness } from "../core/Types";
+import { type Color, Colors, SkiaShadow, Thickness } from "../core/Types";
 import { Easing } from "../core/Easing";
 import { SkiaShape } from "./SkiaShape";
 import { SkiaToggle } from "./SkiaToggle";
@@ -40,9 +40,9 @@ export class SkiaSwitch extends SkiaToggle {
     const thumb = new SkiaShape(); thumb.Tag = "Thumb"; thumb.Type = "Circle"; thumb.HorizontalOptions = "Start"; thumb.VerticalOptions = "Fill"; thumb.LockRatio = -1;
     thumb.UseCache = "Operations";
     switch (this.usingStyle) {
-      case "Cupertino": this.SetContentSize(51, 31); frame.CornerRadius = 100; thumb.Margin = new Thickness(2); break;
-      case "Material": this.SetContentSize(46, 28); frame.CornerRadius = 7; frame.HeightRequest = 15; frame.VerticalOptions = "Center"; thumb.Margin = Thickness.Zero; break;
-      case "Material3": this.SetContentSize(52, 32); frame.CornerRadius = 16; frame.StrokeWidth = 2; frame.StrokeColor = SkiaSwitch.MaterialOutline; thumb.Margin = new Thickness(4); thumb.WidthRequest = 24; thumb.LockRatio = 1; thumb.VerticalOptions = "Center"; break;
+      case "Cupertino": this.SetContentSize(51, 31); frame.CornerRadius = 100; thumb.Margin = new Thickness(2); thumb.Shadows = [new SkiaShadow({ X: 0, Y: 3, Blur: 3, Opacity: 0.1, Color: Colors.Black })]; break;
+      case "Material": this.SetContentSize(46, 28); frame.CornerRadius = 7; frame.HeightRequest = 15; frame.VerticalOptions = "Center"; thumb.Margin = Thickness.Zero; thumb.Shadows = [new SkiaShadow({ X: 1, Y: 1, Blur: 3, Opacity: 0.1, Color: Colors.Black })]; break;
+      case "Material3": this.SetContentSize(52, 32); frame.CornerRadius = 16; frame.StrokeWidth = 2; frame.StrokeColor = SkiaSwitch.MaterialOutline; thumb.Margin = new Thickness(4); thumb.WidthRequest = 24; thumb.LockRatio = 1; thumb.VerticalOptions = "Center"; thumb.Shadows = [new SkiaShadow({ X: 1, Y: 1, Blur: 3, Opacity: 0.1, Color: Colors.Black })]; break;
       case "Windows": this.SetContentSize(48, 22); frame.CornerRadius = 12; frame.StrokeWidth = 2.5; frame.StrokeColor = "#767676"; thumb.Margin = new Thickness(5.5); break;
       default: this.SetContentSize(46, 28); frame.CornerRadius = 20; thumb.Margin = new Thickness(2); break;
     }

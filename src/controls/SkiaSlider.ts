@@ -2,7 +2,8 @@ import { type DrawingContext, SkiaControl } from "../core/SkiaControl";
 import { Super } from "../core/Super";
 import type { GestureEventProcessingInfo, SkiaGesturesParameters } from "../core/Gestures";
 import { type PrebuiltControlStyle, ResolveControlStyle, type ResolvedControlStyle } from "../core/ControlStyle";
-import { type Color, Colors, ScaledSize } from "../core/Types";
+import { type Color, Colors, ScaledSize, SkiaShadow, Thickness } from "../core/Types";
+import { SkiaShape } from "./SkiaShape";
 
 type RangeZone = "Unknown" | "Start" | "End";
 
@@ -65,15 +66,22 @@ export class SkiaSlider extends SkiaControl {
   get TrackSelectedColor(): Color { return this.trackSelectedColor ?? this.Look().selected; }
   set TrackSelectedColor(v: Color) { this.trackSelectedColor = v; this.Update(); }
 
-  /** C# style builders: thumb diameter, track height, palette. */
-  private Look(): { thumb: number; trackH: number; track: Color; selected: Color; thumbColor: Color } {
+  /** C# style builders: thumb diameter, track height, palette, thumb shadow. */
+  private Look(): { thumb: number; trackH: number; track: Color; selected: Color; thumbColor: Color; shadow: SkiaShadow } {
     switch (this.UsingControlStyle) {
-      case "Cupertino": return { thumb: 28, trackH: 2, track: "#CCCCCC", selected: "#007AFF", thumbColor: Colors.White };
-      case "Material": return { thumb: 20, trackH: 4, track: "#E8EAED", selected: "#2196F3", thumbColor: "#2196F3" };
-      case "Material3": return { thumb: 20, trackH: 4, track: "#E6E0E9", selected: "#6750A4", thumbColor: "#6750A4" };
-      case "Windows": return { thumb: 20, trackH: 4, track: "#C6C6C6", selected: "#0078D4", thumbColor: "#0078D4" };
-      default: return { thumb: 35, trackH: 6, track: "#D7DBE0", selected: "#DC143C", thumbColor: "#DC143C" };
+      case "Cupertino": return { thumb: 28, trackH: 2, track: "#CCCCCC", selected: "#007AFF", thumbColor: Colors.White, shadow: new SkiaShadow({ X: 0, Y: 1, Blur: 3, Opacity: 0.2, Color: Colors.Gray }) };
+      case "Material": return { thumb: 20, trackH: 4, track: "#E8EAED", selected: "#2196F3", thumbColor: "#2196F3", shadow: new SkiaShadow({ X: 0, Y: 1, Blur: 2, Opacity: 0.3, Color: Colors.Black }) };
+      case "Material3": return { thumb: 20, trackH: 4, track: "#E6E0E9", selected: "#6750A4", thumbColor: "#6750A4", shadow: new SkiaShadow({ X: 0, Y: 1, Blur: 2, Opacity: 0.3, Color: Colors.Black }) };
+      case "Windows": return { thumb: 20, trackH: 4, track: "#C6C6C6", selected: "#0078D4", thumbColor: "#0078D4", shadow: new SkiaShadow({ X: 0, Y: 1, Blur: 2, Opacity: 0.25, Color: Colors.Black }) };
+      default: return { thumb: 35, trackH: 6, track: "#D7DBE0", selected: "#DC143C", thumbColor: "#DC143C", shadow: new SkiaShadow({ X: 0, Y: 1, Blur: 3, Opacity: 0.25, Color: Colors.Black }) };
     }
+  }
+
+  /** Thumb shadows paint outside the box: the cache must include them. */
+  protected override ComputeEffectsMargin(scale: number): Thickness {
+    const s = this.Look().shadow;
+    const spread = 3 * s.Blur * scale;
+    return new Thickness(Math.max(0, spread - s.X * scale), Math.max(0, spread - s.Y * scale), spread + s.X * scale, spread + s.Y * scale);
   }
 
   private Clamp(v: number): number { return Math.max(this.Min, Math.min(this.Max, v)); }
@@ -137,20 +145,26 @@ export class SkiaSlider extends SkiaControl {
     if (endC > startC) canvas.drawRRect(CK.RRectXY(CK.LTRBRect(startC, cy - r, endC, cy + r), r, r), paint);
     const drawThumb = (c: number) => {
       const s = this.UsingControlStyle;
+      // the thumb's body carries the style shadow (C# SliderThumb shape Shadows)
+      const shadowed = (radius: number, color: Color) => {
+        const filter = SkiaShape.ShadowFilter(look.shadow, scale);
+        paint.setImageFilter(filter); paint.setColor(Super.ParseColor(color)); canvas.drawCircle(c, cy, radius, paint);
+        paint.setImageFilter(null); filter.delete();
+      };
       if (s === "Unset") {
         const inner = thumb - 10 * scale; // C# Margin 5 around the accent circle
-        paint.setColor(Super.ParseColor(this.ThumbColor)); canvas.drawCircle(c, cy, inner / 2, paint);
+        shadowed(inner / 2, this.ThumbColor);
         paint.setColor(Super.ParseColor(Colors.White)); canvas.drawCircle(c, cy, 3 * scale, paint);
       } else if (s === "Windows") {
-        paint.setColor(Super.ParseColor(Colors.White)); canvas.drawCircle(c, cy, thumb / 2, paint);
+        shadowed(thumb / 2, Colors.White);
         paint.setStyle(CK.PaintStyle.Stroke); paint.setStrokeWidth(scale); paint.setColor(Super.ParseColor("#E5E5E5")); canvas.drawCircle(c, cy, thumb / 2 - scale / 2, paint);
         paint.setStyle(CK.PaintStyle.Fill); paint.setColor(Super.ParseColor(this.ThumbColor)); canvas.drawCircle(c, cy, 5 * scale, paint);
       } else if (s === "Cupertino") {
-        paint.setColor(Super.ParseColor(this.ThumbColor)); canvas.drawCircle(c, cy, thumb / 2, paint);
+        shadowed(thumb / 2, this.ThumbColor);
         paint.setStyle(CK.PaintStyle.Stroke); paint.setStrokeWidth(0.5 * scale); paint.setColor(Super.ParseColor("#CCCCCC")); canvas.drawCircle(c, cy, thumb / 2, paint);
         paint.setStyle(CK.PaintStyle.Fill);
       } else {
-        paint.setColor(Super.ParseColor(this.ThumbColor)); canvas.drawCircle(c, cy, thumb / 2, paint);
+        shadowed(thumb / 2, this.ThumbColor);
       }
     };
     if (this.EnableRange) drawThumb(startC);

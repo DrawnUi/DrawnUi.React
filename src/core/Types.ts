@@ -80,6 +80,21 @@ export type TextTransform = "None" | "Lowercase" | "Uppercase" | "Titlecase";
 
 /** DrawnUi LayoutType. */
 export type LayoutType = "Absolute" | "Column" | "Row" | "Wrap" | "Grid";
+/** DrawnUi SkiaShadow: a drop shadow painted with the shape (offset and blur in points; Color alpha 1 = use Opacity). */
+export class SkiaShadow {
+  X = 2;
+  Y = 2;
+  /** Blur sigma, points. */
+  Blur = 5;
+  Opacity = 0.5;
+  Color: Color = "#00000000";
+  /** Draw only the shadow, not the shape itself. */
+  ShadowOnly = false;
+  constructor(init?: Partial<SkiaShadow>) { if (init) Object.assign(this, init); }
+  /** Accepts class instances or plain `{ X, Y, Blur, Opacity, Color }` literals from JSX. */
+  static From(v: SkiaShadow | Partial<SkiaShadow>): SkiaShadow { return v instanceof SkiaShadow ? v : new SkiaShadow(v); }
+}
+
 /** MAUI GridLength: absolute points, "Auto", "*" or "N*" (weighted star). */
 export type GridLength = number | "Auto" | "*" | `${number}*`;
 

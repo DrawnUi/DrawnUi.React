@@ -1,6 +1,6 @@
 import type { Path } from "canvaskit-wasm";
 import type { SkiaControl } from "../core/SkiaControl";
-import { type Color, Colors, type CornerRadius, SKRect, ScaledSize, type SkiaTouchAnimation, Thickness } from "../core/Types";
+import { type Color, Colors, type CornerRadius, SKRect, ScaledSize, SkiaShadow, type SkiaTouchAnimation, Thickness } from "../core/Types";
 import { SKPoint, type GestureEventProcessingInfo, type SkiaGesturesParameters } from "../core/Gestures";
 import { SkiaLayout } from "./SkiaLayout";
 import { SkiaLabel } from "./SkiaLabel";
@@ -68,12 +68,12 @@ export class SkiaButton extends SkiaLayout {
   get UsingControlStyle(): ResolvedControlStyle { return ResolveControlStyle(this.ControlStyle); }
 
   /** C# Create*StyleContent defaults: accent, corner radius, font size/weight, minimum content size. */
-  private static Look(s: ResolvedControlStyle): { bg: Color; radius: number; font: number; weight: number; minH: number } {
+  private static Look(s: ResolvedControlStyle): { bg: Color; radius: number; font: number; weight: number; minH: number; shadow?: SkiaShadow } {
     switch (s) {
-      case "Cupertino": return { bg: "#007AFF", radius: 8, font: 17, weight: 600, minH: 36 };
-      case "Material": return { bg: "#2196F3", radius: 4, font: 14, weight: 0, minH: 40 };
+      case "Cupertino": return { bg: "#007AFF", radius: 8, font: 17, weight: 600, minH: 36, shadow: new SkiaShadow({ X: 0, Y: 1, Blur: 2, Opacity: 0.2, Color: Colors.Black }) };
+      case "Material": return { bg: "#2196F3", radius: 4, font: 14, weight: 0, minH: 40, shadow: new SkiaShadow({ X: 0, Y: 2, Blur: 4, Opacity: 0.3, Color: Colors.Black }) };
       case "Material3": return { bg: "#6750A4", radius: 20, font: 14, weight: 0, minH: 40 };
-      case "Windows": return { bg: "#0078D7", radius: 4, font: 15, weight: 500, minH: 32 };
+      case "Windows": return { bg: "#0078D7", radius: 4, font: 15, weight: 500, minH: 32, shadow: new SkiaShadow({ X: 0, Y: 1, Blur: 1, Opacity: 0.2, Color: Colors.Black }) };
       default: return { bg: "#DC143C", radius: 8, font: 15, weight: 0, minH: 41 };
     }
   }
@@ -84,6 +84,7 @@ export class SkiaButton extends SkiaLayout {
     this.frame.CornerRadius = this.CornerRadius === 8 ? look.radius : this.CornerRadius; // C#: 8 = "not customized"
     this.frame.StrokeColor = this.StrokeColor;
     this.frame.StrokeWidth = this.StrokeWidth;
+    if ((this.frame.Shadows[0] as SkiaShadow | undefined) !== look.shadow) this.frame.Shadows = look.shadow ? [look.shadow] : [];
     if (this.MinimumHeightRequest < 0 && this.UsingControlStyle !== "Unset") this.MinimumHeightRequest = look.minH;
     this.label.Text = this.Text;
     this.label.TextColor = this.TextColor;

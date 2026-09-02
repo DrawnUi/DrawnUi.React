@@ -1,7 +1,7 @@
 import type { Path } from "canvaskit-wasm";
 import { type DrawingContext } from "../core/SkiaControl";
 import { Super } from "../core/Super";
-import { type Color, Colors, CornerRadius, SKRect, type ShapeType, type SkiaPoint, type StrokeCap } from "../core/Types";
+import { type Color, Colors, CornerRadius, SKRect, type ShapeType, SkiaShadow, type SkiaPoint, type StrokeCap, Thickness } from "../core/Types";
 import { SkiaLayout } from "./SkiaLayout";
 
 /**
@@ -26,6 +26,32 @@ export class SkiaShape extends SkiaLayout {
   Points: SkiaPoint[] = [];
   /** SVG path data for Type=Path, fitted and centered inside the rect. */
   PathData?: string;
+
+  private shadows: SkiaShadow[] = [];
+  /** Drop shadows painted with the background (DrawnUi SkiaShape.Shadows); plain `{X, Y, Blur, Opacity, Color}` literals accepted. */
+  get Shadows(): (SkiaShadow | Partial<SkiaShadow>)[] { return this.shadows; }
+  set Shadows(v: (SkiaShadow | Partial<SkiaShadow>)[] | undefined) { this.shadows = (v ?? []).map(SkiaShadow.From); this.Update(); }
+
+  protected override PaintsBackgroundWithoutColor(): boolean { return this.shadows.length > 0; }
+
+  /** C# MergeShadowMargin: spread = 3 * Blur * scale around the offset shadow. */
+  protected override ComputeEffectsMargin(scale: number): Thickness {
+    let l = 0, t = 0, r = 0, b = 0;
+    for (const s of this.shadows) {
+      const spread = 3 * s.Blur * scale, dx = s.X * scale, dy = s.Y * scale;
+      l = Math.max(l, spread - dx); t = Math.max(t, spread - dy); r = Math.max(r, spread + dx); b = Math.max(b, spread + dy);
+    }
+    return new Thickness(l, t, r, b);
+  }
+
+  /** C# CreateShadow: DropShadow (shape + shadow) or DropShadowOnly; a fully opaque Color takes the shadow's Opacity. */
+  static ShadowFilter(shadow: SkiaShadow, scale: number) {
+    const CK = Super.CK;
+    const c = Super.ParseColor(shadow.Color);
+    const color = c[3] >= 0.999 ? CK.Color4f(c[0], c[1], c[2], shadow.Opacity) : c;
+    const make = shadow.ShadowOnly ? CK.ImageFilter.MakeDropShadowOnly : CK.ImageFilter.MakeDropShadow;
+    return make(shadow.X * scale, shadow.Y * scale, shadow.Blur * scale, shadow.Blur * scale, color, null);
+  }
 
   constructor() {
     super();
@@ -120,14 +146,31 @@ export class SkiaShape extends SkiaLayout {
   // ---- paint ----
 
   protected override PaintBackground(ctx: DrawingContext): void {
-    if (this.ClipBackgroundColor) return;
     const type = this.Type;
     if (type === "Arc" || type === "Line") return; // open shapes: stroke only
+    const CK = Super.CK;
+    const canvas = ctx.Context.Canvas;
     const rect = this.StrokeAwareRect(ctx.Destination, ctx.Scale);
     const path = this.CreateShapePath(rect, ctx.Scale);
-    const paint = this.CreateBackgroundPaint(rect);
-    ctx.Context.Canvas.drawPath(path, paint);
-    paint.delete();
+    // C# PaintWithShadowsInternal: the fill is drawn once per shadow with a drop-shadow filter; a hollow shape
+    // (ClipBackgroundColor) clips its own outline away so only the shadow outside remains
+    for (const shadow of this.shadows) {
+      const paint = this.CreateBackgroundPaint(rect);
+      if (this.ClipBackgroundColor) paint.setColor(Super.ParseColor(this.StrokeColor === Colors.Transparent ? Colors.Black : this.StrokeColor));
+      const filter = SkiaShape.ShadowFilter(shadow, ctx.Scale);
+      paint.setImageFilter(filter);
+      const saved = canvas.save();
+      if (this.ClipBackgroundColor) canvas.clipPath(path, CK.ClipOp.Difference, true);
+      canvas.drawPath(path, paint);
+      canvas.restoreToCount(saved);
+      filter.delete();
+      paint.delete();
+    }
+    if (!this.ClipBackgroundColor && (this.shadows.length === 0 || this.shadows.some((s) => s.ShadowOnly))) {
+      const paint = this.CreateBackgroundPaint(rect);
+      canvas.drawPath(path, paint);
+      paint.delete();
+    }
     path.delete();
   }
 
