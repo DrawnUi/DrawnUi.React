@@ -4,6 +4,7 @@ import { ConcurrentRoot, DefaultEventPriority } from "react-reconciler/constants
 import type { Canvas } from "../core/Canvas";
 import { SkiaControl } from "../core/SkiaControl";
 import { SkiaLabel } from "../controls/SkiaLabel";
+import { TextSpan } from "../controls/TextSpan";
 import { SkiaLayer, SkiaLayout, SkiaRow, SkiaStack, SkiaWrap } from "../controls/SkiaLayout";
 import { SkiaHotspot } from "../controls/SkiaHotspot";
 import { SkiaButton } from "../controls/SkiaButton";
@@ -12,9 +13,12 @@ import { SkiaSvg } from "../controls/SkiaSvg";
 import { SkiaScroll } from "../controls/SkiaScroll";
 import { SkiaFrame, SkiaShape } from "../controls/SkiaShape";
 
+/** Anything React can mount: controls, plus TextSpan (a SkiaLabel child that is not a control, as in C#). */
+type HostInstance = SkiaControl | TextSpan;
+
 /** JSX tag name -> engine class. Add a control here to expose it to React. */
-export const Registry: Record<string, new () => SkiaControl> = {
-  SkiaLayout, SkiaStack, SkiaRow, SkiaLayer, SkiaWrap, SkiaLabel, SkiaHotspot, SkiaButton, SkiaImage, SkiaSvg, SkiaScroll, SkiaShape, SkiaFrame,
+export const Registry: Record<string, new () => HostInstance> = {
+  SkiaLayout, SkiaStack, SkiaRow, SkiaLayer, SkiaWrap, SkiaLabel, TextSpan, SkiaHotspot, SkiaButton, SkiaImage, SkiaSvg, SkiaScroll, SkiaShape, SkiaFrame,
 };
 
 type Props = Record<string, unknown>;
@@ -24,7 +28,7 @@ const SKIP = new Set(["children", "key", "ref"]);
  * Assigns changed props straight onto the control (same names as the C# properties).
  * Handler props (functions) are swapped without invalidating: inline arrows change identity every render.
  */
-function applyProps(inst: SkiaControl, prev: Props | null, next: Props): void {
+function applyProps(inst: HostInstance, prev: Props | null, next: Props): void {
   let changed = false;
   for (const k in next) {
     if (SKIP.has(k) || (prev && prev[k] === next[k])) continue;
@@ -32,7 +36,7 @@ function applyProps(inst: SkiaControl, prev: Props | null, next: Props): void {
     if (typeof next[k] !== "function") changed = true;
   }
   if (prev) for (const k in prev) if (!SKIP.has(k) && !(k in next)) {
-    (inst as unknown as Props)[k] = (new (inst.constructor as new () => SkiaControl)() as unknown as Props)[k];
+    (inst as unknown as Props)[k] = (new (inst.constructor as new () => HostInstance)() as unknown as Props)[k];
     changed = true;
   }
   if (changed && prev) inst.Update();
@@ -65,7 +69,7 @@ const hostConfig: Cfg & Record<string, unknown> = {
     if (!ctor) throw new Error(`DrawnUi: unknown control <${type}>`);
     const inst = new ctor();
     applyProps(inst, null, props);
-    return inst;
+    return inst as SkiaControl;
   },
   createTextInstance(text: string): never {
     throw new Error(`DrawnUi: raw text "${text}" is not allowed, use <SkiaLabel Text="..." />`);
@@ -73,7 +77,8 @@ const hostConfig: Cfg & Record<string, unknown> = {
   appendInitialChild: (parent: SkiaControl, child: SkiaControl) => parent.AddSubView(child),
   appendChild: (parent: SkiaControl, child: SkiaControl) => parent.AddSubView(child),
   insertBefore: (parent: SkiaControl, child: SkiaControl, before: SkiaControl) => {
-    const index = parent instanceof SkiaLayout ? parent.Views.indexOf(before) : 0;
+    const index = parent instanceof SkiaLayout ? parent.Views.indexOf(before)
+      : parent instanceof SkiaLabel ? parent.Spans.indexOf(before as unknown as TextSpan) : 0;
     parent.InsertSubView(index, child);
   },
   removeChild: (parent: SkiaControl, child: SkiaControl) => parent.RemoveSubView(child),

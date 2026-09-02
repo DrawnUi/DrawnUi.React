@@ -46,6 +46,14 @@ Updated whenever the port deliberately diverges or finds something worth back-po
   at the main font's width). Opinion: worth back-porting to .NET — a single fallback cannot cover arrows (Math) and
   ♥/★ (Symbols 2) at once, which is exactly the split `AddSymbols()` ships.
 
+### Span decorations use estimated metrics
+- C# reads `UnderlinePosition` / `StrikeoutPosition` / `XHeight` from the SKFont metrics and falls back to
+  1 px / half x-height when a face lacks them. CanvasKit exposes none of the three, so React always uses the
+  C# fallbacks: underline at `baseline + 1 scaled px`, strikeout at `baseline - 0.26 * fontSize` (x-height ≈ 0.52 em).
+  Visually identical for OpenSans; faces with unusual x-height may sit the strike a pixel off.
+- Spaces: a span fragment starting/ending with a space contributes a break opportunity but the space itself is not
+  painted with the span's `BackgroundColor` (C# paints it). Cosmetic; not worth changing on either side.
+
 ## Layout
 
 ### `MaximumWidthRequest` / `MaximumHeightRequest`

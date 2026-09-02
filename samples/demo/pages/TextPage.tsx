@@ -1,4 +1,5 @@
-import { Colors, SkiaLabel, SkiaScroll, SkiaShape, SkiaStack, SkiaWrap, Thickness } from "drawnui-react";
+import { useState } from "react";
+import { Colors, SkiaLabel, SkiaScroll, SkiaShape, SkiaStack, SkiaWrap, TextSpan, Thickness } from "drawnui-react";
 
 const LOREM = "DrawnUI draws every pixel itself: text is shaped and rasterized by Skia, so a label wraps by words, respects MaxLines with an ellipsis, aligns horizontally and vertically, and never leaves the canvas for a native view. This paragraph is long on purpose so it wraps across several lines at whatever width the layout gives it.";
 
@@ -15,6 +16,7 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
 
 /** SkiaLabel text engine: wrapping, MaxLines, alignment, spacing, weights, transforms. */
 export function TextPage() {
+  const [tapped, setTapped] = useState("nothing yet");
   return (
     <SkiaScroll Orientation="Vertical">
       <SkiaStack Spacing={16} Padding={new Thickness(16)} HorizontalOptions="Center" MaximumWidthRequest={720}>
@@ -22,6 +24,29 @@ export function TextPage() {
 
         <Card title="Word wrap · HorizontalOptions=Fill">
           <SkiaLabel Text={LOREM} FontSize={15} TextColor="#DEE2E6" HorizontalOptions="Fill" />
+        </Card>
+
+        <Card title="Spans — <TextSpan> children: color, size, bold, italic, underline, strikeout, background, Tapped">
+          <SkiaLabel FontSize={16} TextColor="#DEE2E6" HorizontalOptions="Fill" FontFamilyFallback="FontSymbols">
+            <TextSpan Text="One label, many styles: " />
+            <TextSpan Text="bold" IsBold />
+            <TextSpan Text=", " />
+            <TextSpan Text="italic" IsItalic />
+            <TextSpan Text=", " />
+            <TextSpan Text="colored" TextColor="#FFC107" />
+            <TextSpan Text=", " />
+            <TextSpan Text="bigger" FontSize={22} TextColor="#20C997" />
+            <TextSpan Text=", " />
+            <TextSpan Text="underlined" Underline />
+            <TextSpan Text=", " />
+            <TextSpan Text="struck out" Strikeout />
+            <TextSpan Text=", " />
+            <TextSpan Text=" highlighted " BackgroundColor="#6610F2" TextColor={Colors.White} />
+            <TextSpan Text=" and a " />
+            <TextSpan Text="tappable link →" TextColor="#6EA8FE" Underline Tapped={() => setTapped("link tapped at " + new Date().toLocaleTimeString())} />
+            <TextSpan Text=" that wraps with the rest of the paragraph like any other word." />
+          </SkiaLabel>
+          <SkiaLabel Text={"Last span tap: " + tapped} FontSize={13} TextColor="#ADB5BD" />
         </Card>
 
         <Card title="MaxLines={2} · TailTruncation (default)">

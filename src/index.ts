@@ -8,6 +8,7 @@ export * from "./core/SkiaControl";
 export * from "./core/Canvas";
 export * from "./controls/SkiaLayout";
 export * from "./controls/SkiaLabel";
+export * from "./controls/TextSpan";
 export * from "./controls/SkiaHotspot";
 export * from "./controls/SkiaShape";
 export * from "./controls/SkiaButton";

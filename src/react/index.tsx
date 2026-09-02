@@ -2,6 +2,7 @@ import { type CSSProperties, type FC, type ReactNode, type Ref, useImperativeHan
 import { Canvas as CanvasView } from "../core/Canvas";
 import type { SkiaControl } from "../core/SkiaControl";
 import type { SkiaLabel as SkiaLabelCtrl } from "../controls/SkiaLabel";
+import type { TextSpan as TextSpanCtrl } from "../controls/TextSpan";
 import type { SkiaLayout as SkiaLayoutCtrl } from "../controls/SkiaLayout";
 import type { SkiaHotspot as SkiaHotspotCtrl } from "../controls/SkiaHotspot";
 import type { SkiaButton as SkiaButtonCtrl } from "../controls/SkiaButton";
@@ -16,7 +17,7 @@ import { createDrawnRoot } from "./reconciler";
 /** Public settable properties of a control become its JSX props, same PascalCase names as C#. */
 type PropsOf<T> = Partial<{
   // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-  [K in keyof T as T[K] extends Function ? never : K extends "Children" | "Views" | "Parent" | "Superview" | "DrawingRect" | "MeasuredSize" | "RenderingScale" | "NeedMeasure" | "_superview" | "HitBoxAuto" | "TotalDown" | "TotalTapped" | "TouchDown" | "PostAnimators" | "LoadedSource" | "IsLoading" | "DisplayRect" | "AspectScale" | "Content" | "ContentSize" | "ContentOffsetBounds" | "OverscrollDistance" | "OverScrolled" | "IsUserPanning" | "IsUserFocused" | "IsScrolling" | "IsTemplated" | "FirstVisibleIndex" | "LastVisibleIndex" | "DebugString" | "ChildrenFactory" | "ContextIndex" | "RenderObject" | "UsingCacheType" ? never : K]: T[K];
+  [K in keyof T as T[K] extends Function ? never : K extends "Children" | "Views" | "Parent" | "Spans" | "Rects" | "HasTapHandler" | "HasDecorations" | "LinesCount" | "Superview" | "DrawingRect" | "MeasuredSize" | "RenderingScale" | "NeedMeasure" | "_superview" | "HitBoxAuto" | "TotalDown" | "TotalTapped" | "TouchDown" | "PostAnimators" | "LoadedSource" | "IsLoading" | "DisplayRect" | "AspectScale" | "Content" | "ContentSize" | "ContentOffsetBounds" | "OverscrollDistance" | "OverScrolled" | "IsUserPanning" | "IsUserFocused" | "IsScrolling" | "IsTemplated" | "FirstVisibleIndex" | "LastVisibleIndex" | "DebugString" | "ChildrenFactory" | "ContextIndex" | "RenderObject" | "UsingCacheType" ? never : K]: T[K];
 }>;
 
 /** `ref` receives the engine control instance (react-reconciler getPublicInstance). */
@@ -29,7 +30,9 @@ export const SkiaStack = "SkiaStack" as unknown as FC<LayoutProps<SkiaLayoutCtrl
 export const SkiaRow = "SkiaRow" as unknown as FC<LayoutProps<SkiaLayoutCtrl>>;
 export const SkiaLayer = "SkiaLayer" as unknown as FC<LayoutProps<SkiaLayoutCtrl>>;
 export const SkiaWrap = "SkiaWrap" as unknown as FC<LayoutProps<SkiaLayoutCtrl>>;
-export const SkiaLabel = "SkiaLabel" as unknown as FC<LeafProps<SkiaLabelCtrl>>;
+export const SkiaLabel = "SkiaLabel" as unknown as FC<LayoutProps<SkiaLabelCtrl>>;
+/** Child of <SkiaLabel>: a styled fragment (C# TextSpan). */
+export const TextSpan = "TextSpan" as unknown as FC<LeafProps<TextSpanCtrl>>;
 export const SkiaHotspot = "SkiaHotspot" as unknown as FC<LeafProps<SkiaHotspotCtrl>>;
 export const SkiaButton = "SkiaButton" as unknown as FC<LeafProps<SkiaButtonCtrl>>;
 export const SkiaImage = "SkiaImage" as unknown as FC<LeafProps<SkiaImageCtrl>>;
