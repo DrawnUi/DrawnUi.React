@@ -150,8 +150,11 @@ export class SkiaScroll extends SkiaControl {
     const alongY = this.Orientation === "Vertical" || this.Orientation === "Both";
     const w = alongX ? Math.max(this.ContentSize.Pixels.Width, r.Width) : r.Width;
     const h = alongY ? Math.max(this.ContentSize.Pixels.Height, r.Height) : r.Height;
-    const x = r.Left + (alongX ? this.offsetX * scale : 0);
-    const y = r.Top + (alongY ? this.offsetY * scale : 0);
+    // Offsets are snapped to whole device pixels: a fractional offset would rasterize every glyph at a
+    // different sub-pixel phase each frame (text shimmer while scrolling). DrawnUi gets the same result from
+    // nearest-sampled cached cells; here the snap applies to the whole content, cached or not.
+    const x = r.Left + (alongX ? Math.round(this.offsetX * scale) : 0);
+    const y = r.Top + (alongY ? Math.round(this.offsetY * scale) : 0);
     c.Arrange(SKRect.Create(x, y, w, h), c.WidthRequest, c.HeightRequest, scale);
     this.OverscrollDistance = this.CalculateOverscrollDistance(this.offsetX, this.offsetY);
   }
