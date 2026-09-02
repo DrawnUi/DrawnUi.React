@@ -26,6 +26,7 @@ Detailed per-feature omissions: [SKIPPED.md](SKIPPED.md). Live sample: https://h
 | 2026-09-02 | Glyph fallback | `SkiaLabel.FontFamilyFallback` chain (per-codepoint runs, spaces on main font), `ConfigureFonts` `AddSymbols()` / `AddEmojis()` with the Blazor Noto subsets (`FontSymbols`, `FontSymbols2`, `FontEmoji`); Text snippet card |
 | 2026-09-02 | Responsive demo | `MinimumWidthRequest`/`MaximumWidthRequest` (+Height), `SkiaLayout` Wrap + `SkiaWrap`; demo pages fluid on 390-px phones (verified in an iframe harness at 390 and 760): root cards, Images/Shapes wrap, Text alignment rows wrap, cells toolbar wraps at the bottom, nav title reserves Back space |
 | 2026-09-02 | Spans | `TextSpan` as `<SkiaLabel>` children (reconciler mounts non-control children): inherit-or-override color/size/family, weight/bold/italic, underline, strikeout, background, `Tapped` with per-fragment hit rects + ripple; line height per line from the tallest run, glued fragments wrap as one word; Text snippet card |
+| 2026-09-02 | Grid | `SkiaLayout` Type=Grid + `SkiaGrid`: 1:1 port of `SkiaGridStructure` (star/Auto/absolute tracks, spans, spacing, implicit tracks, last-track stretch, final-cell remeasure); child `Column`/`Row`/`ColumnSpan`/`RowSpan`; Layouts snippet (grid + wrap) |
 | 2026-09-02 | Scrolling | `SkiaScroll` plain content: pan, deceleration fling cut at edges, rubber-band + spring bounce, wheel, `ScrollTo*`, `Scrolled`; physics classes `ScrollFlingAnimator`, `DecelerationTimingParameters`, `SpringWithVelocityAnimator`, `VelocityAccumulator`, `RubberBandUtils` |
 
 ## In progress
@@ -36,7 +37,7 @@ Detailed per-feature omissions: [SKIPPED.md](SKIPPED.md). Live sample: https://h
 
 1. ~~`SkiaShape`~~ done (Rectangle/Circle/Ellipse, `CornerRadius`, stroke, children clipped) → real `SkiaButton` templating (`BtnShape`/`BtnText`).
 2. ~~`SkiaLabel` spans~~ done → `SkiaRichLabel` (markdown → spans).
-3. `SkiaLayout` Grid. ~~Wrap~~ done.
+3. ~~`SkiaLayout` Grid~~ done, ~~Wrap~~ done → templated `Split` grids, `SkiaDecoratedGrid`.
 4. `MeasureVisible` for uneven rows; `ImageDoubleBuffered` as a real double buffer.
 5. `SkiaLabel` wrapping, `MaxLines`, alignment, font weights.
 6. Transforms (`TranslationX/Y`, `Rotation`, `Scale`, `Opacity`) + gesture mapping through them.

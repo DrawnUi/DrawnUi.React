@@ -78,8 +78,10 @@ export type FontAttributes = "None" | "Bold" | "Italic" | "BoldItalic";
 /** MAUI TextTransform. */
 export type TextTransform = "None" | "Lowercase" | "Uppercase" | "Titlecase";
 
-/** DrawnUi LayoutType (Grid not ported yet). */
-export type LayoutType = "Absolute" | "Column" | "Row" | "Wrap";
+/** DrawnUi LayoutType. */
+export type LayoutType = "Absolute" | "Column" | "Row" | "Wrap" | "Grid";
+/** MAUI GridLength: absolute points, "Auto", "*" or "N*" (weighted star). */
+export type GridLength = number | "Auto" | "*" | `${number}*`;
 
 /** DrawnUi ShapeType (Squricle/Custom draw as Rectangle for now). */
 export type ShapeType = "Rectangle" | "Circle" | "Ellipse" | "Arc" | "Squricle" | "Path" | "Polygon" | "Line" | "Custom";

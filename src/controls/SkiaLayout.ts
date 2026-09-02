@@ -1,9 +1,10 @@
 import { type DrawingContext, SkiaControl } from "../core/SkiaControl";
 import { ViewsAdapter } from "../core/ViewsAdapter";
-import { type LayoutType, type MeasuringStrategy, type RecyclingTemplate, SKRect, ScaledSize, type ShapeType, Thickness } from "../core/Types";
+import { type GridLength, type LayoutType, type MeasuringStrategy, type RecyclingTemplate, SKRect, ScaledSize, type ShapeType, Thickness } from "../core/Types";
+import { SkiaGridStructure } from "./GridStructure";
 
 /**
- * Mirrors DrawnUi SkiaLayout (Absolute / Column / Row / Wrap).
+ * Mirrors DrawnUi SkiaLayout (Absolute / Column / Row / Wrap / Grid).
  * Column/Row give children an infinite main axis (MAUI stack semantics: Fill on the main axis = auto-sized).
  *
  * Templated mode (ItemsSource + ItemTemplate) is a Column only: cells are created through the ViewsAdapter for
@@ -15,6 +16,17 @@ export class SkiaLayout extends SkiaControl {
   Type: LayoutType | ShapeType = "Absolute";
   Spacing = 0;
   Padding: Thickness = Thickness.Zero;
+
+  // ---- grid (same names as DrawnUi; definitions as "*, 2*, Auto, 100" or an array) ----
+  ColumnDefinitions?: string | GridLength[];
+  RowDefinitions?: string | GridLength[];
+  /** Track used for columns/rows a child references but no definition declares (C# default: Auto). */
+  DefaultColumnDefinition: GridLength = "Auto";
+  DefaultRowDefinition: GridLength = "Auto";
+  ColumnSpacing = 0;
+  RowSpacing = 0;
+  /** Structure computed by the last measure; cells are arranged from it. */
+  GridStructure?: SkiaGridStructure;
 
   // ---- templated children (same names as DrawnUi) ----
   RecyclingTemplate: RecyclingTemplate = "Enabled";
@@ -107,6 +119,7 @@ export class SkiaLayout extends SkiaControl {
     let cw = 0, ch = 0, n = 0;
 
     if (this.Type === "Wrap") { const s = this.MeasureWrap(w, scale); return ScaledSize.FromPixels(s.w + px, s.h + py, scale); }
+    if (this.Type === "Grid") { const s = this.MeasureGrid(w, h, scale); return ScaledSize.FromPixels(s.w + px, s.h + py, scale); }
 
     for (const v of this.views) {
       if (!v.IsVisible) continue;
@@ -143,6 +156,20 @@ export class SkiaLayout extends SkiaControl {
     }
     finishRow();
     return { w: maxW, h: this.wrapSlots.length ? y + rowH : 0 };
+  }
+
+  /** Port of C# MeasureGrid: build the structure in points, stretch the last track when the grid fills, remeasure at final cells. */
+  private MeasureGrid(widthPx: number, heightPx: number, scale: number): { w: number; h: number } {
+    const wPts = widthPx / scale, hPts = heightPx / scale;
+    const g = new SkiaGridStructure(this, wPts, hPts, scale);
+    g.DecompressStars(wPts, hPts);
+    const needAutoWidth = this.WidthRequest < 0 && this.HorizontalOptions !== "Fill";
+    const needAutoHeight = this.HeightRequest < 0 && this.VerticalOptions !== "Fill";
+    if (!needAutoWidth && g.Columns.length > 0 && isFinite(wPts) && g.GridWidth() < wPts) g.Columns[g.Columns.length - 1].Size += wPts - g.GridWidth();
+    if (!needAutoHeight && g.Rows.length > 0 && isFinite(hPts) && g.GridHeight() < hPts) g.Rows[g.Rows.length - 1].Size += hPts - g.GridHeight();
+    g.RemeasureChildrenAtFinalCells();
+    this.GridStructure = g;
+    return { w: g.GridWidth() * scale, h: g.GridHeight() * scale };
   }
 
   /** Templated Column: content = padding + sum of item heights + gaps; width = the constraint (cells fill). */
@@ -210,6 +237,16 @@ export class SkiaLayout extends SkiaControl {
 
     if (this.Type === "Wrap") {
       for (const s of this.wrapSlots) s.view.Arrange(SKRect.Create(inner.Left + s.x, inner.Top + s.y, s.w, s.h), s.view.WidthRequest, s.view.HeightRequest, scale);
+      return;
+    }
+    if (this.Type === "Grid") {
+      const g = this.GridStructure;
+      if (!g) return;
+      for (const v of this.views) {
+        if (!v.IsVisible) continue;
+        const c = g.GetCellBoundsFor(v, inner.Left / scale, inner.Top / scale);
+        v.Arrange(SKRect.Create(c.Left * scale, c.Top * scale, c.Width * scale, c.Height * scale), v.WidthRequest, v.HeightRequest, scale);
+      }
       return;
     }
 
@@ -294,6 +331,11 @@ export class SkiaRow extends SkiaLayout {
 /** SkiaLayout Type=Absolute + HorizontalOptions=Fill (DrawnUi alias). */
 export class SkiaLayer extends SkiaLayout {
   constructor() { super(); this.Type = "Absolute"; this.HorizontalOptions = "Fill"; }
+}
+
+/** SkiaLayout Type=Grid + HorizontalOptions=Fill (DrawnUi alias): MAUI Grid alternative. */
+export class SkiaGrid extends SkiaLayout {
+  constructor() { super(); this.Type = "Grid"; this.HorizontalOptions = "Fill"; }
 }
 
 /** SkiaLayout Type=Wrap + HorizontalOptions=Fill (DrawnUi alias): responsive flow of fixed-size children. */

@@ -9,6 +9,7 @@ import { SvgPage } from "./pages/SvgPage";
 import { CellsPage } from "./pages/CellsPage";
 import { ShapesPage } from "./pages/ShapesPage";
 import { TextPage } from "./pages/TextPage";
+import { LayoutsPage } from "./pages/LayoutsPage";
 
 // Same startup shape as DrawnUi.Net / OpenTK: Super.UseDrawnUi().ConfigureFonts(...).BuildAsync()
 await Super.UseDrawnUi()
@@ -26,8 +27,9 @@ const ROUTES = {
   cells: () => <CellsPage />,
   shapes: () => <ShapesPage />,
   text: () => <TextPage />,
+  layouts: () => <LayoutsPage />,
 };
-const TITLES = { images: "Images", svg: "SVG", cells: "Recycled cells", shapes: "Shapes", text: "Text" };
+const TITLES = { images: "Images", svg: "SVG", cells: "Recycled cells", shapes: "Shapes", text: "Text", layouts: "Layouts" };
 
 function App() {
   const [view, setView] = useState<CanvasView | null>(null);

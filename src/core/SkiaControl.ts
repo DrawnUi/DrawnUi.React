@@ -65,6 +65,11 @@ export class SkiaControl {
   /** Floors the measured size (points). -1 = none. */
   MinimumWidthRequest = -1;
   MinimumHeightRequest = -1;
+  /** Grid placement (C# attached properties SkiaLayout.Column/Row/ColumnSpan/RowSpan). */
+  Column = 0;
+  Row = 0;
+  ColumnSpan = 1;
+  RowSpan = 1;
   Margin: Thickness = Thickness.Zero;
   /**
    * DrawnUi LockRatio: 0 = off; positive = square of the LARGER of the two sizes (requests or constraints),

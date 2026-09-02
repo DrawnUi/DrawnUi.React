@@ -17,7 +17,7 @@ import { createDrawnRoot } from "./reconciler";
 /** Public settable properties of a control become its JSX props, same PascalCase names as C#. */
 type PropsOf<T> = Partial<{
   // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-  [K in keyof T as T[K] extends Function ? never : K extends "Children" | "Views" | "Parent" | "Spans" | "Rects" | "HasTapHandler" | "HasDecorations" | "LinesCount" | "Superview" | "DrawingRect" | "MeasuredSize" | "RenderingScale" | "NeedMeasure" | "_superview" | "HitBoxAuto" | "TotalDown" | "TotalTapped" | "TouchDown" | "PostAnimators" | "LoadedSource" | "IsLoading" | "DisplayRect" | "AspectScale" | "Content" | "ContentSize" | "ContentOffsetBounds" | "OverscrollDistance" | "OverScrolled" | "IsUserPanning" | "IsUserFocused" | "IsScrolling" | "IsTemplated" | "FirstVisibleIndex" | "LastVisibleIndex" | "DebugString" | "ChildrenFactory" | "ContextIndex" | "RenderObject" | "UsingCacheType" ? never : K]: T[K];
+  [K in keyof T as T[K] extends Function ? never : K extends "Children" | "Views" | "Parent" | "Spans" | "GridStructure" | "Rects" | "HasTapHandler" | "HasDecorations" | "LinesCount" | "Superview" | "DrawingRect" | "MeasuredSize" | "RenderingScale" | "NeedMeasure" | "_superview" | "HitBoxAuto" | "TotalDown" | "TotalTapped" | "TouchDown" | "PostAnimators" | "LoadedSource" | "IsLoading" | "DisplayRect" | "AspectScale" | "Content" | "ContentSize" | "ContentOffsetBounds" | "OverscrollDistance" | "OverScrolled" | "IsUserPanning" | "IsUserFocused" | "IsScrolling" | "IsTemplated" | "FirstVisibleIndex" | "LastVisibleIndex" | "DebugString" | "ChildrenFactory" | "ContextIndex" | "RenderObject" | "UsingCacheType" ? never : K]: T[K];
 }>;
 
 /** `ref` receives the engine control instance (react-reconciler getPublicInstance). */
@@ -30,6 +30,7 @@ export const SkiaStack = "SkiaStack" as unknown as FC<LayoutProps<SkiaLayoutCtrl
 export const SkiaRow = "SkiaRow" as unknown as FC<LayoutProps<SkiaLayoutCtrl>>;
 export const SkiaLayer = "SkiaLayer" as unknown as FC<LayoutProps<SkiaLayoutCtrl>>;
 export const SkiaWrap = "SkiaWrap" as unknown as FC<LayoutProps<SkiaLayoutCtrl>>;
+export const SkiaGrid = "SkiaGrid" as unknown as FC<LayoutProps<SkiaLayoutCtrl>>;
 export const SkiaLabel = "SkiaLabel" as unknown as FC<LayoutProps<SkiaLabelCtrl>>;
 /** Child of <SkiaLabel>: a styled fragment (C# TextSpan). */
 export const TextSpan = "TextSpan" as unknown as FC<LeafProps<TextSpanCtrl>>;

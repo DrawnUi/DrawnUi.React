@@ -56,6 +56,10 @@ Updated whenever the port deliberately diverges or finds something worth back-po
 
 ## Layout
 
+### Grid attached properties are plain child props
+- C#: `draw:SkiaLayout.Column="1"` attached bindable properties. React: `Column={1}` / `Row` / `ColumnSpan` / `RowSpan`
+  props on any control (fields on `SkiaControl`, read by the grid only). Same defaults (0 / 0 / 1 / 1), no behaviour change.
+
 ### `MaximumWidthRequest` / `MaximumHeightRequest`
 - Same as C# (1.10.5.18+): caps the measured size AND the arranged Fill box; alignment uses the parent's full box. Used by
   the demo for responsive pages (`SkiaStack MaximumWidthRequest={720} HorizontalOptions="Center"`) — fluid below the cap,
