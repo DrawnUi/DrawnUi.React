@@ -107,7 +107,7 @@ export function ShellPage() {
               <SkiaShape Type="Rectangle" Margin={new Thickness(16)} BackgroundColor="#66FFFFFF" ClipBackgroundColor CornerRadius={19} HorizontalOptions="Fill" VerticalOptions="Fill"
                 Shadows={[{ X: 4, Y: 4, Blur: 3, Opacity: 1, Color: "#44000000" }]}>
                 <SkiaLayer>
-                  <SkiaBackdrop Blur={10} UseContext HorizontalOptions="Fill" VerticalOptions="Fill" ZIndex={-1} />
+                  <SkiaBackdrop Blur={6} UseContext HorizontalOptions="Fill" VerticalOptions="Fill" ZIndex={-1} />
                   <SkiaLayer Padding={new Thickness(8)} HorizontalOptions="Fill" VerticalOptions="Fill">
                     <SkiaLabel Text="Wonnabe Frosted Glass" FontSize={20} TextColor="#EFEFEF" HorizontalOptions="Center" HorizontalTextAlignment="Center" VerticalOptions="Center" />
                   </SkiaLayer>
