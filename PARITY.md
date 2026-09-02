@@ -73,6 +73,12 @@ Updated whenever the port deliberately diverges or finds something worth back-po
 
 ## Lists
 
+### ItemsSource changes are diffed, not observed
+- **C#**: `ObservableCollection` events say exactly what changed.
+- **React**: state is immutable arrays; the layout compares old/new (first/middle/last element identity) to recognise
+  append and prepend and keeps its structure; anything else rebuilds. Same user-visible result for the paging and
+  chat-history cases; an in-place removal costs a rebuild here. Opinion: nothing to back-port, .NET has the events.
+
 ### MeasureVisible measures visible cells on demand, not only in the background
 - **C#**: initial measured batch + background batches; a cell entering the viewport before its batch arrives uses
   the estimate until measured.

@@ -39,6 +39,43 @@ export class SkiaScroll extends SkiaControl {
   /** Offset changed (drag, fling, bounce, ScrollTo). */
   Scrolled?: (sender: SkiaScroll, e: ScaledPoint) => void;
 
+  // ---- LoadMore (DrawnUi SkiaScroll.LoadMoreCommand / LoadMoreTopCommand, callbacks instead of ICommand) ----
+  /** Called when scrolling within LoadMoreOffset points of the end (bottom / right), or when the content underfills the viewport. */
+  LoadMoreCommand?: (sender: SkiaScroll) => void;
+  /** Called when scrolling within LoadMoreTopOffset points of the start (top / left). */
+  LoadMoreTopCommand?: (sender: SkiaScroll) => void;
+  LoadMoreOffset = 0;
+  LoadMoreTopOffset = 0;
+  private loadMoreBottomAt = NaN;   // content extent (points) when the bottom command last fired; NaN = armed
+  private loadMoreBottomTime = 0;
+  /** Top fires only after the user has actually left the top edge and comes back (a fresh list at offset 0 is not a "reached the top"). */
+  private loadMoreTopArmed = false;
+
+  /** C# CheckNeedToLoadMore: fires once per content extent near an edge; re-arms when the content grows or the user moves away (>offset+100pt, >2 s). */
+  private CheckLoadMore(): void {
+    const vertical = this.Orientation !== "Horizontal";
+    const offset = vertical ? this.offsetY : this.offsetX;
+    const min = vertical ? this.ContentOffsetBounds.Top : this.ContentOffsetBounds.Left; // most negative offset
+    const extent = vertical ? this.ContentSize.Units.Height : this.ContentSize.Units.Width;
+    const now = performance.now();
+    if (this.LoadMoreCommand) {
+      const underfills = min >= 0; // nothing to scroll: keep paging until the viewport is filled
+      if (!isNaN(this.loadMoreBottomAt) && this.loadMoreBottomAt !== extent) this.loadMoreBottomAt = NaN;
+      else if (!isNaN(this.loadMoreBottomAt) && !underfills && offset - min > this.LoadMoreOffset + 100 && now - this.loadMoreBottomTime > 2000) this.loadMoreBottomAt = NaN;
+      if (isNaN(this.loadMoreBottomAt) && (underfills || offset <= min + this.LoadMoreOffset)) {
+        this.loadMoreBottomAt = extent; this.loadMoreBottomTime = now;
+        this.LoadMoreCommand(this);
+      }
+    }
+    if (this.LoadMoreTopCommand) {
+      if (-offset > this.LoadMoreTopOffset + 100) this.loadMoreTopArmed = true;
+      else if (this.loadMoreTopArmed && min < 0 && offset >= -this.LoadMoreTopOffset) {
+        this.loadMoreTopArmed = false;
+        this.LoadMoreTopCommand(this);
+      }
+    }
+  }
+
   IsUserPanning = false;
   IsUserFocused = false;
   IsScrolling = false;
@@ -52,9 +89,16 @@ export class SkiaScroll extends SkiaControl {
   get Content(): SkiaControl | undefined { return this.content; }
   set Content(value: SkiaControl | undefined) {
     if (this.content === value) return;
-    if (this.content) this.content.Parent = undefined;
+    if (this.content) { this.content.Parent = undefined; if (this.content instanceof SkiaLayout) this.content.ItemsInsertedAtStart = undefined; }
     this.content = value;
-    if (value) value.Parent = this;
+    if (value) {
+      value.Parent = this;
+      // items prepended (chat history): move the offset by the inserted extent so the visible rows stay put
+      if (value instanceof SkiaLayout) value.ItemsInsertedAtStart = (_, px) => {
+        const d = px / this.RenderingScale;
+        if (this.Orientation === "Horizontal") this.offsetX -= d; else this.offsetY -= d;
+      };
+    }
     this.InvalidateMeasure();
   }
 
@@ -139,6 +183,7 @@ export class SkiaScroll extends SkiaControl {
     const height = Math.max(0, this.ContentSize.Units.Height - viewportH);
     this.ContentOffsetBounds = new SKRect(-width, -height, 0, 0);
     this.ArrangeContent();
+    this.CheckLoadMore();
   }
 
   /** Places Content at the current offset; called on layout and every frame while the offset moves. */
@@ -173,6 +218,7 @@ export class SkiaScroll extends SkiaControl {
   }
 
   private OnScrolled(): void {
+    this.CheckLoadMore();
     this.Repaint();
     this.Scrolled?.(this, { Units: new SKPoint(this.offsetX, this.offsetY), Pixels: new SKPoint(this.offsetX * this.RenderingScale, this.offsetY * this.RenderingScale) });
   }

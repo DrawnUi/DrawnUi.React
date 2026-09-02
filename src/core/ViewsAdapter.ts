@@ -41,6 +41,15 @@ export class ViewsAdapter {
 
   GetExistingViewAtIndex(index: number): SkiaControl | undefined { return this.inUse.get(index); }
 
+  /** Items were inserted at the head: realized views keep their item, only their index moves (no rebind). */
+  ShiftIndices(by: number, items: readonly unknown[]): void {
+    this.items = items;
+    const moved = new Map<number, SkiaControl>();
+    for (const [index, view] of this.inUse) moved.set(index + by, view);
+    this.inUse.clear();
+    for (const [index, view] of moved) this.inUse.set(index, view);
+  }
+
   /** View bound to items[index]: existing, recycled from the pool, or freshly created. */
   GetOrCreateViewForIndex(index: number): SkiaControl | undefined {
     const existing = this.inUse.get(index);

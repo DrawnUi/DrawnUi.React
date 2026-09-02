@@ -61,10 +61,68 @@ export class SkiaLayout extends SkiaControl {
   get ItemsSource(): readonly unknown[] | undefined { return this.itemsSource; }
   set ItemsSource(value: readonly unknown[] | undefined) {
     if (this.itemsSource === value) return;
+    const old = this.itemsSource;
     this.itemsSource = value;
+    if (value && old && this.IsTemplated && !this.structureDirty && this.ApplyIncrementalChange(old, value)) { this.InvalidateMeasure(); return; }
     if (value && this.IsTemplated) this.ChildrenFactory.UpdateItems(value);
     this.structureDirty = true;
     this.InvalidateMeasure();
+  }
+
+  /**
+   * Raised after items were inserted at the head and measured, with the inserted extent in pixels; SkiaScroll uses it to
+   * keep the visible rows where they are (DrawnUi head-insert rebase).
+   */
+  ItemsInsertedAtStart?: (sender: SkiaLayout, insertedPx: number) => void;
+
+  /**
+   * DrawnUi keeps the structure on ObservableCollection Add/Insert; React apps replace the array, so the relation is
+   * detected instead: same items appended (page loaded) or prepended (chat history) keep every measured height,
+   * anything else rebuilds. Returns false when a full rebuild is needed.
+   */
+  private ApplyIncrementalChange(old: readonly unknown[], items: readonly unknown[]): boolean {
+    const n = items.length, o = old.length;
+    if (n <= o || o === 0) return false;
+    const k = n - o;
+    const scale = this.RenderingScale, gap = this.Spacing * scale, w = this.measuredWidthPx;
+    if (this.MeasureItemsStrategy === "MeasureFirst" && this.uniformHeight <= 0) return false;
+    const sameAt = (offset: number) => old[0] === items[offset] && old[o - 1] === items[offset + o - 1] && old[o >> 1] === items[offset + (o >> 1)];
+    if (sameAt(0)) {
+      // append: heights of the new tail are measured lazily (MeasureAll now, MeasureVisible on demand / in idle time)
+      this.ChildrenFactory.UpdateItems(items);
+      if (this.MeasureItemsStrategy === "MeasureAll") for (let i = o; i < n; i++) this.itemHeights.push(this.MeasureItem(i, w, scale));
+      else if (this.MeasureItemsStrategy === "MeasureVisible") {
+        const heights = new Float64Array(n); heights.set(this.mvHeights);
+        const prefix = new Float64Array(n + 1); prefix.set(this.mvPrefix);
+        this.mvHeights = heights; this.mvPrefix = prefix;
+      }
+      return true;
+    }
+    if (sameAt(k)) {
+      // prepend: shift indices, measure the new head synchronously (bounded), report the inserted extent
+      this.ChildrenFactory.ShiftIndices(k, items);
+      let insertedPx = 0;
+      if (this.MeasureItemsStrategy === "MeasureAll") {
+        const head: number[] = [];
+        for (let i = 0; i < k; i++) head.push(this.MeasureItem(i, w, scale));
+        this.itemHeights.unshift(...head);
+        for (const h of head) insertedPx += h + gap;
+      } else if (this.MeasureItemsStrategy === "MeasureVisible") {
+        const heights = new Float64Array(n); heights.set(this.mvHeights, k);
+        this.mvHeights = heights;
+        this.mvPrefix = new Float64Array(n + 1);
+        this.mvMeasured = 0;
+        const sync = Math.min(k, Math.max(this.BackgroundMeasurementBatchSize, 200));
+        for (let i = 0; i < sync; i++) insertedPx += this.MvMeasure(i, w, scale, true) + gap;
+        if (sync < k) insertedPx += (k - sync) * this.MvStride(gap); // the rest is estimated until the idle pass reaches it
+        this.MvExtendPrefix(gap);
+      } else {
+        insertedPx = k * (this.uniformHeight + gap);
+      }
+      this.ItemsInsertedAtStart?.(this, insertedPx);
+      return true;
+    }
+    return false;
   }
 
   /** Factory creating one cell (DrawnUi DataTemplate). Cells receive the item as BindingContext. */
@@ -219,7 +277,10 @@ export class SkiaLayout extends SkiaControl {
     }
 
     let total = 0;
-    if (this.MeasureItemsStrategy === "MeasureAll") { for (const h of this.itemHeights) total += h; total += Math.max(0, items.length - 1) * gap; }
+    if (this.MeasureItemsStrategy === "MeasureAll") {
+      while (this.itemHeights.length < items.length) this.itemHeights.push(this.MeasureItem(this.itemHeights.length, w, scale));
+      for (const h of this.itemHeights) total += h; total += Math.max(0, items.length - 1) * gap;
+    }
     else if (this.MeasureItemsStrategy === "MeasureVisible") { total = this.MvContentHeight(gap); this.MvScheduleBackground(); }
     else total = this.uniformHeight * items.length + Math.max(0, items.length - 1) * gap;
     return ScaledSize.FromPixels(w + px, total + py, scale);
