@@ -1,7 +1,8 @@
 import type { Canvas as SkCanvas, Image, Path, SkPicture, Surface } from "canvaskit-wasm";
 import { Super } from "./Super";
 import { type Color, Colors, type LayoutOptions, SKRect, ScaledSize, type SkiaCacheType, type SkiaGradient, type SkiaTouchAnimation, Thickness } from "./Types";
-import { type IOverlayEffect, RippleAnimator } from "./Animators";
+import { type IOverlayEffect, RippleAnimator, SkiaValueAnimator } from "./Animators";
+import { Easing } from "./Easing";
 import type { Canvas } from "./Canvas";
 import { Aria } from "./Accessibility";
 import { ControlTappedEventArgs, GestureEventProcessingInfo, type LockTouch, SKPoint, SkiaGesturesInfo, SkiaGesturesParameters, TouchActionEventArgs } from "./Gestures";
@@ -80,6 +81,30 @@ export class SkiaControl {
   FillGradient?: SkiaGradient;
   IsVisible = true;
   Tag?: string;
+
+  // ---- render transforms (MAUI VisualElement names; points, applied at render around DrawingRect) ----
+  TranslationX = 0;
+  TranslationY = 0;
+  /** Degrees, around (AnchorX, AnchorY). */
+  Rotation = 0;
+  ScaleX = 1;
+  ScaleY = 1;
+  /** Degrees. */
+  SkewX = 0;
+  SkewY = 0;
+  /** Pivot for Rotation/Scale/Skew as a fraction of the box (MAUI default 0.5). */
+  AnchorX = 0.5;
+  AnchorY = 0.5;
+  /** 0..1, applied as a layer alpha over the whole subtree (MAUI VisualElement.Opacity). */
+  Opacity = 1;
+  /** Sets ScaleX and ScaleY together (MAUI Scale). */
+  get Scale(): number { return this.ScaleX; }
+  set Scale(v: number) { this.ScaleX = v; this.ScaleY = v; }
+  get HasTransform(): boolean {
+    return this.TranslationX !== 0 || this.TranslationY !== 0 || this.Rotation !== 0 || this.ScaleX !== 1 || this.ScaleY !== 1 || this.SkewX !== 0 || this.SkewY !== 0;
+  }
+  /** Matrix applied at the last render (canvas space), undefined when none; gestures map through its inverse. */
+  RenderTransformMatrix?: number[];
   /** Generic numeric parameters (DrawnUi Value1/Value2): SkiaShape Arc uses start angle / sweep angle in degrees. */
   Value1 = 0;
   Value2 = 0;
@@ -286,8 +311,14 @@ export class SkiaControl {
 
   get IsAccessibilityElement(): boolean { const r = this.AccessibilityRole; return r != null && r !== Aria.RolePresentation; }
 
-  /** Hit rect in canvas pixels used to position the overlay element. */
-  GetAccessibilityPixelRect(): SKRect { return this.DrawingRect; }
+  /** Hit rect in canvas pixels used to position the overlay element: the drawn (transformed) bounds, like C# HitBoxWithTransforms. */
+  GetAccessibilityPixelRect(): SKRect {
+    const r = this.DrawingRect, m = this.RenderTransformMatrix;
+    if (!m) return r;
+    const pts = Super.CK.Matrix.mapPoints(m, [r.Left, r.Top, r.Right, r.Top, r.Right, r.Bottom, r.Left, r.Bottom]);
+    const xs = [pts[0], pts[2], pts[4], pts[6]], ys = [pts[1], pts[3], pts[5], pts[7]];
+    return new SKRect(Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys));
+  }
 
   /** Registers on first call, marks the snapshot dirty afterwards. */
   NotifyAccessibility(): void {
@@ -359,7 +390,59 @@ export class SkiaControl {
 
   /** Draws the control: from its cache when it has one, else background + Paint(); overlays always live. */
   Render(ctx: DrawingContext): void {
-    if (!this.IsVisible) return;
+    if (!this.IsVisible || this.Opacity <= 0) return;
+    const canvas = ctx.Context.Canvas;
+    const applyOpacity = this.Opacity < 1;
+    const needTransform = this.HasTransform;
+    let saved = false;
+    // same as DrawnUi: opacity = a layer with alpha, transforms = canvas matrix around the whole subtree (cache included)
+    if (applyOpacity) {
+      const paint = new Super.CK.Paint();
+      paint.setAlphaf(Math.max(0, Math.min(1, this.Opacity)));
+      canvas.saveLayer(paint);
+      paint.delete();
+      saved = true;
+    } else if (needTransform) {
+      canvas.save();
+      saved = true;
+    }
+    if (needTransform) {
+      this.RenderTransformMatrix = this.CreateRenderTransformMatrix(this.DrawingRect, ctx.Scale);
+      canvas.concat(this.RenderTransformMatrix);
+    } else {
+      this.RenderTransformMatrix = undefined;
+    }
+    this.RenderContent(ctx);
+    if (saved) canvas.restore();
+  }
+
+  /** Port of DrawnUi ApplyTransforms: T(-pivot) · rotation · scale/skew · T(pivot) · translation, in canvas pixels. */
+  protected CreateRenderTransformMatrix(destination: SKRect, scale: number): number[] {
+    const M = Super.CK.Matrix;
+    const moveX = this.TranslationX * scale, moveY = this.TranslationY * scale;
+    if (this.Rotation === 0 && this.ScaleX === 1 && this.ScaleY === 1 && this.SkewX === 0 && this.SkewY === 0) return M.translated(moveX, moveY);
+    const px = destination.Left + destination.Width * this.AnchorX;
+    const py = destination.Top + destination.Height * this.AnchorY;
+    const kx = this.SkewX !== 0 ? Math.tan((Math.PI * this.SkewX) / 180) : 0;
+    const ky = this.SkewY !== 0 ? Math.tan((Math.PI * this.SkewY) / 180) : 0;
+    const scaleSkew = [this.ScaleX, kx, 0, ky, this.ScaleY, 0, 0, 0, 1];
+    const rotation = this.Rotation !== 0 ? M.rotated((Math.PI * this.Rotation) / 180) : M.identity();
+    // multiply(a, b, c) = a·b·c, the right-most applies first
+    return M.multiply(M.translated(px + moveX, py + moveY), scaleSkew, rotation, M.translated(-px, -py));
+  }
+
+  /** Maps a point given in the parent's space into this control's untransformed space (DrawnUi TransformPointToLocalSpace). */
+  TransformPointToLocalSpace(point: SKPoint): SKPoint {
+    const m = this.RenderTransformMatrix;
+    if (!m) return point;
+    const inv = Super.CK.Matrix.invert(m);
+    if (!inv) return point;
+    const p = Super.CK.Matrix.mapPoints(inv, [point.X, point.Y]);
+    return new SKPoint(p[0], p[1]);
+  }
+
+  /** Cache blit or live paint, then post animators — the part a transform/opacity layer wraps. */
+  private RenderContent(ctx: DrawingContext): void {
     const own: DrawingContext = { ...ctx, Destination: this.DrawingRect };
     const cacheType = this.UsingCacheType;
     if (cacheType === "None") {
@@ -482,6 +565,16 @@ export class SkiaControl {
     this.Superview?.Update();
   }
 
+  /**
+   * Transform / Opacity changed: this control's own cache is still valid (content unchanged) but every ancestor
+   * cache holds its composited output, so those are staled before redrawing (DrawnUi RedrawCanvas + parent invalidation).
+   */
+  RepaintComposition(): void {
+    let p = this.Parent;
+    while (p) { p.cacheDirty = true; p = p.Parent; }
+    this.Repaint();
+  }
+
   /** Size or content may have changed: this control and all ancestors remeasure and re-record. */
   InvalidateMeasure(): void {
     this.NeedMeasure = true;
@@ -501,7 +594,8 @@ export class SkiaControl {
   }
 
   IsGestureForChild(child: SkiaControl, point: SKPoint): boolean {
-    return child.HitIsInside(point.X, point.Y);
+    const local = child.TransformPointToLocalSpace(point);
+    return child.HitIsInside(local.X, local.Y);
   }
 
   /** Children that may receive gestures, top-most LAST (layouts return their Views). */
@@ -554,7 +648,9 @@ export class SkiaControl {
       if (args.Type === "Tapped") {
         if (this.ChildTapped) { breakForChild = listener; this.ChildTapped(this, new ControlTappedEventArgs(listener, args, apply)); }
       }
-      consumed = listener.OnSkiaGestureEvent(args, new GestureEventProcessingInfo(apply.MappedLocation, apply.ChildOffset, apply.ChildOffsetDirect, wasConsumed));
+      // the child sees the location in its own untransformed space (DrawnUi maps through the inverse RenderTransformMatrix)
+      const local = listener.TransformPointToLocalSpace(point);
+      consumed = listener.OnSkiaGestureEvent(args, new GestureEventProcessingInfo(local, SKPoint.Empty, apply.ChildOffsetDirect, wasConsumed));
       if (consumed) break;
       if (breakForChild) { consumed = breakForChild; break; }
     }
@@ -582,6 +678,64 @@ export class SkiaControl {
       (location.X + childOffset.X - this.DrawingRect.Left) / this.RenderingScale,
       (location.Y + childOffset.Y - this.DrawingRect.Top) / this.RenderingScale,
     );
+  }
+
+  // ---- animations (DrawnUi AnimateAsync family, Promise-based; AbortSignal instead of CancellationTokenSource) ----
+  private ownAnimations = new Map<string, AbortController>();
+
+  /** Runs callback(0..1) over ms with easing on the canvas frame loop; rejects with AbortError when cancelled. */
+  AnimateAsync(callback: (value: number) => void, onCancel?: () => void, ms = 250, easing: Easing = Easing.Linear, cancel?: AbortSignal): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      const animator = new SkiaValueAnimator(this);
+      animator.mMinValue = 0;
+      animator.mMaxValue = 1;
+      animator.Speed = ms;
+      animator.Easing = easing;
+      let cancelled = false;
+      const abort = () => { cancelled = true; animator.Stop(); };
+      if (cancel?.aborted) { onCancel?.(); reject(new DOMException("Aborted", "AbortError")); return; }
+      cancel?.addEventListener("abort", abort, { once: true });
+      animator.OnUpdated = (v) => { callback(v); this.RepaintComposition(); };
+      animator.OnStop = () => {
+        cancel?.removeEventListener("abort", abort);
+        if (cancelled) { onCancel?.(); reject(new DOMException("Aborted", "AbortError")); } else resolve();
+      };
+      animator.Start();
+    });
+  }
+
+  /** callback(start..end) over ms. */
+  AnimateRangeAsync(callback: (value: number) => void, start: number, end: number, ms = 250, easing: Easing = Easing.Linear, cancel?: AbortSignal): Promise<void> {
+    return this.AnimateAsync((v) => callback(start + (end - start) * v), undefined, ms, easing, cancel);
+  }
+
+  /** One running animation per kind, like the per-property CancellationTokenSources in C#. */
+  private RunOwnAnimation(kind: string, run: (signal: AbortSignal) => Promise<void>, cancel?: AbortSignal): Promise<void> {
+    this.ownAnimations.get(kind)?.abort();
+    const controller = new AbortController();
+    this.ownAnimations.set(kind, controller);
+    cancel?.addEventListener("abort", () => controller.abort(), { once: true });
+    return run(controller.signal).finally(() => { if (this.ownAnimations.get(kind) === controller) this.ownAnimations.delete(kind); });
+  }
+
+  FadeToAsync(end: number, ms = 250, easing: Easing = Easing.Linear, cancel?: AbortSignal): Promise<void> {
+    const start = this.Opacity;
+    return this.RunOwnAnimation("fade", (s) => this.AnimateAsync((v) => { this.Opacity = start + (end - start) * v; }, undefined, ms, easing, s).then(() => { this.Opacity = end; }), cancel);
+  }
+
+  ScaleToAsync(x: number, y: number, ms = 250, easing: Easing = Easing.Linear, cancel?: AbortSignal): Promise<void> {
+    const sx = this.ScaleX, sy = this.ScaleY;
+    return this.RunOwnAnimation("scale", (s) => this.AnimateAsync((v) => { this.ScaleX = sx + (x - sx) * v; this.ScaleY = sy + (y - sy) * v; }, undefined, ms, easing, s).then(() => { this.ScaleX = x; this.ScaleY = y; }), cancel);
+  }
+
+  TranslateToAsync(x: number, y: number, ms = 250, easing: Easing = Easing.Linear, cancel?: AbortSignal): Promise<void> {
+    const tx = this.TranslationX, ty = this.TranslationY;
+    return this.RunOwnAnimation("translate", (s) => this.AnimateAsync((v) => { this.TranslationX = tx + (x - tx) * v; this.TranslationY = ty + (y - ty) * v; }, undefined, ms, easing, s).then(() => { this.TranslationX = x; this.TranslationY = y; }), cancel);
+  }
+
+  RotateToAsync(end: number, ms = 250, easing: Easing = Easing.Linear, cancel?: AbortSignal): Promise<void> {
+    const start = this.Rotation;
+    return this.RunOwnAnimation("rotate", (s) => this.AnimateAsync((v) => { this.Rotation = start + (end - start) * v; }, undefined, ms, easing, s).then(() => { this.Rotation = end; }), cancel);
   }
 
   /** Starts a ripple at (x, y) points inside this control; speedMs 0 = RippleAnimator default. */

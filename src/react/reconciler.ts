@@ -23,23 +23,27 @@ export const Registry: Record<string, new () => HostInstance> = {
 
 type Props = Record<string, unknown>;
 const SKIP = new Set(["children", "key", "ref"]);
+/** Props that change how the subtree is composited, not what it contains: repaint, keep caches (DrawnUi RedrawCanvas). */
+const REPAINT_ONLY = new Set(["TranslationX", "TranslationY", "Rotation", "ScaleX", "ScaleY", "Scale", "SkewX", "SkewY", "AnchorX", "AnchorY", "Opacity"]);
 
 /**
  * Assigns changed props straight onto the control (same names as the C# properties).
  * Handler props (functions) are swapped without invalidating: inline arrows change identity every render.
  */
 function applyProps(inst: HostInstance, prev: Props | null, next: Props): void {
-  let changed = false;
+  let changed = false, repaint = false;
   for (const k in next) {
     if (SKIP.has(k) || (prev && prev[k] === next[k])) continue;
     (inst as unknown as Props)[k] = next[k];
-    if (typeof next[k] !== "function") changed = true;
+    if (typeof next[k] === "function") continue;
+    if (REPAINT_ONLY.has(k)) repaint = true; else changed = true;
   }
   if (prev) for (const k in prev) if (!SKIP.has(k) && !(k in next)) {
     (inst as unknown as Props)[k] = (new (inst.constructor as new () => HostInstance)() as unknown as Props)[k];
     changed = true;
   }
   if (changed && prev) inst.Update();
+  else if (repaint && prev) (inst as SkiaControl).RepaintComposition?.();
 }
 
 let currentUpdatePriority: number = DefaultEventPriority;

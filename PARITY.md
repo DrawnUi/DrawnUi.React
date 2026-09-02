@@ -81,6 +81,21 @@ Updated whenever the port deliberately diverges or finds something worth back-po
   `Super.ParseColor`; CanvasKit's own `parseColorString` (CSS `#RRGGBBAA`) is used only for `rgb()/rgba()` strings.
   Web developers used to CSS must be told — `"#22FFFFFF"` is 13% white here, not opaque cyan.
 
+## Transforms
+
+### Transform / Opacity changes stale ancestor caches, not the control's own
+- **C#**: transform properties call `RedrawCanvas`; whether a cached parent re-records depends on the invalidation path.
+- **React**: `RepaintComposition()` marks every ancestor cache dirty (their pictures contain this control's composited
+  output) and keeps the control's own cache (content unchanged); the reconciler routes transform/opacity prop changes
+  there instead of `Update()`, so animating a child never remeasures. Found the hard way: the animated logo lived
+  inside an `Operations`-cached `SkiaShape` and did not move until the parent was re-recorded.
+- Opinion: matches what DrawnUi does at the top cached container; nothing to back-port beyond making sure a child's
+  transform change invalidates the parent's cache on every path.
+
+### Cancellation and skew
+- C# `*ToAsync` take a `CancellationTokenSource`; React takes an `AbortSignal` and rejects with `AbortError`.
+- C# ignores negative `SkewX/SkewY` (`> 0` check); React applies both signs. Opinion: C# check looks accidental.
+
 ## Accessibility
 
 ### Overlay does not capture pointer events

@@ -15,7 +15,7 @@ interface TextRun { Text: string; Font: Font; Width: number; Span?: TextSpan; Fo
 /** One laid-out line: runs, total advance, max ascent above / descent below the baseline (pixels). */
 interface TextLine { Runs: TextRun[]; Width: number; Ascent: number; Descent: number }
 /** A wrap unit: a word (or glued span fragment) with its style. */
-interface Token { Text: string; Fonts: SpanFonts; Span?: TextSpan; SpaceBefore: boolean }
+interface Token { Text: string; Fonts: SpanFonts; Span?: TextSpan; SpaceBefore: boolean; TrailingSpace?: boolean }
 
 /**
  * Mirrors DrawnUi SkiaLabel: multi-line text with word wrapping, MaxLines + tail ellipsis, horizontal /
@@ -229,7 +229,7 @@ export class SkiaLabel extends SkiaControl {
           if (words[w] === "") continue;
           para.push({ Text: words[w], Fonts: fonts, Span: span, SpaceBefore: w > 0 || (para.length > 0 && parts[p].startsWith(" ")) });
         }
-        if (parts[p].endsWith(" ") && para.length > 0) para[para.length - 1].Text += " "; // marks a trailing space
+        if (parts[p].endsWith(" ") && para.length > 0) para[para.length - 1].TrailingSpace = true;
       }
     };
     if (this.Spans.length > 0) {
@@ -240,10 +240,7 @@ export class SkiaLabel extends SkiaControl {
     // a fragment ending with a space puts the space before the NEXT token
     for (const para of paragraphs) {
       for (let i = 0; i < para.length; i++) {
-        if (para[i].Text.endsWith(" ")) {
-          para[i].Text = para[i].Text.slice(0, -1);
-          if (i + 1 < para.length) para[i + 1].SpaceBefore = true;
-        }
+        if (para[i].TrailingSpace && i + 1 < para.length) para[i + 1].SpaceBefore = true;
       }
     }
     return paragraphs;
