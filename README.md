@@ -15,7 +15,7 @@ await Super.UseDrawnUi()
 <Canvas BackgroundColor={Colors.DarkSlateBlue} RenderingMode="Accelerated" Gestures="Enabled">
   <SkiaStack Spacing={8} Padding={new Thickness(16)} VerticalOptions="Center">
     <SkiaLabel Text="Hello World" FontSize={32} TextColor={Colors.White} HorizontalOptions="Center" />
-    <SkiaButton Text="Tap me" HorizontalOptions="Center" Tapped={() => setCount((c) => c + 1)} />
+    <SkiaButton Text="Tap me" ApplyEffect="Ripple" HorizontalOptions="Center" Tapped={() => setCount((c) => c + 1)} />
   </SkiaStack>
 </Canvas>
 ```

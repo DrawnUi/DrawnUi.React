@@ -19,7 +19,9 @@ DrawnUi name and semantics; nothing here is a redesign, only an omission.
 | `LockRatio`, `HorizontalFillRatio`/`VerticalFillRatio` | skipped | |
 | `ZIndex` | skipped | Children draw in declaration order. |
 | Styles / `ConfigureStyles` | skipped | |
-| Animations (`AnimatorBase`, `FadeToAsync`, ...) | skipped | |
+| Animators core: `AnimatorBase` / `SkiaValueAnimator` / `RenderingAnimator` (`IOverlayEffect`), `Canvas.RegisterAnimator`/`AnimatingControls`, `PostAnimators` + `ExecutePostAnimators`, `Easing` (Linear/Cubic*) | ported | Frame-driven: a running animator keeps frames coming, idle canvas draws nothing. |
+| Touch feedback: `AnimationTapped="Ripple"` + `TouchEffectColor` + `AnimationTappedSpeed` on any control, `SkiaButton.ApplyEffect="Ripple"` (on Down), `PlayRippleAnimation`, `RippleAnimator`, `ClipEffects`/`CreateClip` | ported | Same numbers as C#: 500ms CubicIn, radius 300pt, opacity 0.20 fading over 1.15x progress. |
+| `Shimmer` touch animation, `ShimmerAnimator`, `ClippedEffectsWith`, `TransformView`, `DelayCallbackMs`, `removePrevious`, `Pause`/`Resume`, `UseInterpolator`, spring/deceleration timing, `AnimateExtensions` (`FadeToAsync`, `TranslateToAsync`, ...) | skipped | |
 | `VisualEffects`, shadows, shaders, `SkiaBackdrop` | skipped | |
 | Multithreading / offscreen rendering | skipped | Browser main thread only. |
 | Hot reload hook | skipped | Vite HMR reloads the page. |
@@ -45,7 +47,7 @@ DrawnUi name and semantics; nothing here is a redesign, only an omission.
 | `SkiaLayout` Grid / Wrap, `Split`, `ItemsSource`/`ItemTemplate`, recycling, virtualization | skipped | |
 | `SkiaLabel` | partial | Single line, `Text`, `FontSize`, `TextColor`, `FontFamily`. No wrap, `MaxLines`, alignment, spans, `AutoSize`, font weight. |
 | `SkiaHotspot` | ported | Fill/Fill, `Tapped`, `Down`, `Up`, `LockPanning`, `TouchDown`; consumes only Tapped like the C# one. No `AnimationTapped`/ripple/shimmer. |
-| `SkiaButton` | partial | Default look only: rounded frame radius 8 (hardcoded like the C# default content), centered label, `Text`/`TextColor`/`FontSize`/`FontFamily`/`BackgroundColor`/`IsPressed`/`IsDisabled`/`LockPanning`, `Tapped`/`Down`/`Up`. Pressed = 20% black overlay, no animation. No `ButtonStyle` platform looks, icons, `TextCase`, elevation, shimmer, `BtnText`/`BtnShape` templating. |
+| `SkiaButton` | partial | Default look only: rounded frame radius 8 (hardcoded like the C# default content), centered label, `Text`/`TextColor`/`FontSize`/`FontFamily`/`BackgroundColor`/`IsPressed`/`IsDisabled`/`LockPanning`, `Tapped`/`Down`/`Up`. `IsPressed` is tracked but has no visual; press feedback = `ApplyEffect="Ripple"`. No `ButtonStyle` platform looks, icons, `TextCase`, elevation, shimmer, `BtnText`/`BtnShape` templating. |
 | `SkiaShape`, `SkiaImage`, `SkiaSvg`, `SkiaScroll`, everything else | skipped | |
 
 ## Startup

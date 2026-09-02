@@ -1,7 +1,8 @@
 import { type DrawingContext } from "../core/SkiaControl";
 import type { SkiaControl } from "../core/SkiaControl";
 import { Super } from "../core/Super";
-import { type Color, Colors, ScaledSize, Thickness } from "../core/Types";
+import { type Color, Colors, ScaledSize, type SkiaTouchAnimation, Thickness } from "../core/Types";
+import type { Path } from "canvaskit-wasm";
 import { SKPoint, type GestureEventProcessingInfo, type SkiaGesturesParameters } from "../core/Gestures";
 import { SkiaLayout } from "./SkiaLayout";
 import { SkiaLabel } from "./SkiaLabel";
@@ -20,6 +21,8 @@ export class SkiaButton extends SkiaLayout {
   IsPressed = false;
   IsDisabled = false;
   LockPanning = false;
+  /** Touch feedback played on Down (DrawnUi SkiaButton.ApplyEffect). */
+  ApplyEffect: SkiaTouchAnimation = "None";
   TotalDown = 0;
   TotalTapped = 0;
   Down?: (sender: SkiaButton, args: SkiaGesturesParameters) => void;
@@ -55,11 +58,27 @@ export class SkiaButton extends SkiaLayout {
     paint.setAntiAlias(true);
     paint.setColor(Super.CK.parseColorString(this.BackgroundColor!));
     ctx.Context.Canvas.drawRRect(Super.CK.RRectXY(Super.CK.LTRBRect(r.Left, r.Top, r.Right, r.Bottom), radius, radius), paint);
-    if (this.IsPressed) {
-      paint.setColor(Super.CK.Color4f(0, 0, 0, 0.2));
-      ctx.Context.Canvas.drawRRect(Super.CK.RRectXY(Super.CK.LTRBRect(r.Left, r.Top, r.Right, r.Bottom), radius, radius), paint);
-    }
     paint.delete();
+  }
+
+  /** Rounded clip so overlay effects (ripple) stay inside the frame. */
+  override CreateClip(): Path {
+    const r = this.DrawingRect;
+    const radius = 8 * this.RenderingScale;
+    const b = new Super.CK.PathBuilder();
+    b.addRRect(Super.CK.RRectXY(Super.CK.LTRBRect(r.Left, r.Top, r.Right, r.Bottom), radius, radius));
+    const path = b.detach();
+    b.delete();
+    return path;
+  }
+
+  /** DrawnUi SkiaButton.OnDown: press feedback; true = consume Down. */
+  protected OnDown(_args: SkiaGesturesParameters, apply: GestureEventProcessingInfo): boolean {
+    if (this.ApplyEffect === "Ripple") {
+      const pts = this.GetOffsetInsideControlInPoints(apply.MappedLocation, apply.ChildOffset);
+      this.PlayRippleAnimation(this.TouchEffectColor, pts.X, pts.Y);
+    }
+    return true;
   }
 
   private SetUp(args: SkiaGesturesParameters): void {
@@ -80,7 +99,7 @@ export class SkiaButton extends SkiaLayout {
       this.TotalDown++;
       this.Down?.(this, args);
       this.Repaint();
-      return this;
+      return this.OnDown(args, apply) ? this : null;
     }
     if (args.Type === "Panning") {
       if (this.LockPanning) return this;

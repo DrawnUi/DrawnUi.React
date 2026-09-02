@@ -65,5 +65,8 @@ export const Colors = {
 /** DrawnUi LayoutType (Grid/Wrap not ported yet). */
 export type LayoutType = "Absolute" | "Column" | "Row";
 
+/** DrawnUi SkiaTouchAnimation (Shimmer declared for parity, not ported). */
+export type SkiaTouchAnimation = "None" | "Ripple" | "Shimmer";
+
 /** DrawnUi RenderingModeType subset. */
 export type RenderingModeType = "Default" | "Accelerated";

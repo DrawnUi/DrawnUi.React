@@ -12,7 +12,7 @@ import { createDrawnRoot } from "./reconciler";
 /** Public settable properties of a control become its JSX props, same PascalCase names as C#. */
 type PropsOf<T> = Partial<{
   // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-  [K in keyof T as T[K] extends Function ? never : K extends "Children" | "Views" | "Parent" | "Superview" | "DrawingRect" | "MeasuredSize" | "RenderingScale" | "NeedMeasure" | "_superview" | "HitBoxAuto" | "TotalDown" | "TotalTapped" | "TouchDown" ? never : K]: T[K];
+  [K in keyof T as T[K] extends Function ? never : K extends "Children" | "Views" | "Parent" | "Superview" | "DrawingRect" | "MeasuredSize" | "RenderingScale" | "NeedMeasure" | "_superview" | "HitBoxAuto" | "TotalDown" | "TotalTapped" | "TouchDown" | "PostAnimators" ? never : K]: T[K];
 }>;
 
 type LeafProps<T> = PropsOf<T>;

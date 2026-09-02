@@ -1,5 +1,6 @@
 import type { Surface } from "canvaskit-wasm";
 import type { SkiaControl } from "./SkiaControl";
+import type { AnimatorBase } from "./Animators";
 import { Super } from "./Super";
 import { type Color, Colors, type RenderingModeType, SKRect } from "./Types";
 import {
@@ -78,14 +79,40 @@ export class Canvas {
 
   private Draw(canvas: import("canvaskit-wasm").Canvas): void {
     this.ProcessPendingGestures();
+    const executed = this.ExecuteAnimators(Math.round(performance.now() * 1_000_000));
     canvas.clear(Super.CK.parseColorString(this.BackgroundColor));
     const root = this.content;
-    if (!root) return;
-    const scale = this.RenderingScale;
-    const w = this.Element.width, h = this.Element.height;
-    root.Measure(w, h, scale);
-    root.Arrange(new SKRect(0, 0, w, h), root.WidthRequest, root.HeightRequest, scale);
-    root.Render({ Context: { Canvas: canvas }, Destination: new SKRect(0, 0, w, h), Scale: scale });
+    if (root) {
+      const scale = this.RenderingScale;
+      const w = this.Element.width, h = this.Element.height;
+      root.Measure(w, h, scale);
+      root.Arrange(new SKRect(0, 0, w, h), root.WidthRequest, root.HeightRequest, scale);
+      root.Render({ Context: { Canvas: canvas }, Destination: new SKRect(0, 0, w, h), Scale: scale });
+    }
+    if (executed > 0) this.Update(); // animators running: keep frames coming
+  }
+
+  // ---- animators (DrawnView.AnimatingControls) ----
+
+  readonly AnimatingControls = new Map<number, AnimatorBase>();
+
+  RegisterAnimator(animator: AnimatorBase): boolean {
+    if (this.disposed) return false;
+    this.AnimatingControls.set(animator.Uid, animator);
+    return true;
+  }
+
+  UnregisterAnimator(uid: number): void { this.AnimatingControls.delete(uid); }
+
+  /** Ticks every registered animator once; returns how many ran. */
+  protected ExecuteAnimators(frameTimeNanos: number): number {
+    let executed = 0;
+    for (const a of [...this.AnimatingControls.values()]) {
+      if (!a.Parent) { this.AnimatingControls.delete(a.Uid); continue; }
+      a.TickFrame(frameTimeNanos);
+      executed++;
+    }
+    return executed;
   }
 
   Dispose(): void {

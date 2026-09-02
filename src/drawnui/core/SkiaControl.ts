@@ -1,6 +1,7 @@
-import type { Canvas as SkCanvas } from "canvaskit-wasm";
+import type { Canvas as SkCanvas, Path } from "canvaskit-wasm";
 import { Super } from "./Super";
-import { type Color, type LayoutOptions, SKRect, ScaledSize, Thickness } from "./Types";
+import { type Color, Colors, type LayoutOptions, SKRect, ScaledSize, type SkiaTouchAnimation, Thickness } from "./Types";
+import { type IOverlayEffect, RippleAnimator } from "./Animators";
 import type { Canvas } from "./Canvas";
 import {
   ControlTappedEventArgs, GestureEventProcessingInfo, type LockTouch, SKPoint, SkiaGesturesInfo, type SkiaGesturesParameters,
@@ -38,6 +39,17 @@ export class SkiaControl {
   /** Consume every gesture that lands on this control so nothing below (z-order) receives it. */
   BlockGesturesBelow = false;
   LockChildrenGestures: LockTouch = "Disabled";
+
+  // ---- touch feedback (same names as DrawnUi) ----
+  TouchEffectColor: Color = Colors.White;
+  /** Plays a ripple (from the tap point) when Tapped fires. */
+  AnimationTapped: SkiaTouchAnimation = "None";
+  /** Ripple duration ms, 0 = animator default (500). */
+  AnimationTappedSpeed = 0;
+  /** Overlay effects drawn above this control's content every frame (ripple etc). */
+  readonly PostAnimators: IOverlayEffect[] = [];
+  /** Clip overlay effects to the control's shape (CreateClip). */
+  ClipEffects = true;
 
   // ---- gesture events (single handler each; C# events map to one callback prop) ----
   Tapped?: (sender: SkiaControl, e: ControlTappedEventArgs) => void;
@@ -117,6 +129,23 @@ export class SkiaControl {
     const own: DrawingContext = { ...ctx, Destination: this.DrawingRect };
     if (this.BackgroundColor) this.PaintBackground(own);
     this.Paint(own);
+    this.ExecutePostAnimators(own);
+  }
+
+  /** Draws PostAnimators above content; an effect returning true asks for another frame. */
+  ExecutePostAnimators(ctx: DrawingContext): void {
+    if (this.PostAnimators.length === 0) return;
+    for (const effect of [...this.PostAnimators]) if (effect.Render(ctx, this)) this.Repaint();
+  }
+
+  /** Clip path of this control in canvas pixels (rect; shapes override). Caller deletes it. */
+  CreateClip(): Path {
+    const r = this.DrawingRect;
+    const b = new Super.CK.PathBuilder();
+    b.addRect(Super.CK.LTRBRect(r.Left, r.Top, r.Right, r.Bottom));
+    const path = b.detach();
+    b.delete();
+    return path;
   }
 
   /** Fills DrawingRect with BackgroundColor; shapes override for rounded corners etc. */
@@ -224,10 +253,32 @@ export class SkiaControl {
     return consumed ?? consumedDefault;
   }
 
-  /** Fires Tapped; true when a handler existed (= consumed), like DrawnUi SendTapped. */
+  /** Fires Tapped (after AnimationTapped feedback); true when a handler existed (= consumed), like DrawnUi SendTapped. */
   protected SendTapped(args: SkiaGesturesParameters, apply: GestureEventProcessingInfo): boolean {
     if (!this.Tapped) return false;
+    if (this.AnimationTapped === "Ripple") {
+      const pts = this.GetOffsetInsideControlInPoints(apply.MappedLocation, apply.ChildOffset);
+      this.PlayRippleAnimation(this.TouchEffectColor, pts.X, pts.Y, true, this.AnimationTappedSpeed);
+    }
     this.Tapped(this, new ControlTappedEventArgs(this, args, apply));
     return true;
+  }
+
+  /** Canvas-pixel touch location -> points relative to this control's top-left. */
+  GetOffsetInsideControlInPoints(location: SKPoint, childOffset: SKPoint): SKPoint {
+    return new SKPoint(
+      (location.X + childOffset.X - this.DrawingRect.Left) / this.RenderingScale,
+      (location.Y + childOffset.Y - this.DrawingRect.Top) / this.RenderingScale,
+    );
+  }
+
+  /** Starts a ripple at (x, y) points inside this control; speedMs 0 = RippleAnimator default. */
+  PlayRippleAnimation(color: Color, x: number, y: number, _removePrevious = true, speedMs = 0): void {
+    const animation = new RippleAnimator(this);
+    animation.Color = color;
+    animation.X = x;
+    animation.Y = y;
+    if (speedMs > 0) animation.Speed = speedMs;
+    animation.Start();
   }
 }

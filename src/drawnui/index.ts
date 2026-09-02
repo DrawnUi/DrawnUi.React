@@ -1,5 +1,7 @@
 export * from "./core/Types";
 export * from "./core/Gestures";
+export * from "./core/Easing";
+export * from "./core/Animators";
 export * from "./core/Super";
 export * from "./core/SkiaControl";
 export * from "./core/Canvas";
