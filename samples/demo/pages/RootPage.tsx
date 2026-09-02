@@ -5,6 +5,7 @@ const SAMPLES: { route: string; title: string; text: string }[] = [
   { route: "images", title: "Images", text: "SkiaImage — every TransformAspect, alignment, clipping" },
   { route: "svg", title: "SVG", text: "SkiaSvg — file and inline sources, TintColor, LockRatio" },
   { route: "shapes", title: "Shapes", text: "SkiaShape — rectangle, circle, ellipse, arc, polygon, line, path; stroke, corner radii, clipping" },
+  { route: "text", title: "Text", text: "SkiaLabel — word wrap, MaxLines, alignment, line spacing, weights, transforms" },
 ];
 
 /** Root menu styled after drawnui.net: dark body, logo + bold title, sample cards below. */

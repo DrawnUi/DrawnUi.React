@@ -35,6 +35,15 @@ Updated whenever the port deliberately diverges or finds something worth back-po
   through `applyProps` which calls `Update()`, but engine-level code must call `Update()` itself after mutating a field.
   Converting the remaining hot properties to accessors is pending.
 
+## Text
+
+### Font weights are registered per alias
+- **Both**: `ConfigureFonts(f => f.AddFont(source, alias, weight))`; `FontWeight`/`FontAttributes=Bold` resolve to the nearest
+  registered weight of the alias (400 = default). React adds: italic without an italic face = synthetic skew (-0.25), the C#
+  side has no synthetic italic. Defaults adopted from C#: `FontSize` 12, `TextColor` GreenYellow (unstyled text stays visible).
+- **React-only gap**: no glyph fallback yet — a symbol missing from the face renders as tofu instead of falling back
+  (C# `FontFamilyFallback` / `AutoFont`).
+
 ## Lists
 
 ### Recycled cells contract

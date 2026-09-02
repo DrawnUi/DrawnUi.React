@@ -1,11 +1,12 @@
-import CanvasKitInit, { type CanvasKit, type Typeface } from "canvaskit-wasm";
+import CanvasKitInit, { type CanvasKit, type Font, type Typeface } from "canvaskit-wasm";
 import wasmUrl from "canvaskit-wasm/bin/canvaskit.wasm?url";
 
-/** Mirrors DrawnUi.Net IFontCollection: fonts.AddFont(source, alias). */
+/** Mirrors DrawnUi.Net IFontCollection: fonts.AddFont(source, alias[, weight]). */
 export class FontCollection {
-  readonly Fonts: { Source: string; Alias: string }[] = [];
-  AddFont(source: string, alias: string): FontCollection {
-    this.Fonts.push({ Source: source, Alias: alias });
+  readonly Fonts: { Source: string; Alias: string; Weight: number }[] = [];
+  /** Registers a face under an alias; weight 100..900 lets FontWeight / FontAttributes=Bold pick the right file. */
+  AddFont(source: string, alias: string, weight = 400): FontCollection {
+    this.Fonts.push({ Source: source, Alias: alias, Weight: weight });
     return this;
   }
 }
@@ -22,11 +23,18 @@ export class DrawnUiBuilder {
   /** Loads CanvasKit + registered fonts. Must complete before the first Canvas is created. */
   async BuildAsync(): Promise<void> {
     Super.CK = await CanvasKitInit({ locateFile: () => wasmUrl });
+    const loaded = new Map<string, Typeface>(); // same file registered twice = one face
     for (const f of this.fonts.Fonts) {
-      const data = await (await fetch(f.Source)).arrayBuffer();
-      const face = Super.CK.Typeface.MakeFreeTypeFaceFromData(data);
-      if (!face) throw new Error(`DrawnUi: cannot load font '${f.Source}'`);
-      Super.Fonts.set(f.Alias, face);
+      let face = loaded.get(f.Source);
+      if (!face) {
+        const data = await (await fetch(f.Source)).arrayBuffer();
+        face = Super.CK.Typeface.MakeFreeTypeFaceFromData(data) ?? undefined;
+        if (!face) throw new Error(`DrawnUi: cannot load font '${f.Source}'`);
+        loaded.set(f.Source, face);
+      }
+      let weights = Super.Fonts.get(f.Alias);
+      if (!weights) { weights = new Map(); Super.Fonts.set(f.Alias, weights); }
+      weights.set(f.Weight, face);
       Super.DefaultTypeface ??= face;
     }
     Super.DefaultTypeface ??= Super.CK.Typeface.GetDefault() ?? undefined;
@@ -37,10 +45,11 @@ export class DrawnUiBuilder {
 export class Super {
   /** CanvasKit instance, valid after BuildAsync(). */
   static CK: CanvasKit;
-  /** Registered typefaces by alias (FontFamily). */
-  static readonly Fonts = new Map<string, Typeface>();
+  /** Registered typefaces by alias (FontFamily) and weight. */
+  static readonly Fonts = new Map<string, Map<number, Typeface>>();
   /** First registered font, or CanvasKit's built-in one. */
   static DefaultTypeface?: Typeface;
+  private static readonly fontCache = new Map<string, Font>();
 
   static UseDrawnUi(): DrawnUiBuilder { return new DrawnUiBuilder(); }
 
@@ -71,7 +80,29 @@ export class Super {
     return c;
   }
 
-  static GetTypeface(alias?: string): Typeface | null {
-    return (alias ? Super.Fonts.get(alias) : undefined) ?? Super.DefaultTypeface ?? null;
+  /** Typeface for an alias at a weight: exact, else the nearest registered weight, else the default face. */
+  static GetTypeface(alias?: string, weight = 0): Typeface | null {
+    const weights = alias ? Super.Fonts.get(alias) : undefined;
+    if (weights && weights.size > 0) {
+      const target = weight > 0 ? weight : 400;
+      if (weights.has(target)) return weights.get(target)!;
+      let best: number | undefined;
+      for (const w of weights.keys()) if (best === undefined || Math.abs(w - target) < Math.abs(best - target)) best = w;
+      return weights.get(best!)!;
+    }
+    return Super.DefaultTypeface ?? null;
+  }
+
+  /** Shared Font (typeface + pixel size + synthetic italic), cached across all labels. */
+  static GetFont(alias: string, weight: number, italic: boolean, sizePx: number): Font {
+    const key = `${alias}|${weight}|${italic ? 1 : 0}|${sizePx}`;
+    let font = Super.fontCache.get(key);
+    if (!font) {
+      font = new Super.CK.Font(Super.GetTypeface(alias, weight), sizePx);
+      font.setSubpixel(true);
+      if (italic) font.setSkewX(-0.25);
+      Super.fontCache.set(key, font);
+    }
+    return font;
   }
 }

@@ -60,7 +60,23 @@ export const Colors = {
   Yellow: "#FFFF00",
   CornflowerBlue: "#6495ED",
   DarkSlateBlue: "#483D8B",
+  GreenYellow: "#ADFF2F",
 } as const;
+
+/** DrawnUi DrawTextAlignment (Fill* variants are accepted and currently align Start). */
+export type DrawTextAlignment = "Start" | "Center" | "End" | "FillWords" | "FillWordsFull" | "FillCharacters" | "FillCharactersFull";
+
+/** MAUI TextAlignment. */
+export type TextAlignment = "Start" | "Center" | "End";
+
+/** MAUI LineBreakMode. Head/Middle truncation currently behave like TailTruncation. */
+export type LineBreakMode = "NoWrap" | "WordWrap" | "CharacterWrap" | "HeadTruncation" | "MiddleTruncation" | "TailTruncation";
+
+/** MAUI FontAttributes flags. */
+export type FontAttributes = "None" | "Bold" | "Italic" | "BoldItalic";
+
+/** MAUI TextTransform. */
+export type TextTransform = "None" | "Lowercase" | "Uppercase" | "Titlecase";
 
 /** DrawnUi LayoutType (Grid/Wrap not ported yet). */
 export type LayoutType = "Absolute" | "Column" | "Row";

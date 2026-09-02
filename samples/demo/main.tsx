@@ -8,11 +8,13 @@ import { ImagesPage } from "./pages/ImagesPage";
 import { SvgPage } from "./pages/SvgPage";
 import { CellsPage } from "./pages/CellsPage";
 import { ShapesPage } from "./pages/ShapesPage";
+import { TextPage } from "./pages/TextPage";
 
 // Same startup shape as DrawnUi.Net / OpenTK: Super.UseDrawnUi().ConfigureFonts(...).BuildAsync()
 await Super.UseDrawnUi()
   .ConfigureFonts((fonts) => fonts
     .AddFont("fonts/OpenSans-Regular.ttf", "FontText")
+    .AddFont("fonts/OpenSans-Semibold.ttf", "FontText", 600) // FontAttributes="Bold" / FontWeight={600} pick this face
     .AddFont("fonts/OpenSans-Semibold.ttf", "FontTextBold"))
   .BuildAsync();
 
@@ -21,8 +23,9 @@ const ROUTES = {
   svg: () => <SvgPage />,
   cells: () => <CellsPage />,
   shapes: () => <ShapesPage />,
+  text: () => <TextPage />,
 };
-const TITLES = { images: "Images", svg: "SVG", cells: "Recycled cells", shapes: "Shapes" };
+const TITLES = { images: "Images", svg: "SVG", cells: "Recycled cells", shapes: "Shapes", text: "Text" };
 
 function App() {
   const [view, setView] = useState<CanvasView | null>(null);
