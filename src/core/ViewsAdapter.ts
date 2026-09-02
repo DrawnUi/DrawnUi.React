@@ -80,6 +80,12 @@ export class ViewsAdapter {
     for (const index of [...this.inUse.keys()]) if (index < first || index > last) this.ReleaseViewAt(index);
   }
 
+  /** Releases every realized index not in `keep` (non-contiguous sets, e.g. a looped carousel). */
+  ReleaseExcept(keep: ReadonlySet<number>): void {
+    if (this.recycling !== "Enabled") return;
+    for (const index of [...this.inUse.keys()]) if (!keep.has(index)) this.ReleaseViewAt(index);
+  }
+
   /** Views currently bound, in index order (gesture listeners / drawing). */
   GetViewsInUse(): SkiaControl[] {
     return [...this.inUse.entries()].sort((a, b) => a[0] - b[0]).map((e) => e[1]);

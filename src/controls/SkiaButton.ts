@@ -31,7 +31,7 @@ export class SkiaButton extends SkiaLayout {
   IsDisabled = false;
   LockPanning = false;
   /** Touch feedback played on Down (DrawnUi SkiaButton.ApplyEffect). */
-  ApplyEffect: SkiaTouchAnimation = "None";
+  ApplyEffect: SkiaTouchAnimation = "Ripple"; // C# default
   TotalDown = 0;
   TotalTapped = 0;
   Down?: (sender: SkiaButton, args: SkiaGesturesParameters) => void;

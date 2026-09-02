@@ -173,3 +173,21 @@ Updated whenever the port deliberately diverges or finds something worth back-po
   `SrcIn`. Effects that operate on the SVG picture (`FillGradient`, FontAwesome duotone) are not reproducible this way.
 - **.NET**: `Svg.Skia` picture, vector at any scale.
 - **Opinion**: web-only constraint; nothing to back-port.
+
+## SkiaCarousel
+
+### Wrong-direction check follows the carousel axis
+- **React**: the first pan compares the movement along the carousel axis with the movement across it (`IsVertical` aware), using the total movement since Down.
+- **.NET**: `movex < RenderingScale * 2 || movey > movex` on the per-event delta, regardless of `IsVertical` — a vertical carousel rejects its own vertical swipes.
+- **Opinion**: back-port; pick the axis from `IsVertical`.
+
+### LinearSpeedMs ratio in points
+- **React**: `ratio = |end - start| / CellSize.Units`, so `LinearSpeedMs` is the time of exactly one slide.
+- **.NET**: divides the unit displacement by `CellSize.Pixels.Width`, so one slide takes `LinearSpeedMs / RenderingScale` (350 ms becomes 175 ms on a 2x screen), which contradicts the doc comment.
+- **Opinion**: back-port; use `CellSize.Units`.
+
+### Programmatic SelectedIndex interrupts a running snap
+- **React**: setting `SelectedIndex` (or `ScrollTo`) while a snap animates calls `InterruptSnapping` first, like `GoNext`/`GoPrev`, so the new target is honoured.
+- **.NET**: only `GoNext`/`GoPrev` interrupt; a plain `SelectedIndex` set during `_isSnapping` is ignored by `OnSelectedIndexChanged` and the carousel ends on the old target while the property says otherwise.
+- **Opinion**: back-port; call `InterruptSnapping()` from the `SelectedIndex` property changed handler.
+
