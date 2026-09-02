@@ -48,7 +48,9 @@ DrawnUi name and semantics; nothing here is a redesign, only an omission.
 | `SkiaLabel` | partial | Single line, `Text`, `FontSize`, `TextColor`, `FontFamily`. No wrap, `MaxLines`, alignment, spans, `AutoSize`, font weight. |
 | `SkiaHotspot` | ported | Fill/Fill, `Tapped`, `Down`, `Up`, `LockPanning`, `TouchDown`; consumes only Tapped like the C# one. No `AnimationTapped`/ripple/shimmer. |
 | `SkiaButton` | partial | Default look only: rounded frame radius 8 (hardcoded like the C# default content), centered label, `Text`/`TextColor`/`FontSize`/`FontFamily`/`BackgroundColor`/`IsPressed`/`IsDisabled`/`LockPanning`, `Tapped`/`Down`/`Up`. `IsPressed` is tracked but has no visual; press feedback = `ApplyEffect="Ripple"`. No `ButtonStyle` platform looks, icons, `TextCase`, elevation, shimmer, `BtnText`/`BtnShape` templating. |
-| `SkiaShape`, `SkiaImage`, `SkiaSvg`, `SkiaScroll`, everything else | skipped | |
+| `SkiaImage` | partial | `Source` (URL), `Aspect` (all `TransformAspect` values except `Tile`, same `RescaleAspect` math), `HorizontalAlignment`/`VerticalAlignment`, `Success`/`Error`, `IsLoading`, `LoadedSource`, `DisplayRect`, `AspectScale`; overflow clipped to the box. Not ported: `LoadSourceOnFirstDraw`, `PreviewBase64`, `ImageBitmap`/`LoadedImageSource`, `RescaleSource`/`CacheRescaledSource`/`RescalingQuality`, all adjustments (`Brightness`…`Blur`, `ColorTint`, gradient, `Zoom*`, offsets), sprites, `DrawWhenEmpty`, `EraseChangedContent`, `UseAssembly`. Measure: bounded box taken as is, unbounded axis from source aspect; no `NeedAutoWidth/Height` from Start alignment. |
+| `SkiaImageManager` | partial | `Instance.LoadImageAsync(url)`, `PreloadImages(urls)`, `ReuseBitmaps`, `Clear()`; in-memory cache of decoded images only. No `CacheLongevitySecs` eviction, no platform loaders, no `LoadImageOnlineAsync` retry policy. |
+| `SkiaShape`, `SkiaSvg`, `SkiaScroll`, everything else | skipped | |
 
 ## Startup
 

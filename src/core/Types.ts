@@ -65,6 +65,12 @@ export const Colors = {
 /** DrawnUi LayoutType (Grid/Wrap not ported yet). */
 export type LayoutType = "Absolute" | "Column" | "Row";
 
+/** DrawnUi TransformAspect: how an image/svg is scaled into its box. */
+export type TransformAspect = "None" | "Fill" | "Fit" | "AspectFit" | "AspectFill" | "AspectFitFill" | "FitFill" | "Cover" | "AspectCover" | "Tile";
+
+/** DrawnUi DrawImageAlignment. */
+export type DrawImageAlignment = "Start" | "Center" | "End";
+
 /** DrawnUi SkiaTouchAnimation (Shimmer declared for parity, not ported). */
 export type SkiaTouchAnimation = "None" | "Ripple" | "Shimmer";
 
