@@ -29,6 +29,11 @@ export class SkiaControl {
   WidthRequest = -1;
   HeightRequest = -1;
   Margin: Thickness = Thickness.Zero;
+  /**
+   * DrawnUi LockRatio: 0 = off; positive = square of the LARGER of the two sizes (requests or constraints),
+   * negative = square of the SMALLER one. Infinite sides are ignored, so WidthRequest=150 + LockRatio=1 = 150x150.
+   */
+  LockRatio = 0;
   BackgroundColor?: Color;
   IsVisible = true;
   Tag?: string;
@@ -82,10 +87,16 @@ export class SkiaControl {
     if (this.WidthRequest >= 0) w = this.WidthRequest * scale;
     if (this.HeightRequest >= 0) h = this.HeightRequest * scale;
 
+    let locked = false;
+    if (this.LockRatio !== 0) {
+      const lock = this.LockRatio > 0 ? SkiaControl.SmartMax(w, h) : SkiaControl.SmartMin(w, h);
+      if (lock > 0 && isFinite(lock)) { w = h = lock; locked = true; }
+    }
+
     const content = this.MeasureAbsolute(w, h, scale);
 
-    const rw = this.WidthRequest >= 0 ? w : this.HorizontalOptions === "Fill" && isFinite(w) ? w : content.Pixels.Width;
-    const rh = this.HeightRequest >= 0 ? h : this.VerticalOptions === "Fill" && isFinite(h) ? h : content.Pixels.Height;
+    const rw = locked || this.WidthRequest >= 0 ? w : this.HorizontalOptions === "Fill" && isFinite(w) ? w : content.Pixels.Width;
+    const rh = locked || this.HeightRequest >= 0 ? h : this.VerticalOptions === "Fill" && isFinite(h) ? h : content.Pixels.Height;
 
     this.MeasuredSize = ScaledSize.FromPixels(rw + mx, rh + my, scale);
     this.NeedMeasure = false;
@@ -112,6 +123,18 @@ export class SkiaControl {
     const y = availT + SkiaControl.Align(this.VerticalOptions, availH, h);
     this.DrawingRect = SKRect.Create(x, y, w, h);
     this.OnLayoutChanged();
+  }
+
+  /** DrawnUi SmartMax: larger of two sizes, an infinite one loses. */
+  protected static SmartMax(a: number, b: number): number {
+    if (!isFinite(a) || (isFinite(b) && b > a)) return b;
+    return a;
+  }
+
+  /** DrawnUi SmartMin: smaller of two sizes, an infinite one loses. */
+  protected static SmartMin(a: number, b: number): number {
+    if (!isFinite(a) || (isFinite(b) && b < a)) return b;
+    return a;
   }
 
   private static Align(o: LayoutOptions, avail: number, size: number): number {

@@ -11,3 +11,4 @@ export * from "./controls/SkiaHotspot";
 export * from "./controls/SkiaButton";
 export * from "./core/SkiaImageManager";
 export * from "./controls/SkiaImage";
+export * from "./controls/SkiaSvg";

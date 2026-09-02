@@ -8,10 +8,11 @@ import { SkiaLayer, SkiaLayout, SkiaRow, SkiaStack } from "../controls/SkiaLayou
 import { SkiaHotspot } from "../controls/SkiaHotspot";
 import { SkiaButton } from "../controls/SkiaButton";
 import { SkiaImage } from "../controls/SkiaImage";
+import { SkiaSvg } from "../controls/SkiaSvg";
 
 /** JSX tag name -> engine class. Add a control here to expose it to React. */
 export const Registry: Record<string, new () => SkiaControl> = {
-  SkiaLayout, SkiaStack, SkiaRow, SkiaLayer, SkiaLabel, SkiaHotspot, SkiaButton, SkiaImage,
+  SkiaLayout, SkiaStack, SkiaRow, SkiaLayer, SkiaLabel, SkiaHotspot, SkiaButton, SkiaImage, SkiaSvg,
 };
 
 type Props = Record<string, unknown>;

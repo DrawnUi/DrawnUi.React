@@ -6,6 +6,7 @@ import type { SkiaLayout as SkiaLayoutCtrl } from "../controls/SkiaLayout";
 import type { SkiaHotspot as SkiaHotspotCtrl } from "../controls/SkiaHotspot";
 import type { SkiaButton as SkiaButtonCtrl } from "../controls/SkiaButton";
 import type { SkiaImage as SkiaImageCtrl } from "../controls/SkiaImage";
+import type { SkiaSvg as SkiaSvgCtrl } from "../controls/SkiaSvg";
 import type { Color, RenderingModeType } from "../core/Types";
 import type { GesturesMode } from "../core/Gestures";
 import { createDrawnRoot } from "./reconciler";
@@ -28,6 +29,7 @@ export const SkiaLabel = "SkiaLabel" as unknown as FC<LeafProps<SkiaLabelCtrl>>;
 export const SkiaHotspot = "SkiaHotspot" as unknown as FC<LeafProps<SkiaHotspotCtrl>>;
 export const SkiaButton = "SkiaButton" as unknown as FC<LeafProps<SkiaButtonCtrl>>;
 export const SkiaImage = "SkiaImage" as unknown as FC<LeafProps<SkiaImageCtrl>>;
+export const SkiaSvg = "SkiaSvg" as unknown as FC<LeafProps<SkiaSvgCtrl>>;
 
 export interface CanvasProps {
   BackgroundColor?: Color;

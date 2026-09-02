@@ -16,7 +16,8 @@ DrawnUi name and semantics; nothing here is a redesign, only an omission.
 | Clipping to bounds, `ClipEffect`, `IsClippedToBounds` | skipped | Children can overflow their parent. |
 | `Padding` on base `SkiaControl` | skipped | Only `SkiaLayout.Padding` exists. |
 | `MinimumWidthRequest`/`MaximumWidthRequest` (+Height) | skipped | |
-| `LockRatio`, `HorizontalFillRatio`/`VerticalFillRatio` | skipped | |
+| `LockRatio` | ported | Same `SmartMax`/`SmartMin` rule as C# (sign decides larger/smaller side, infinite side loses). |
+| `HorizontalFillRatio`/`VerticalFillRatio` | skipped | |
 | `ZIndex` | skipped | Children draw in declaration order. |
 | Styles / `ConfigureStyles` | skipped | |
 | Animators core: `AnimatorBase` / `SkiaValueAnimator` / `RenderingAnimator` (`IOverlayEffect`), `Canvas.RegisterAnimator`/`AnimatingControls`, `PostAnimators` + `ExecutePostAnimators`, `Easing` (Linear/Cubic*) | ported | Frame-driven: a running animator keeps frames coming, idle canvas draws nothing. |
@@ -50,7 +51,8 @@ DrawnUi name and semantics; nothing here is a redesign, only an omission.
 | `SkiaButton` | partial | Default look only: rounded frame radius 8 (hardcoded like the C# default content), centered label, `Text`/`TextColor`/`FontSize`/`FontFamily`/`BackgroundColor`/`IsPressed`/`IsDisabled`/`LockPanning`, `Tapped`/`Down`/`Up`. `IsPressed` is tracked but has no visual; press feedback = `ApplyEffect="Ripple"`. No `ButtonStyle` platform looks, icons, `TextCase`, elevation, shimmer, `BtnText`/`BtnShape` templating. |
 | `SkiaImage` | partial | `Source` (URL), `Aspect` (all `TransformAspect` values except `Tile`, same `RescaleAspect` math), `HorizontalAlignment`/`VerticalAlignment`, `Success`/`Error`, `IsLoading`, `LoadedSource`, `DisplayRect`, `AspectScale`; overflow clipped to the box. Not ported: `LoadSourceOnFirstDraw`, `PreviewBase64`, `ImageBitmap`/`LoadedImageSource`, `RescaleSource`/`CacheRescaledSource`/`RescalingQuality`, all adjustments (`Brightness`…`Blur`, `ColorTint`, gradient, `Zoom*`, offsets), sprites, `DrawWhenEmpty`, `EraseChangedContent`, `UseAssembly`. Measure: bounded box taken as is, unbounded axis from source aspect; no `NeedAutoWidth/Height` from Start alignment. |
 | `SkiaImageManager` | partial | `Instance.LoadImageAsync(url)`, `PreloadImages(urls)`, `ReuseBitmaps`, `Clear()`; in-memory cache of decoded images only. No `CacheLongevitySecs` eviction, no platform loaders, no `LoadImageOnlineAsync` retry policy. |
-| `SkiaShape`, `SkiaSvg`, `SkiaScroll`, everything else | skipped | |
+| `SkiaSvg` | partial | `Source` (URL) / `SvgString`, `Aspect` (default `AspectFitFill`, uses the shared `RescaleAspect` math, not SkiaSvg's own matrix path), alignments, `TintColor` (SrcIn), `Success`/`Error`, `IsLoading`, `DisplayRect`. Rendering: browser decodes the SVG, rasterized at the displayed pixel size and cached per size (CanvasKit npm has no SVG module). Not ported: shadows, FontAwesome duotone colors, `FillGradient`, `Zoom*`/offsets/`InflateAmount`, `IconFilePath`/embedded resources, `UseCache=Operations` default (no caching yet). |
+| `SkiaShape`, `SkiaScroll`, everything else | skipped | |
 
 ## Startup
 
