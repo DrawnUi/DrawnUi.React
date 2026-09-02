@@ -1,15 +1,15 @@
-import { type DrawingContext } from "../core/SkiaControl";
-import type { SkiaControl } from "../core/SkiaControl";
-import { Super } from "../core/Super";
-import { type Color, Colors, ScaledSize, type SkiaTouchAnimation, Thickness } from "../core/Types";
 import type { Path } from "canvaskit-wasm";
+import type { SkiaControl } from "../core/SkiaControl";
+import { type Color, Colors, type CornerRadius, SKRect, ScaledSize, type SkiaTouchAnimation, Thickness } from "../core/Types";
 import { SKPoint, type GestureEventProcessingInfo, type SkiaGesturesParameters } from "../core/Gestures";
 import { SkiaLayout } from "./SkiaLayout";
 import { SkiaLabel } from "./SkiaLabel";
+import { SkiaShape } from "./SkiaShape";
 
 /**
- * Mirrors DrawnUi SkiaButton (default style): rounded frame (radius 8 like the C# default content) + centered label.
- * Consumes Down/Up/Tapped inside its rect; releases the pressed state when a pan exceeds PanThreshold.
+ * Mirrors DrawnUi SkiaButton (default style): a SkiaShape frame tagged "BtnShape" + a centered SkiaLabel
+ * tagged "BtnText". Consumes Down/Up/Tapped inside its rect; releases the pressed state when a pan exceeds
+ * PanThreshold. Press feedback = ApplyEffect (ripple), no darkening.
  */
 export class SkiaButton extends SkiaLayout {
   static PanThreshold = 5;
@@ -18,6 +18,10 @@ export class SkiaButton extends SkiaLayout {
   TextColor: Color = Colors.White;
   FontSize = 15;
   FontFamily = "";
+  /** Frame corner radius, points (DrawnUi default look uses 8). */
+  CornerRadius: CornerRadius | number = 8;
+  StrokeColor: Color = Colors.Transparent;
+  StrokeWidth = 0;
   IsPressed = false;
   IsDisabled = false;
   LockPanning = false;
@@ -28,6 +32,7 @@ export class SkiaButton extends SkiaLayout {
   Down?: (sender: SkiaButton, args: SkiaGesturesParameters) => void;
   Up?: (sender: SkiaButton, args: SkiaGesturesParameters) => void;
 
+  private readonly frame = new SkiaShape();
   private readonly label = new SkiaLabel();
   private lastDownPts = SKPoint.Empty;
   private hadDown = false;
@@ -37,40 +42,45 @@ export class SkiaButton extends SkiaLayout {
     this.Type = "Absolute";
     this.BackgroundColor = Colors.CornflowerBlue;
     this.Padding = new Thickness(16, 10);
+    this.frame.Tag = "BtnShape";
+    this.frame.HorizontalOptions = "Fill";
+    this.frame.VerticalOptions = "Fill";
     this.label.Tag = "BtnText";
     this.label.HorizontalOptions = "Center";
     this.label.VerticalOptions = "Center";
+    this.AddSubView(this.frame);
     this.AddSubView(this.label);
   }
 
+  /** The button's own BackgroundColor/CornerRadius/Stroke are the frame's; the button itself paints nothing. */
+  protected override PaintBackground(): void {}
+
   protected override MeasureAbsolute(w: number, h: number, scale: number): ScaledSize {
+    this.frame.BackgroundColor = this.BackgroundColor;
+    this.frame.CornerRadius = this.CornerRadius;
+    this.frame.StrokeColor = this.StrokeColor;
+    this.frame.StrokeWidth = this.StrokeWidth;
     this.label.Text = this.Text;
     this.label.TextColor = this.TextColor;
     this.label.FontSize = this.FontSize;
     this.label.FontFamily = this.FontFamily;
-    return super.MeasureAbsolute(w, h, scale);
+    // Size comes from the label + Padding; the Fill frame follows whatever the button is arranged to.
+    const px = this.Padding.HorizontalThickness * scale, py = this.Padding.VerticalThickness * scale;
+    const l = this.label.Measure(isFinite(w) ? w - px : w, isFinite(h) ? h - py : h, scale);
+    return ScaledSize.FromPixels(l.Pixels.Width + px, l.Pixels.Height + py, scale);
   }
 
-  protected override PaintBackground(ctx: DrawingContext): void {
-    const r = ctx.Destination;
-    const radius = 8 * ctx.Scale;
-    const paint = new Super.CK.Paint();
-    paint.setAntiAlias(true);
-    paint.setColor(Super.ParseColor(this.BackgroundColor!));
-    ctx.Context.Canvas.drawRRect(Super.CK.RRectXY(Super.CK.LTRBRect(r.Left, r.Top, r.Right, r.Bottom), radius, radius), paint);
-    paint.delete();
-  }
-
-  /** Rounded clip so overlay effects (ripple) stay inside the frame. */
-  override CreateClip(): Path {
+  /** The frame sits under the padding box: arrange children in the full rect, the label centered inside padding. */
+  protected override OnLayoutChanged(): void {
+    const scale = this.RenderingScale;
     const r = this.DrawingRect;
-    const radius = 8 * this.RenderingScale;
-    const b = new Super.CK.PathBuilder();
-    b.addRRect(Super.CK.RRectXY(Super.CK.LTRBRect(r.Left, r.Top, r.Right, r.Bottom), radius, radius));
-    const path = b.detach();
-    b.delete();
-    return path;
+    this.frame.Arrange(r, -1, -1, scale);
+    const p = this.Padding;
+    this.label.Arrange(new SKRect(r.Left + p.Left * scale, r.Top + p.Top * scale, r.Right - p.Right * scale, r.Bottom - p.Bottom * scale), -1, -1, scale);
   }
+
+  /** Ripple clipped to the rounded frame. */
+  override CreateClip(): Path { return this.frame.CreateClip(); }
 
   /** DrawnUi SkiaButton.OnDown: press feedback; true = consume Down. */
   protected OnDown(_args: SkiaGesturesParameters, apply: GestureEventProcessingInfo): boolean {

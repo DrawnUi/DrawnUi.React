@@ -1,9 +1,10 @@
-import { Colors, SkiaLabel, SkiaLayer, SkiaScroll, SkiaStack, SkiaSvg, Thickness, useShell } from "drawnui-react";
+import { Colors, SkiaLabel, SkiaScroll, SkiaShape, SkiaStack, SkiaSvg, Thickness, useShell } from "drawnui-react";
 
 const SAMPLES: { route: string; title: string; text: string }[] = [
   { route: "cells", title: "Recycled cells", text: "100 000 items in a SkiaScroll, RecyclingTemplate + MeasureFirst, UseCache=Image" },
   { route: "images", title: "Images", text: "SkiaImage — every TransformAspect, alignment, clipping" },
   { route: "svg", title: "SVG", text: "SkiaSvg — file and inline sources, TintColor, LockRatio" },
+  { route: "shapes", title: "Shapes", text: "SkiaShape — rectangle, circle, ellipse, arc, polygon, line, path; stroke, corner radii, clipping" },
 ];
 
 /** Root menu styled after drawnui.net: dark body, logo + bold title, sample cards below. */
@@ -18,13 +19,13 @@ export function RootPage() {
         {/* samples */}
         <SkiaLabel Text="Snippets" FontSize={32} TextColor="#DEE2E6" Margin={new Thickness(0, 8, 0, 0)} />
         {SAMPLES.map((s) => (
-          <SkiaLayer key={s.route} BackgroundColor="#2B3035" AnimationTapped="Ripple" Tapped={() => void shell.GoToAsync(s.route)}>
+          <SkiaShape key={s.route} Type="Rectangle" CornerRadius={12} BackgroundColor="#2B3035" StrokeColor="#373B3E" StrokeWidth={1} AnimationTapped="Ripple" Tapped={() => void shell.GoToAsync(s.route)}>
             <SkiaStack Spacing={6} Padding={new Thickness(24, 20)}>
               <SkiaLabel Text={s.title} FontSize={24} FontFamily="FontTextBold" TextColor={Colors.White} />
               <SkiaLabel Text={s.text} FontSize={14} TextColor="#ADB5BD" />
             </SkiaStack>
             <SkiaLabel Text="›" FontSize={28} TextColor="#6EA8FE" HorizontalOptions="End" VerticalOptions="Center" Margin={new Thickness(0, 0, 24, 0)} />
-          </SkiaLayer>
+          </SkiaShape>
         ))}
 
         <SkiaLabel Text="helloreact.drawnui.net · github.com/DrawnUi/DrawnUi.React · MIT" FontSize={12} TextColor="#6C757D" HorizontalOptions="Center" Margin={new Thickness(0, 16, 0, 0)} />

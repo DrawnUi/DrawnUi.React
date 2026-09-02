@@ -70,6 +70,9 @@ export class SkiaControl {
   FillGradient?: SkiaGradient;
   IsVisible = true;
   Tag?: string;
+  /** Generic numeric parameters (DrawnUi Value1/Value2): SkiaShape Arc uses start angle / sweep angle in degrees. */
+  Value1 = 0;
+  Value2 = 0;
   /** Extra points beyond the viewport a virtualized layout keeps realized (DrawnUi VirtualisationInflated). */
   VirtualisationInflated = 0;
 

@@ -65,6 +65,29 @@ export const Colors = {
 /** DrawnUi LayoutType (Grid/Wrap not ported yet). */
 export type LayoutType = "Absolute" | "Column" | "Row";
 
+/** DrawnUi ShapeType (Squricle/Custom draw as Rectangle for now). */
+export type ShapeType = "Rectangle" | "Circle" | "Ellipse" | "Arc" | "Squricle" | "Path" | "Polygon" | "Line" | "Custom";
+
+/** SKStrokeCap. */
+export type StrokeCap = "Butt" | "Round" | "Square";
+
+/** MAUI CornerRadius: uniform or per corner (points). */
+export class CornerRadius {
+  readonly TopLeft: number; readonly TopRight: number; readonly BottomLeft: number; readonly BottomRight: number;
+  constructor(topLeft: number, topRight?: number, bottomLeft?: number, bottomRight?: number) {
+    this.TopLeft = topLeft;
+    this.TopRight = topRight ?? topLeft;
+    this.BottomLeft = bottomLeft ?? topLeft;
+    this.BottomRight = bottomRight ?? topLeft;
+  }
+  static readonly Zero = new CornerRadius(0);
+}
+
+/** DrawnUi SkiaPoint: a vertex as ratios (0..1) of the shape rect. */
+export class SkiaPoint {
+  constructor(public X = 0, public Y = 0) {}
+}
+
 /** DrawnUi TransformAspect: how an image/svg is scaled into its box. */
 export type TransformAspect = "None" | "Fill" | "Fit" | "AspectFit" | "AspectFill" | "AspectFitFill" | "FitFill" | "Cover" | "AspectCover" | "Tile";
 

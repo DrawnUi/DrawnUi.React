@@ -1,4 +1,4 @@
-import { Colors, SkiaDynamicDrawnCell, SkiaLabel, SkiaLayout, Thickness } from "drawnui-react/core";
+import { Colors, SkiaDynamicDrawnCell, SkiaLabel, SkiaLayout, SkiaShape, Thickness } from "drawnui-react/core";
 
 /** Recycled cell, the DrawnUi way: visuals built once in the ctor, SetContent runs on every rebind. */
 export class ContactCell extends SkiaDynamicDrawnCell {
@@ -16,7 +16,8 @@ export class ContactCell extends SkiaDynamicDrawnCell {
     this.AnimationTapped = "Ripple";
     this.Tapped = () => onTap(this.BindingContext as number);
 
-    const avatar = new SkiaLayout();
+    const avatar = new SkiaShape();
+    avatar.Type = "Circle";
     avatar.WidthRequest = 42;
     avatar.LockRatio = 1;
     avatar.BackgroundColor = "#1F2937";

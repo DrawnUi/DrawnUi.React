@@ -1,6 +1,6 @@
 import { type DrawingContext, SkiaControl } from "../core/SkiaControl";
 import { ViewsAdapter } from "../core/ViewsAdapter";
-import { type LayoutType, type MeasuringStrategy, type RecyclingTemplate, SKRect, ScaledSize, Thickness } from "../core/Types";
+import { type LayoutType, type MeasuringStrategy, type RecyclingTemplate, SKRect, ScaledSize, type ShapeType, Thickness } from "../core/Types";
 
 /**
  * Mirrors DrawnUi SkiaLayout (Absolute / Column / Row).
@@ -11,7 +11,8 @@ import { type LayoutType, type MeasuringStrategy, type RecyclingTemplate, SKRect
  * MeasureFirst measures one cell and assumes uniform size, MeasureAll measures every item once.
  */
 export class SkiaLayout extends SkiaControl {
-  Type: LayoutType = "Absolute";
+  /** Layout type. SkiaShape redeclares it as ShapeType (any shape value lays out as Absolute), like the C# hidden Type. */
+  Type: LayoutType | ShapeType = "Absolute";
   Spacing = 0;
   Padding: Thickness = Thickness.Zero;
 
