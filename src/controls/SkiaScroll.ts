@@ -197,6 +197,27 @@ export class SkiaScroll extends SkiaControl {
   // ---- programmatic scrolling ----
 
   /** Scroll to an offset in points; maxSpeedSecs > 0 animates along the deceleration curve. */
+  /**
+   * Scrolls every SkiaScroll ancestor of `control` so its DrawingRect lies inside the viewport (React extension,
+   * used by the accessibility overlay when keyboard focus lands on an off-screen node). Offsets are points.
+   */
+  static EnsureVisible(control: SkiaControl, maxTimeSecs = 0.25, paddingPts = 8): void {
+    let p = control.Parent;
+    while (p) {
+      if (p instanceof SkiaScroll) {
+        const scale = p.RenderingScale;
+        const r = control.DrawingRect, v = p.DrawingRect;
+        let dx = 0, dy = 0;
+        if (r.Top < v.Top) dy = (v.Top - r.Top) / scale + paddingPts;
+        else if (r.Bottom > v.Bottom) dy = -((r.Bottom - v.Bottom) / scale + paddingPts);
+        if (r.Left < v.Left) dx = (v.Left - r.Left) / scale + paddingPts;
+        else if (r.Right > v.Right) dx = -((r.Right - v.Right) / scale + paddingPts);
+        if (dx !== 0 || dy !== 0) p.ScrollTo(p.offsetX + dx, p.offsetY + dy, maxTimeSecs);
+      }
+      p = p.Parent;
+    }
+  }
+
   ScrollTo(x: number, y: number, maxSpeedSecs: number, clamp = true): void {
     this.StopAnimators(); // also forgets any pending edge bounce: a programmatic scroll never bounces
     let tx = x, ty = y;

@@ -9,7 +9,7 @@ import type { SkiaHotspot as SkiaHotspotCtrl } from "../controls/SkiaHotspot";
 import type { SkiaButton as SkiaButtonCtrl } from "../controls/SkiaButton";
 import type { SkiaImage as SkiaImageCtrl } from "../controls/SkiaImage";
 import type { SkiaSvg as SkiaSvgCtrl } from "../controls/SkiaSvg";
-import type { SkiaScroll as SkiaScrollCtrl } from "../controls/SkiaScroll";
+import { SkiaScroll as SkiaScrollCtrl } from "../controls/SkiaScroll";
 import type { SkiaShape as SkiaShapeCtrl } from "../controls/SkiaShape";
 import type { Color, RenderingModeType } from "../core/Types";
 import type { GesturesMode } from "../core/Gestures";
@@ -116,8 +116,10 @@ function AccessibilityOverlay({ view }: { view: CanvasView }) {
     return () => { off(); offLive(); };
   }, [view]);
   if (nodes.length === 0) return null;
+  // the browser scrolls an overflow:hidden container to reveal a focused child; the overlay must stay pinned to the canvas
+  const pin = (e: React.SyntheticEvent<HTMLDivElement>) => { e.currentTarget.scrollTop = 0; e.currentTarget.scrollLeft = 0; };
   return (
-    <div className="drawnui-a11y-overlay">
+    <div className="drawnui-a11y-overlay" onScroll={pin}>
       <style>{A11Y_CSS}</style>
       {nodes.map((n) => {
         const pos: CSSProperties = { left: n.Rect.Left, top: n.Rect.Top, width: n.Rect.Width, height: n.Rect.Height };
@@ -127,7 +129,7 @@ function AccessibilityOverlay({ view }: { view: CanvasView }) {
             tabIndex={0} className="drawnui-a11y-node" style={{ ...pos, fontSize: 0, userSelect: "none" }}
             onClick={activate}
             onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); activate(); } }}
-            onFocus={() => { n.Source.OnAccessibilityFocused(true); n.Source.NotifyAccessibilityFocused(true); }}
+            onFocus={(e) => { pin({ currentTarget: e.currentTarget.parentElement as HTMLDivElement } as React.SyntheticEvent<HTMLDivElement>); SkiaScrollCtrl.EnsureVisible(n.Source); n.Source.OnAccessibilityFocused(true); n.Source.NotifyAccessibilityFocused(true); }}
             onBlur={() => { n.Source.OnAccessibilityFocused(false); n.Source.NotifyAccessibilityFocused(false); }}>
             {n.Label}
           </div>

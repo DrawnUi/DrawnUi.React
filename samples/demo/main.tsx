@@ -10,6 +10,7 @@ import { CellsPage } from "./pages/CellsPage";
 import { ShapesPage } from "./pages/ShapesPage";
 import { TextPage } from "./pages/TextPage";
 import { LayoutsPage } from "./pages/LayoutsPage";
+import { AccessibilityPage } from "./pages/AccessibilityPage";
 import { Aria } from "drawnui-react";
 import { SkiaButton as SkiaButtonCtrl, SkiaLabel as SkiaLabelCtrl } from "drawnui-react/core";
 
@@ -34,8 +35,9 @@ const ROUTES = {
   shapes: () => <ShapesPage />,
   text: () => <TextPage />,
   layouts: () => <LayoutsPage />,
+  a11y: () => <AccessibilityPage />,
 };
-const TITLES = { images: "Images", svg: "SVG", cells: "Recycled cells", shapes: "Shapes", text: "Text", layouts: "Layouts" };
+const TITLES = { images: "Images", svg: "SVG", cells: "Recycled cells", shapes: "Shapes", text: "Text", layouts: "Layouts", a11y: "Accessibility" };
 
 function App() {
   const [view, setView] = useState<CanvasView | null>(null);

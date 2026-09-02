@@ -7,6 +7,7 @@ const SAMPLES: { route: string; title: string; text: string }[] = [
   { route: "shapes", title: "Shapes", text: "SkiaShape — rectangle, circle, ellipse, arc, polygon, line, path; stroke, corner radii, clipping" },
   { route: "text", title: "Text", text: "SkiaLabel — word wrap, MaxLines, alignment, spans, weights, glyph fallback" },
   { route: "layouts", title: "Layouts", text: "SkiaGrid — star / Auto / absolute tracks, spans, spacing; SkiaWrap" },
+  { route: "a11y", title: "Accessibility", text: "ARIA overlay over the canvas — roles, labels, hints, toggles, live regions, keyboard" },
 ];
 
 /** Root menu styled after drawnui.net: dark body, logo + bold title, sample cards below. */

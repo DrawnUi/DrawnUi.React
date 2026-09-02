@@ -61,6 +61,7 @@ export class ViewsAdapter {
     if (!view) return;
     if (this.recycling !== "Enabled") return; // Disabled = one view per item, kept alive
     this.inUse.delete(index);
+    view.Parent = undefined; // detached until rebound: keeps pooled cells out of gestures and the accessibility tree
     this.pool.push(view);
   }
 

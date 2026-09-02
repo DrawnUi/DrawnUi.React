@@ -102,9 +102,15 @@ Updated whenever the port deliberately diverges or finds something worth back-po
 
 ### Nodes pruned instead of unregistered
 - **C#**: controls unregister on detach/dispose/visibility change.
-- **React**: the snapshot rebuild drops nodes without a `Superview`, invisible, or fully outside the canvas
-  (off-screen scroll content stays out of the tab order); rects are re-read from `DrawingRect`, so they follow
-  scrolling. Behavioural difference: a removed node can linger up to `MinUpdateIntervalMs` in the DOM.
+- **React**: the snapshot rebuild drops nodes without a `Superview`, invisible, or farther than one canvas size
+  outside it; rects are re-read from `DrawingRect`, so they follow scrolling. Behavioural difference: a removed
+  node can linger up to `MinUpdateIntervalMs` in the DOM. Pooled recycled cells get `Parent = undefined` on release.
+
+### Focus scrolls the drawn content into view
+- **React-only**: when keyboard focus lands on an overlay node that is outside its `SkiaScroll` viewport,
+  `SkiaScroll.EnsureVisible(control)` animates every scroll ancestor so the control is visible (browser
+  behaviour for DOM pages). Opinion: back-port — Blazor users tabbing through a drawn list get the same
+  experience as a native page; needs a `ScrollToView`-like helper plus the overlay `focus` callback.
 
 ## Rendering
 

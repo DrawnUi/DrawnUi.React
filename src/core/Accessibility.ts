@@ -36,7 +36,7 @@ export interface AccessibilityNode {
 /**
  * Mirrors DrawnUi SkiaAccessibilityManager: registry of accessible controls + a rate-limited snapshot
  * (at most one rebuild per MinUpdateIntervalMs, taken at frame end) that the DOM overlay renders.
- * Detached / hidden / off-canvas controls drop out of the snapshot on the next rebuild, so nothing has
+ * Detached / hidden / far-off-canvas controls drop out of the snapshot on the next rebuild, so nothing has
  * to unregister explicitly; positions follow scrolling because rects are read from the arranged DrawingRect.
  */
 export class SkiaAccessibilityManager {
@@ -102,7 +102,10 @@ export class SkiaAccessibilityManager {
       if (!n.Superview) { this.nodes.delete(n); n.OnAccessibilityUnregistered(); continue; } // detached from the tree
       if (!n.IsVisible || !n.IsAccessibilityElement || n.AccessibilityRole === Aria.RolePresentation) continue;
       const px = n.GetAccessibilityPixelRect();
-      if (px.Right <= 0 || px.Bottom <= 0 || px.Left >= canvasWidthPx || px.Top >= canvasHeightPx || px.Width <= 0 || px.Height <= 0) continue;
+      if (px.Width <= 0 || px.Height <= 0) continue;
+      // nodes beyond the canvas stay in the tree (scroll content reachable with Tab, the overlay scrolls them into view);
+      // only what is entirely outside a clipped canvas by more than a screen is dropped to keep the DOM small
+      if (px.Right < -canvasWidthPx || px.Bottom < -canvasHeightPx || px.Left > 2 * canvasWidthPx || px.Top > 2 * canvasHeightPx) continue;
       list.push({
         Id: n.AccessibilityId, Label: n.AccessibilityLabel, Hint: n.AccessibilityHint, Role: n.AccessibilityRole!,
         Rect: new SKRect(px.Left / scale, px.Top / scale, px.Right / scale, px.Bottom / scale),
