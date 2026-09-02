@@ -35,8 +35,9 @@ export class SkiaShape extends SkiaLayout {
   protected override PaintsBackgroundWithoutColor(): boolean { return this.shadows.length > 0; }
 
   /** C# MergeShadowMargin: spread = 3 * Blur * scale around the offset shadow. */
-  protected override ComputeEffectsMargin(scale: number): Thickness {
-    let l = 0, t = 0, r = 0, b = 0;
+  override ComputeEffectsMargin(scale: number): Thickness {
+    const inner = super.ComputeEffectsMargin(scale);
+    let l = inner.Left, t = inner.Top, r = inner.Right, b = inner.Bottom;
     for (const s of this.shadows) {
       const spread = 3 * s.Blur * scale, dx = s.X * scale, dy = s.Y * scale;
       l = Math.max(l, spread - dx); t = Math.max(t, spread - dy); r = Math.max(r, spread + dx); b = Math.max(b, spread + dy);

@@ -78,7 +78,7 @@ export class SkiaSlider extends SkiaControl {
   }
 
   /** Thumb shadows paint outside the box: the cache must include them. */
-  protected override ComputeEffectsMargin(scale: number): Thickness {
+  override ComputeEffectsMargin(scale: number): Thickness {
     const s = this.Look().shadow;
     const spread = 3 * s.Blur * scale;
     return new Thickness(Math.max(0, spread - s.X * scale), Math.max(0, spread - s.Y * scale), spread + s.X * scale, spread + s.Y * scale);

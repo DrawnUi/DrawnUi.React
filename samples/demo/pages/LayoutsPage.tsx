@@ -58,6 +58,23 @@ export function LayoutsPage() {
           </SkiaLayer>
         </Card>
 
+        <Card title="IsClippedToBounds — a child larger than its parent">
+          <SkiaRow Spacing={24}>
+            <SkiaLayer WidthRequest={140} HeightRequest={70} BackgroundColor="#1F2937">
+              <SkiaShape Type="Circle" BackgroundColor="#D63384" WidthRequest={110} LockRatio={1} HorizontalOptions="End" VerticalOptions="End" Margin={new Thickness(0, 0, -30, -30)} />
+              <SkiaLabel Text="overflows (default)" FontSize={11} TextColor={Colors.White} Padding={new Thickness(6)} />
+            </SkiaLayer>
+            <SkiaLayer WidthRequest={140} HeightRequest={70} BackgroundColor="#1F2937" IsClippedToBounds>
+              <SkiaShape Type="Circle" BackgroundColor="#D63384" WidthRequest={110} LockRatio={1} HorizontalOptions="End" VerticalOptions="End" Margin={new Thickness(0, 0, -30, -30)} />
+              <SkiaLabel Text="IsClippedToBounds" FontSize={11} TextColor={Colors.White} Padding={new Thickness(6)} />
+            </SkiaLayer>
+            <SkiaLayer WidthRequest={140} HeightRequest={70} BackgroundColor="#1F2937" IsClippedToBounds ClipEffects={false}>
+              <SkiaShape Type="Rectangle" CornerRadius={8} BackgroundColor="#20C997" WidthRequest={100} HeightRequest={40} HorizontalOptions="Center" VerticalOptions="Center" Shadows={[{ X: 0, Y: 0, Blur: 12, Opacity: 1, Color: "#20C997" }]} />
+              <SkiaLabel Text="ClipEffects={false}" FontSize={11} TextColor={Colors.White} Padding={new Thickness(6)} />
+            </SkiaLayer>
+          </SkiaRow>
+        </Card>
+
         <SkiaLabel Text="Column · SkiaStack" FontSize={20} TextColor={Colors.White} HorizontalOptions="Center" Margin={new Thickness(0, 8, 0, 0)} />
         <Card title="Vertical stack, Spacing between children, each child aligns horizontally on its own">
           <SkiaStack Spacing={6} BackgroundColor="#1F2937" Padding={new Thickness(8)}>

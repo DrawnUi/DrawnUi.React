@@ -2,7 +2,8 @@ import type { Image } from "canvaskit-wasm";
 import { type DrawingContext, SkiaControl } from "../core/SkiaControl";
 import { SkiaImageManager } from "../core/SkiaImageManager";
 import { Super } from "../core/Super";
-import { type DrawImageAlignment, SKRect, ScaledSize, type TransformAspect } from "../core/Types";
+import { type Color, Colors, type DrawImageAlignment, SKRect, ScaledSize, type TransformAspect } from "../core/Types";
+import { type BlendMode, type SkiaImageEffect, SkiaImageEffects } from "../core/ImageEffects";
 
 /**
  * Mirrors DrawnUi SkiaImage: async Source -> decoded image, drawn into DrawingRect with Aspect
@@ -12,6 +13,43 @@ export class SkiaImage extends SkiaControl {
   Aspect: TransformAspect = "AspectCover";
   HorizontalAlignment: DrawImageAlignment = "Center";
   VerticalAlignment: DrawImageAlignment = "Center";
+
+  // ---- effects (DrawnUi SkiaImage: AddEffect + parameters, same defaults) ----
+  AddEffect: SkiaImageEffect = "None";
+  ColorTint: Color = Colors.Transparent;
+  EffectBlendMode: BlendMode = "SrcIn";
+  Darken = 5;
+  Lighten = 5;
+  Contrast = 1;
+  Brightness = 1;
+  Gamma = 1;
+  /** Blur sigma (points); 0 = off. */
+  Blur = 0;
+  Saturation = 0;
+  ZoomX = 1;
+  ZoomY = 1;
+  /** Points, shifts the drawn image inside the box. */
+  HorizontalOffset = 0;
+  VerticalOffset = 0;
+
+  /** C# PaintColorFilter selection (null = no filter). */
+  private CreateColorFilter() {
+    switch (this.AddEffect) {
+      case "Tint": return this.ColorTint !== Colors.Transparent ? SkiaImageEffects.Tint(this.ColorTint, this.EffectBlendMode) : null;
+      case "Darken": return this.Darken !== 0 ? SkiaImageEffects.Darken(this.Darken) : null;
+      case "BlackAndWhite": case "Grayscale": return SkiaImageEffects.Grayscale();
+      case "Pastel": return SkiaImageEffects.Pastel();
+      case "Lighten": return this.Lighten !== 0 ? SkiaImageEffects.Lighten(this.Lighten) : null;
+      case "Sepia": return SkiaImageEffects.Sepia();
+      case "InvertColors": return SkiaImageEffects.InvertColors();
+      case "Gamma": return this.Gamma >= 0 ? SkiaImageEffects.Gamma(this.Gamma) : null;
+      case "Contrast": return this.Contrast >= 1 ? SkiaImageEffects.Contrast(this.Contrast) : null;
+      case "Saturation": return this.Saturation >= 0 ? SkiaImageEffects.Saturation(this.Saturation) : null;
+      case "Brightness": return this.Brightness >= 1 ? SkiaImageEffects.Brightness(this.Brightness) : null;
+      case "TSL": return this.BackgroundColor && this.BackgroundColor !== Colors.Transparent ? SkiaImageEffects.TintSL(this.BackgroundColor, this.Saturation, this.Brightness, this.EffectBlendMode) : null;
+      default: return null;
+    }
+  }
 
   /** Fired after the image decoded and the control invalidated. */
   Success?: (sender: SkiaImage, source: string) => void;
@@ -112,22 +150,35 @@ export class SkiaImage extends SkiaControl {
     const dest = ctx.Destination;
     const scaled = SkiaImage.RescaleAspect(img.width(), img.height(), dest, this.Aspect);
     this.AspectScale = scaled;
-    const display = SkiaImage.CalculateDisplayRect(dest, img.width() * scaled.X, img.height() * scaled.Y, this.HorizontalAlignment, this.VerticalAlignment);
+    let display = SkiaImage.CalculateDisplayRect(dest, img.width() * scaled.X, img.height() * scaled.Y, this.HorizontalAlignment, this.VerticalAlignment);
+    // ZoomX/ZoomY scale around the center, offsets shift (points)
+    const scale = ctx.Scale;
+    if (this.ZoomX !== 1 || this.ZoomY !== 1 || this.HorizontalOffset !== 0 || this.VerticalOffset !== 0) {
+      const cx = (display.Left + display.Right) / 2 + this.HorizontalOffset * scale, cy = (display.Top + display.Bottom) / 2 + this.VerticalOffset * scale;
+      const hw = (display.Width * this.ZoomX) / 2, hh = (display.Height * this.ZoomY) / 2;
+      display = new SKRect(cx - hw, cy - hh, cx + hw, cy + hh);
+    }
     this.DisplayRect = display;
 
     const CK = Super.CK;
     const canvas = ctx.Context.Canvas;
-    const overflows = display.Left < dest.Left || display.Top < dest.Top || display.Right > dest.Right || display.Bottom > dest.Bottom;
+    const overflows = this.Blur > 0 || display.Left < dest.Left || display.Top < dest.Top || display.Right > dest.Right || display.Bottom > dest.Bottom;
     const saved = canvas.save();
     if (overflows) canvas.clipRect(CK.LTRBRect(dest.Left, dest.Top, dest.Right, dest.Bottom), CK.ClipOp.Intersect, true);
     const paint = new CK.Paint();
     paint.setAntiAlias(true);
+    const colorFilter = this.CreateColorFilter();
+    if (colorFilter) paint.setColorFilter(colorFilter);
+    const blur = this.Blur > 0 ? CK.ImageFilter.MakeBlur(this.Blur * scale, this.Blur * scale, CK.TileMode.Mirror, null) : null;
+    if (blur) paint.setImageFilter(blur);
     canvas.drawImageRectOptions(
       img,
       CK.LTRBRect(0, 0, img.width(), img.height()),
       CK.LTRBRect(display.Left, display.Top, display.Right, display.Bottom),
       CK.FilterMode.Linear, CK.MipmapMode.Linear, paint,
     );
+    colorFilter?.delete();
+    blur?.delete();
     paint.delete();
     canvas.restoreToCount(saved);
   }

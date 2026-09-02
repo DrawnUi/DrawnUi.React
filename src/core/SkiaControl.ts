@@ -97,6 +97,9 @@ export class SkiaControl {
   AnchorY = 0.5;
   /** 0..1, applied as a layer alpha over the whole subtree (MAUI VisualElement.Opacity). */
   Opacity = 1;
+  /** Clip everything this control draws (content, children, effects per ClipEffects) to its DrawingRect. */
+  IsClippedToBounds = false;
+
   /** Sets ScaleX and ScaleY together (MAUI Scale). */
   get Scale(): number { return this.ScaleX; }
   set Scale(v: number) { this.ScaleX = v; this.ScaleY = v; }
@@ -394,11 +397,18 @@ export class SkiaControl {
    * Pixels the control paints OUTSIDE its DrawingRect (shadows, effects): caches record that much more and the
    * blit is offset accordingly (DrawnUi ComputeEffectsMargin / GetRenderingExpandPixels). Base: nothing.
    */
-  protected ComputeEffectsMargin(_scale: number): Thickness { return Thickness.Zero; }
+  ComputeEffectsMargin(_scale: number): Thickness { return Thickness.Zero; }
+
+  private effectsMarginCache?: { scale: number; margin: Thickness };
+  /** Cached ComputeEffectsMargin (reset by InvalidateMeasure) — C# AggregatedEffectsMarginPixels. */
+  EffectsMargin(scale: number): Thickness {
+    if (!this.effectsMarginCache || this.effectsMarginCache.scale !== scale) this.effectsMarginCache = { scale, margin: this.ComputeEffectsMargin(scale) };
+    return this.effectsMarginCache.margin;
+  }
 
   /** DrawingRect grown by the effects margin, in pixels — the rect a cache is recorded for. */
   protected ExpandedCacheRect(scale: number): SKRect {
-    const r = this.DrawingRect, m = this.ComputeEffectsMargin(scale);
+    const r = this.DrawingRect, m = this.EffectsMargin(scale);
     if (m.Left === 0 && m.Top === 0 && m.Right === 0 && m.Bottom === 0) return r;
     return new SKRect(r.Left - Math.ceil(m.Left), r.Top - Math.ceil(m.Top), r.Right + Math.ceil(m.Right), r.Bottom + Math.ceil(m.Bottom));
   }
@@ -425,6 +435,11 @@ export class SkiaControl {
       canvas.concat(this.RenderTransformMatrix);
     } else {
       this.RenderTransformMatrix = undefined;
+    }
+    if (this.IsClippedToBounds) {
+      if (!saved) { canvas.save(); saved = true; }
+      const c = this.ClipEffects ? this.DrawingRect : this.ExpandedCacheRect(ctx.Scale);
+      canvas.clipRect(Super.CK.LTRBRect(c.Left, c.Top, c.Right, c.Bottom), Super.CK.ClipOp.Intersect, true);
     }
     this.RenderContent(ctx);
     if (saved) canvas.restore();
@@ -620,6 +635,7 @@ export class SkiaControl {
   InvalidateMeasure(): void {
     this.NeedMeasure = true;
     this.cacheDirty = true;
+    this.effectsMarginCache = undefined;
     if (this.Parent) this.Parent.InvalidateMeasure();
     else this.Superview?.Update();
   }

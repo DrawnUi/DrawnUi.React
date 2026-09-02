@@ -150,6 +150,21 @@ export class SkiaLayout extends SkiaControl {
     return `items ${this.itemsSource!.length} visible ${this.FirstVisibleIndex}-${this.LastVisibleIndex}${measured} inuse ${f.InUseCount} pool ${f.PoolSize} created ${f.Created}`;
   }
 
+  /** A layout paints outside its box whatever its children paint outside theirs (C# aggregated effects margin). */
+  override ComputeEffectsMargin(scale: number): Thickness {
+    let l = 0, t = 0, r = 0, b = 0;
+    const mine = this.DrawingRect;
+    for (const v of this.views) {
+      if (!v.IsVisible) continue;
+      const m = v.EffectsMargin(scale);
+      if (m.Left === 0 && m.Top === 0 && m.Right === 0 && m.Bottom === 0) continue;
+      const cr = v.DrawingRect; // child overflow beyond this box, if already arranged
+      l = Math.max(l, m.Left - Math.max(0, cr.Left - mine.Left)); t = Math.max(t, m.Top - Math.max(0, cr.Top - mine.Top));
+      r = Math.max(r, m.Right - Math.max(0, mine.Right - cr.Right)); b = Math.max(b, m.Bottom - Math.max(0, mine.Bottom - cr.Bottom));
+    }
+    return new Thickness(Math.max(0, l), Math.max(0, t), Math.max(0, r), Math.max(0, b));
+  }
+
   // ---- static children ----
 
   private readonly views: SkiaControl[] = [];

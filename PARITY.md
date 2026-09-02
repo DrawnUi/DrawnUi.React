@@ -116,6 +116,17 @@ Updated whenever the port deliberately diverges or finds something worth back-po
 - C# `*ToAsync` take a `CancellationTokenSource`; React takes an `AbortSignal` and rejects with `AbortError`.
 - C# ignores negative `SkewX/SkewY` (`> 0` check); React applies both signs. Opinion: C# check looks accidental.
 
+## Effects
+
+### ClipEffects is honoured
+- C# `WillClipEffects` exists but the render path always expands the clip by the effects margin. React: with
+  `IsClippedToBounds`, `ClipEffects=true` (default) clips to the exact box, `false` expands by the aggregated
+  effects margin. Opinion: wire `WillClipEffects` into `DrawWithClipAndTransforms` on .NET, it is a one-line gate.
+
+### Color matrix units
+- SkiaSharp `CreateColorMatrix` translations are 0..255, CanvasKit `MakeMatrix` 0..1; React divides the C# constants
+  so `Darken=5` looks the same on both. Gamma has no table filter in CanvasKit — linear approximation.
+
 ## Accessibility
 
 ### Overlay does not capture pointer events
