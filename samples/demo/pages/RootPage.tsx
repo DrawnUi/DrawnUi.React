@@ -1,9 +1,9 @@
 import { Colors, SkiaLabel, SkiaLayer, SkiaScroll, SkiaStack, SkiaSvg, Thickness, useShell } from "drawnui-react";
 
 const SAMPLES: { route: string; title: string; text: string }[] = [
+  { route: "cells", title: "Recycled cells", text: "100 000 items in a SkiaScroll, RecyclingTemplate + MeasureFirst, UseCache=Image" },
   { route: "images", title: "Images", text: "SkiaImage — every TransformAspect, alignment, clipping" },
   { route: "svg", title: "SVG", text: "SkiaSvg — file and inline sources, TintColor, LockRatio" },
-  { route: "cells", title: "Recycled cells", text: "100 000 items in a SkiaScroll, RecyclingTemplate + MeasureFirst, UseCache=Image" },
 ];
 
 /** Root menu styled after drawnui.net: dark body, logo + bold title, sample cards below. */
