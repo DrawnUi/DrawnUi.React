@@ -77,6 +77,9 @@ export class SkiaScroll extends SkiaControl {
   private velocityX = 0;
   private velocityY = 0;
   private static readonly MinVelocity = 1.5;
+  /** Set when a fling was cut to stop at the edge: the edge offset it lands on (DrawnUi _axis / _changeSpeed). */
+  private flingEdgeX: number | null = null;
+  private flingEdgeY: number | null = null;
 
   constructor() {
     super();
@@ -88,6 +91,23 @@ export class SkiaScroll extends SkiaControl {
       a.OnStart = () => { this.IsScrolling = true; };
       a.OnStop = () => { this.IsScrolling = this.animatorFlingX.IsRunning || this.animatorFlingY.IsRunning || this.bounceX.IsRunning || this.bounceY.IsRunning; };
     }
+    // DrawnUi OnScrollerStopped: a fling that was cut at the edge hands its remaining velocity to the bounce.
+    const flingStop = this.animatorFlingY.OnStop!;
+    this.animatorFlingY.OnStop = () => { flingStop(); if (this.animatorFlingY.WasStarted) this.BounceIfNeeded(this.animatorFlingY, false); };
+    const flingStopX = this.animatorFlingX.OnStop!;
+    this.animatorFlingX.OnStop = () => { flingStopX(); if (this.animatorFlingX.WasStarted) this.BounceIfNeeded(this.animatorFlingX, true); };
+  }
+
+  /** DrawnUi BounceIfNeeded: after an edge-cut fling finishes, bounce with the velocity it still had. */
+  private BounceIfNeeded(animator: ScrollFlingAnimator, horizontal: boolean): void {
+    const edge = horizontal ? this.flingEdgeX : this.flingEdgeY;
+    if (!this.Bounces || edge === null || !animator.SelfFinished || !animator.Parameters) return;
+    if (horizontal) this.flingEdgeX = null; else this.flingEdgeY = null;
+    const remaining = animator.Parameters.VelocityAt(animator.Speed);
+    const velocity = Math.sign(remaining) * Math.min(Math.abs(remaining), this.MaxBounceVelocity);
+    if (Math.abs(velocity) <= SkiaScroll.ThesholdSwipeOnUp * this.RenderingScale) return;
+    if (horizontal) this.Bounce(this.bounceX, this.animatorFlingX, this.offsetX, edge, velocity);
+    else this.Bounce(this.bounceY, this.animatorFlingY, this.offsetY, edge, velocity);
   }
 
   // ---- tree (single Content) ----
@@ -302,8 +322,8 @@ export class SkiaScroll extends SkiaControl {
 
   private Bounce(animator: SpringWithVelocityAnimator, fling: ScrollFlingAnimator, offsetFrom: number, offsetTo: number, velocity: number): void {
     const displacement = offsetFrom - offsetTo;
-    if (displacement === 0) return;
-    fling.Stop();
+    if (displacement === 0 && velocity === 0) return;
+    if (fling.IsRunning) fling.Stop();
     const spring = new Spring(1 * (1 + this.RubberDamping), 200, 0.5 * (1 + this.RubberDamping));
     animator.Initialize(offsetTo, displacement, velocity, spring);
     animator.Start();
@@ -316,10 +336,12 @@ export class SkiaScroll extends SkiaControl {
     const b = this.ContentOffsetBounds;
     const min = horizontal ? b.Left : b.Top, max = horizontal ? b.Right : b.Bottom;
     const destination = p.Destination;
+    let edge: number | null = null;
     if (destination < min || destination > max) {
-      const edge = Math.max(min, Math.min(max, destination));
+      edge = Math.max(min, Math.min(max, destination));
       animator.Speed = p.DurationToValue(edge);
     }
+    if (horizontal) this.flingEdgeX = edge; else this.flingEdgeY = edge;
     if (animator.Speed <= 0) return false;
     animator.Start();
     return true;
