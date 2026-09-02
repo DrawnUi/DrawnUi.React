@@ -18,7 +18,6 @@ Detailed per-feature omissions: [SKIPPED.md](SKIPPED.md). Live sample: https://h
 | 2026-09-02 | Images | `SkiaImage` (all `TransformAspect` but Tile, alignments, `Success`/`Error`), `SkiaImageManager` cache/preload |
 | 2026-09-02 | SVG | `SkiaSvg` (browser-decoded, rasterized per displayed size, `TintColor`) |
 | 2026-09-02 | Infra | repo layout `src/` + `samples/<name>/`, Cloudflare Pages deploy on push (`.github/workflows/deploy.yml`) |
-
 | 2026-09-02 | Scrolling | `SkiaScroll` plain content: pan, deceleration fling cut at edges, rubber-band + spring bounce, wheel, `ScrollTo*`, `Scrolled`; physics classes `ScrollFlingAnimator`, `DecelerationTimingParameters`, `SpringWithVelocityAnimator`, `VelocityAccumulator`, `RubberBandUtils` |
 
 ## In progress
