@@ -16,7 +16,7 @@ export function RootPage() {
         <SkiaLabel Text="DrawnUI for React" FontSize={48} FontFamily="FontTextBold" TextColor={Colors.White} HorizontalOptions="Center" />
 
         {/* samples */}
-        <SkiaLabel Text="Samples" FontSize={32} TextColor="#DEE2E6" Margin={new Thickness(0, 8, 0, 0)} />
+        <SkiaLabel Text="Snippets" FontSize={32} TextColor="#DEE2E6" Margin={new Thickness(0, 8, 0, 0)} />
         {SAMPLES.map((s) => (
           <SkiaLayer key={s.route} BackgroundColor="#2B3035" AnimationTapped="Ripple" Tapped={() => void shell.GoToAsync(s.route)}>
             <SkiaStack Spacing={6} Padding={new Thickness(24, 20)}>
