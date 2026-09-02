@@ -1,6 +1,7 @@
 import { type DrawingContext, SkiaControl } from "../core/SkiaControl";
 import { Super } from "../core/Super";
-import { SKRect, ScaledSize, type ScrollOrientation } from "../core/Types";
+import { type RelativePositionType, SKRect, ScaledSize, type ScrollOrientation } from "../core/Types";
+import { SkiaLayout } from "./SkiaLayout";
 import { type GestureEventProcessingInfo, SKPoint, type SkiaGesturesParameters } from "../core/Gestures";
 import {
   RubberBandUtils, ScrollFlingAnimator, Spring, SpringWithVelocityAnimator, VelocityAccumulator,
@@ -197,7 +198,7 @@ export class SkiaScroll extends SkiaControl {
 
   /** Scroll to an offset in points; maxSpeedSecs > 0 animates along the deceleration curve. */
   ScrollTo(x: number, y: number, maxSpeedSecs: number, clamp = true): void {
-    this.StopAnimators();
+    this.StopAnimators(); // also forgets any pending edge bounce: a programmatic scroll never bounces
     let tx = x, ty = y;
     if (clamp) { const c = this.ClampOffset(x, y, this.ContentOffsetBounds, true); tx = c.X; ty = c.Y; }
     const rate = 1 - this.DecelerationRatio;
@@ -219,7 +220,25 @@ export class SkiaScroll extends SkiaControl {
 
   StopScrolling(): void { this.StopAnimators(); this.IsUserPanning = false; }
 
+  /**
+   * Scrolls so that item `index` is at the viewport start (or end). Like DrawnUi, Content must BE the
+   * templated layout (the recycled list is the scroll's only child; a header goes above the scroll or in Header).
+   */
+  ScrollToIndex(index: number, animate: boolean, option: RelativePositionType = "Start"): void {
+    const layout = this.content instanceof SkiaLayout && this.content.IsTemplated ? this.content : undefined;
+    const items = layout?.ItemsSource;
+    if (!layout || !items || items.length === 0 || !this.content) return;
+    const i = Math.max(0, Math.min(items.length - 1, index));
+    const scale = this.RenderingScale;
+    const layoutTopPts = (layout.DrawingRect.Top - this.content.DrawingRect.Top) / scale;
+    let target = layoutTopPts + layout.GetItemOffsetPixels(i) / scale;
+    if (option === "End") target -= this.DrawingRect.Height / scale - layout.GetItemOffsetPixels(i + 1) / scale + layout.GetItemOffsetPixels(i) / scale;
+    else if (option === "Center") target -= this.DrawingRect.Height / scale / 2;
+    this.ScrollTo(this.offsetX, -target, animate ? this.ScrollingSpeedMs / 1000 : 0, true);
+  }
+
   private StopAnimators(): void {
+    this.flingEdgeX = null; this.flingEdgeY = null;
     this.animatorFlingX.Stop(); this.animatorFlingY.Stop(); this.bounceX.Stop(); this.bounceY.Stop();
   }
 

@@ -37,6 +37,22 @@ export class SkiaControl {
   BackgroundColor?: Color;
   IsVisible = true;
   Tag?: string;
+  /** Extra points beyond the viewport a virtualized layout keeps realized (DrawnUi VirtualisationInflated). */
+  VirtualisationInflated = 0;
+
+  // ---- data binding (MAUI BindableObject subset) ----
+  private bindingContext: unknown = undefined;
+  /** Bound item; recycled cells get a new one on every rebind. */
+  get BindingContext(): unknown { return this.bindingContext; }
+  set BindingContext(value: unknown) {
+    if (this.bindingContext === value) return;
+    this.bindingContext = value;
+    this.OnBindingContextChanged();
+  }
+  /** Index of the bound item inside its ItemsSource, -1 when not templated. */
+  ContextIndex = -1;
+  /** Override to react to a new BindingContext (DrawnUi ContextPropertyChanged / cell SetContent). */
+  protected OnBindingContextChanged(): void {}
 
   // ---- gesture properties ----
   /** Control itself ignores input (things below it still get it). */
@@ -149,6 +165,14 @@ export class SkiaControl {
 
   /** Called after DrawingRect changed; layouts arrange children here. */
   protected OnLayoutChanged(): void {}
+
+  /** Part of DrawingRect that can actually be seen: intersected with every ancestor (a scroll's box clips its content). */
+  GetVisibleViewport(): SKRect {
+    const r = this.DrawingRect;
+    if (!this.Parent) return r;
+    const p = this.Parent.GetVisibleViewport();
+    return new SKRect(Math.max(r.Left, p.Left), Math.max(r.Top, p.Top), Math.min(r.Right, p.Right), Math.min(r.Bottom, p.Bottom));
+  }
 
   /** Draws background then Paint(). */
   Render(ctx: DrawingContext): void {

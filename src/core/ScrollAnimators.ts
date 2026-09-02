@@ -77,9 +77,10 @@ export class ScrollFlingAnimator extends SkiaValueAnimator {
     this.belowThresholdFrames = 0;
   }
 
+  /** Reaches target exactly at timeSecs; the curve is stopped there (its asymptote lies beyond the target). */
   InitializeWithDestination(position: number, target: number, timeSecs: number, deceleration = 0.998, valueThreshold = 0.1): void {
     this.Parameters = DecelerationTimingParameters.ToDestination(position, target, timeSecs, deceleration, 0.001);
-    this.Speed = this.Parameters.DurationSecs;
+    this.Speed = timeSecs;
     this.ValueThreshold = valueThreshold;
     this.lastValue = position;
     this.belowThresholdFrames = 0;
@@ -97,9 +98,15 @@ export class ScrollFlingAnimator extends SkiaValueAnimator {
     const p = this.Parameters;
     if (!p) return true;
     const secs = deltaFromStart / 1e9;
+    if (secs > this.Speed) {
+      // Land exactly where the planned duration ends (edge or destination), not a frame past it.
+      this.mValue = p.ValueAt(this.Speed);
+      this.CurrentVelocity = p.VelocityAt(this.Speed);
+      this.SelfFinished = true;
+      return true;
+    }
     this.mValue = p.ValueAt(secs);
     this.CurrentVelocity = p.VelocityAt(secs);
-    if (secs > this.Speed) { this.SelfFinished = true; return true; }
     if (this.lastUpdateTime > 0) {
       const dt = deltaT / 1e9;
       const changeRate = dt > 0 ? Math.abs(this.mValue - this.lastValue) / dt : 0;

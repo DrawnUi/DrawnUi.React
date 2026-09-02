@@ -14,3 +14,5 @@ export * from "./core/SkiaImageManager";
 export * from "./controls/SkiaImage";
 export * from "./controls/SkiaSvg";
 export * from "./controls/SkiaScroll";
+export * from "./controls/SkiaDynamicDrawnCell";
+export * from "./core/ViewsAdapter";

@@ -74,6 +74,15 @@ export type DrawImageAlignment = "Start" | "Center" | "End";
 /** MAUI/DrawnUi ScrollOrientation. */
 export type ScrollOrientation = "Vertical" | "Horizontal" | "Both" | "Neither";
 
+/** DrawnUi RecyclingTemplate: Enabled = pool of cells for the visible range, Disabled = one view per item. */
+export type RecyclingTemplate = "Enabled" | "Disabled";
+
+/** DrawnUi MeasuringStrategy (MeasureVisible not ported yet). */
+export type MeasuringStrategy = "MeasureAll" | "MeasureFirst" | "MeasureVisible";
+
+/** DrawnUi RelativePositionType for ScrollToIndex. */
+export type RelativePositionType = "None" | "Start" | "Center" | "End";
+
 /** DrawnUi SkiaTouchAnimation (Shimmer declared for parity, not ported). */
 export type SkiaTouchAnimation = "None" | "Ripple" | "Shimmer";
 

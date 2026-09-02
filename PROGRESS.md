@@ -18,6 +18,7 @@ Detailed per-feature omissions: [SKIPPED.md](SKIPPED.md). Live sample: https://h
 | 2026-09-02 | Images | `SkiaImage` (all `TransformAspect` but Tile, alignments, `Success`/`Error`), `SkiaImageManager` cache/preload |
 | 2026-09-02 | SVG | `SkiaSvg` (browser-decoded, rasterized per displayed size, `TintColor`) |
 | 2026-09-02 | Infra | repo layout `src/` + `samples/<name>/`, Cloudflare Pages deploy on push (`.github/workflows/deploy.yml`) |
+| 2026-09-02 | Recycled cells | Templated `SkiaLayout` (`ItemsSource`/`ItemTemplate`/`RecyclingTemplate`/`MeasureFirst`+`MeasureAll`), `ViewsAdapter` pool, `BindingContext` + `SkiaDynamicDrawnCell.SetContent`, `SkiaScroll.ScrollToIndex`, `FirstVisibleIndex`/`DebugString`; sample = Cells fiddle shape with 100 000 items |
 | 2026-09-02 | Scrolling | `SkiaScroll` plain content: pan, deceleration fling cut at edges, rubber-band + spring bounce, wheel, `ScrollTo*`, `Scrolled`; physics classes `ScrollFlingAnimator`, `DecelerationTimingParameters`, `SpringWithVelocityAnimator`, `VelocityAccumulator`, `RubberBandUtils` |
 
 ## In progress
@@ -26,10 +27,9 @@ Detailed per-feature omissions: [SKIPPED.md](SKIPPED.md). Live sample: https://h
 
 ## Next
 
-1. `ItemsSource` / `ItemTemplate` on `SkiaLayout` (templated children, `RecyclingTemplate`, `MeasureItemsStrategy` `MeasureAll`/`MeasureFirst`) → recycled cells inside `SkiaScroll`; validate against the **Cells** fiddle snippet.
+1. `UseCache` (`Image`/`Operations`) — cells cached like the C# recipes; then `MeasureVisible` for uneven rows.
 2. `SkiaShape` (Rectangle/Circle/Ellipse, `CornerRadius`, stroke, children clipped) → real `SkiaButton` templating (`BtnShape`/`BtnText`).
-3. `UseCache` (`Operations` / `Image`) — first real performance layer.
-4. `SkiaLayout` Grid, then Wrap.
+3. `SkiaLayout` Grid, then Wrap (Grid also removes the fixed-height header workaround in the sample).
 5. `SkiaLabel` wrapping, `MaxLines`, alignment, font weights.
 6. Transforms (`TranslationX/Y`, `Rotation`, `Scale`, `Opacity`) + gesture mapping through them.
 7. `MeasureVisible` + virtualization, windowed `ItemsSource`.

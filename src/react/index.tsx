@@ -1,4 +1,4 @@
-import { type CSSProperties, type FC, type ReactNode, useLayoutEffect, useRef } from "react";
+import { type CSSProperties, type FC, type ReactNode, type Ref, useLayoutEffect, useRef } from "react";
 import { Canvas as CanvasView } from "../core/Canvas";
 import type { SkiaControl } from "../core/SkiaControl";
 import type { SkiaLabel as SkiaLabelCtrl } from "../controls/SkiaLabel";
@@ -15,11 +15,12 @@ import { createDrawnRoot } from "./reconciler";
 /** Public settable properties of a control become its JSX props, same PascalCase names as C#. */
 type PropsOf<T> = Partial<{
   // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-  [K in keyof T as T[K] extends Function ? never : K extends "Children" | "Views" | "Parent" | "Superview" | "DrawingRect" | "MeasuredSize" | "RenderingScale" | "NeedMeasure" | "_superview" | "HitBoxAuto" | "TotalDown" | "TotalTapped" | "TouchDown" | "PostAnimators" | "LoadedSource" | "IsLoading" | "DisplayRect" | "AspectScale" | "Content" | "ContentSize" | "ContentOffsetBounds" | "OverscrollDistance" | "OverScrolled" | "IsUserPanning" | "IsUserFocused" | "IsScrolling" ? never : K]: T[K];
+  [K in keyof T as T[K] extends Function ? never : K extends "Children" | "Views" | "Parent" | "Superview" | "DrawingRect" | "MeasuredSize" | "RenderingScale" | "NeedMeasure" | "_superview" | "HitBoxAuto" | "TotalDown" | "TotalTapped" | "TouchDown" | "PostAnimators" | "LoadedSource" | "IsLoading" | "DisplayRect" | "AspectScale" | "Content" | "ContentSize" | "ContentOffsetBounds" | "OverscrollDistance" | "OverScrolled" | "IsUserPanning" | "IsUserFocused" | "IsScrolling" | "IsTemplated" | "FirstVisibleIndex" | "LastVisibleIndex" | "DebugString" | "ChildrenFactory" | "ContextIndex" ? never : K]: T[K];
 }>;
 
-type LeafProps<T> = PropsOf<T>;
-type LayoutProps<T> = PropsOf<T> & { children?: ReactNode };
+/** `ref` receives the engine control instance (react-reconciler getPublicInstance). */
+type LeafProps<T> = PropsOf<T> & { ref?: Ref<T> };
+type LayoutProps<T> = PropsOf<T> & { children?: ReactNode; ref?: Ref<T> };
 
 /** Typed JSX tags resolved by the reconciler Registry. */
 export const SkiaLayout = "SkiaLayout" as unknown as FC<LayoutProps<SkiaLayoutCtrl>>;
