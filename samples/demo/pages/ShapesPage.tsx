@@ -49,6 +49,28 @@ export function ShapesPage() {
           </Demo>
         </SkiaWrap>
 
+        <SkiaLabel Text="Bevel / Emboss" FontSize={20} TextColor={Colors.White} HorizontalOptions="Center" Margin={new Thickness(0, 8, 0, 0)} />
+        <SkiaWrap Spacing={16} HorizontalOptions="Center" MaximumWidthRequest={680}>
+          <Demo title="BevelType=Bevel · Depth 4">
+            <SkiaShape Type="Rectangle" CornerRadius={12} BackgroundColor="#495057" WidthRequest={110} HeightRequest={70} HorizontalOptions="Center" VerticalOptions="Center" BevelType="Bevel" Bevel={{ Depth: 4 }} />
+          </Demo>
+          <Demo title="BevelType=Emboss · Depth 4">
+            <SkiaShape Type="Rectangle" CornerRadius={12} BackgroundColor="#495057" WidthRequest={110} HeightRequest={70} HorizontalOptions="Center" VerticalOptions="Center" BevelType="Emboss" Bevel={{ Depth: 4 }} />
+          </Demo>
+          <Demo title="Circle · Bevel, colored edges">
+            <SkiaShape Type="Circle" BackgroundColor="#0D6EFD" WidthRequest={80} LockRatio={1} HorizontalOptions="Center" VerticalOptions="Center" BevelType="Bevel" Bevel={{ Depth: 6, LightColor: "#9EC5FE", ShadowColor: "#052C65", Opacity: 0.8 }} />
+          </Demo>
+          <Demo title="Polygon (star) · Emboss">
+            <SkiaShape Type="Polygon" Points={STAR} BackgroundColor="#FFC107" WidthRequest={90} HeightRequest={90} HorizontalOptions="Center" VerticalOptions="Center" BevelType="Emboss" Bevel={{ Depth: 3, Opacity: 0.7 }} />
+          </Demo>
+          <Demo title="Path (heart) · Bevel">
+            <SkiaShape Type="Path" PathData={HEART} BackgroundColor="#D63384" WidthRequest={90} HeightRequest={90} HorizontalOptions="Center" VerticalOptions="Center" BevelType="Bevel" Bevel={{ Depth: 3, Opacity: 0.7 }} />
+          </Demo>
+          <Demo title="Sharp rectangle · Bevel, Opacity 1">
+            <SkiaShape Type="Rectangle" BackgroundColor="#6C757D" WidthRequest={110} HeightRequest={70} HorizontalOptions="Center" VerticalOptions="Center" BevelType="Bevel" Bevel={{ Depth: 5, Opacity: 1 }} />
+          </Demo>
+        </SkiaWrap>
+
         <SkiaLabel Text="Shadows" FontSize={20} TextColor={Colors.White} HorizontalOptions="Center" Margin={new Thickness(0, 8, 0, 0)} />
         <SkiaWrap Spacing={16} HorizontalOptions="Center" MaximumWidthRequest={680}>
           <Demo title="Shadows=[{Y:4, Blur:6, Opacity:.5}]">

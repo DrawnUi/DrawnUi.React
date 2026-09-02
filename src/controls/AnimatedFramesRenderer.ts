@@ -109,8 +109,7 @@ export class AnimatedFramesRenderer extends SkiaControl {
   protected ApplySpeed(): void {}
   protected ApplyDefaultFrame(): void { if (!this.IsPlaying && this.Animator) this.Seek(this.defaultFrame); }
 
-  /** Stops and releases the animator (React has no unmount hook into the engine yet; call it yourself when needed). */
-  Dispose(): void {
+  protected override OnDisposing(): void {
     if (this.Animator) { this.Stop(); this.Animator.Dispose(); this.Animator = undefined; }
   }
 }

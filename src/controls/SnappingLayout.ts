@@ -69,6 +69,8 @@ export abstract class SnappingLayout extends SkiaLayout {
     this.Stopped?.(this, this.CurrentPosition);
   }
 
+  protected override OnDisposing(): void { this.StopSnapAnimators(); }
+
   protected get IsSnapAnimating(): boolean { return this.springX.IsRunning || this.springY.IsRunning || this.range.IsRunning; }
   protected StopSnapAnimators(): void {
     this.stoppingSilently = true;

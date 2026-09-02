@@ -28,6 +28,7 @@ export * from "./controls/SkiaButton";
 export * from "./core/SkiaImageManager";
 export * from "./controls/SkiaImage";
 export * from "./controls/SkiaSvg";
+export * from "./controls/SkiaBackdrop";
 export * from "./controls/AnimatedFramesRenderer";
 export * from "./controls/SkiaLottie";
 export * from "./controls/SkiaGif";

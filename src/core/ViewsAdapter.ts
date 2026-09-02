@@ -86,6 +86,14 @@ export class ViewsAdapter {
     for (const index of [...this.inUse.keys()]) if (!keep.has(index)) this.ReleaseViewAt(index);
   }
 
+  /** Disposes every realized and pooled view (the layout is being disposed). */
+  DisposeAll(): void {
+    for (const v of this.inUse.values()) v.Dispose();
+    for (const v of this.pool) v.Dispose();
+    this.inUse.clear();
+    this.pool.length = 0;
+  }
+
   /** Views currently bound, in index order (gesture listeners / drawing). */
   GetViewsInUse(): SkiaControl[] {
     return [...this.inUse.entries()].sort((a, b) => a[0] - b[0]).map((e) => e[1]);

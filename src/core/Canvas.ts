@@ -132,6 +132,7 @@ export class Canvas {
     this.AccessibilityManager.OnFrameEnd(this.RenderingScale, this.Element.width, this.Element.height, () => this.Update());
     const now = performance.now();
     this.FrameTime = now - started;
+    this.FrameIndex++;
     this.frameTimes.push(now);
     while (this.frameTimes.length && this.frameTimes[0] < now - 1000) this.frameTimes.shift();
     this.FPS = this.frameTimes.length;
@@ -174,10 +175,17 @@ export class Canvas {
     return executed;
   }
 
+  /** Frames drawn so far (SkiaBackdrop uses it to refresh once after a cached record). */
+  FrameIndex = 0;
+
+  /** On-screen surface (SkiaBackdrop snapshots it). */
+  get Surface(): Surface | undefined { return this.surface; }
+
   Dispose(): void {
     this.disposed = true;
     this.Gestures = "Disabled";
     this.observer.disconnect();
+    this.content?.Dispose();
     this.Content = undefined;
     this.ReleaseSurface();
     this.grContext?.delete();

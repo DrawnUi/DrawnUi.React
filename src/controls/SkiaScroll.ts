@@ -114,6 +114,11 @@ export class SkiaScroll extends SkiaControl {
   private readonly animatorFlingY = new ScrollFlingAnimator(this);
   private readonly bounceX = new SpringWithVelocityAnimator(this);
   private readonly bounceY = new SpringWithVelocityAnimator(this);
+
+  protected override OnDisposing(): void {
+    this.animatorFlingX.Stop(); this.animatorFlingY.Stop(); this.bounceX.Stop(); this.bounceY.Stop();
+  }
+  protected override DisposeChildren(): void { this.content?.Dispose(); this.content = undefined; }
   private readonly velocity = new VelocityAccumulator();
   private panningCurrentOffsetPts = SKPoint.Empty;
   private panningLastDelta = SKPoint.Empty;

@@ -49,7 +49,7 @@ const ROUTES = {
   animations: () => <AnimationsPage />,
   shell: () => <ShellPage />,
 };
-const TITLES = { images: "Images", svg: "SVG", cells: "Recycled cells", shapes: "Shapes", text: "Text", layouts: "Layouts", a11y: "Accessibility", transforms: "Transforms", uneven: "Uneven cells", looks: "Platform Looks", snapping: "Carousel & Drawer", animations: "Lottie & GIF", shell: "Shell" };
+const TITLES = { images: "Images", svg: "SVG", cells: "Recycled cells", shapes: "Shapes", text: "Text", layouts: "Layouts", a11y: "Accessibility", transforms: "Transforms", uneven: "Uneven cells", looks: "Common Controls", snapping: "Carousel & Drawer", animations: "Lottie & GIF", shell: "Shell" };
 
 function App() {
   const [view, setView] = useState<CanvasView | null>(null);

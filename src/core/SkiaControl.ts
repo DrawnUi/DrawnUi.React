@@ -9,7 +9,8 @@ import { ControlTappedEventArgs, GestureEventProcessingInfo, type LockTouch, SKP
 
 /** Mirrors DrawnUi DrawingContext: ctx.Context.Canvas / Surface, ctx.Destination (pixels), ctx.Scale. */
 export interface DrawingContext {
-  Context: { Canvas: SkCanvas; Surface?: Surface };
+  /** Recording = the canvas records a picture (Operations cache): nothing reaches a surface until it is replayed. */
+  Context: { Canvas: SkCanvas; Surface?: Surface; Recording?: boolean };
   Destination: SKRect;
   Scale: number;
 }
@@ -428,7 +429,7 @@ export class SkiaControl {
   }
 
   Render(ctx: DrawingContext): void {
-    if (!this.IsVisible || this.Opacity <= 0) return;
+    if (!this.IsVisible || this.Opacity <= 0 || this.IsDisposed) return;
     const canvas = ctx.Context.Canvas;
     const applyOpacity = this.Opacity < 1;
     const needTransform = this.HasTransform;
@@ -506,7 +507,7 @@ export class SkiaControl {
 
   /** Background + Paint(): the part of the control that a cache captures. */
   protected PaintContent(ctx: DrawingContext): void {
-    if (this.BackgroundColor || this.FillGradient || this.PaintsBackgroundWithoutColor()) this.PaintBackground(ctx);
+    if (this.BackgroundColor || (this.FillGradient && this.FillGradientPaintsBackground()) || this.PaintsBackgroundWithoutColor()) this.PaintBackground(ctx);
     this.Paint(ctx);
   }
   /** Subclasses whose PaintBackground has something to draw without a BackgroundColor (shape shadows). */
@@ -535,7 +536,7 @@ export class SkiaControl {
     if (cacheType === "Operations") {
       const recorder = new CK.PictureRecorder();
       const canvas = recorder.beginRecording(CK.LTRBRect(r.Left, r.Top, r.Right, r.Bottom));
-      this.PaintContent({ ...ctx, Context: { ...ctx.Context, Canvas: canvas } });
+      this.PaintContent({ ...ctx, Context: { ...ctx.Context, Canvas: canvas, Recording: true } });
       const picture = recorder.finishRecordingAsPicture();
       recorder.delete();
       this.RenderObject = new CachedObject("Operations", r, ctx.Scale, picture);
@@ -716,6 +717,32 @@ export class SkiaControl {
   protected Paint(_ctx: DrawingContext): void {}
 
   // ---- invalidation (same names as DrawnUi) ----
+
+  // ---- disposal (C# Dispose / OnDisposing) ----
+  IsDisposed = false;
+
+  /**
+   * Frees what the control owns: caches, gradient shaders, running animations and overlay effects, the accessibility
+   * node, then the children. Called by the React renderer when the element leaves the tree (detachDeletedInstance).
+   */
+  Dispose(): void {
+    if (this.IsDisposed) return;
+    this.IsDisposed = true;
+    this.OnDisposing();
+    for (const c of this.ownAnimations.values()) c.abort();
+    this.ownAnimations.clear();
+    for (const e of [...this.PostAnimators]) (e as { Stop?: () => void }).Stop?.();
+    this.PostAnimators.length = 0;
+    this.DestroyRenderingObject();
+    if (this.gradientShaders) { for (const m of this.gradientShaders.values()) for (const s of m.values()) s.delete(); this.gradientShaders.clear(); }
+    this.UnregisterAccessibility();
+    this.DisposeChildren();
+    this.Parent = undefined;
+  }
+  /** Subclasses release their own native objects here (before the base frees caches and children). */
+  protected OnDisposing(): void {}
+  /** Layouts dispose their children here. */
+  protected DisposeChildren(): void {}
 
   /** Content changed: cache invalidated + remeasure + redraw (bubbles to every ancestor, whose caches go stale too). */
   Update(): void {

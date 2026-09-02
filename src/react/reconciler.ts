@@ -18,6 +18,7 @@ import { SkiaHotspot } from "../controls/SkiaHotspot";
 import { SkiaButton } from "../controls/SkiaButton";
 import { SkiaImage } from "../controls/SkiaImage";
 import { SkiaSvg } from "../controls/SkiaSvg";
+import { SkiaBackdrop } from "../controls/SkiaBackdrop";
 import { SkiaLottie } from "../controls/SkiaLottie";
 import { SkiaGif } from "../controls/SkiaGif";
 import { SkiaScroll } from "../controls/SkiaScroll";
@@ -28,7 +29,7 @@ type HostInstance = SkiaControl | TextSpan;
 
 /** JSX tag name -> engine class. Add a control here to expose it to React. */
 export const Registry: Record<string, new () => HostInstance> = {
-  SkiaLayout, SkiaStack, SkiaRow, SkiaLayer, SkiaWrap, SkiaGrid, SkiaLabel, SkiaRichLabel, TextSpan, SkiaHotspot, SkiaButton, SkiaImage, SkiaSvg, SkiaLottie, SkiaGif, SkiaScroll, SkiaShape, SkiaFrame,
+  SkiaLayout, SkiaStack, SkiaRow, SkiaLayer, SkiaWrap, SkiaGrid, SkiaBackdrop, SkiaLabel, SkiaRichLabel, TextSpan, SkiaHotspot, SkiaButton, SkiaImage, SkiaSvg, SkiaLottie, SkiaGif, SkiaScroll, SkiaShape, SkiaFrame,
   SkiaSwitch, SkiaCheckbox, SkiaRadioButton, SkiaProgress, SkiaSlider, SkiaCarousel, SkiaDrawer,
 };
 
@@ -124,7 +125,8 @@ const hostConfig: Cfg & Record<string, unknown> = {
   afterActiveInstanceBlur: noop,
   prepareScopeUpdate: noop,
   getInstanceFromScope: () => null,
-  detachDeletedInstance: noop,
+  // React deleted the element: free the engine resources (C# Dispose); children are disposed by their parent first
+  detachDeletedInstance: (inst: HostInstance) => { (inst as SkiaControl).Dispose?.(); },
 
   setCurrentUpdatePriority: (p: number) => { currentUpdatePriority = p; },
   getCurrentUpdatePriority: () => currentUpdatePriority,

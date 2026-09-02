@@ -192,8 +192,9 @@ export class SkiaLottie extends AnimatedFramesRenderer {
     this.Update();
   }
 
-  override Dispose(): void {
-    super.Dispose();
+  protected override OnDisposing(): void {
+    this.loadGeneration++;
+    super.OnDisposing();
     this.Animation?.delete();
     this.Animation = undefined;
   }

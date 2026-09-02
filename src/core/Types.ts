@@ -83,6 +83,19 @@ export type DrawerDirection = "FromBottom" | "FromTop" | "FromLeft" | "FromRight
 
 /** DrawnUi LayoutType. */
 export type LayoutType = "Absolute" | "Column" | "Row" | "Wrap" | "Grid";
+/** DrawnUi BevelType: None, Bevel (light top/left, shadow bottom/right), Emboss (the opposite). */
+export type BevelType = "None" | "Bevel" | "Emboss";
+/** DrawnUi SkiaBevel: bevel / emboss edge parameters of a SkiaShape (Depth in points). */
+export class SkiaBevel {
+  Depth = 2;
+  LightColor: Color = "#FFFFFF";
+  ShadowColor: Color = "#000000";
+  /** Applies to both the light and the shadow edge. */
+  Opacity = 0.5;
+  constructor(init?: Partial<SkiaBevel>) { if (init) Object.assign(this, init); }
+  static From(v: SkiaBevel | Partial<SkiaBevel>): SkiaBevel { return v instanceof SkiaBevel ? v : new SkiaBevel(v); }
+}
+
 /** DrawnUi SkiaShadow: a drop shadow painted with the shape (offset and blur in points; Color alpha 1 = use Opacity). */
 export class SkiaShadow {
   X = 2;

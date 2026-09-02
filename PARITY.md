@@ -203,3 +203,10 @@ Updated whenever the port deliberately diverges or finds something worth back-po
 - **.NET**: the effect invalidates the parent through the regular `Update`/`Repaint` path.
 - **Opinion**: same outcome; noted because the React cache model had to add it explicitly.
 
+## SkiaBackdrop
+
+### No snapshot while a picture is being recorded
+- **React**: inside an Operations (SkPicture) cache the backdrop draws only its tint and warns once; the snapshot of the previous on-screen frame was tried and rejected — the box overlaps its own previous output, so the stale content feeds back into itself forever.
+- **.NET**: `UseContext` snapshots `ctx.Context.Surface`; a backdrop recorded into a cached parent's picture has the same problem (the surface has not received the parent's content yet).
+- **Opinion**: document it in .NET too, or make `SkiaBackdrop` invalidate an Operations-caching ancestor to `Image` when it is attached.
+

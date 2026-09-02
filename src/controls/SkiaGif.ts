@@ -183,8 +183,9 @@ export class SkiaGif extends AnimatedFramesRenderer {
     canvas.restoreToCount(saved);
   }
 
-  override Dispose(): void {
-    super.Dispose();
+  protected override OnDisposing(): void {
+    this.loadGeneration++;
+    super.OnDisposing();
     this.Animation?.Dispose();
     this.Animation = undefined;
   }

@@ -192,6 +192,13 @@ export class SkiaLayout extends SkiaControl {
 
   protected override GetGestureListeners(): readonly SkiaControl[] { return this.GetOrderedSubviews(); }
 
+  protected override DisposeChildren(): void {
+    for (const v of [...this.views]) v.Dispose();
+    this.views.length = 0;
+    this.orderedViews = undefined;
+    this.ChildrenFactory.DisposeAll();
+  }
+
   override AddSubView(control: SkiaControl): void { this.InsertSubView(this.views.length, control); }
 
   override InsertSubView(index: number, control: SkiaControl): void {
