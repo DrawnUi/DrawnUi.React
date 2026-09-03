@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Colors, SkiaBackdrop, SkiaButton, SkiaImage, SkiaLabel, SkiaLayer, SkiaScroll, SkiaShape, SkiaShell, SkiaStack, SkiaWrap, Thickness, useShell } from "drawnui-react";
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
@@ -46,12 +46,17 @@ function ModalContent() {
 /** A page inside the embedded tabbed shell: shows its tab stack and pushes deeper pages. */
 function TabPage({ name, color }: { name: string; color: string }) {
   const shell = useShell();
+  const args = Object.keys(shell.Arguments).length ? ` · Arguments ${JSON.stringify(shell.Arguments)}` : "";
   return (
     <SkiaLayer VerticalOptions="Fill" BackgroundColor={color}>
       <SkiaStack Spacing={10} Padding={new Thickness(16)} HorizontalOptions="Center" VerticalOptions="Center">
         <SkiaLabel Text={name} FontSize={22} FontFamily="FontTextBold" TextColor={Colors.White} HorizontalOptions="Center" />
-        <SkiaLabel Text={`Tab ${shell.SelectedTab} · stack [${shell.NavigationStack.join(", ")}]`} FontSize={12} TextColor="#DEE2E6" HorizontalOptions="Center" />
-        <SkiaButton Text="Push detail" BackgroundColor="#212529" FontSize={13} HorizontalOptions="Center" Tapped={() => void shell.GoToAsync("detail")} />
+        <SkiaLabel Text={`Tab ${shell.SelectedTab} · stack [${shell.NavigationStack.join(", ")}]${args}`} FontSize={12} TextColor="#DEE2E6" HorizontalOptions="Center" HorizontalTextAlignment="Center" />
+        <SkiaWrap Spacing={8} HorizontalOptions="Center">
+          <SkiaButton Text="Push detail" BackgroundColor="#212529" FontSize={13} Tapped={() => void shell.GoToAsync("detail")} />
+          <SkiaButton Text="GoToAsync('detail', true, { id: 42, from })" BackgroundColor="#212529" FontSize={13} Tapped={() => void shell.GoToAsync("detail", true, { id: 42, from: name })} />
+          <SkiaButton Text="GoToAsync('detail?id=7')" BackgroundColor="#212529" FontSize={13} Tapped={() => void shell.GoToAsync("detail?id=7")} />
+        </SkiaWrap>
       </SkiaStack>
     </SkiaLayer>
   );
@@ -61,13 +66,16 @@ const TAB_ROUTES = {
   home: () => <TabPage name="Home" color="#0F3460" />,
   search: () => <TabPage name="Search" color="#533483" />,
   profile: () => <TabPage name="Profile" color="#1B4332" />,
-  detail: () => <TabPage name="Detail page (pushed inside this tab)" color="#2B3035" />,
+  detail: (args: Record<string, unknown>) => <TabPage name={args.id !== undefined ? `Detail id=${String(args.id)}` : "Detail page (pushed inside this tab)"} color="#2B3035" />,
 };
 const TAB_TITLES = { detail: "Detail" };
 
 /** SkiaShell: pages with slide transitions, popups, modals, toasts, tabs, browser back. */
 export function ShellPage() {
   const shell = useShell();
+  const [events, setEvents] = useState<string[]>([]);
+  const [cancel, setCancel] = useState(false);
+  const cancelNext = useRef(false);
   const [log, setLog] = useState("");
   return (
     <SkiaScroll Orientation="Vertical">
@@ -87,8 +95,15 @@ export function ShellPage() {
 
         <Card title="Tabs — a nested SkiaShell with Tabs: per-tab navigation stacks, AnimateTabs (C# SkiaViewSwitcher slide + fade), PopTabToRootAsync">
           <SkiaLayer HeightRequest={300} HorizontalOptions="Fill" IsClippedToBounds>
-            <SkiaShell Routes={TAB_ROUTES} Titles={TAB_TITLES} Tabs={[{ route: "home", title: "Home" }, { route: "search", title: "Search" }, { route: "profile", title: "Profile" }]} UseBrowserHistory={false} NavBarHeight={44} AnimateTabs />
+            <SkiaShell Routes={TAB_ROUTES} Titles={TAB_TITLES} Tabs={[{ route: "home", title: "Home" }, { route: "search", title: "Search" }, { route: "profile", title: "Profile" }]} UseBrowserHistory={false} NavBarHeight={44} AnimateTabs Insets={Thickness.Zero}
+              Navigating={(e) => { if (cancelNext.current) { e.Cancel = true; cancelNext.current = false; setCancel(false); } setEvents((l) => [`Navigating ${e.Source} '${e.Route}'${e.Cancel ? " CANCELLED" : ""}`, ...l].slice(0, 4)); }}
+              Navigated={(e) => setEvents((l) => [`Navigated ${e.Source} '${e.Route}' view=${e.View?.constructor.name ?? "-"}`, ...l].slice(0, 4))}
+              RouteChanged={(r) => setEvents((l) => [`RouteChanged '${r}'`, ...l].slice(0, 4))} />
           </SkiaLayer>
+        <SkiaWrap Spacing={8}>
+            <SkiaButton Text={cancel ? "Next Navigating will be CANCELLED" : "Cancel next navigation"} BackgroundColor={cancel ? "#D63384" : "#495057"} FontSize={12} Tapped={() => { cancelNext.current = !cancelNext.current; setCancel(cancelNext.current); }} />
+          </SkiaWrap>
+          <SkiaLabel Text={events.length ? events.join("\n") : "Navigating / Navigated / RouteChanged events of the nested shell appear here"} FontSize={12} TextColor="#ADB5BD" HorizontalOptions="Fill" />
         </Card>
 
         <Card title="SkiaBackdrop — the Sandbox MainPageBackdrop frosted glass, same tree">

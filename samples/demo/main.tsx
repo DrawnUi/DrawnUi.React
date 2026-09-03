@@ -21,6 +21,7 @@ import { EditorPage } from "./pages/EditorPage";
 import { KeyboardPage } from "./pages/KeyboardPage";
 import { SpritesPage } from "./pages/SpritesPage";
 import { ShadersPage } from "./pages/ShadersPage";
+import { ScrollPage } from "./pages/ScrollPage";
 import { Aria } from "drawnui-react";
 import { SkiaButton as SkiaButtonCtrl, SkiaLabel as SkiaLabelCtrl } from "drawnui-react/core";
 
@@ -56,8 +57,9 @@ const ROUTES = {
   keyboard: () => <KeyboardPage />,
   sprites: () => <SpritesPage />,
   shaders: () => <ShadersPage />,
+  scroll: () => <ScrollPage />,
 };
-const TITLES = { images: "Images", svg: "SVG", cells: "Recycled cells", shapes: "Shapes", text: "Text", layouts: "Layouts", a11y: "Accessibility", transforms: "Transforms", uneven: "Uneven cells", looks: "Common Controls", snapping: "Carousel & Drawer", animations: "Lottie & GIF", shell: "Shell", editor: "Editor", keyboard: "Keyboard Input", sprites: "Sprites", shaders: "Shaders" };
+const TITLES = { images: "Images", svg: "SVG", cells: "Recycled cells", shapes: "Shapes", text: "Text", layouts: "Layouts", a11y: "Accessibility", transforms: "Transforms", uneven: "Uneven cells", looks: "Common Controls", snapping: "Carousel & Drawer", animations: "Lottie & GIF", shell: "Shell", editor: "Editor", keyboard: "Keyboard Input", sprites: "Sprites", shaders: "Shaders", scroll: "SkiaScroll" };
 
 function App() {
   const [view, setView] = useState<CanvasView | null>(null);

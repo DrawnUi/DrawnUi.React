@@ -30,6 +30,14 @@ export class SkiaLayout extends SkiaControl {
 
   // ---- templated children (same names as DrawnUi) ----
   RecyclingTemplate: RecyclingTemplate = "Enabled";
+  /** Column count for Column / Wrap content and a templated Grid (0 = free flow); C# Split. */
+  Split = 0;
+  /** Split > 0: every slot keeps the same width (true) or the cell keeps its measured width (C# SplitAlign). */
+  SplitAlign = true;
+  /** A short last row spreads over the whole width instead of keeping empty Split slots (C# DynamicColumns). */
+  DynamicColumns = false;
+  /** Templated Grid: fill column-major (top to bottom, then next column) instead of row-major (C# Invert). */
+  Invert = false;
   MeasureItemsStrategy: MeasuringStrategy = "MeasureFirst";
   /** Realized views per item (Disabled) or a recycled pool for the visible range (Enabled). */
   readonly ChildrenFactory = new ViewsAdapter(this);
@@ -134,6 +142,15 @@ export class SkiaLayout extends SkiaControl {
   }
 
   get IsTemplated(): boolean { return !!this.itemTemplate && !!this.itemsSource; }
+  /** The virtualized list case: a templated single-column Column. Templated Row / Wrap / Grid realize every item. */
+  private get IsTemplatedList(): boolean { return this.IsTemplated && this.Type === "Column" && this.Split <= 1; }
+  /** Views taking part in the layout pass: static children, or every item of a templated Row / Wrap / Grid (C# non-list layouts are not virtualized). */
+  private LayoutViews(): readonly SkiaControl[] {
+    if (!this.IsTemplated) return this.views;
+    const n = this.itemsSource!.length, out: SkiaControl[] = [];
+    for (let i = 0; i < n; i++) { const v = this.ChildrenFactory.GetOrCreateViewForIndex(i); if (v) out.push(v); }
+    return out;
+  }
 
   /** Drops realized cells and rebuilds the structure (DrawnUi ApplyItemsSource). */
   ApplyItemsSource(): void {
@@ -220,7 +237,7 @@ export class SkiaLayout extends SkiaControl {
   // ---- measure ----
 
   protected override MeasureAbsolute(widthConstraint: number, heightConstraint: number, scale: number): ScaledSize {
-    if (this.IsTemplated) return this.MeasureTemplated(widthConstraint, heightConstraint, scale);
+    if (this.IsTemplatedList) return this.MeasureTemplated(widthConstraint, heightConstraint, scale);
     const px = this.Padding.HorizontalThickness * scale;
     const py = this.Padding.VerticalThickness * scale;
     const w = widthConstraint - px;
@@ -228,10 +245,10 @@ export class SkiaLayout extends SkiaControl {
     const gap = this.Spacing * scale;
     let cw = 0, ch = 0, n = 0;
 
-    if (this.Type === "Wrap") { const s = this.MeasureWrap(w, scale); return ScaledSize.FromPixels(s.w + px, s.h + py, scale); }
+    if (this.IsWrapFlow) { const s = this.MeasureWrap(w, scale); return ScaledSize.FromPixels(s.w + px, s.h + py, scale); }
     if (this.Type === "Grid") { const s = this.MeasureGrid(w, h, scale); return ScaledSize.FromPixels(s.w + px, s.h + py, scale); }
 
-    for (const v of this.views) {
+    for (const v of this.LayoutViews()) {
       if (!v.IsVisible) continue;
       let s: ScaledSize;
       if (this.Type === "Column") { s = v.Measure(w, Infinity, scale); cw = Math.max(cw, s.Pixels.Width); ch += s.Pixels.Height; }
@@ -248,29 +265,58 @@ export class SkiaLayout extends SkiaControl {
   /** Wrap rows computed by the last measure: [childIndex, x, y, w, h] in pixels relative to the padded box. */
   private wrapSlots: { view: SkiaControl; x: number; y: number; w: number; h: number }[] = [];
 
-  /** Flow children left to right, wrapping when the row overflows; Spacing applies between items and rows. */
+  /** Wrap, or a Column with Split > 1 (C# lays a multi-column Column out like a wrap with fixed slots). */
+  private get IsWrapFlow(): boolean { return this.Type === "Wrap" || (this.Type === "Column" && this.Split > 1); }
+
+  /**
+   * Flow children left to right, wrapping when the row overflows; Spacing applies between items and rows.
+   * Split > 0: fixed column count with slot width (width - (Split - 1) * gap) / Split (`SplitAlign`), a new row every
+   * Split items; `DynamicColumns` lets a short last row spread over the width.
+   */
   private MeasureWrap(width: number, scale: number): { w: number; h: number } {
     const gap = this.Spacing * scale;
+    const split = this.Split > 0 ? this.Split : 0;
+    const slotW = split > 0 && isFinite(width) ? (width - (split - 1) * gap) / split : 0;
     this.wrapSlots = [];
     let x = 0, y = 0, rowH = 0, maxW = 0;
     const row: typeof this.wrapSlots = [];
-    const finishRow = () => { for (const s of row) s.h = rowH; row.length = 0; };
-    for (const v of this.views) {
+    const finishRow = (last: boolean) => {
+      if (last && split > 0 && this.DynamicColumns && row.length > 0 && row.length < split && isFinite(width)) {
+        // C# DynamicColumns: the last short row takes the whole width
+        const w = (width - (row.length - 1) * gap) / row.length;
+        let rx = 0; rowH = 0;
+        for (const s of row) { const m = s.view.Measure(w, Infinity, scale); s.x = rx; s.w = w; s.h = m.Pixels.Height; rowH = Math.max(rowH, s.h); rx += w + gap; }
+        maxW = Math.max(maxW, rx - gap);
+      }
+      for (const s of row) s.h = rowH;
+      row.length = 0;
+    };
+    for (const v of this.LayoutViews()) {
       if (!v.IsVisible) continue;
-      const s = v.Measure(width, Infinity, scale);
-      const cw = s.Pixels.Width, ch = s.Pixels.Height;
-      if (x > 0 && isFinite(width) && x + cw > width) { finishRow(); y += rowH + gap; x = 0; rowH = 0; }
+      const s = v.Measure(split > 0 && slotW > 0 ? slotW : width, Infinity, scale);
+      const cw = split > 0 && slotW > 0 && this.SplitAlign ? slotW : s.Pixels.Width, ch = s.Pixels.Height;
+      const wrap = split > 0 ? row.length >= split : x > 0 && isFinite(width) && x + cw > width;
+      if (wrap) { finishRow(false); y += rowH + gap; x = 0; rowH = 0; }
       const slot = { view: v, x, y, w: cw, h: ch };
       this.wrapSlots.push(slot); row.push(slot);
       x += cw + gap; rowH = Math.max(rowH, ch); maxW = Math.max(maxW, x - gap);
     }
-    finishRow();
+    finishRow(true);
     return { w: maxW, h: this.wrapSlots.length ? y + rowH : 0 };
   }
 
   /** Port of C# MeasureGrid: build the structure in points, stretch the last track when the grid fills, remeasure at final cells. */
   private MeasureGrid(widthPx: number, heightPx: number, scale: number): { w: number; h: number } {
     const wPts = widthPx / scale, hPts = heightPx / scale;
+    if (this.IsTemplated) {
+      // C# templated grid: item i goes to (i % Split, i / Split), column-major when Invert
+      const views = this.LayoutViews(), split = Math.max(1, this.Split);
+      const rowsPerColumn = this.Invert && split > 1 ? Math.ceil(views.length / split) : 0;
+      views.forEach((v, i) => {
+        if (rowsPerColumn > 0) { v.Column = Math.floor(i / rowsPerColumn); v.Row = i % rowsPerColumn; }
+        else { v.Row = Math.floor(i / split); v.Column = i % split; }
+      });
+    }
     const g = new SkiaGridStructure(this, wPts, hPts, scale);
     g.DecompressStars(wPts, hPts);
     const needAutoWidth = this.WidthRequest < 0 && this.HorizontalOptions !== "Fill";
@@ -413,7 +459,7 @@ export class SkiaLayout extends SkiaControl {
   // ---- arrange ----
 
   protected override OnLayoutChanged(): void {
-    if (this.IsTemplated) return; // cells are arranged per frame for the visible range only
+    if (this.IsTemplatedList) return; // cells are arranged per frame for the visible range only
     const scale = this.RenderingScale;
     const p = this.Padding;
     const r = this.DrawingRect;
@@ -421,14 +467,14 @@ export class SkiaLayout extends SkiaControl {
     const gap = this.Spacing * scale;
     let cursor = this.Type === "Row" ? inner.Left : inner.Top;
 
-    if (this.Type === "Wrap") {
+    if (this.IsWrapFlow) {
       for (const s of this.wrapSlots) s.view.Arrange(SKRect.Create(inner.Left + s.x, inner.Top + s.y, s.w, s.h), s.view.WidthRequest, s.view.HeightRequest, scale);
       return;
     }
     if (this.Type === "Grid") {
       const g = this.GridStructure;
       if (!g) return;
-      for (const v of this.views) {
+      for (const v of this.LayoutViews()) {
         if (!v.IsVisible) continue;
         const c = g.GetCellBoundsFor(v, inner.Left / scale, inner.Top / scale);
         v.Arrange(SKRect.Create(c.Left * scale, c.Top * scale, c.Width * scale, c.Height * scale), v.WidthRequest, v.HeightRequest, scale);
@@ -436,7 +482,7 @@ export class SkiaLayout extends SkiaControl {
       return;
     }
 
-    for (const v of this.views) {
+    for (const v of this.LayoutViews()) {
       if (!v.IsVisible) continue;
       if (this.Type === "Column") {
         const h = v.MeasuredSize.Pixels.Height;
@@ -453,9 +499,11 @@ export class SkiaLayout extends SkiaControl {
   }
 
   protected override Paint(ctx: DrawingContext): void {
-    if (this.IsTemplated) { this.PaintTemplated(ctx); return; }
-    for (const v of this.GetOrderedSubviews()) v.Render(ctx);
+    if (this.IsTemplatedList) { this.PaintTemplated(ctx); return; }
+    const composing = this.IsRenderingWithComposition;
+    for (const v of this.GetOrderedSubviews()) if (!composing || this.DirtyChildrenInternal.has(v)) v.Render(ctx);
   }
+  protected override GetCompositeChildren(): readonly SkiaControl[] { return this.IsTemplatedList ? [] : this.GetOrderedSubviews(); }
 
   /** Realizes, binds, arranges and draws only the cells intersecting the visible viewport (+ inflation). */
   private PaintTemplated(ctx: DrawingContext): void {

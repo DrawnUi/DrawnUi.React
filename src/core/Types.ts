@@ -190,6 +190,8 @@ export type RecyclingTemplate = "Enabled" | "Disabled";
 /** DrawnUi MeasuringStrategy (MeasureVisible not ported yet). */
 export type MeasuringStrategy = "MeasureAll" | "MeasureFirst" | "MeasureVisible";
 
+/** DrawnUi SnapToChildrenType: snap the scroll to a child after scrolling stops. */
+export type SnapToChildrenType = "Disabled" | "Center" | "Side";
 /** DrawnUi RelativePositionType for ScrollToIndex. */
 export type RelativePositionType = "None" | "Start" | "Center" | "End";
 

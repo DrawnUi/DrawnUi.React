@@ -1,4 +1,25 @@
-import { Colors, SkiaGrid, SkiaLabel, SkiaLayer, SkiaRow, SkiaScroll, SkiaShape, SkiaStack, SkiaWrap, Thickness } from "drawnui-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Colors, SkiaButton, SkiaDecoratedGrid, SkiaGrid, SkiaLabel, SkiaLayer, SkiaRow, SkiaScroll, SkiaShape, SkiaStack, SkiaWrap, Thickness } from "drawnui-react";
+import { SkiaDynamicDrawnCell, type SkiaLayout as SkiaLayoutCtrl, SkiaLabel as SkiaLabelCtrl, SkiaShape as SkiaShapeCtrl, Thickness as ThicknessCtrl } from "drawnui-react/core";
+
+/** Recycled chip cell for the templated layouts below: visuals once, SetContent per bind. */
+class ChipCell extends SkiaDynamicDrawnCell {
+  private readonly shape = new SkiaShapeCtrl();
+  private readonly label = new SkiaLabelCtrl();
+  constructor() {
+    super();
+    this.shape.Type = "Rectangle"; this.shape.CornerRadius = 10; this.shape.HorizontalOptions = "Fill";
+    this.label.FontSize = 13; this.label.TextColor = "#DEE2E6"; this.label.Padding = new ThicknessCtrl(12, 8); this.label.HorizontalOptions = "Center";
+    this.shape.AddSubView(this.label);
+    this.AddSubView(this.shape);
+    this.HorizontalOptions = "Fill";
+  }
+  protected override SetContent(ctx: unknown): void {
+    const item = ctx as { text: string; color: string };
+    this.label.Text = item.text; this.shape.BackgroundColor = item.color;
+  }
+}
+const PALETTE = ["#0F3460", "#533483", "#1B4332", "#7B2D26", "#495057", "#0D6EFD", "#D63384", "#2D6A4F"];
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -31,6 +52,32 @@ function Box({ text, color, w, h, ...rest }: { text: string; color: string; w?: 
 
 /** Every SkiaLayout type: Absolute (SkiaLayer), Column (SkiaStack), Row (SkiaRow), Wrap (SkiaWrap), Grid (SkiaGrid). */
 export function LayoutsPage() {
+  const [count, setCount] = useState(10);
+  const [split, setSplit] = useState(3);
+  const [dynamic, setDynamic] = useState(false);
+  const items = useMemo(() => Array.from({ length: count }, (_, i) => ({ text: `Item ${i + 1}`, color: PALETTE[i % PALETTE.length] })), [count]);
+  const template = useCallback(() => new ChipCell(), []);
+  // ImageComposite: one child spins, the layer re-records only it (+ what it overlaps)
+  const composite = useRef<SkiaLayoutCtrl>(null);
+  const spinner = useRef<SkiaShapeCtrl>(null);
+  const [compositeInfo, setCompositeInfo] = useState("");
+  // stable elements: a new Margin object on every render would remeasure every shape (a full composite record)
+  const compositeShapes = useMemo(() => Array.from({ length: 24 }, (_, i) => (
+    <SkiaShape key={i} Type={i % 3 === 0 ? "Circle" : "Rectangle"} CornerRadius={6} WidthRequest={40} HeightRequest={40} BackgroundColor={PALETTE[i % PALETTE.length]} Margin={new Thickness(12 + (i % 12) * 52, 12 + Math.floor(i / 12) * 70, 0, 0)} UseCache="Operations" />
+  )), []);
+  const spinnerMargin = useMemo(() => new Thickness(12 + 5 * 52 + 6, 12 + 35 + 4, 0, 0), []);
+  useEffect(() => {
+    let angle = 0;
+    const id = setInterval(() => {
+      const sp = spinner.current, layer = composite.current;
+      if (!sp || !layer) return;
+      angle = (angle + 6) % 360;
+      sp.Rotation = angle; sp.RepaintComposition();
+      const rec = layer.LastCompositeRecord;
+      setCompositeInfo(`last record: ${rec.Mode} · ${rec.Children} of ${layer.Children.length} children`);
+    }, 40);
+    return () => clearInterval(id);
+  }, []);
   return (
     <SkiaScroll Orientation="Vertical">
       <SkiaStack Spacing={16} Padding={new Thickness(16)} HorizontalOptions="Center" MaximumWidthRequest={720}>
@@ -162,6 +209,34 @@ export function LayoutsPage() {
               </SkiaShape>
             ))}
           </SkiaWrap>
+        </Card>
+
+        <SkiaLabel Text="Caching · UseCache=ImageComposite" FontSize={20} TextColor={Colors.White} HorizontalOptions="Center" Margin={new Thickness(0, 8, 0, 0)} />
+        <Card title={`SkiaLayer UseCache="ImageComposite" · 24 shapes, one rotating · ${compositeInfo || "…"}`}>
+          <SkiaLayer ref={composite} UseCache="ImageComposite" HeightRequest={150} HorizontalOptions="Fill" BackgroundColor="#212529">
+            {compositeShapes}
+            <SkiaShape ref={spinner} Type="Rectangle" CornerRadius={4} WidthRequest={44} HeightRequest={44} BackgroundColor="#FFC107" Margin={spinnerMargin} UseCache="Operations" ZIndex={5} />
+          </SkiaLayer>
+          <SkiaLabel Text="RepaintComposition() from the spinning child marks it dirty in the composite parent (C# DirtyChildrenTracker); the next record erases its old + new bounds and the siblings they overlap, then paints only those children into the kept surface. Own content / measure changes record fully." FontSize={12} TextColor="#ADB5BD" HorizontalOptions="Fill" />
+        </Card>
+        <SkiaLabel Text="ItemsSource + ItemTemplate for Wrap / Row / Grid · Split" FontSize={20} TextColor={Colors.White} HorizontalOptions="Center" Margin={new Thickness(0, 8, 0, 0)} />
+        <Card title={`SkiaWrap ItemsSource (${count} recycled ChipCell) · Split=${split} · DynamicColumns=${dynamic}`}>
+          <SkiaWrap Spacing={8} ItemsSource={items} ItemTemplate={template} Split={split} DynamicColumns={dynamic} />
+          <SkiaWrap Spacing={6}>
+            {[0, 2, 3, 4].map((v) => <SkiaButton key={v} Text={v === 0 ? "Split 0 (flow)" : `Split ${v}`} BackgroundColor={split === v ? "#533483" : "#495057"} FontSize={12} Tapped={() => setSplit(v)} />)}
+            <SkiaButton Text={`DynamicColumns ${dynamic ? "on" : "off"}`} BackgroundColor={dynamic ? "#533483" : "#495057"} FontSize={12} Tapped={() => setDynamic((d) => !d)} />
+            <SkiaButton Text="+ item" BackgroundColor="#0D6EFD" FontSize={12} Tapped={() => setCount((c) => c + 1)} />
+            <SkiaButton Text="- item" BackgroundColor="#0D6EFD" FontSize={12} Tapped={() => setCount((c) => Math.max(1, c - 1))} />
+          </SkiaWrap>
+        </Card>
+        <Card title="SkiaRow ItemsSource (same cells, laid out horizontally, every item realized)">
+          <SkiaRow Spacing={8} ItemsSource={items.slice(0, 5)} ItemTemplate={template} />
+        </Card>
+        <Card title={`SkiaDecoratedGrid ItemsSource · Split=4 · ColumnDefinitions="*,*,*,*" · gradient lines in ColumnSpacing / RowSpacing`}>
+          <SkiaDecoratedGrid ItemsSource={items} ItemTemplate={template} Split={4} ColumnDefinitions="*,*,*,*" ColumnSpacing={10} RowSpacing={10} />
+        </Card>
+        <Card title="SkiaGrid ItemsSource · Split=3 · Invert (column-major)">
+          <SkiaGrid ItemsSource={items} ItemTemplate={template} Split={3} Invert ColumnDefinitions="*,*,*" ColumnSpacing={8} RowSpacing={8} />
         </Card>
       </SkiaStack>
     </SkiaScroll>

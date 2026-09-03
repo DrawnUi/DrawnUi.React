@@ -18,6 +18,9 @@ import type { SkiaHotspot as SkiaHotspotCtrl } from "../controls/SkiaHotspot";
 import type { SkiaButton as SkiaButtonCtrl } from "../controls/SkiaButton";
 import type { SkiaImage as SkiaImageCtrl } from "../controls/SkiaImage";
 import type { SkiaImageTiles as SkiaImageTilesCtrl } from "../controls/SkiaImageTiles";
+import type { SkiaDecoratedGrid as SkiaDecoratedGridCtrl } from "../controls/SkiaDecoratedGrid";
+import type { SkiaScrollBar as SkiaScrollBarCtrl } from "../controls/SkiaScrollBar";
+import type { RefreshIndicator as RefreshIndicatorCtrl } from "../controls/RefreshIndicator";
 import type { SkiaSvg as SkiaSvgCtrl } from "../controls/SkiaSvg";
 import type { SkiaBackdrop as SkiaBackdropCtrl } from "../controls/SkiaBackdrop";
 import type { SkiaEditor as SkiaEditorCtrl } from "../controls/SkiaEditor";
@@ -34,7 +37,7 @@ import { createDrawnRoot } from "./reconciler";
 /** Public settable properties of a control become its JSX props, same PascalCase names as C#. */
 type PropsOf<T> = Partial<{
   // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-  [K in keyof T as T[K] extends Function ? never : K extends "Children" | "Views" | "Parent" | "Spans" | "GridStructure" | "AccessibilityId" | "IsAccessibilityElement" | "HasTransform" | "RenderTransformMatrix" | "RenderObjectPrevious" | "LastMeasuredIndex" | "ItemsInsertedAtStart" | "UsingControlStyle" | "Track" | "Thumb" | "FrameOn" | "FrameOff" | "ViewCheckOn" | "ViewOn" | "ViewText" | "Ratio" | "StartThumbX" | "EndThumbX" | "SnapPoints" | "CurrentPosition" | "CurrentSnap" | "ContentOffsetBounds" | "InTransition" | "CanAnimate" | "MaxIndex" | "ChildrenTotal" | "IsAtStart" | "IsAtEnd" | "ScrollProgress" | "ScrollAmount" | "TransitionProgress" | "LastIndex" | "ChildrenCount" | "Horizontal" | "Animator" | "Animation" | "IsPlaying" | "PlayWhenAvailable" | "TotalFrames" | "HasEffects" | "IsDisposed" | "Label" | "IsMultiline" | "HasSelection" | "LayoutVersion" | "LinesCount" | "MeasuredLineHeight" | "Focused" | "SpriteSheet" | "FrameWidth" | "FrameHeight" | "DurationMs" | "FrameDurationMs" | "CurrentSprite" | "Rects" | "HasTapHandler" | "HasDecorations" | "LinesCount" | "Superview" | "DrawingRect" | "MeasuredSize" | "RenderingScale" | "NeedMeasure" | "_superview" | "HitBoxAuto" | "TotalDown" | "TotalTapped" | "TouchDown" | "PostAnimators" | "LoadedSource" | "IsLoading" | "DisplayRect" | "AspectScale" | "Content" | "ContentSize" | "ContentOffsetBounds" | "OverscrollDistance" | "OverScrolled" | "IsUserPanning" | "IsUserFocused" | "IsScrolling" | "IsTemplated" | "FirstVisibleIndex" | "LastVisibleIndex" | "DebugString" | "ChildrenFactory" | "ContextIndex" | "RenderObject" | "UsingCacheType" | "TransitionEffect" | "TransitionFromIndex" | "TransitionToIndex" | "EffectPostRenderers" | "CachedImage" | "ImageBitmap" | "ShouldSubmitOnEnter" ? never : K]: T[K];
+  [K in keyof T as T[K] extends Function ? never : K extends "Children" | "Views" | "Parent" | "Spans" | "GridStructure" | "AccessibilityId" | "IsAccessibilityElement" | "HasTransform" | "RenderTransformMatrix" | "RenderObjectPrevious" | "LastMeasuredIndex" | "ItemsInsertedAtStart" | "UsingControlStyle" | "Track" | "Thumb" | "FrameOn" | "FrameOff" | "ViewCheckOn" | "ViewOn" | "ViewText" | "Ratio" | "StartThumbX" | "EndThumbX" | "SnapPoints" | "CurrentPosition" | "CurrentSnap" | "ContentOffsetBounds" | "InTransition" | "CanAnimate" | "MaxIndex" | "ChildrenTotal" | "IsAtStart" | "IsAtEnd" | "ScrollProgress" | "ScrollAmount" | "TransitionProgress" | "LastIndex" | "ChildrenCount" | "Horizontal" | "Animator" | "Animation" | "IsPlaying" | "PlayWhenAvailable" | "TotalFrames" | "HasEffects" | "IsDisposed" | "Label" | "IsMultiline" | "HasSelection" | "LayoutVersion" | "LinesCount" | "MeasuredLineHeight" | "Focused" | "SpriteSheet" | "FrameWidth" | "FrameHeight" | "DurationMs" | "FrameDurationMs" | "CurrentSprite" | "Rects" | "HasTapHandler" | "HasDecorations" | "LinesCount" | "Superview" | "DrawingRect" | "MeasuredSize" | "RenderingScale" | "NeedMeasure" | "_superview" | "HitBoxAuto" | "TotalDown" | "TotalTapped" | "TouchDown" | "PostAnimators" | "LoadedSource" | "IsLoading" | "DisplayRect" | "AspectScale" | "Content" | "ContentSize" | "ContentOffsetBounds" | "OverscrollDistance" | "OverScrolled" | "IsUserPanning" | "IsUserFocused" | "IsScrolling" | "IsTemplated" | "FirstVisibleIndex" | "LastVisibleIndex" | "DebugString" | "ChildrenFactory" | "ContextIndex" | "RenderObject" | "UsingCacheType" | "TransitionEffect" | "TransitionFromIndex" | "TransitionToIndex" | "EffectPostRenderers" | "CachedImage" | "ImageBitmap" | "ShouldSubmitOnEnter" | "Header" | "Footer" | "RefreshIndicator" | "ScrollBar" | "ScrollBarHorizontal" | "IsRunning" | "VisibleRatio" | "CurrentIndex" | "LastCompositeRecord" | "DirtyChildrenInternal" | "IsRenderingWithComposition" ? never : K]: T[K];
 }>;
 
 /** `ref` receives the engine control instance (react-reconciler getPublicInstance). */
@@ -48,6 +51,8 @@ export const SkiaRow = "SkiaRow" as unknown as FC<LayoutProps<SkiaLayoutCtrl>>;
 export const SkiaLayer = "SkiaLayer" as unknown as FC<LayoutProps<SkiaLayoutCtrl>>;
 export const SkiaWrap = "SkiaWrap" as unknown as FC<LayoutProps<SkiaLayoutCtrl>>;
 export const SkiaGrid = "SkiaGrid" as unknown as FC<LayoutProps<SkiaLayoutCtrl>>;
+/** Grid drawing gradient separator lines in its spacing (C# SkiaDecoratedGrid). */
+export const SkiaDecoratedGrid = "SkiaDecoratedGrid" as unknown as FC<LayoutProps<SkiaDecoratedGridCtrl>>;
 export const SkiaLabel = "SkiaLabel" as unknown as FC<LayoutProps<SkiaLabelCtrl>>;
 /** Markdown label (C# SkiaRichLabel): Text is markdown, rendered as spans; LinkTapped for [text](url). */
 export const SkiaRichLabel = "SkiaRichLabel" as unknown as FC<LeafProps<SkiaRichLabelCtrl>>;
@@ -70,6 +75,10 @@ export const SkiaSpriteSet = "SkiaSpriteSet" as unknown as FC<LayoutProps<SkiaSp
 export const SkiaLottie = "SkiaLottie" as unknown as FC<LeafProps<SkiaLottieCtrl>>;
 export const SkiaGif = "SkiaGif" as unknown as FC<LeafProps<SkiaGifCtrl>>;
 export const SkiaScroll = "SkiaScroll" as unknown as FC<LayoutProps<SkiaScrollCtrl>>;
+/** Default scroll bar overlay (C# SkiaScrollBar); as a SkiaScroll child with Tag="ScrollBar" / "ScrollBarHorizontal". */
+export const SkiaScrollBar = "SkiaScrollBar" as unknown as FC<LayoutProps<SkiaScrollBarCtrl>>;
+/** Pull-to-refresh view base (C# RefreshIndicator); as a SkiaScroll child with Tag="RefreshIndicator", put the visuals inside. */
+export const RefreshIndicator = "RefreshIndicator" as unknown as FC<LayoutProps<RefreshIndicatorCtrl>>;
 export const SkiaShape = "SkiaShape" as unknown as FC<LayoutProps<SkiaShapeCtrl>>;
 export const SkiaFrame = "SkiaFrame" as unknown as FC<LayoutProps<SkiaShapeCtrl>>;
 export const SkiaSwitch = "SkiaSwitch" as unknown as FC<LeafProps<SkiaSwitchCtrl>>;

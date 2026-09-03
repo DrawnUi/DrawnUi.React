@@ -246,3 +246,32 @@ Updated whenever the port deliberately diverges or finds something worth back-po
 
 ### Queue in the browser
 - **React**: `LoadImageManagedAsync` orders by priority and caps concurrent fetches at 5 like the C# semaphore; `SkiaImage.Source` goes through it (`LoadPriority`). Browsers already limit connections per host, so the cap mostly keeps decode work paced.
+
+## SkiaScroll
+
+### Scroll inside a cached parent stales it
+- **React**: every offset change calls `RepaintComposition` (ancestor caches staled, own cache kept) instead of a plain `Repaint`; before, a `SkiaScroll` inside an Operations-cached card moved its arranged rects but never repainted (the card's picture was replayed).
+- **.NET**: `Update()` invalidates up the tree.
+
+### Wheel goes to the innermost scroll first
+- **React**: a nested scroll under the pointer takes the wheel; when it sits at its edge in that direction it declines and the outer scroll moves. C# has no wheel routing rule for nested scrolls.
+
+### Refresh indicator position
+- **React**: `RefreshIndicator.SetDragRatio` slides the view in linearly with the overscroll and parks it at `RefreshShowDistance` (centered in the gap when the gap is taller than the view); the C# curve (`getPosition(k)`) depends on the sign convention of `InternalViewportOffset` and produced off-screen positions with this port's positive top overscroll.
+
+### Snap uses the last paint's geometry
+- **React**: `Snap` computes the target offset from the child's position relative to the content start as arranged at the last paint, so a fling that stopped a tick after that paint still lands the child exactly; `ScrollTo` applies its exact destination when the deceleration curve finishes (`LandScrollTo`).
+
+## Layouts
+
+### Templated Row / Wrap / Grid are not virtualized
+- **React**: every item is realized through the `ViewsAdapter` (the C# non-list layouts also measure and draw all cells); only the templated single-column Column is the virtualized list.
+
+### `OnChildrenInitialized` order in SkiaCarousel
+- see SkiaShaderCarousel above.
+
+## Caching
+
+### ImageComposite dirty tracking
+- **React**: `RepaintComposition` is the only dirty source (transform / own cache invalidation of a child); a remeasure anywhere below marks the composite for a full record. C# tracks `DirtyChildrenTracker` from `InvalidateByChild` too; both erase the union of old + new transformed bounds and pull intersecting siblings in.
+- **React-only gotcha**: React props that are new objects on every render (`Margin={new Thickness(...)}`) remeasure the child each render and force full records; memoize them.

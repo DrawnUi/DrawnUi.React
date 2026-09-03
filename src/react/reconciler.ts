@@ -19,6 +19,9 @@ import { SkiaHotspot } from "../controls/SkiaHotspot";
 import { SkiaButton } from "../controls/SkiaButton";
 import { SkiaImage } from "../controls/SkiaImage";
 import { SkiaImageTiles } from "../controls/SkiaImageTiles";
+import { SkiaDecoratedGrid } from "../controls/SkiaDecoratedGrid";
+import { SkiaScrollBar } from "../controls/SkiaScrollBar";
+import { RefreshIndicator } from "../controls/RefreshIndicator";
 import { SkiaSvg } from "../controls/SkiaSvg";
 import { SkiaBackdrop } from "../controls/SkiaBackdrop";
 import { SkiaEditor } from "../controls/SkiaEditor";
@@ -34,7 +37,7 @@ type HostInstance = SkiaControl | TextSpan;
 
 /** JSX tag name -> engine class. Add a control here to expose it to React. */
 export const Registry: Record<string, new () => HostInstance> = {
-  SkiaLayout, SkiaStack, SkiaRow, SkiaLayer, SkiaWrap, SkiaGrid, SkiaBackdrop, SkiaEditor, SkiaSprite, SkiaSpriteSet, SkiaLabel, SkiaRichLabel, TextSpan, SkiaHotspot, SkiaButton, SkiaImage, SkiaImageTiles, SkiaSvg, SkiaLottie, SkiaGif, SkiaScroll, SkiaShape, SkiaFrame,
+  SkiaLayout, SkiaStack, SkiaRow, SkiaLayer, SkiaWrap, SkiaGrid, SkiaDecoratedGrid, SkiaBackdrop, SkiaEditor, SkiaSprite, SkiaSpriteSet, SkiaLabel, SkiaRichLabel, TextSpan, SkiaHotspot, SkiaButton, SkiaImage, SkiaImageTiles, SkiaSvg, SkiaLottie, SkiaGif, SkiaScroll, SkiaScrollBar, RefreshIndicator, SkiaShape, SkiaFrame,
   SkiaSwitch, SkiaCheckbox, SkiaRadioButton, SkiaProgress, SkiaSlider, SkiaCarousel, SkiaShaderCarousel, SkiaDrawer,
 };
 

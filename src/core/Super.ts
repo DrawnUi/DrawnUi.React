@@ -1,3 +1,4 @@
+import { Thickness } from "./Types";
 // the "full" build: same API plus Skottie (SkiaLottie) and the paragraph module; +0.9 MB raw over the default build
 import CanvasKitInit from "canvaskit-wasm/bin/full/canvaskit.js";
 import type { CanvasKit, Font, Typeface } from "canvaskit-wasm";
@@ -58,7 +59,36 @@ export class DrawnUiBuilder {
 }
 
 /** Mirrors DrawnUi static Super: global engine state. */
+
 export class Super {
+  // ---- insets (C# Super.Insets / InsetsChanged): the browser's safe area from env(safe-area-inset-*) ----
+  private static insets?: Thickness;
+  private static insetsProbe?: HTMLDivElement;
+  private static readonly insetsChanged = new Set<() => void>();
+  /** Safe-area insets in CSS px (points), measured once and on resize; zero outside a browser. */
+  static get Insets(): Thickness {
+    if (!Super.insets) Super.MeasureInsets();
+    return Super.insets ?? Thickness.Zero;
+  }
+  /** Subscribe to inset changes (orientation / resize); returns the unsubscribe. */
+  static OnInsetsChanged(handler: () => void): () => void { Super.insetsChanged.add(handler); return () => Super.insetsChanged.delete(handler); }
+  static MeasureInsets(): void {
+    if (typeof document === "undefined") { Super.insets = Thickness.Zero; return; }
+    let probe = Super.insetsProbe;
+    if (!probe) {
+      probe = document.createElement("div");
+      probe.style.cssText = "position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);";
+      document.body.appendChild(probe);
+      Super.insetsProbe = probe;
+      window.addEventListener("resize", () => Super.MeasureInsets());
+    }
+    const cs = getComputedStyle(probe);
+    const next = new Thickness(parseFloat(cs.paddingLeft) || 0, parseFloat(cs.paddingTop) || 0, parseFloat(cs.paddingRight) || 0, parseFloat(cs.paddingBottom) || 0);
+    const prev = Super.insets;
+    Super.insets = next;
+    if (prev && (prev.Left !== next.Left || prev.Top !== next.Top || prev.Right !== next.Right || prev.Bottom !== next.Bottom)) for (const h of [...Super.insetsChanged]) h();
+  }
+
   /** CanvasKit instance, valid after BuildAsync(). */
   static CK: CanvasKit;
   /** Registered typefaces by alias (FontFamily) and weight. */

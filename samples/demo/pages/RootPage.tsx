@@ -16,6 +16,7 @@ const SAMPLES: { route: string; title: string; text: string }[] = [
   { route: "shell", title: "Shell", text: "SkiaShell — page transitions, OpenPopupAsync, PushModalAsync (drawer), ShowToast" },
   { route: "editor", title: "Editor", text: "SkiaEditor — drawn text input: caret, selection, placeholder, password, multiline, ControlStyle looks" },
   { route: "keyboard", title: "Keyboard Input", text: "KeyboardManager — window-level KeyDown / KeyUp / KeyChar with modifier state, the Blazor sandbox probe" },
+  { route: "scroll", title: "SkiaScroll", text: "Header in flow / sticky / behind with parallax, Footer, scroll bars, pull to refresh, SnapToChildren, TrackIndexPosition" },
   { route: "shaders", title: "Shaders", text: "SkiaShaderEffect — SkSL on any control (iImage1, iTime, iMouse, custom uniforms, touch ripples) and SkiaShaderCarousel gl-transitions" },
   { route: "sprites", title: "Sprites", text: "SkiaSprite spritesheets and a SkiaSpriteSet warrior on a tile board, moved with the keyboard (FastRepro sprites)" },
   { route: "transforms", title: "Transforms", text: "Rotation, Scale, Skew, Translation, Opacity — hit-testing through them, *ToAsync animations" },

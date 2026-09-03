@@ -156,8 +156,35 @@ export class SkiaControl {
       case "None": return "None";
       case "Operations": case "OperationsFull": return "Operations";
       case "ImageDoubleBuffered": return "ImageDoubleBuffered";
-      default: return "Image"; // Image, GPU, ImageComposite(GPU) -> single offscreen image for now
+      case "ImageComposite": case "ImageCompositeGPU": return "ImageComposite";
+      default: return "Image"; // Image, GPU -> single offscreen image
     }
+  }
+  /** C# IsCacheComposite: the offscreen surface is kept and only the changed children are re-recorded. */
+  get IsCacheComposite(): boolean { return this.UsingCacheType === "ImageComposite"; }
+  /** Children reported dirty since the last composite record (C# DirtyChildrenInternal, filled by RepaintComposition). */
+  readonly DirtyChildrenInternal = new Set<SkiaControl>();
+  /** True while a composite re-record paints only the dirty children (C# IsRenderingWithComposition). */
+  IsRenderingWithComposition = false;
+  /** Composite surface kept across records; its size follows the expanded cache rect. */
+  private compositeSurface?: Surface;
+  /** Own content or structure changed: the next composite record is a full one. */
+  private compositeFull = true;
+  /** Canvas-pixel bounds this control covered when its parent last recorded it (composite erase region). */
+  private lastCompositeBounds?: SKRect;
+  /** What the last composite record did (diagnostics): "full" or "partial" with the number of children re-recorded. */
+  LastCompositeRecord: { Mode: "full" | "partial"; Children: number } = { Mode: "full", Children: 0 };
+  /** The children a composite record can re-record individually; layouts return their views. */
+  protected GetCompositeChildren(): readonly SkiaControl[] { return []; }
+  /** C# TrackChildAsDirty (DirtyChildrenTracker): the child changed without a remeasure of this control. */
+  TrackChildAsDirty(child: SkiaControl): void { if (this.IsCacheComposite) this.DirtyChildrenInternal.add(child); }
+  /** Drawn bounds in canvas pixels including transforms and effects margins (C# GetTransformedDirtyBounds). */
+  GetTransformedDirtyBounds(): SKRect {
+    const r = this.ExpandedCacheRect(this.RenderingScale), m = this.RenderTransformMatrix;
+    if (!m) return r;
+    const pts = Super.CK.Matrix.mapPoints(m, [r.Left, r.Top, r.Right, r.Top, r.Right, r.Bottom, r.Left, r.Bottom]);
+    const xs = [pts[0], pts[2], pts[4], pts[6]], ys = [pts[1], pts[3], pts[5], pts[7]];
+    return new SKRect(Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys));
   }
   /** Current cache, if any. */
   RenderObject?: CachedObject;
@@ -476,7 +503,10 @@ export class SkiaControl {
     if (!this.IsVisible || this.Opacity <= 0 || this.IsDisposed) return;
     const canvas = ctx.Context.Canvas;
     const applyOpacity = this.Opacity < 1;
-    const needTransform = this.HasTransform;
+    // C# Left/Top: a cached control is blitted at an offset, no matrix and no save/restore around the subtree
+    const offsetOnly = (this.Left !== 0 || this.Top !== 0) && this.UsingCacheType !== "None" && this.TranslationX === 0 && this.TranslationY === 0
+      && this.Rotation === 0 && this.ScaleX === 1 && this.ScaleY === 1 && this.SkewX === 0 && this.SkewY === 0;
+    const needTransform = this.HasTransform && !offsetOnly;
     let saved = false;
     // same as DrawnUi: opacity = a layer with alpha, transforms = canvas matrix around the whole subtree (cache included)
     if (applyOpacity) {
@@ -489,18 +519,22 @@ export class SkiaControl {
       canvas.save();
       saved = true;
     }
+    let dx = 0, dy = 0;
     if (needTransform) {
       this.RenderTransformMatrix = this.CreateRenderTransformMatrix(this.DrawingRect, ctx.Scale);
       canvas.concat(this.RenderTransformMatrix);
+    } else if (offsetOnly) {
+      dx = this.Left * ctx.Scale; dy = this.Top * ctx.Scale;
+      this.RenderTransformMatrix = Super.CK.Matrix.translated(dx, dy); // gestures / accessibility still map through it
     } else {
       this.RenderTransformMatrix = undefined;
     }
     if (this.IsClippedToBounds) {
       if (!saved) { canvas.save(); saved = true; }
       const c = this.ClipEffects ? this.DrawingRect : this.ExpandedCacheRect(ctx.Scale);
-      canvas.clipRect(Super.CK.LTRBRect(c.Left, c.Top, c.Right, c.Bottom), Super.CK.ClipOp.Intersect, true);
+      canvas.clipRect(Super.CK.LTRBRect(c.Left + dx, c.Top + dy, c.Right + dx, c.Bottom + dy), Super.CK.ClipOp.Intersect, true);
     }
-    this.RenderContent(ctx);
+    this.RenderContent(ctx, dx, dy);
     if (saved) canvas.restore();
   }
 
@@ -530,8 +564,9 @@ export class SkiaControl {
   }
 
   /** Cache blit or live paint, then post animators — the part a transform/opacity layer wraps. */
-  private RenderContent(ctx: DrawingContext): void {
-    const own: DrawingContext = { ...ctx, Destination: this.DrawingRect };
+  private RenderContent(ctx: DrawingContext, dx = 0, dy = 0): void {
+    const dest = dx !== 0 || dy !== 0 ? new SKRect(this.DrawingRect.Left + dx, this.DrawingRect.Top + dy, this.DrawingRect.Right + dx, this.DrawingRect.Bottom + dy) : this.DrawingRect;
+    const own: DrawingContext = { ...ctx, Destination: dest };
     const cacheType = this.UsingCacheType;
     const post = this.ActivePostRenderers();
     if (cacheType === "None") {
@@ -544,14 +579,14 @@ export class SkiaControl {
       const stale = this.cacheDirty || !this.RenderObject || this.RenderObject.Type !== cacheType
         || this.RenderObject.Scale !== ctx.Scale
         || Math.round(this.RenderObject.Bounds.Width) !== Math.round(r.Width) || Math.round(this.RenderObject.Bounds.Height) !== Math.round(r.Height);
-      if (stale) this.CreateRenderingObject(own, cacheType);
+      if (stale) this.CreateRenderingObject({ ...ctx, Destination: this.DrawingRect }, cacheType);
       if (this.RenderObject) {
         // C# DrawRenderObject: with post renderers an Image cache is not blitted, the effects sample it (CachedImage)
         // and paint the result; a picture cache has no texture, so it is replayed first and snapshotted by the effect
-        if (post.length === 0 || !this.RenderObject.Image) this.RenderObject.Draw(ctx.Context.Canvas, r.Left, r.Top);
+        if (post.length === 0 || !this.RenderObject.Image) this.RenderObject.Draw(ctx.Context.Canvas, r.Left + dx, r.Top + dy);
         for (const e of post) e.Render(own);
       }
-      else if (this.RenderObjectPrevious) this.RenderObjectPrevious.Draw(ctx.Context.Canvas, r.Left, r.Top); // double buffer: last good frame
+      else if (this.RenderObjectPrevious) this.RenderObjectPrevious.Draw(ctx.Context.Canvas, r.Left + dx, r.Top + dy); // double buffer: last good frame
       else this.DrawPlaceholder(own);
     }
     this.ExecutePostAnimators(own);
@@ -582,7 +617,7 @@ export class SkiaControl {
     if (cacheType === "ImageDoubleBuffered") {
       // keep the previous frame as the fallback until the new cache exists
       if (this.RenderObject) { this.DisposePrevious(); this.RenderObjectPrevious = this.RenderObject; this.RenderObject = undefined; }
-    } else {
+    } else if (cacheType !== "ImageComposite") { // a composite keeps its previous object to patch it
       this.DestroyRenderingObject();
     }
     if (cacheType === "Operations") {
@@ -592,6 +627,8 @@ export class SkiaControl {
       const picture = recorder.finishRecordingAsPicture();
       recorder.delete();
       this.RenderObject = new CachedObject("Operations", r, ctx.Scale, picture);
+    } else if (cacheType === "ImageComposite") {
+      this.CreateCompositeRenderingObject(ctx, r, w, h);
     } else {
       const main = ctx.Context.Surface;
       if (!main) { this.PaintContent(ctx); return; } // no surface to derive from (e.g. recording): draw live
@@ -606,6 +643,75 @@ export class SkiaControl {
       this.RenderObject = new CachedObject(cacheType, r, ctx.Scale, undefined, image);
     }
     this.cacheDirty = false;
+  }
+
+  /**
+   * C# ImageComposite (SetupRenderingWithComposition + CreateRenderingObject reuse): the offscreen surface survives
+   * between records; when only some children changed (RepaintComposition from a child, no remeasure of this control)
+   * their old and new bounds — plus every sibling they overlap — are erased and just those children are painted
+   * again. Anything else (own content, structure, size, scale) records fully.
+   */
+  private CreateCompositeRenderingObject(ctx: DrawingContext, r: SKRect, w: number, h: number): void {
+    const CK = Super.CK;
+    const main = ctx.Context.Surface;
+    if (!main) { this.PaintContent(ctx); return; }
+    let surface = this.compositeSurface;
+    const prev = this.RenderObject;
+    const sameGeometry = !!surface && !!prev && prev.Type === "ImageComposite" && prev.Scale === ctx.Scale
+      && Math.round(prev.Bounds.Width) === w && Math.round(prev.Bounds.Height) === h;
+    if (!sameGeometry) { surface?.delete(); surface = main.makeSurface({ ...main.imageInfo(), width: w, height: h }) ?? undefined; this.compositeSurface = surface; }
+    if (!surface) { this.PaintContent(ctx); return; }
+    const canvas = surface.getCanvas();
+    const children = this.GetCompositeChildren();
+    const partial = sameGeometry && !this.compositeFull && this.DirtyChildrenInternal.size > 0 && children.length > 0;
+    const offset = prev && sameGeometry ? { X: r.Left - prev.Bounds.Left, Y: r.Top - prev.Bounds.Top } : { X: 0, Y: 0 };
+    const saved = canvas.save();
+    canvas.translate(-r.Left, -r.Top);
+    if (partial) {
+      // dirty = reported children + siblings intersecting their old or new bounds (C# makes intersecting children dirty too)
+      const dirty = new Set<SkiaControl>();
+      const rects: SKRect[] = [];
+      const boundsOf = (c: SkiaControl): SKRect[] => {
+        const out = [c.GetTransformedDirtyBounds()];
+        if (c.lastCompositeBounds) out.push(new SKRect(c.lastCompositeBounds.Left + offset.X, c.lastCompositeBounds.Top + offset.Y, c.lastCompositeBounds.Right + offset.X, c.lastCompositeBounds.Bottom + offset.Y));
+        return out;
+      };
+      for (const c of this.DirtyChildrenInternal) if (children.includes(c)) { dirty.add(c); rects.push(...boundsOf(c)); }
+      let grew = true;
+      while (grew) {
+        grew = false;
+        for (const c of children) {
+          if (dirty.has(c) || !c.IsVisible) continue;
+          const own = boundsOf(c);
+          if (rects.some((d) => own.some((o) => o.Left < d.Right && d.Left < o.Right && o.Top < d.Bottom && d.Top < o.Bottom))) { dirty.add(c); rects.push(...own); grew = true; }
+        }
+      }
+      const clip = new CK.PathBuilder();
+      const erase = new CK.Paint(); erase.setBlendMode(CK.BlendMode.Clear);
+      for (const d of rects) { const l = Math.floor(d.Left), t = Math.floor(d.Top), rr = Math.ceil(d.Right), b = Math.ceil(d.Bottom); clip.addRect(CK.LTRBRect(l, t, rr, b)); canvas.drawRect(CK.LTRBRect(l, t, rr, b), erase); }
+      erase.delete();
+      const path = clip.detach(); clip.delete();
+      canvas.clipPath(path, CK.ClipOp.Intersect, false);
+      path.delete();
+      this.IsRenderingWithComposition = true;
+      this.DirtyChildrenInternal.clear();
+      for (const c of dirty) this.DirtyChildrenInternal.add(c);
+      this.PaintContent({ ...ctx, Context: { Canvas: canvas, Surface: surface, Origin: { X: r.Left, Y: r.Top } } });
+      this.IsRenderingWithComposition = false;
+      this.LastCompositeRecord = { Mode: "partial", Children: dirty.size };
+    } else {
+      canvas.clear(CK.TRANSPARENT);
+      this.PaintContent({ ...ctx, Context: { Canvas: canvas, Surface: surface, Origin: { X: r.Left, Y: r.Top } } });
+      this.LastCompositeRecord = { Mode: "full", Children: children.length };
+    }
+    canvas.restoreToCount(saved);
+    for (const c of children) c.lastCompositeBounds = c.IsVisible ? c.GetTransformedDirtyBounds() : undefined;
+    this.DirtyChildrenInternal.clear();
+    this.compositeFull = false;
+    const image = surface.makeImageSnapshot();
+    const old = this.RenderObject;
+    this.RenderObject = new CachedObject("ImageComposite", r, ctx.Scale, undefined, image);
+    if (old) { const sv = this.Superview; if (sv) sv.DisposeObject(old); else old.Dispose(); }
   }
 
   private DisposePrevious(): void {
@@ -626,8 +732,8 @@ export class SkiaControl {
     if (sv) sv.DisposeObject(old); else old.Dispose();
   }
 
-  /** Marks the cache stale; re-recorded on the next frame. */
-  InvalidateCache(): void { this.cacheDirty = true; }
+  /** Marks the cache stale; re-recorded on the next frame (a composite records fully: its own content changed). */
+  InvalidateCache(): void { this.cacheDirty = true; this.compositeFull = true; }
   /** Effects margin recomputed on the next use (C# InvalidateEffectsMargin). */
   InvalidateEffectsMargin(): void { this.effectsMarginCache = undefined; }
 
@@ -788,6 +894,7 @@ export class SkiaControl {
     for (const e of [...this.PostAnimators]) (e as { Stop?: () => void }).Stop?.();
     this.PostAnimators.length = 0;
     this.DestroyRenderingObject();
+    this.compositeSurface?.delete(); this.compositeSurface = undefined;
     for (const e of this.visualEffects) e.Dispose(); // C# disposes attached effects with the control
     this.visualEffects = []; this.EffectPostRenderers = [];
     if (this.gradientShaders) { for (const m of this.gradientShaders.values()) for (const s of m.values()) s.delete(); this.gradientShaders.clear(); }
@@ -815,8 +922,8 @@ export class SkiaControl {
    * cache holds its composited output, so those are staled before redrawing (DrawnUi RedrawCanvas + parent invalidation).
    */
   RepaintComposition(): void {
-    let p = this.Parent;
-    while (p) { p.cacheDirty = true; p = p.Parent; }
+    let child: SkiaControl = this, p = this.Parent;
+    while (p) { p.cacheDirty = true; p.TrackChildAsDirty(child); child = p; p = p.Parent; }
     this.Repaint();
   }
 
@@ -824,6 +931,7 @@ export class SkiaControl {
   InvalidateMeasure(): void {
     this.NeedMeasure = true;
     this.cacheDirty = true;
+    this.compositeFull = true; // structure may change: a composite cannot patch it
     this.effectsMarginCache = undefined;
     if (this.Parent) this.Parent.InvalidateMeasure();
     else this.Superview?.Update();
