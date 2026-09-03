@@ -381,6 +381,14 @@ export class SkiaLabel extends SkiaControl {
     return out;
   }
 
+  /** Lines as CSS text for the accessibility overlay (AccessibilityTextSelectable): font alias chain, weight and px size. */
+  override GetAccessibilityTextLines(scale: number): import("../core/Accessibility").AccessibilityTextLine[] {
+    const family = [this.fontFamily || Super.DefaultFontAlias, ...this.fontFamilyFallback.split(",").map((f) => f.trim()).filter(Boolean)].filter(Boolean).join(", ");
+    const weight = this.fontWeight > 0 ? this.fontWeight : this.fontAttributes === "Bold" || this.fontAttributes === "BoldItalic" ? 600 : 400;
+    const size = this.fontSize;
+    return this.LineGeometry().map((g) => ({ Text: g.text, Left: g.x / scale, Top: g.y / scale, Width: g.w / scale, Height: g.h / scale, FontFamily: family, FontWeight: weight, FontSize: size }));
+  }
+
   /** Laid-out lines with their text index range (a wrapped-away space or line break sits between two lines). */
   GetLineBoxes(): LineBox[] {
     const geo = this.LineGeometry();

@@ -279,3 +279,9 @@ Updated whenever the port deliberately diverges or finds something worth back-po
 ### Image caches on whole pixels
 - **React**: `Image` / `ImageComposite` / `ImageDoubleBuffered` caches record the expanded rect snapped outward to integer device pixels; the blit is 1:1 and a shader effect sampling `fragCoord - iOffset` hits texel centers (a fractional `DrawingRect.Left` made `blit.sksl` bilinear-blur the image by a sub-pixel amount). Picture caches keep the exact rect.
 - **.NET**: `CachedObject.Bounds` / recording areas are already integer pixels.
+
+## Accessibility
+
+### Selectable text is opt-in
+- **React**: `AccessibilityTextSelectable` (default false) puts a label's lines into the overlay as real text with pointer events; the text then owns the pointer (selection), so it is never enabled implicitly — custom controls would lose taps and pans under their labels. ARIA roles / labels stay unaffected.
+- **.NET**: no selectable labels (only `SkiaEditor` selects).

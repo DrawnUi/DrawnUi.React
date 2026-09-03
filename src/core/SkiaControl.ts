@@ -394,6 +394,17 @@ export class SkiaControl {
 
   get IsAccessibilityElement(): boolean { const r = this.AccessibilityRole; return r != null && r !== Aria.RolePresentation; }
 
+  private accessibilityTextSelectable = false;
+  /**
+   * Opt-in (React extension, off by default): the control's text is rendered as real, invisible DOM text in the
+   * accessibility overlay with pointer events, so the browser selects / copies it like HTML. Pointer input over the
+   * text then goes to the selection, not to the drawn control — never enable it on gesture-driven controls.
+   */
+  get AccessibilityTextSelectable(): boolean { return this.accessibilityTextSelectable; }
+  set AccessibilityTextSelectable(v: boolean) { if (this.accessibilityTextSelectable !== v) { this.accessibilityTextSelectable = v; this.AccessibilityChanged(); } }
+  /** Text lines for AccessibilityTextSelectable in CSS px relative to the node (SkiaLabel implements it). */
+  GetAccessibilityTextLines(_scale: number): import("./Accessibility").AccessibilityTextLine[] { return []; }
+
   /** Hit rect in canvas pixels used to position the overlay element: the drawn (transformed) bounds, like C# HitBoxWithTransforms. */
   GetAccessibilityPixelRect(): SKRect {
     const r = this.DrawingRect, m = this.RenderTransformMatrix;

@@ -47,6 +47,10 @@ export class DrawnUiBuilder {
         face = Super.CK.Typeface.MakeFreeTypeFaceFromData(data) ?? undefined;
         if (!face) throw new Error(`DrawnUi: cannot load font '${f.Source}'`);
         loaded.set(f.Source, face);
+        // the same face as a CSS font under the alias: the accessibility overlay's selectable text lines up with the drawn glyphs
+        if (typeof FontFace !== "undefined" && typeof document !== "undefined") {
+          try { const css = new FontFace(f.Alias, data, { weight: String(f.Weight) }); await css.load(); document.fonts.add(css); } catch { /* selection text falls back to a system font */ }
+        }
       }
       let weights = Super.Fonts.get(f.Alias);
       if (!weights) { weights = new Map(); Super.Fonts.set(f.Alias, weights); }

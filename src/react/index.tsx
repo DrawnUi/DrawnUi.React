@@ -147,6 +147,9 @@ const A11Y_CSS = `
 .drawnui-a11y-node{position:absolute;margin:0;padding:0;border:0;background:transparent;color:transparent;overflow:hidden;white-space:nowrap;pointer-events:none;font:inherit}
 .drawnui-a11y-node:focus{outline:none}
 .drawnui-a11y-node:focus-visible{outline:3px solid rgba(13,110,253,.85);outline-offset:1px;border-radius:3px}
+.drawnui-a11y-text{overflow:visible}
+.drawnui-a11y-text>span{position:absolute;white-space:pre;color:transparent;user-select:text;-webkit-user-select:text;pointer-events:auto;cursor:text;line-height:1}
+.drawnui-a11y-text>span::selection{background:rgba(110,168,254,.55);color:transparent}
 `;
 
 /**
@@ -163,11 +166,21 @@ function AccessibilityOverlay({ view }: { view: CanvasView }) {
     const offLive = mgr.OnLiveRegionUpdated(() => { mgr.ForceRebuildOnNextFrame(); view.Update(); });
     return () => { off(); offLive(); };
   }, [view]);
-  if (nodes.length === 0) return null;
+  // selectable text spans take pointer events: the wheel over them is re-dispatched to the canvas so drawn scrolls keep working
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const hasNodes = nodes.length > 0;
+  useEffect(() => {
+    const el = overlayRef.current;
+    if (!el) return;
+    const forward = (e: WheelEvent) => { e.preventDefault(); view.Element.dispatchEvent(new WheelEvent("wheel", { deltaX: e.deltaX, deltaY: e.deltaY, deltaMode: e.deltaMode, clientX: e.clientX, clientY: e.clientY, ctrlKey: e.ctrlKey, shiftKey: e.shiftKey, bubbles: false, cancelable: true })); };
+    el.addEventListener("wheel", forward, { passive: false });
+    return () => el.removeEventListener("wheel", forward);
+  }, [view, hasNodes]);
+  if (!hasNodes) return null;
   // the browser scrolls an overflow:hidden container to reveal a focused child; the overlay must stay pinned to the canvas
   const pin = (e: React.SyntheticEvent<HTMLDivElement>) => { e.currentTarget.scrollTop = 0; e.currentTarget.scrollLeft = 0; };
   return (
-    <div className="drawnui-a11y-overlay" onScroll={pin}>
+    <div className="drawnui-a11y-overlay" onScroll={pin} ref={overlayRef}>
       <style>{A11Y_CSS}</style>
       {nodes.map((n) => {
         const pos: CSSProperties = { left: n.Rect.Left, top: n.Rect.Top, width: n.Rect.Width, height: n.Rect.Height };
@@ -183,6 +196,13 @@ function AccessibilityOverlay({ view }: { view: CanvasView }) {
             onFocus={(e) => { pin({ currentTarget: e.currentTarget.parentElement as HTMLDivElement } as React.SyntheticEvent<HTMLDivElement>); SkiaScrollCtrl.EnsureVisible(n.Source); n.Source.OnAccessibilityFocused(true); n.Source.NotifyAccessibilityFocused(true); }}
             onBlur={() => { n.Source.OnAccessibilityFocused(false); n.Source.NotifyAccessibilityFocused(false); }}>
             {n.Label}
+          </div>
+        ) : n.TextLines ? (
+          // AccessibilityTextSelectable: one positioned span per drawn line, in the drawn font, so the browser selects and copies it like HTML
+          <div key={n.Id} role={n.Role} title={n.Hint} aria-live={n.Live as "polite" | "assertive" | undefined} className="drawnui-a11y-node drawnui-a11y-text" style={pos}>
+            {n.TextLines.map((l, i) => (
+              <span key={i} style={{ left: l.Left, top: l.Top, minWidth: l.Width, height: l.Height, fontFamily: l.FontFamily, fontWeight: l.FontWeight, fontSize: l.FontSize, lineHeight: `${l.Height}px` }}>{l.Text}{i < n.TextLines!.length - 1 ? "\n" : ""}</span>
+            ))}
           </div>
         ) : (
           // static text is exposed as real (transparent) text content; aria-label only for roles that need a name
