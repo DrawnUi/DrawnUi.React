@@ -91,8 +91,8 @@ export function LayoutsPage() {
   const compositeShapes = useMemo(() => Array.from({ length: 24 }, (_, i) => (
     <SkiaShape key={i} Type={i % 3 === 0 ? "Circle" : "Rectangle"} CornerRadius={6} WidthRequest={40} HeightRequest={40} BackgroundColor={PALETTE[i % PALETTE.length]} Margin={new Thickness(12 + (i % 12) * 52, 12 + Math.floor(i / 12) * 70, 0, 0)} UseCache="Operations" />
   )), []);
-  const spinnerMargin = useMemo(() => new Thickness(12 + 5 * 52 + 6, 12 + 35 + 4, 0, 0), []);
-  const compositeMargins = useMemo(() => [...Array.from({ length: 24 }, (_, i) => new Thickness(12 + (i % 12) * 52, 12 + Math.floor(i / 12) * 70, 0, 0)), new Thickness(12 + 5 * 52 + 6, 12 + 35 + 4, 0, 0)], []);
+  const spinnerMargin = useMemo(() => new Thickness(12 + 5 * 52 + 46 - 22, 12 + 40 + 15 - 22, 0, 0), []);
+  const compositeMargins = useMemo(() => [...Array.from({ length: 24 }, (_, i) => new Thickness(12 + (i % 12) * 52, 12 + Math.floor(i / 12) * 70, 0, 0)), new Thickness(12 + 5 * 52 + 46 - 22, 12 + 40 + 15 - 22, 0, 0)], []);
   useEffect(() => {
     let angle = 0;
     const id = setInterval(() => {

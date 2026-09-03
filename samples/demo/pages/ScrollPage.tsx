@@ -40,7 +40,7 @@ export function ScrollPage() {
 
   return (
     <SkiaScroll Orientation="Vertical">
-      <SkiaStack Spacing={16} Padding={new Thickness(16)} HorizontalOptions="Center" MaximumWidthRequest={720}>
+      <SkiaStack Spacing={16} Padding={new Thickness(16)} HorizontalOptions="Center" MaximumWidthRequest={720} UseCache="Operations">
         <SkiaLabel Text="SkiaScroll" FontSize={24} TextColor={Colors.White} HorizontalOptions="Center" />
 
         <Card title='Header + Footer in the flow · Tag="Header" / Tag="Footer" children scroll with the content'>
