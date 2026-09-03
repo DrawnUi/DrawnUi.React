@@ -172,8 +172,8 @@ export class SkiaControl {
   private compositeFull = true;
   /** Canvas-pixel bounds this control covered when its parent last recorded it (composite erase region). */
   private lastCompositeBounds?: SKRect;
-  /** What the last composite record did (diagnostics): "full" or "partial" with the number of children re-recorded. */
-  LastCompositeRecord: { Mode: "full" | "partial"; Children: number } = { Mode: "full", Children: 0 };
+  /** What the last composite record did (diagnostics): "full" or "partial", the number of children re-recorded and which ones. */
+  LastCompositeRecord: { Mode: "full" | "partial"; Children: number; Dirty: readonly SkiaControl[] } = { Mode: "full", Children: 0, Dirty: [] };
   /** The children a composite record can re-record individually; layouts return their views. */
   protected GetCompositeChildren(): readonly SkiaControl[] { return []; }
   /** C# TrackChildAsDirty (DirtyChildrenTracker): the child changed without a remeasure of this control. */
@@ -708,11 +708,11 @@ export class SkiaControl {
       for (const c of dirty) this.DirtyChildrenInternal.add(c);
       this.PaintContent({ ...ctx, Context: { Canvas: canvas, Surface: surface, Origin: { X: r.Left, Y: r.Top } } });
       this.IsRenderingWithComposition = false;
-      this.LastCompositeRecord = { Mode: "partial", Children: dirty.size };
+      this.LastCompositeRecord = { Mode: "partial", Children: dirty.size, Dirty: [...dirty] };
     } else {
       canvas.clear(CK.TRANSPARENT);
       this.PaintContent({ ...ctx, Context: { Canvas: canvas, Surface: surface, Origin: { X: r.Left, Y: r.Top } } });
-      this.LastCompositeRecord = { Mode: "full", Children: children.length };
+      this.LastCompositeRecord = { Mode: "full", Children: children.length, Dirty: children };
     }
     canvas.restoreToCount(saved);
     for (const c of children) c.lastCompositeBounds = c.IsVisible ? c.GetTransformedDirtyBounds() : undefined;

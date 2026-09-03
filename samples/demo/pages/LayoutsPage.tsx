@@ -86,11 +86,13 @@ export function LayoutsPage() {
   const composite = useRef<SkiaLayoutCtrl>(null);
   const spinner = useRef<SkiaShapeCtrl>(null);
   const [compositeInfo, setCompositeInfo] = useState("");
+  const [redrawn, setRedrawn] = useState<number[]>([]); // indexes of the children the last composite record repainted
   // stable elements: a new Margin object on every render would remeasure every shape (a full composite record)
   const compositeShapes = useMemo(() => Array.from({ length: 24 }, (_, i) => (
     <SkiaShape key={i} Type={i % 3 === 0 ? "Circle" : "Rectangle"} CornerRadius={6} WidthRequest={40} HeightRequest={40} BackgroundColor={PALETTE[i % PALETTE.length]} Margin={new Thickness(12 + (i % 12) * 52, 12 + Math.floor(i / 12) * 70, 0, 0)} UseCache="Operations" />
   )), []);
   const spinnerMargin = useMemo(() => new Thickness(12 + 5 * 52 + 6, 12 + 35 + 4, 0, 0), []);
+  const compositeMargins = useMemo(() => [...Array.from({ length: 24 }, (_, i) => new Thickness(12 + (i % 12) * 52, 12 + Math.floor(i / 12) * 70, 0, 0)), new Thickness(12 + 5 * 52 + 6, 12 + 35 + 4, 0, 0)], []);
   useEffect(() => {
     let angle = 0;
     const id = setInterval(() => {
@@ -99,7 +101,8 @@ export function LayoutsPage() {
       angle = (angle + 6) % 360;
       sp.Rotation = angle; sp.RepaintComposition();
       const rec = layer.LastCompositeRecord;
-      setCompositeInfo(`last record: ${rec.Mode} · ${rec.Children} of ${layer.Children.length} children`);
+      setCompositeInfo(`last record: ${rec.Mode} · ${rec.Children} of ${layer.Children.length} children redrawn`);
+      setRedrawn(rec.Dirty.map((c) => layer.Children.indexOf(c)).filter((i) => i >= 0));
     }, 40);
     return () => clearInterval(id);
   }, []);
@@ -237,12 +240,18 @@ export function LayoutsPage() {
         </Card>
 
         <SkiaLabel Text="Caching · UseCache=ImageComposite" FontSize={20} TextColor={Colors.White} HorizontalOptions="Center" Margin={new Thickness(0, 8, 0, 0)} />
-        <Card title={`SkiaLayer UseCache="ImageComposite" · 24 shapes, one rotating · ${compositeInfo || "…"}`}>
-          <SkiaLayer ref={composite} UseCache="ImageComposite" HeightRequest={150} HorizontalOptions="Fill" BackgroundColor="#212529">
-            {compositeShapes}
-            <SkiaShape ref={spinner} Type="Rectangle" CornerRadius={4} WidthRequest={44} HeightRequest={44} BackgroundColor="#FFC107" Margin={spinnerMargin} UseCache="Operations" ZIndex={5} />
+        <Card title={`SkiaLayer UseCache="ImageComposite" · 24 shapes + 1 rotating · ${compositeInfo || "…"}`}>
+          <SkiaLayer HeightRequest={150} HorizontalOptions="Fill">
+            <SkiaLayer ref={composite} UseCache="ImageComposite" HeightRequest={150} HorizontalOptions="Fill" BackgroundColor="#212529">
+              {compositeShapes}
+              <SkiaShape ref={spinner} Type="Rectangle" CornerRadius={4} WidthRequest={44} HeightRequest={44} BackgroundColor="#FFC107" Margin={spinnerMargin} UseCache="Operations" ZIndex={5} />
+            </SkiaLayer>
+            {/* overlay OUTSIDE the composite: white outline = repainted by the last record, everything else was kept as is */}
+            <SkiaLayer HeightRequest={150} HorizontalOptions="Fill" InputTransparent>
+              {redrawn.map((i) => <SkiaShape key={i} Type="Rectangle" CornerRadius={i === 24 ? 4 : 6} WidthRequest={i === 24 ? 44 : 40} HeightRequest={i === 24 ? 44 : 40} StrokeColor="#FFFFFF" StrokeWidth={2} Margin={compositeMargins[i]} />)}
+            </SkiaLayer>
           </SkiaLayer>
-          <SkiaLabel Text="RepaintComposition() from the spinning child marks it dirty in the composite parent (C# DirtyChildrenTracker); the next record erases its old + new bounds and the siblings they overlap, then paints only those children into the kept surface. Own content / measure changes record fully." FontSize={12} TextColor="#ADB5BD" HorizontalOptions="Fill" />
+          <SkiaLabel Text="White outlines = the children the last record repainted (the rotating one + every sibling its old and new bounds overlap); the others are kept in the cache surface untouched. RepaintComposition() from the spinning child marks it dirty in the composite parent (C# DirtyChildrenTracker); own content / measure changes record fully." FontSize={12} TextColor="#ADB5BD" HorizontalOptions="Fill" />
         </Card>
         <SkiaLabel Text="ItemsSource + ItemTemplate for Wrap / Row / Grid · Split" FontSize={20} TextColor={Colors.White} HorizontalOptions="Center" Margin={new Thickness(0, 8, 0, 0)} />
         <Card title={`SkiaWrap ItemsSource (${count} recycled ChipCell) · Split=${split} · DynamicColumns=${dynamic}`}>
