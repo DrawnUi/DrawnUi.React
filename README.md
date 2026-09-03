@@ -41,6 +41,13 @@ npx vite samples/<name>  # any other sample
 npm run build            # typecheck + build all samples into dist/<name>/
 ```
 
+## Skills for AI agents
+
+`skills/drawnui-react/SKILL.md` teaches an agent this library (install, startup, composition rules, scroll / shell
+extras, caching, effects, accessibility). Save it under `~/.claude/skills/drawnui-react/SKILL.md` or fetch it from
+the demo site: https://helloreact.drawnui.net/skills/drawnui-react/SKILL.md — `llms.txt` / `llms-full.txt` at the
+site root point to it. Pair it with the DrawnUI framework skill from https://drawnui.net/llms.txt.
+
 ## Repo Layout
 
 - `src/` — the library, imported by samples as `drawnui-react` (React tags + all engine types) or `drawnui-react/core` (engine only).
@@ -49,6 +56,7 @@ npm run build            # typecheck + build all samples into dist/<name>/
   - `src/react` — reconciler host config + typed JSX tags + `<Canvas>` bridge component.
 - `samples/demo/` — the deployed demo: root menu + pages (`pages/ImagesPage.tsx`, `SvgPage.tsx`, `CellsPage.tsx` with `ContactCell.ts`) navigated by the React-level `SkiaShell`.
 - `samples/<name>/` — one folder per sample: `index.html`, `main.tsx`, two-line `vite.config.ts` (`defineSample`). Shared assets (fonts) in `samples/public`.
+- `skills/` — public agent skills, synced from the maintainer's local copy (`npm run sync:skills`, leak-guarded) and served by the demo site.
 - `dev/` — maintainer material: `build-samples.mjs` builds every sample into `dist/<name>/` + a `dist/index.html` list; used by the Pages workflow.
 
 What is intentionally missing: see [SKIPPED.md](SKIPPED.md). Maintainer notes live in `dev/`: [PARITY.md](dev/PARITY.md) (where and why the port diverges from DrawnUi.Net) and [PROGRESS.md](dev/PROGRESS.md) (work log).
