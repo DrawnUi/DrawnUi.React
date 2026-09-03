@@ -20,6 +20,16 @@ await Super.UseDrawnUi()
 </Canvas>
 ```
 
+## Install
+
+```
+npm i drawnui-react@preview react react-dom
+```
+
+`drawnui-react` = React tags + every engine type, `drawnui-react/core` = the engine only. Ships ES modules + `.d.ts`;
+CanvasKit's `.wasm` is referenced with a `?url` import, so use Vite (or any bundler that understands `?url`) and
+put your fonts under `public/fonts`. Preview releases carry the `preview` dist-tag; `latest` stays empty until 0.1.0.
+
 ## Layout
 
 - `src/` — the library, imported by samples as `drawnui-react` (React tags + all engine types) or `drawnui-react/core` (engine only).
