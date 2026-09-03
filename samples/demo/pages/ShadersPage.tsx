@@ -81,7 +81,7 @@ half4 main(float2 fragCoord) {
 }`;
 
 const TRANSITIONS = ["cube", "fade", "swirl", "doorway", "bounce", "waterdrop", "pixelize", "windowslice", "crosszoom", "pagecurl", "morph", "heart", "kaleidoscope", "wind"];
-const PHOTOS = ["images/baboon.jpg", "images/glass2.jpg", "images/baboon.jpg", "images/glass2.jpg"];
+const PHOTOS = ["images/hugrobot2.jpg", "images/8.jpg", "images/dungeon.jpg", "images/nebula.jpg"];
 
 /** A slide of the shader carousel: MUST be cached as Image, the transition effect samples the cache. */
 class PhotoSlide extends SkiaLayerCtrl {
@@ -100,14 +100,13 @@ class PhotoSlide extends SkiaLayerCtrl {
     const i = this.ContextIndex;
     this.image.Source = PHOTOS[i % PHOTOS.length];
     this.label.Text = `Slide ${i + 1}`;
-    this.image.ScaleX = i % 2 === 0 ? 1 : -1;
   }
 }
 
 /** SkiaShaderEffect (SkSL on a control's output, generative shaders, touch ripples) and SkiaShaderCarousel transitions. */
 export function ShadersPage() {
   const [error, setError] = useState("");
-  const ripple = useMemo(() => { const e = new MultiRippleWithTouchEffect(); e.SecondarySource = "images/glass2.jpg"; e.OnCompilationError = (_, err) => setError(err); return e; }, []);
+  const ripple = useMemo(() => { const e = new MultiRippleWithTouchEffect(); e.SecondarySource = "images/nebula.jpg"; e.OnCompilationError = (_, err) => setError(err); return e; }, []);
   const [strength, setStrength] = useState(0.01);
   const wave = useMemo(() => { const e = new SkiaShaderEffect(); e.ShaderCode = WAVE; e.OnCompilationError = (_, err) => setError(err); return e; }, []);
   useEffect(() => { wave.SetUniform("strength", strength); }, [wave, strength]);
@@ -150,12 +149,12 @@ export function ShadersPage() {
         </Card>
 
         <Card title='SkiaShaderEffect on a SkiaImage — ShaderSource="shaders/ripples.sksl" (Sandbox MultiRippleWithTouchEffect) · tap to ripple'>
-          <SkiaImage Source="images/baboon.jpg" Aspect="AspectCover" HorizontalOptions="Fill" HeightRequest={260} UseCache="Image" VisualEffects={[ripple]} />
+          <SkiaImage Source="images/hugrobot2.jpg" Aspect="AspectCover" HorizontalOptions="Fill" HeightRequest={260} UseCache="Image" VisualEffects={[ripple]} />
           <SkiaLabel Text="The effect is an ISkiaGestureProcessor: every Down starts a ripple at the touch point, animated 0→1 over 4.5 s through Parent.AnimateRangeAsync and passed as the origins[10] / progresses[10] array uniforms; iImage1 is the image's own cache, iImage2 (SecondarySource) the reflection texture." FontSize={12} TextColor="#ADB5BD" HorizontalOptions="Fill" />
         </Card>
 
         <Card title={`Inline ShaderCode + SetUniform("strength", ${strength}) + iTime · ${running ? "animating" : "paused"}`}>
-          <SkiaImage ref={waveHost} Source="images/glass2.jpg" Aspect="AspectCover" HorizontalOptions="Fill" HeightRequest={200} UseCache="Image" VisualEffects={[wave]} />
+          <SkiaImage ref={waveHost} Source="images/8.jpg" Aspect="AspectCover" HorizontalOptions="Fill" HeightRequest={200} UseCache="Image" VisualEffects={[wave]} />
           <SkiaWrap Spacing={6}>
             {[0, 0.005, 0.01, 0.03].map((v) => <SkiaButton key={v} Text={`strength ${v}`} BackgroundColor={strength === v ? "#533483" : "#495057"} FontSize={12} Tapped={() => setStrength(v)} />)}
             <SkiaButton Text={running ? "Pause" : "Run"} BackgroundColor="#0D6EFD" FontSize={12} Tapped={() => setRunning((r) => !r)} />
@@ -167,7 +166,7 @@ export function ShadersPage() {
         </Card>
 
         <Card title={`ShaderSource="shaders/blit.sksl" (pass-through) toggled through VisualEffects · ${blit ? "on" : "off"}`}>
-          <SkiaImage Source="images/baboon.jpg" Aspect="AspectCover" HorizontalOptions="Fill" HeightRequest={120} UseCache="Image" VisualEffects={blit ? [blitFx] : []} />
+          <SkiaImage Source="images/dungeon.jpg" Aspect="AspectCover" HorizontalOptions="Fill" HeightRequest={160} UseCache="Image" VisualEffects={blit ? [blitFx] : []} />
           <SkiaButton Text={blit ? "Remove effect" : "Add effect"} BackgroundColor="#0D6EFD" FontSize={12} Tapped={() => setBlit((b) => !b)} />
         </Card>
       </SkiaStack>

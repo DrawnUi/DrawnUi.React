@@ -275,3 +275,7 @@ Updated whenever the port deliberately diverges or finds something worth back-po
 ### ImageComposite dirty tracking
 - **React**: `RepaintComposition` is the only dirty source (transform / own cache invalidation of a child); a remeasure anywhere below marks the composite for a full record. C# tracks `DirtyChildrenTracker` from `InvalidateByChild` too; both erase the union of old + new transformed bounds and pull intersecting siblings in.
 - **React-only gotcha**: React props that are new objects on every render (`Margin={new Thickness(...)}`) remeasure the child each render and force full records; memoize them.
+
+### Image caches on whole pixels
+- **React**: `Image` / `ImageComposite` / `ImageDoubleBuffered` caches record the expanded rect snapped outward to integer device pixels; the blit is 1:1 and a shader effect sampling `fragCoord - iOffset` hits texel centers (a fractional `DrawingRect.Left` made `blit.sksl` bilinear-blur the image by a sub-pixel amount). Picture caches keep the exact rect.
+- **.NET**: `CachedObject.Bounds` / recording areas are already integer pixels.

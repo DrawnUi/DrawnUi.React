@@ -232,8 +232,8 @@ export function LayoutsPage() {
         <Card title="SkiaRow ItemsSource (same cells, laid out horizontally, every item realized)">
           <SkiaRow Spacing={8} ItemsSource={items.slice(0, 5)} ItemTemplate={template} />
         </Card>
-        <Card title={`SkiaDecoratedGrid ItemsSource · Split=4 · ColumnDefinitions="*,*,*,*" · gradient lines in ColumnSpacing / RowSpacing`}>
-          <SkiaDecoratedGrid ItemsSource={items} ItemTemplate={template} Split={4} ColumnDefinitions="*,*,*,*" ColumnSpacing={10} RowSpacing={10} />
+        <Card title={`SkiaDecoratedGrid ItemsSource · Split=4 · ColumnSpacing / RowSpacing 1 · gradient lines in the spacing`}>
+          <SkiaDecoratedGrid ItemsSource={items} ItemTemplate={template} Split={4} ColumnDefinitions="*,*,*,*" ColumnSpacing={1} RowSpacing={1} />
         </Card>
         <Card title="SkiaGrid ItemsSource · Split=3 · Invert (column-major)">
           <SkiaGrid ItemsSource={items} ItemTemplate={template} Split={3} Invert ColumnDefinitions="*,*,*" ColumnSpacing={8} RowSpacing={8} />

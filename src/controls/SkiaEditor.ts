@@ -49,6 +49,10 @@ export class SkiaEditor extends SkiaShape {
   /** Enter on a multiline editor: Send submits, anything else inserts a line break. */
   ReturnType: ReturnType = "Done";
   KeyboardType: SkiaEditorKeyboard = "Default";
+  private fontFamilyFallback = "";
+  /** Fallback font aliases for glyphs the main font lacks (symbols, emoji), forwarded to the text and placeholder labels. */
+  get FontFamilyFallback(): string { return this.fontFamilyFallback; }
+  set FontFamilyFallback(v: string) { if (this.fontFamilyFallback !== v) { this.fontFamilyFallback = v ?? ""; this.UpdateLabel(); } }
   IsSpellCheckEnabled = true;
   /** Accepted for parity: the React label always renders unicode; markdown formatting while editing is not ported. */
   UseMarkdown = false;
@@ -212,11 +216,11 @@ export class SkiaEditor extends SkiaShape {
     let display = this.isPassword && this.text ? "•".repeat(this.text.length) : this.text;
     if (display.length === 0 || (this.IsMultiline && display.endsWith(ParagraphBreak))) display += "\u200B"; // C#: keeps the empty (last) line for the caret
     const l = this.Label;
-    l.Text = display; l.FontFamily = this.fontFamily; l.FontSize = this.fontSize; l.TextColor = this.textColor; l.FontWeight = this.fontWeight;
+    l.Text = display; l.FontFamily = this.fontFamily; l.FontFamilyFallback = this.fontFamilyFallback; l.FontSize = this.fontSize; l.TextColor = this.textColor; l.FontWeight = this.fontWeight;
     l.FillGradient = this.TextGradient; l.HorizontalTextAlignment = this.horizontalTextAlignment; l.VerticalTextAlignment = this.verticalTextAlignment; l.LineHeight = this.lineHeight;
     l.MaxLines = -1; l.LineBreakMode = this.IsMultiline ? "WordWrap" : "NoWrap"; l.HorizontalOptions = this.IsMultiline ? "Fill" : "Start";
     const p = this.placeholder;
-    p.Text = this.placeholderText; p.TextColor = this.PlaceholderColor; p.HorizontalTextAlignment = this.PlaceholderHorizontalAlignment; p.FontFamily = this.fontFamily; p.FontSize = this.fontSize; p.FontWeight = this.fontWeight; p.LineHeight = this.lineHeight;
+    p.Text = this.placeholderText; p.TextColor = this.PlaceholderColor; p.HorizontalTextAlignment = this.PlaceholderHorizontalAlignment; p.FontFamily = this.fontFamily; p.FontFamilyFallback = this.fontFamilyFallback; p.FontSize = this.fontSize; p.FontWeight = this.fontWeight; p.LineHeight = this.lineHeight;
     p.MaxLines = this.IsMultiline ? -1 : 1; p.HorizontalOptions = "Fill";
     p.IsVisible = this.text.length === 0 && this.placeholderText.length > 0;
     this.Update();

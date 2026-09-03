@@ -563,6 +563,15 @@ export class SkiaControl {
     return new SKPoint(p[0], p[1]);
   }
 
+  /**
+   * Image caches are rasterized over whole device pixels: the expanded rect snapped outward to integers, so the blit
+   * lands 1:1 (no sub-pixel resample) and effects sampling the cache at `fragCoord - iOffset` hit texel centers.
+   */
+  private AlignedCacheRect(scale: number): SKRect {
+    const r = this.ExpandedCacheRect(scale);
+    return new SKRect(Math.floor(r.Left), Math.floor(r.Top), Math.ceil(r.Right), Math.ceil(r.Bottom));
+  }
+
   /** Cache blit or live paint, then post animators — the part a transform/opacity layer wraps. */
   private RenderContent(ctx: DrawingContext, dx = 0, dy = 0): void {
     const dest = dx !== 0 || dy !== 0 ? new SKRect(this.DrawingRect.Left + dx, this.DrawingRect.Top + dy, this.DrawingRect.Right + dx, this.DrawingRect.Bottom + dy) : this.DrawingRect;
@@ -575,7 +584,7 @@ export class SkiaControl {
       // C# DrawDirectInternal: post renderers run after the direct paint, snapshotting what was painted
       for (const e of post) e.Render(own);
     } else {
-      const r = this.ExpandedCacheRect(ctx.Scale);
+      const r = cacheType === "Operations" ? this.ExpandedCacheRect(ctx.Scale) : this.AlignedCacheRect(ctx.Scale);
       const stale = this.cacheDirty || !this.RenderObject || this.RenderObject.Type !== cacheType
         || this.RenderObject.Scale !== ctx.Scale
         || Math.round(this.RenderObject.Bounds.Width) !== Math.round(r.Width) || Math.round(this.RenderObject.Bounds.Height) !== Math.round(r.Height);
@@ -612,7 +621,8 @@ export class SkiaControl {
   /** Records/renders the content into a new CachedObject for the current DrawingRect. */
   protected CreateRenderingObject(ctx: DrawingContext, cacheType: SkiaCacheType): void {
     const CK = Super.CK;
-    const r = this.ExpandedCacheRect(ctx.Scale); // includes what shadows/effects paint outside the box
+    // includes what shadows/effects paint outside the box; image caches on whole pixels
+    const r = cacheType === "Operations" ? this.ExpandedCacheRect(ctx.Scale) : this.AlignedCacheRect(ctx.Scale);
     const w = Math.max(1, Math.round(r.Width)), h = Math.max(1, Math.round(r.Height));
     if (cacheType === "ImageDoubleBuffered") {
       // keep the previous frame as the fallback until the new cache exists
