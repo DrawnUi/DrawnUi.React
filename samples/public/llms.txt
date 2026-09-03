@@ -1,0 +1,30 @@
+# DrawnUI for React
+
+> The DrawnUi drawn-UI engine (originally .NET / SkiaSharp) in TypeScript on CanvasKit (Skia WebAssembly), composed with React through a custom react-reconciler. Same controls and PascalCase API as DrawnUi.Net: layouts, recycled cells, caching, gestures, animations, shaders, shell navigation, accessibility. npm package `drawnui-react`, MIT. Source: https://github.com/DrawnUi/DrawnUi.React
+
+## Skills (for AI Agents)
+
+Save under `~/.claude/skills/<name>/SKILL.md` (or your agent's skill folder) to teach your agent DrawnUI for React.
+
+- [DrawnUI React skill](https://helloreact.drawnui.net/skills/drawnui-react/SKILL.md): install, startup, JSX composition rules, templated lists, SkiaScroll / SkiaShell extras, caching and invalidation, shader effects, keyboard, accessibility
+- [DrawnUI framework skill](https://drawnui.net/skills/drawnui/SKILL.md): the engine itself — controls, layouts, caching, gestures, virtualization (applies 1:1, the API is the same)
+- Everything inlined: https://helloreact.drawnui.net/llms-full.txt
+
+## Install
+
+```
+npm i drawnui-react@preview react react-dom
+```
+
+`drawnui-react` = React tags + engine types, `drawnui-react/core` = engine only. Vite recommended (CanvasKit `.wasm` is a `?url` import).
+
+## Demo
+
+- https://helloreact.drawnui.net — root menu with one page per feature area: images, SVG, recycled cells, shapes, text, layouts, SkiaScroll (header / footer / scroll bars / refresh / snapping), carousel & drawer, Lottie & GIF, shell (pages, popups, modals, toasts, tabs), editor, keyboard input, sprites, shaders, transforms, accessibility, common controls.
+- Pages describe DrawnUI features, not React ones: the same demos are meant to be reused for other frameworks on this engine.
+
+## Docs
+
+- README: https://github.com/DrawnUi/DrawnUi.React#readme
+- What is not ported yet: https://github.com/DrawnUi/DrawnUi.React/blob/master/SKIPPED.md
+- DrawnUI (.NET) documentation, same concepts: https://drawnui.net

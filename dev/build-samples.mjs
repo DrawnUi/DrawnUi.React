@@ -12,6 +12,7 @@ const samples = readdirSync("samples", { withFileTypes: true })
 for (const name of samples) {
   console.log(`\n=== building sample: ${name} ===`);
   execSync(`npx vite build samples/${name}`, { stdio: "inherit", env: { ...process.env, BASE_PATH: `${base}${name}/` } });
+  if (name === "demo") execSync(`node dev/site-extras.mjs dist/${name}`, { stdio: "inherit" }); // skills + llms-full.txt on the demo site
 }
 
 mkdirSync("dist", { recursive: true });

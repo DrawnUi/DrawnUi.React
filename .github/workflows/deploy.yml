@@ -24,6 +24,8 @@ jobs:
         run: npx vite build samples/demo
         env:
           BASE_PATH: /
+      - name: Site extras (public skills + llms-full.txt)
+        run: node dev/site-extras.mjs dist/demo
       - name: Deploy to Cloudflare Pages (helloreact.drawnui.net)
         run: npx --yes wrangler@4 pages deploy dist/demo --project-name helloreact-drawnui --branch master --commit-dirty=true
         env:
