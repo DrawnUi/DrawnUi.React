@@ -32,6 +32,23 @@ await Super.UseDrawnUi()
 
 What is intentionally missing: see [SKIPPED.md](SKIPPED.md).
 
+## Where React ends and DrawnUi begins
+
+React never touches the canvas. The engine (`src/core`, `src/controls`) is plain TypeScript: `SkiaControl` trees
+that measure, arrange and paint themselves on a CanvasKit surface, exactly like the .NET `SkiaControl` trees — it can
+be driven from any framework, or from no framework at all (`new SkiaLabel()`, `AddSubView`, `canvas.Content = ...`).
+
+`react-reconciler` is React's own renderer-building package: the same core that powers `react-dom` and
+`react-native`, minus the DOM. You hand it a "host config" — how to create an instance for a JSX tag, how to append
+/ remove / reorder children, how to apply changed props — and React does the rest: diffing, hooks, state, effects,
+keys, Suspense. Our host config (`src/react/reconciler.ts`) maps every tag to an engine class (`<SkiaLabel>` →
+`new SkiaLabel()`), `appendChild` to `AddSubView`, and a changed prop to a plain property assignment on the control
+(`Text`, `FontSize`, `Tapped`…), after which the control invalidates itself the way it would from C#. So the JSX is
+just a declarative way to build and mutate the same control tree; the render loop, caching, gestures, animators and
+accessibility all live in the engine and would work identically under Vue, Svelte, Blazor-JS interop or a game loop.
+That is also why the demo pages describe DrawnUi features, not React ones: the same pages are meant to be reused as
+the showcase for other frameworks on this engine.
+
 ## Accessibility
 
 Same model as DrawnUi.Blazor: the `<canvas>` is `aria-hidden`, an invisible DOM overlay mirrors every

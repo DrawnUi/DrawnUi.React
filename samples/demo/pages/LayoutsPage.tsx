@@ -21,6 +21,30 @@ class ChipCell extends SkiaDynamicDrawnCell {
 }
 const PALETTE = ["#0F3460", "#533483", "#1B4332", "#7B2D26", "#495057", "#0D6EFD", "#D63384", "#2D6A4F"];
 
+/** Text cell for the decorated grid: a title and a value, padded, no background — the grid lines separate the cells. */
+class TextCell extends SkiaDynamicDrawnCell {
+  private readonly title = new SkiaLabelCtrl();
+  private readonly value = new SkiaLabelCtrl();
+  constructor() {
+    super();
+    this.Type = "Column";
+    this.Padding = new ThicknessCtrl(12, 10);
+    this.HorizontalOptions = "Fill";
+    this.title.FontSize = 11; this.title.TextColor = "#8B95A1"; this.title.TextTransform = "Uppercase";
+    this.value.FontSize = 15; this.value.TextColor = "#DEE2E6"; this.value.FontFamily = "FontTextBold";
+    this.AddSubView(this.title); this.AddSubView(this.value);
+  }
+  protected override SetContent(ctx: unknown): void {
+    const item = ctx as { title: string; value: string };
+    this.title.Text = item.title; this.value.Text = item.value;
+  }
+}
+const FACTS = [
+  { title: "Engine", value: "Skia" }, { title: "Language", value: "TypeScript" }, { title: "Layouts", value: "5 types" }, { title: "Cache", value: "4 kinds" },
+  { title: "Gestures", value: "Unified" }, { title: "Shaders", value: "SkSL" }, { title: "Fonts", value: "Any TTF" }, { title: "Animations", value: "60 fps" },
+  { title: "Navigation", value: "SkiaShell" }, { title: "Accessibility", value: "ARIA overlay" }, { title: "License", value: "MIT" }, { title: "Docs", value: "drawnui.net" },
+];
+
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <SkiaShape Type="Rectangle" CornerRadius={8} BackgroundColor="#2B3035" HorizontalOptions="Fill">
@@ -57,6 +81,7 @@ export function LayoutsPage() {
   const [dynamic, setDynamic] = useState(false);
   const items = useMemo(() => Array.from({ length: count }, (_, i) => ({ text: `Item ${i + 1}`, color: PALETTE[i % PALETTE.length] })), [count]);
   const template = useCallback(() => new ChipCell(), []);
+  const textTemplate = useCallback(() => new TextCell(), []);
   // ImageComposite: one child spins, the layer re-records only it (+ what it overlaps)
   const composite = useRef<SkiaLayoutCtrl>(null);
   const spinner = useRef<SkiaShapeCtrl>(null);
@@ -185,9 +210,9 @@ export function LayoutsPage() {
         <Card title="Implicit tracks: no definitions, children reference Column/Row (DefaultColumnDefinition = Auto)">
           <SkiaGrid ColumnSpacing={12} RowSpacing={4} HorizontalOptions="Start">
             <SkiaLabel Text="Name" FontSize={14} TextColor="#ADB5BD" Column={0} Row={0} />
-            <SkiaLabel Text="DrawnUI for React" FontSize={14} TextColor={Colors.White} Column={1} Row={0} />
+            <SkiaLabel Text="DrawnUI" FontSize={14} TextColor={Colors.White} Column={1} Row={0} />
             <SkiaLabel Text="Renderer" FontSize={14} TextColor="#ADB5BD" Column={0} Row={1} />
-            <SkiaLabel Text="CanvasKit (Skia WASM) + react-reconciler" FontSize={14} TextColor={Colors.White} Column={1} Row={1} />
+            <SkiaLabel Text="CanvasKit (Skia WASM)" FontSize={14} TextColor={Colors.White} Column={1} Row={1} />
             <SkiaLabel Text="License" FontSize={14} TextColor="#ADB5BD" Column={0} Row={2} />
             <SkiaLabel Text="MIT" FontSize={14} TextColor={Colors.White} Column={1} Row={2} />
           </SkiaGrid>
@@ -233,7 +258,7 @@ export function LayoutsPage() {
           <SkiaRow Spacing={8} ItemsSource={items.slice(0, 5)} ItemTemplate={template} />
         </Card>
         <Card title={`SkiaDecoratedGrid ItemsSource · Split=4 · ColumnSpacing / RowSpacing 1 · gradient lines in the spacing`}>
-          <SkiaDecoratedGrid ItemsSource={items} ItemTemplate={template} Split={4} ColumnDefinitions="*,*,*,*" ColumnSpacing={1} RowSpacing={1} />
+          <SkiaDecoratedGrid ItemsSource={FACTS} ItemTemplate={textTemplate} Split={4} ColumnDefinitions="*,*,*,*" ColumnSpacing={1} RowSpacing={1} BackgroundColor="#212529" />
         </Card>
         <Card title="SkiaGrid ItemsSource · Split=3 · Invert (column-major)">
           <SkiaGrid ItemsSource={items} ItemTemplate={template} Split={3} Invert ColumnDefinitions="*,*,*" ColumnSpacing={8} RowSpacing={8} />
