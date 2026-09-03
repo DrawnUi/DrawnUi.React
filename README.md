@@ -48,19 +48,6 @@ extras, caching, effects, accessibility). Save it under `~/.claude/skills/drawnu
 the demo site: https://helloreact.drawnui.net/skills/drawnui-react/SKILL.md — `llms.txt` / `llms-full.txt` at the
 site root point to it. Pair it with the DrawnUI framework skill from https://drawnui.net/llms.txt.
 
-## Repo Layout
-
-- `src/` — the library, imported by samples as `drawnui-react` (React tags + all engine types) or `drawnui-react/core` (engine only).
-  - `src/core` — `Super` (startup, CanvasKit, fonts), `SkiaControl` (measure/arrange/render/gestures), `Canvas` (host, surface, frame loop, input), animators, value types.
-  - `src/controls` — `SkiaLayout` (+ `SkiaStack`/`SkiaRow`/`SkiaLayer`), `SkiaLabel`, `SkiaHotspot`, `SkiaButton`.
-  - `src/react` — reconciler host config + typed JSX tags + `<Canvas>` bridge component.
-- `samples/demo/` — the deployed demo: root menu + pages (`pages/ImagesPage.tsx`, `SvgPage.tsx`, `CellsPage.tsx` with `ContactCell.ts`) navigated by the React-level `SkiaShell`.
-- `samples/<name>/` — one folder per sample: `index.html`, `main.tsx`, two-line `vite.config.ts` (`defineSample`). Shared assets (fonts) in `samples/public`.
-- `skills/` — public agent skills, synced from the maintainer's local copy (`npm run sync:skills`, leak-guarded) and served by the demo site.
-- `dev/` — maintainer material: `build-samples.mjs` builds every sample into `dist/<name>/` + a `dist/index.html` list; used by the Pages workflow.
-
-What is intentionally missing: see [SKIPPED.md](SKIPPED.md). Maintainer notes live in `dev/`: [PARITY.md](dev/PARITY.md) (where and why the port diverges from DrawnUi.Net) and [PROGRESS.md](dev/PROGRESS.md) (work log).
-
 ## Where React ends and DrawnUi begins
 
 React never touches the canvas. The engine (`src/core`, `src/controls`) is plain TypeScript: `SkiaControl` trees
@@ -105,7 +92,6 @@ drawn content. It is off by default and must stay off on anything gesture-driven
 selectable text owns the pointer, so taps and pans under it never reach the drawn control. Everything else in the
 overlay is `user-select: none`, so select-all only highlights opted-in text.
 
-## Publishing
+## Development
 
-Every push to `master` deploys the demo to **https://helloreact.drawnui.net** (Cloudflare Pages); the npm package is
-released from the maintainer's machine. Both are described in [dev/PUBLISHING.md](dev/PUBLISHING.md).
+Repo layout, build scripts, skill sync and how the demo / npm package are published: [dev/DEVELOPMENT.md](dev/DEVELOPMENT.md).
