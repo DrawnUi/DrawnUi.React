@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Colors, SkiaButton, SkiaEditor, SkiaLabel, SkiaRow, SkiaScroll, SkiaShape, SkiaStack, SkiaWrap, Thickness } from "drawnui-react";
+import { Colors, SkiaButton, SkiaEditor, SkiaLabel, SkiaScroll, SkiaShape, SkiaStack, SkiaWrap, Thickness } from "drawnui-react";
 import type { SkiaEditor as SkiaEditorCtrl } from "drawnui-react/core";
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
@@ -71,9 +71,7 @@ export function EditorPage() {
           <SkiaStack Spacing={6}>
             {chat.slice(-4).map((m, i) => <SkiaLabel key={i} Text={m} FontSize={13} TextColor="#DEE2E6" BackgroundColor="#0F3460" Padding={new Thickness(10, 6)} HorizontalOptions="End" />)}
           </SkiaStack>
-          <SkiaRow Spacing={8}>
-            <SkiaEditor FontFamilyFallback="FontSymbols,FontSymbols2,FontEmoji" MaxLines={3} ReturnType="Send" PlaceholderText="Message" FontSize={15} HorizontalOptions="Fill" TextSubmitted={(e, t) => { if (t.trim()) { setChat((c) => [...c, t]); e.Text = ""; } }} />
-          </SkiaRow>
+          <SkiaEditor FontFamilyFallback="FontSymbols,FontSymbols2,FontEmoji" MaxLines={3} ReturnType="Send" PlaceholderText="Message" FontSize={15} HorizontalOptions="Fill" TextSubmitted={(e, t) => { if (t.trim()) { setChat((c) => [...c, t]); e.Text = ""; } }} />
         </Card>
       </SkiaStack>
     </SkiaScroll>

@@ -21,7 +21,7 @@ const LOREM = "DrawnUI draws every pixel itself: text is shaped and rasterized b
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <SkiaShape Type="Rectangle" CornerRadius={8} BackgroundColor="#2B3035" HorizontalOptions="Fill">
+    <SkiaShape Type="Rectangle" CornerRadius={8} BackgroundColor="#2B3035" HorizontalOptions="Fill" UseCache="Image">
       <SkiaStack Spacing={8} Padding={new Thickness(16, 12)}>
         <SkiaLabel Text={title} FontSize={12} TextColor="#6EA8FE" FontAttributes="Bold" TextTransform="Uppercase" />
         {children}
@@ -36,7 +36,7 @@ export function TextPage() {
   const [link, setLink] = useState("none");
   return (
     <SkiaScroll Orientation="Vertical">
-      <SkiaStack Spacing={16} Padding={new Thickness(16)} HorizontalOptions="Center" MaximumWidthRequest={720}>
+      <SkiaStack Spacing={16} Padding={new Thickness(16)} HorizontalOptions="Center" MaximumWidthRequest={720} UseCache="Operations">
         <SkiaLabel Text="SkiaLabel" FontSize={24} TextColor={Colors.White} HorizontalOptions="Center" />
 
         <Card title="Word wrap · HorizontalOptions=Fill">

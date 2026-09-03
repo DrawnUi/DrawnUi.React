@@ -143,8 +143,9 @@ export function Canvas({ BackgroundColor, RenderingMode, Gestures, children, sty
 }
 
 const A11Y_CSS = `
-.drawnui-a11y-overlay{position:absolute;inset:0;overflow:hidden;pointer-events:none}
-.drawnui-a11y-node{position:absolute;margin:0;padding:0;border:0;background:transparent;color:transparent;overflow:hidden;white-space:nowrap;pointer-events:none;font:inherit}
+.drawnui-a11y-overlay{position:absolute;inset:0;overflow:hidden;pointer-events:none;user-select:none;-webkit-user-select:none}
+.drawnui-a11y-node{position:absolute;margin:0;padding:0;border:0;background:transparent;color:transparent;overflow:hidden;white-space:nowrap;pointer-events:none;font:inherit;user-select:none;-webkit-user-select:none}
+.drawnui-a11y-node::selection,.drawnui-a11y-node *::selection{background:transparent;color:transparent}
 .drawnui-a11y-node:focus{outline:none}
 .drawnui-a11y-node:focus-visible{outline:3px solid rgba(13,110,253,.85);outline-offset:1px;border-radius:3px}
 .drawnui-a11y-text{overflow:visible}
