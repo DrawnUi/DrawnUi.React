@@ -149,7 +149,7 @@ const A11Y_CSS = `
 .drawnui-a11y-node:focus{outline:none}
 .drawnui-a11y-node:focus-visible{outline:3px solid rgba(13,110,253,.85);outline-offset:1px;border-radius:3px}
 .drawnui-a11y-text{overflow:visible}
-.drawnui-a11y-text>span{position:absolute;white-space:pre;color:transparent;user-select:text;-webkit-user-select:text;pointer-events:auto;cursor:text;line-height:1}
+.drawnui-a11y-text>span{position:absolute;white-space:pre;color:transparent;user-select:text;-webkit-user-select:text;pointer-events:auto;cursor:text;line-height:1;font-kerning:none;font-feature-settings:"kern" 0,"liga" 0,"calt" 0;text-rendering:geometricPrecision}
 .drawnui-a11y-text>span::selection{background:rgba(110,168,254,.55);color:transparent}
 `;
 
@@ -177,6 +177,19 @@ function AccessibilityOverlay({ view }: { view: CanvasView }) {
     el.addEventListener("wheel", forward, { passive: false });
     return () => el.removeEventListener("wheel", forward);
   }, [view, hasNodes]);
+  // the browser lays the invisible lines out with its own shaping; stretch each line with letter-spacing to the drawn width
+  // so the selection highlight covers the drawn glyphs end to end
+  useLayoutEffect(() => {
+    const el = overlayRef.current;
+    if (!el) return;
+    for (const span of el.querySelectorAll<HTMLSpanElement>(".drawnui-a11y-text>span")) {
+      const want = parseFloat(span.dataset.w ?? "0"), n = (span.textContent ?? "").replace(/\n$/, "").length - 1;
+      span.style.letterSpacing = "0px";
+      if (want <= 0 || n <= 0) continue;
+      const have = span.getBoundingClientRect().width;
+      if (Math.abs(have - want) > 0.5) span.style.letterSpacing = `${(want - have) / n}px`;
+    }
+  }, [nodes]);
   if (!hasNodes) return null;
   // the browser scrolls an overflow:hidden container to reveal a focused child; the overlay must stay pinned to the canvas
   const pin = (e: React.SyntheticEvent<HTMLDivElement>) => { e.currentTarget.scrollTop = 0; e.currentTarget.scrollLeft = 0; };
@@ -202,7 +215,7 @@ function AccessibilityOverlay({ view }: { view: CanvasView }) {
           // AccessibilityTextSelectable: one positioned span per drawn line, in the drawn font, so the browser selects and copies it like HTML
           <div key={n.Id} role={n.Role} title={n.Hint} aria-live={n.Live as "polite" | "assertive" | undefined} className="drawnui-a11y-node drawnui-a11y-text" style={pos}>
             {n.TextLines.map((l, i) => (
-              <span key={i} style={{ left: l.Left, top: l.Top, minWidth: l.Width, height: l.Height, fontFamily: l.FontFamily, fontWeight: l.FontWeight, fontSize: l.FontSize, lineHeight: `${l.Height}px` }}>{l.Text}{i < n.TextLines!.length - 1 ? "\n" : ""}</span>
+              <span key={i} data-w={l.Width} style={{ left: l.Left, top: l.Top, height: l.Height, fontFamily: l.FontFamily, fontWeight: l.FontWeight, fontSize: l.FontSize, lineHeight: `${l.Height}px` }}>{l.Text}{i < n.TextLines!.length - 1 ? "\n" : ""}</span>
             ))}
           </div>
         ) : (
