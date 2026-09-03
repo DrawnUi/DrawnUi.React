@@ -11,11 +11,13 @@ import type { SkiaRadioButton as SkiaRadioButtonCtrl } from "../controls/SkiaRad
 import type { SkiaProgress as SkiaProgressCtrl } from "../controls/SkiaProgress";
 import type { SkiaSlider as SkiaSliderCtrl } from "../controls/SkiaSlider";
 import type { SkiaCarousel as SkiaCarouselCtrl } from "../controls/SkiaCarousel";
+import type { SkiaShaderCarousel as SkiaShaderCarouselCtrl } from "../controls/SkiaShaderCarousel";
 import type { SkiaDrawer as SkiaDrawerCtrl } from "../controls/SkiaDrawer";
 import type { SkiaLayout as SkiaLayoutCtrl } from "../controls/SkiaLayout";
 import type { SkiaHotspot as SkiaHotspotCtrl } from "../controls/SkiaHotspot";
 import type { SkiaButton as SkiaButtonCtrl } from "../controls/SkiaButton";
 import type { SkiaImage as SkiaImageCtrl } from "../controls/SkiaImage";
+import type { SkiaImageTiles as SkiaImageTilesCtrl } from "../controls/SkiaImageTiles";
 import type { SkiaSvg as SkiaSvgCtrl } from "../controls/SkiaSvg";
 import type { SkiaBackdrop as SkiaBackdropCtrl } from "../controls/SkiaBackdrop";
 import type { SkiaEditor as SkiaEditorCtrl } from "../controls/SkiaEditor";
@@ -32,7 +34,7 @@ import { createDrawnRoot } from "./reconciler";
 /** Public settable properties of a control become its JSX props, same PascalCase names as C#. */
 type PropsOf<T> = Partial<{
   // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-  [K in keyof T as T[K] extends Function ? never : K extends "Children" | "Views" | "Parent" | "Spans" | "GridStructure" | "AccessibilityId" | "IsAccessibilityElement" | "HasTransform" | "RenderTransformMatrix" | "RenderObjectPrevious" | "LastMeasuredIndex" | "ItemsInsertedAtStart" | "UsingControlStyle" | "Track" | "Thumb" | "FrameOn" | "FrameOff" | "ViewCheckOn" | "ViewOn" | "ViewText" | "Ratio" | "StartThumbX" | "EndThumbX" | "SnapPoints" | "CurrentPosition" | "CurrentSnap" | "ContentOffsetBounds" | "InTransition" | "CanAnimate" | "MaxIndex" | "ChildrenTotal" | "IsAtStart" | "IsAtEnd" | "ScrollProgress" | "ScrollAmount" | "TransitionProgress" | "LastIndex" | "ChildrenCount" | "Horizontal" | "Animator" | "Animation" | "IsPlaying" | "PlayWhenAvailable" | "TotalFrames" | "HasEffects" | "IsDisposed" | "Label" | "IsMultiline" | "HasSelection" | "LayoutVersion" | "LinesCount" | "MeasuredLineHeight" | "Focused" | "SpriteSheet" | "FrameWidth" | "FrameHeight" | "DurationMs" | "FrameDurationMs" | "CurrentSprite" | "Rects" | "HasTapHandler" | "HasDecorations" | "LinesCount" | "Superview" | "DrawingRect" | "MeasuredSize" | "RenderingScale" | "NeedMeasure" | "_superview" | "HitBoxAuto" | "TotalDown" | "TotalTapped" | "TouchDown" | "PostAnimators" | "LoadedSource" | "IsLoading" | "DisplayRect" | "AspectScale" | "Content" | "ContentSize" | "ContentOffsetBounds" | "OverscrollDistance" | "OverScrolled" | "IsUserPanning" | "IsUserFocused" | "IsScrolling" | "IsTemplated" | "FirstVisibleIndex" | "LastVisibleIndex" | "DebugString" | "ChildrenFactory" | "ContextIndex" | "RenderObject" | "UsingCacheType" ? never : K]: T[K];
+  [K in keyof T as T[K] extends Function ? never : K extends "Children" | "Views" | "Parent" | "Spans" | "GridStructure" | "AccessibilityId" | "IsAccessibilityElement" | "HasTransform" | "RenderTransformMatrix" | "RenderObjectPrevious" | "LastMeasuredIndex" | "ItemsInsertedAtStart" | "UsingControlStyle" | "Track" | "Thumb" | "FrameOn" | "FrameOff" | "ViewCheckOn" | "ViewOn" | "ViewText" | "Ratio" | "StartThumbX" | "EndThumbX" | "SnapPoints" | "CurrentPosition" | "CurrentSnap" | "ContentOffsetBounds" | "InTransition" | "CanAnimate" | "MaxIndex" | "ChildrenTotal" | "IsAtStart" | "IsAtEnd" | "ScrollProgress" | "ScrollAmount" | "TransitionProgress" | "LastIndex" | "ChildrenCount" | "Horizontal" | "Animator" | "Animation" | "IsPlaying" | "PlayWhenAvailable" | "TotalFrames" | "HasEffects" | "IsDisposed" | "Label" | "IsMultiline" | "HasSelection" | "LayoutVersion" | "LinesCount" | "MeasuredLineHeight" | "Focused" | "SpriteSheet" | "FrameWidth" | "FrameHeight" | "DurationMs" | "FrameDurationMs" | "CurrentSprite" | "Rects" | "HasTapHandler" | "HasDecorations" | "LinesCount" | "Superview" | "DrawingRect" | "MeasuredSize" | "RenderingScale" | "NeedMeasure" | "_superview" | "HitBoxAuto" | "TotalDown" | "TotalTapped" | "TouchDown" | "PostAnimators" | "LoadedSource" | "IsLoading" | "DisplayRect" | "AspectScale" | "Content" | "ContentSize" | "ContentOffsetBounds" | "OverscrollDistance" | "OverScrolled" | "IsUserPanning" | "IsUserFocused" | "IsScrolling" | "IsTemplated" | "FirstVisibleIndex" | "LastVisibleIndex" | "DebugString" | "ChildrenFactory" | "ContextIndex" | "RenderObject" | "UsingCacheType" | "TransitionEffect" | "TransitionFromIndex" | "TransitionToIndex" | "EffectPostRenderers" | "CachedImage" | "ImageBitmap" | "ShouldSubmitOnEnter" ? never : K]: T[K];
 }>;
 
 /** `ref` receives the engine control instance (react-reconciler getPublicInstance). */
@@ -54,6 +56,8 @@ export const TextSpan = "TextSpan" as unknown as FC<LeafProps<TextSpanCtrl>>;
 export const SkiaHotspot = "SkiaHotspot" as unknown as FC<LeafProps<SkiaHotspotCtrl>>;
 export const SkiaButton = "SkiaButton" as unknown as FC<LeafProps<SkiaButtonCtrl>>;
 export const SkiaImage = "SkiaImage" as unknown as FC<LeafProps<SkiaImageCtrl>>;
+/** Source repeated as TileWidth x TileHeight tiles over the box (C# SkiaImageTiles). */
+export const SkiaImageTiles = "SkiaImageTiles" as unknown as FC<LeafProps<SkiaImageTilesCtrl>>;
 export const SkiaSvg = "SkiaSvg" as unknown as FC<LeafProps<SkiaSvgCtrl>>;
 /** Blurs / tints what is painted beneath it (C# SkiaBackdrop); children draw first. */
 export const SkiaBackdrop = "SkiaBackdrop" as unknown as FC<LayoutProps<SkiaBackdropCtrl>>;
@@ -74,6 +78,8 @@ export const SkiaRadioButton = "SkiaRadioButton" as unknown as FC<LeafProps<Skia
 export const SkiaProgress = "SkiaProgress" as unknown as FC<LeafProps<SkiaProgressCtrl>>;
 export const SkiaSlider = "SkiaSlider" as unknown as FC<LeafProps<SkiaSliderCtrl>>;
 export const SkiaCarousel = "SkiaCarousel" as unknown as FC<LayoutProps<SkiaCarouselCtrl>>;
+/** Carousel whose slide changes are rendered by an SkSL transition (C# SkiaShaderCarousel); slides need UseCache="Image". */
+export const SkiaShaderCarousel = "SkiaShaderCarousel" as unknown as FC<LayoutProps<SkiaShaderCarouselCtrl>>;
 export const SkiaDrawer = "SkiaDrawer" as unknown as FC<LayoutProps<SkiaDrawerCtrl>>;
 
 export interface CanvasProps {

@@ -39,6 +39,7 @@ export function EditorPage() {
             <SkiaButton Text="Set Text" BackgroundColor="#495057" FontSize={13} Tapped={() => { if (editor.current) editor.current.Text = "Hello from code"; }} />
             <SkiaButton Text="Clear" BackgroundColor="#495057" FontSize={13} Tapped={() => { if (editor.current) editor.current.Text = ""; }} />
           </SkiaWrap>
+          <SkiaLabel Text="A focused editor is mirrored by a hidden textarea (TextInputProxy): IME composition, the mobile soft keyboard, autocorrect, native paste / cut / undo land in the drawn editor through the same stub methods the physical keyboard uses." FontSize={12} TextColor="#ADB5BD" HorizontalOptions="Fill" />
         </Card>
 
         <Card title="ControlStyle — Cupertino, Material, Material3, Windows (C# ApplyControlStyleVisuals palettes)">

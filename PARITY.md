@@ -209,3 +209,40 @@ Updated whenever the port deliberately diverges or finds something worth back-po
 - **React**: a backdrop recorded into a cached parent (the demo card is a SkiaShape with the default Operations cache) kept a snapshot taken before the baboon image had loaded: the image's invalidation climbs its own branch and never reaches the sibling shape. After each paint the backdrop marks its ancestors' caches stale (microtask, no frame requested), so the next frame for any reason re-records it.
 - **.NET**: the same tree in `MainPageBackdrop` works because the sandbox content loads before the first record or the page redraws for other reasons; a late-loading sibling would leave the same stale snapshot.
 - **Opinion**: consider the same "stale ancestors after paint" in `SkiaBackdrop.Paint`; it costs nothing while the canvas is idle.
+
+## Visual effects
+
+### Post renderers wait for the shader to compile
+- **React**: `SkiaControl.EffectPostRenderers` is filtered by `NeedApply` at render time; `SkiaShaderEffect.NeedApply` fetches the source (async, once) and compiles (sync) when needed, so a control with an effect whose `.sksl` is still loading is blitted plainly and takes the shader on the next frame.
+- **.NET**: `DrawRenderObject` skips the cache blit whenever `EffectPostRenderers` is non-empty and the effect logs "failed to create shader" until compiled, so the control is invisible while the shader is missing.
+- **Opinion**: filtering by `NeedApply` there too avoids the blank control on a slow resource / compile error.
+
+### Texture texel origin
+- **React**: `CachedTexture.Origin` records where texel (0,0) of the texture sits in canvas space; a cache image gets no local matrix (shaders sample `fragCoord - iOffset` in texel space, as in C#), a whole-surface snapshot gets a translation so texel (0,0) is the destination's top-left (a bounded `makeImageSnapshot` of a GPU surface is not origin-safe in CanvasKit).
+- **.NET**: `CreateSnapshot` maps the destination through `TotalMatrix` and snapshots that sub-rect.
+- **Opinion**: same outcome.
+
+### Effects' `Update()` re-records the parent
+- **React**: `SkiaEffect.Update` invalidates the parent's cache and stales the ancestors (`RepaintComposition`), the C# `Parent.Update()` semantics; the parent's own re-record is what lets `SkiaShaderCarousel` realize new slides while the transition progresses.
+
+## SkiaShaderCarousel
+
+### Cached as Image by default
+- **React**: the constructor sets `UseCache="Image"` so the overlapping slides (all arranged at offset 0) are recorded into a cache that is never blitted (the post renderer replaces the blit) instead of being painted on screen under the effect.
+- **.NET**: the user sets the cache type; with `UseCache=None` `DrawRenderObject` is never used and the transition effect never runs.
+- **Opinion**: forcing an Image cache in the C# constructor would make the control work out of the box.
+
+### `OnChildrenInitialized` before the first position
+- **React**: `InitializeChildren` raises `OnChildrenInitialized` before `ApplyIndex(true)`; the shader carousel resets its from/to state there, and the first `OnScrollProgressChanged` (from the instant `ApplyPosition`) then sets them up. The other order left the first transition pair at -1 until the first swipe.
+
+## SkiaEditor
+
+### Hidden DOM textarea for IME / soft keyboards
+- **React**: `TextInputProxy` mirrors the focused editor into a hidden textarea and replays its input events through the stub methods (diff of the value). DrawnUi.Blazor has no DOM input at all (physical keyboard only); this is a deliberate addition so mobile browsers can type.
+- **.NET**: `SkiaEditor.Blazor.cs` subscribes to `KeyboardManager` only.
+- **Opinion**: the same proxy would give the Blazor / Wasm heads mobile input; the diff approach avoids per-inputType handling and keeps IME composition intact.
+
+## SkiaImageManager
+
+### Queue in the browser
+- **React**: `LoadImageManagedAsync` orders by priority and caps concurrent fetches at 5 like the C# semaphore; `SkiaImage.Source` goes through it (`LoadPriority`). Browsers already limit connections per host, so the cap mostly keeps decode work paced.

@@ -4,6 +4,7 @@ import { Super } from "../core/Super";
 import { SkiaValueAnimator } from "../core/Animators";
 import { type PrebuiltControlStyle, ResolveControlStyle } from "../core/ControlStyle";
 import { type InputKey, KeyboardManager } from "../core/KeyboardManager";
+import { TextInputProxy } from "../core/TextInputProxy";
 import { type Color, Colors, type DrawTextAlignment, type ReturnType, ScaledSize, type SkiaEditorKeyboard, type SkiaGradient, SKRect, type TextAlignment, Thickness } from "../core/Types";
 import { type GlyphBox, SkiaLabel } from "./SkiaLabel";
 import { SkiaShape } from "./SkiaShape";
@@ -108,6 +109,7 @@ export class SkiaEditor extends SkiaShape {
     if (this.cursorPosition > value.length) this.cursorPosition = value.length;
     if (this.cursorPosition + this.selectionLength > value.length) this.selectionLength = Math.max(0, value.length - this.cursorPosition);
     this.UpdateLabel();
+    TextInputProxy.Sync(this);
     this.TextChanged?.(this, value);
   }
   get PlaceholderText(): string { return this.placeholderText; }
@@ -133,7 +135,7 @@ export class SkiaEditor extends SkiaShape {
   set IsPassword(v: boolean) { if (this.isPassword !== v) { this.isPassword = v; this.UpdateLabel(); } }
   get IsMultiline(): boolean { return this.maxLines !== 1; }
   get HasSelection(): boolean { return this.selectionLength > 0; }
-  protected get ShouldSubmitOnEnter(): boolean { return this.IsMultiline && this.ReturnType === "Send"; }
+  get ShouldSubmitOnEnter(): boolean { return this.IsMultiline && this.ReturnType === "Send"; }
 
   /** Caret index (UTF-16 units) = the left edge of the selection when one exists. */
   get CursorPosition(): number { return this.cursorPosition; }
@@ -153,6 +155,7 @@ export class SkiaEditor extends SkiaShape {
   private OnCursorMoved(): void {
     this.ScrollToCaret();
     this.caretVisible = true;
+    TextInputProxy.Sync(this);
     this.CursorMoved?.(this);
     this.InvalidateCache(); this.RepaintComposition();
   }
@@ -447,13 +450,15 @@ export class SkiaEditor extends SkiaShape {
   private SetFocusNative(focus: boolean): void {
     if (focus === this.subscribed) return;
     this.subscribed = focus;
-    if (focus) { KeyboardManager.Subscribe(this.onKeyDown, this.onKeyChar); KeyboardManager.BlurExternalTextInput(); }
-    else KeyboardManager.Unsubscribe(this.onKeyDown, this.onKeyChar);
+    if (focus) { KeyboardManager.Subscribe(this.onKeyDown, this.onKeyChar); KeyboardManager.BlurExternalTextInput(); TextInputProxy.Attach(this); }
+    else { TextInputProxy.Detach(this); KeyboardManager.Unsubscribe(this.onKeyDown, this.onKeyChar); }
   }
 
   private OnKeyDown(key: InputKey, e: KeyboardEvent): void {
     const shift = KeyboardManager.IsShiftPressed, ctrl = KeyboardManager.IsControlPressed, alt = KeyboardManager.IsAltPressed;
     const handled = () => e.preventDefault();
+    // with the hidden textarea focused these keys become input / clipboard events there and are applied from those
+    if (TextInputProxy.IsActive(this) && TextInputProxy.IsProxyTarget(e.target) && (key === "Backspace" || key === "Delete" || key === "Enter" || key === "NumpadEnter" || (ctrl && (key === "KeyC" || key === "KeyX" || key === "KeyV")))) return;
     switch (key) {
       case "Backspace": handled(); this.StubBackspace(); break;
       case "Delete": handled(); this.StubDelete(); break;

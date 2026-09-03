@@ -6,6 +6,7 @@ import { Easing } from "./Easing";
 import type { Canvas } from "./Canvas";
 import { Aria } from "./Accessibility";
 import { ControlTappedEventArgs, GestureEventProcessingInfo, type LockTouch, SKPoint, SkiaGesturesInfo, SkiaGesturesParameters, TouchActionEventArgs } from "./Gestures";
+import { type CachedTexture, type IPostRendererEffect, IsPostRendererEffect, type SkiaEffect } from "./SkiaEffect";
 
 /** Mirrors DrawnUi DrawingContext: ctx.Context.Canvas / Surface, ctx.Destination (pixels), ctx.Scale. */
 export interface DrawingContext {
@@ -177,6 +178,38 @@ export class SkiaControl {
   AnimationTappedSpeed = 0;
   /** Overlay effects drawn above this control's content every frame (ripple etc). */
   readonly PostAnimators: IOverlayEffect[] = [];
+
+  // ---- visual effects (C# VisualEffects: attached SkiaEffect objects) ----
+  private visualEffects: SkiaEffect[] = [];
+  /** Post-renderer effects among VisualEffects (C# EffectPostRenderers). */
+  EffectPostRenderers: (SkiaEffect & IPostRendererEffect)[] = [];
+  /** Skip every attached effect (C# DisableEffects). */
+  DisableEffects = false;
+  /** Effects attached to this control; assign a new array to change them (they are attached/detached here). */
+  get VisualEffects(): readonly SkiaEffect[] { return this.visualEffects; }
+  set VisualEffects(v: readonly SkiaEffect[] | undefined) {
+    const next = v ? [...v] : [];
+    for (const e of this.visualEffects) if (!next.includes(e)) e.Dettach();
+    for (const e of next) if (e.Parent !== this) e.Attach(this);
+    this.visualEffects = next;
+    this.OnVisualEffectsChanged();
+  }
+  protected OnVisualEffectsChanged(): void {
+    this.EffectPostRenderers = this.visualEffects.filter(IsPostRendererEffect);
+    this.InvalidateEffectsMargin();
+    this.InvalidateCache();
+    this.RepaintComposition();
+  }
+  /** Post renderers that can render this frame (compiled shaders); an unready effect leaves the control drawn plainly. */
+  private ActivePostRenderers(): (SkiaEffect & IPostRendererEffect)[] {
+    if (this.DisableEffects || this.EffectPostRenderers.length === 0) return [];
+    return this.EffectPostRenderers.filter((e) => e.NeedApply);
+  }
+  /** C# CachedImage: the cached texture and the canvas rect it was rasterized over (Image caches only). */
+  get CachedImage(): CachedTexture | undefined {
+    const c = this.RenderObject;
+    return c?.Image ? { Image: c.Image, Bounds: c.Bounds } : undefined;
+  }
   /** Clip overlay effects to the control's shape (CreateClip). */
   ClipEffects = true;
 
@@ -421,7 +454,14 @@ export class SkiaControl {
   private effectsMarginCache?: { scale: number; margin: Thickness };
   /** Cached ComputeEffectsMargin (reset by InvalidateMeasure) — C# AggregatedEffectsMarginPixels. */
   EffectsMargin(scale: number): Thickness {
-    if (!this.effectsMarginCache || this.effectsMarginCache.scale !== scale) this.effectsMarginCache = { scale, margin: this.ComputeEffectsMargin(scale) };
+    if (!this.effectsMarginCache || this.effectsMarginCache.scale !== scale) {
+      let m = this.ComputeEffectsMargin(scale);
+      if (!this.DisableEffects) for (const e of this.visualEffects) { // C# ComputeEffectsMargin: per-side max over the attached effects
+        const em = e.GetEffectMargin(scale);
+        if (em.Left > m.Left || em.Top > m.Top || em.Right > m.Right || em.Bottom > m.Bottom) m = new Thickness(Math.max(m.Left, em.Left), Math.max(m.Top, em.Top), Math.max(m.Right, em.Right), Math.max(m.Bottom, em.Bottom));
+      }
+      this.effectsMarginCache = { scale, margin: m };
+    }
     return this.effectsMarginCache.margin;
   }
 
@@ -493,16 +533,24 @@ export class SkiaControl {
   private RenderContent(ctx: DrawingContext): void {
     const own: DrawingContext = { ...ctx, Destination: this.DrawingRect };
     const cacheType = this.UsingCacheType;
+    const post = this.ActivePostRenderers();
     if (cacheType === "None") {
       this.DestroyRenderingObject();
       this.PaintContent(own);
+      // C# DrawDirectInternal: post renderers run after the direct paint, snapshotting what was painted
+      for (const e of post) e.Render(own);
     } else {
       const r = this.ExpandedCacheRect(ctx.Scale);
       const stale = this.cacheDirty || !this.RenderObject || this.RenderObject.Type !== cacheType
         || this.RenderObject.Scale !== ctx.Scale
         || Math.round(this.RenderObject.Bounds.Width) !== Math.round(r.Width) || Math.round(this.RenderObject.Bounds.Height) !== Math.round(r.Height);
       if (stale) this.CreateRenderingObject(own, cacheType);
-      if (this.RenderObject) this.RenderObject.Draw(ctx.Context.Canvas, r.Left, r.Top);
+      if (this.RenderObject) {
+        // C# DrawRenderObject: with post renderers an Image cache is not blitted, the effects sample it (CachedImage)
+        // and paint the result; a picture cache has no texture, so it is replayed first and snapshotted by the effect
+        if (post.length === 0 || !this.RenderObject.Image) this.RenderObject.Draw(ctx.Context.Canvas, r.Left, r.Top);
+        for (const e of post) e.Render(own);
+      }
       else if (this.RenderObjectPrevious) this.RenderObjectPrevious.Draw(ctx.Context.Canvas, r.Left, r.Top); // double buffer: last good frame
       else this.DrawPlaceholder(own);
     }
@@ -580,6 +628,8 @@ export class SkiaControl {
 
   /** Marks the cache stale; re-recorded on the next frame. */
   InvalidateCache(): void { this.cacheDirty = true; }
+  /** Effects margin recomputed on the next use (C# InvalidateEffectsMargin). */
+  InvalidateEffectsMargin(): void { this.effectsMarginCache = undefined; }
 
   /** Draws PostAnimators above content; an effect returning true asks for another frame. */
   ExecutePostAnimators(ctx: DrawingContext): void {
@@ -738,6 +788,8 @@ export class SkiaControl {
     for (const e of [...this.PostAnimators]) (e as { Stop?: () => void }).Stop?.();
     this.PostAnimators.length = 0;
     this.DestroyRenderingObject();
+    for (const e of this.visualEffects) e.Dispose(); // C# disposes attached effects with the control
+    this.visualEffects = []; this.EffectPostRenderers = [];
     if (this.gradientShaders) { for (const m of this.gradientShaders.values()) for (const s of m.values()) s.delete(); this.gradientShaders.clear(); }
     this.UnregisterAccessibility();
     this.DisposeChildren();
@@ -824,6 +876,12 @@ export class SkiaControl {
       const sent = new SkiaGesturesInfo(args, apply);
       this.ConsumeGestures(this, sent);
       if (args.Type !== "Up" && sent.Consumed) return this;
+    }
+
+    // C# EffectsGestureProcessors: attached effects that process gestures (ISkiaGestureProcessor) see them first
+    if (!this.DisableEffects) for (const e of this.visualEffects) {
+      const p = (e as unknown as { ProcessGestures?: (a: SkiaGesturesParameters, i: GestureEventProcessingInfo) => SkiaControl | null }).ProcessGestures;
+      if (typeof p === "function" && p.call(e, args, apply) && args.Type !== "Up") return this;
     }
 
     if (this.CheckChildrenGesturesLocked(args.Type)) return consumedDefault;

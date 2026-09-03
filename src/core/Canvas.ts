@@ -141,10 +141,10 @@ export class Canvas {
 
   // ---- deferred disposal (DrawnUi DisposeObject: never delete Skia objects mid-frame) ----
 
-  private readonly disposeQueue: CachedObject[] = [];
+  private readonly disposeQueue: { Dispose(): void }[] = [];
 
   /** Queues a cache for deletion after the current frame has been flushed. */
-  DisposeObject(obj: CachedObject): void { this.disposeQueue.push(obj); }
+  DisposeObject(obj: { Dispose(): void }): void { this.disposeQueue.push(obj); }
 
   private DrainDisposeQueue(): void {
     if (this.disposeQueue.length === 0) return;

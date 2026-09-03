@@ -50,6 +50,9 @@ export class ViewsAdapter {
     for (const [index, view] of moved) this.inUse.set(index, view);
   }
 
+  /** The realized view for an index, if any (no creation). */
+  GetViewForIndex(index: number): SkiaControl | undefined { return this.inUse.get(index); }
+
   /** View bound to items[index]: existing, recycled from the pool, or freshly created. */
   GetOrCreateViewForIndex(index: number): SkiaControl | undefined {
     const existing = this.inUse.get(index);

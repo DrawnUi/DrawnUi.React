@@ -5,7 +5,7 @@ import { Spring } from "../core/ScrollAnimators";
 import { SKRect, ScaledSize, Thickness } from "../core/Types";
 import { SnappingLayout } from "./SnappingLayout";
 
-interface SnapPoint { Id: number; Location: SKPoint }
+export interface SnapPoint { Id: number; Location: SKPoint }
 interface ChildPosition { Offset: SKPoint; OnScreen: boolean; NextToScreen: boolean }
 
 /**
@@ -41,6 +41,8 @@ export class SkiaCarousel extends SnappingLayout {
   private layoutKey = "";
   private lastLooped = false;
   private cellSize = { W: 0, H: 0 };
+  /** Slide size in points (C# CellSize). */
+  protected get CellSize(): { W: number; H: number } { return this.cellSize; }
   private panningOffset = SKPoint.Empty;
   private panningStart = SKPoint.Empty;
   private wrongDirection = false;
@@ -170,8 +172,17 @@ export class SkiaCarousel extends SnappingLayout {
 
   override ApplyPosition(position: SKPoint): void {
     super.ApplyPosition(position);
+    this.OnScrollProgressChanged();
     this.RepaintComposition();
   }
+  /** The position changed (C# OnScrollProgressChanged); SkiaShaderCarousel drives its transition here. */
+  protected OnScrollProgressChanged(): void {}
+  /** Snap points were (re)built (C# OnChildrenInitialized). */
+  protected OnChildrenInitialized(): void {}
+  /** Where a drawn slide goes for its scroll offset; SkiaShaderCarousel keeps every slide in place (C# AnimateVisibleChild). */
+  protected SlideOffset(offset: SKPoint): SKPoint { return offset; }
+  /** An already realized slide (C# ChildrenFactory.GetViewForIndex): no cell is created. */
+  protected GetExistingView(index: number): SkiaControl | undefined { return this.IsTemplated ? this.ChildrenFactory.GetViewForIndex(index) : this.Children[index]; }
 
   // ---- looped: virtual anchors one step before the first and after the last slide ----
   private GetVirtualSnapPoints(): SnapPoint[] {
@@ -187,7 +198,7 @@ export class SkiaCarousel extends SnappingLayout {
     return this.snapPointsVirtual;
   }
 
-  private GetVirtualAnchor(current: SKPoint): SnapPoint {
+  protected GetVirtualAnchor(current: SKPoint): SnapPoint {
     let best = this.GetVirtualSnapPoints()[0], d = Infinity;
     for (const p of this.GetVirtualSnapPoints()) { const dd = SnappingLayout.Dist(p.Location, current); if (dd < d) { d = dd; best = p; } }
     return best;
@@ -353,6 +364,7 @@ export class SkiaCarousel extends SnappingLayout {
     if (count > 0 && (this.selectedIndex < 0 || this.selectedIndex > this.MaxIndex)) {
       this.lastIndex = this.selectedIndex; this.selectedIndex = 0; this.OnSelectedIndexChanged();
     }
+    this.OnChildrenInitialized();
     this.ApplyIndex(true);
   }
 
@@ -418,7 +430,7 @@ export class SkiaCarousel extends SnappingLayout {
       if (!view || !view.IsVisible) continue;
       if (cell.index === this.selectedIndex && track > 0) this.scrollAmount = ((this.IsVertical ? cell.offset.Y : cell.offset.X) * scale) / track;
       if (this.IsTemplated) view.Measure(inner.Width, inner.Height, scale); // recycled cells carry new content
-      view.Arrange(this.SlideRect(inner, cell.offset, scale), view.WidthRequest, view.HeightRequest, scale);
+      view.Arrange(this.SlideRect(inner, this.SlideOffset(cell.offset), scale), view.WidthRequest, view.HeightRequest, scale);
       view.Render(ctx);
       if (cell.visible) visible.push(view);
     }

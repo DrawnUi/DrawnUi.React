@@ -2,8 +2,9 @@
  * Mirrors DrawnUi KeyboardManager (Blazor / Wasm heads, drawnui-keyboard.js): window-level keydown / keyup
  * capture listeners feeding `KeyDown` / `KeyUp` (the DOM `event.code`, e.g. "KeyA", "Backspace", "ArrowLeft")
  * and `KeyChar` (a printable character, no Ctrl / Alt / Meta), plus the modifier state. A drawn editor
- * subscribes while focused; there is no DOM text input, so IME and the mobile soft keyboard are not involved
- * (same as DrawnUi.Blazor).
+ * subscribes while focused. Characters typed into the hidden TextInputProxy textarea (IME, soft keyboard) arrive
+ * as input events there, so its key events are not forwarded as KeyChar here (a React-port addition over
+ * DrawnUi.Blazor, which has no DOM text input).
  */
 export type InputKey = string;
 
@@ -28,7 +29,8 @@ export class KeyboardManager {
       const code = e.code || "";
       KeyboardManager.pressed.add(code);
       for (const h of [...KeyboardManager.keyDown]) h(code, e);
-      if (e.key && e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) for (const h of [...KeyboardManager.keyChar]) h(e.key, e);
+      const proxied = (e.target as HTMLElement | null)?.dataset?.drawnuiTextInput === "1"; // TextInputProxy: characters come through its input events
+      if (!proxied && e.key && e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) for (const h of [...KeyboardManager.keyChar]) h(e.key, e);
     }, true);
     window.addEventListener("keyup", (e) => {
       const code = e.code || "";
@@ -49,6 +51,6 @@ export class KeyboardManager {
   /** JS blurExternalTextInput: a page text input outside the canvas would keep receiving the keys. */
   static BlurExternalTextInput(): void {
     const a = typeof document !== "undefined" ? document.activeElement as HTMLElement | null : null;
-    if (a && (a.tagName === "INPUT" || a.tagName === "TEXTAREA" || a.isContentEditable) && !a.closest("canvas")) a.blur();
+    if (a && a.dataset?.drawnuiTextInput !== "1" && (a.tagName === "INPUT" || a.tagName === "TEXTAREA" || a.isContentEditable) && !a.closest("canvas")) a.blur();
   }
 }
