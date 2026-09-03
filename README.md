@@ -1,10 +1,12 @@
 # DrawnUi.React
 
-Prototype of the [DrawnUi](https://drawnui.net) engine rewritten in TypeScript on top of
+[DrawnUi](https://drawnui.net) engine for React, TypeScript on top of
 [CanvasKit](https://skia.org/docs/user/modules/canvaskit/) (Skia for the browser), composed with React
 through a custom `react-reconciler` renderer.
 
-Goal: the same API surface and semantics as DrawnUi (.NET) — same control names, same PascalCase
+Check out latest playbook: [helloreact.drawnui.net](https://helloreact.drawnui.net/) 👈
+
+Work in progress: the same API surface and semantics as DrawnUi (.NET) — same control names, same PascalCase
 property names, same measure/arrange/paint contract — so knowledge and docs transfer 1:1.
 
 ```tsx
@@ -30,7 +32,16 @@ npm i drawnui-react@preview react react-dom
 CanvasKit's `.wasm` is referenced with a `?url` import, so use Vite (or any bundler that understands `?url`) and
 put your fonts under `public/fonts`. Preview releases carry the `preview` dist-tag (the first publish also became `latest`, as npm always does).
 
-## Layout
+## Run
+
+```
+npm install
+npm run dev              # samples/demo at http://localhost:5173
+npx vite samples/<name>  # any other sample
+npm run build            # typecheck + build all samples into dist/<name>/
+```
+
+## Repo Layout
 
 - `src/` — the library, imported by samples as `drawnui-react` (React tags + all engine types) or `drawnui-react/core` (engine only).
   - `src/core` — `Super` (startup, CanvasKit, fonts), `SkiaControl` (measure/arrange/render/gestures), `Canvas` (host, surface, frame loop, input), animators, value types.
@@ -85,15 +96,6 @@ selects, copies (Ctrl+C / context menu) and reads it like an HTML paragraph, and
 drawn content. It is off by default and must stay off on anything gesture-driven (buttons, carousels, drawers): the
 selectable text owns the pointer, so taps and pans under it never reach the drawn control. Everything else in the
 overlay is `user-select: none`, so select-all only highlights opted-in text.
-
-## Run
-
-```
-npm install
-npm run dev              # samples/demo at http://localhost:5173
-npx vite samples/<name>  # any other sample
-npm run build            # typecheck + build all samples into dist/<name>/
-```
 
 ## Publishing
 
