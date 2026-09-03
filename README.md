@@ -78,6 +78,14 @@ label readable and every button focusable without touching each control.
 The overlay has `pointer-events: none`, so hover and all pointer gestures still reach the canvas — the
 Blazor "accessible control loses hover" limitation does not apply.
 
+Text selection (React extension, opt-in): `AccessibilityTextSelectable` on a `SkiaLabel` renders its laid-out lines
+as real, invisible DOM text in the overlay — one span per drawn line, in the same font (registered fonts are also
+installed as CSS `FontFace`s) and stretched to the drawn line width — with pointer events on. The browser then
+selects, copies (Ctrl+C / context menu) and reads it like an HTML paragraph, and the wheel over it still scrolls the
+drawn content. It is off by default and must stay off on anything gesture-driven (buttons, carousels, drawers): the
+selectable text owns the pointer, so taps and pans under it never reach the drawn control. Everything else in the
+overlay is `user-select: none`, so select-all only highlights opted-in text.
+
 ## Run
 
 ```
