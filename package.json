@@ -28,7 +28,7 @@
     },
     "./package.json": "./package.json"
   },
-  "files": ["dist", "README.md", "LICENSE", "SKIPPED.md", "PARITY.md"],
+  "files": ["dist", "README.md", "LICENSE", "SKIPPED.md"],
   "sideEffects": false,
   "scripts": {
     "dev": "vite samples/demo",

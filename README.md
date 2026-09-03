@@ -38,9 +38,9 @@ put your fonts under `public/fonts`. Preview releases carry the `preview` dist-t
   - `src/react` — reconciler host config + typed JSX tags + `<Canvas>` bridge component.
 - `samples/demo/` — the deployed demo: root menu + pages (`pages/ImagesPage.tsx`, `SvgPage.tsx`, `CellsPage.tsx` with `ContactCell.ts`) navigated by the React-level `SkiaShell`.
 - `samples/<name>/` — one folder per sample: `index.html`, `main.tsx`, two-line `vite.config.ts` (`defineSample`). Shared assets (fonts) in `samples/public`.
-- `dev/build-samples.mjs` — builds every sample into `dist/<name>/` + a `dist/index.html` list; used by the Pages workflow.
+- `dev/` — maintainer material: `build-samples.mjs` builds every sample into `dist/<name>/` + a `dist/index.html` list; used by the Pages workflow.
 
-What is intentionally missing: see [SKIPPED.md](SKIPPED.md).
+What is intentionally missing: see [SKIPPED.md](SKIPPED.md). Maintainer notes live in `dev/`: [PARITY.md](dev/PARITY.md) (where and why the port diverges from DrawnUi.Net) and [PROGRESS.md](dev/PROGRESS.md) (work log).
 
 ## Where React ends and DrawnUi begins
 
