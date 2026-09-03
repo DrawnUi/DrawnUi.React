@@ -1,12 +1,12 @@
 # DrawnUi.React
 
-[DrawnUi](https://drawnui.net) engine for React, TypeScript on top of
+[DrawnUi](https://drawnui.net) engine ptototype for React, TypeScript on top of
 [CanvasKit](https://skia.org/docs/user/modules/canvaskit/) (Skia for the browser), composed with React
 through a custom `react-reconciler` renderer.
 
 Check out latest playbook: [helloreact.drawnui.net](https://helloreact.drawnui.net/) 👈
 
-Work in progress: the same API surface and semantics as DrawnUi (.NET) — same control names, same PascalCase
+*Work in progress*: the goal is same API surface and semantics as DrawnUi (.NET) — same control names, same PascalCase
 property names, same measure/arrange/paint contract — so knowledge and docs transfer 1:1.
 
 ```tsx
