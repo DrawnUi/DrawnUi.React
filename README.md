@@ -99,14 +99,5 @@ overlay is `user-select: none`, so select-all only highlights opted-in text.
 
 ## Publishing
 
-Every push to `master` runs `.github/workflows/deploy.yml`: build `samples/demo`, deploy `dist/demo`
-to the Cloudflare Pages project `helloreact-drawnui` → **https://helloreact.drawnui.net**.
-
-Repository secrets used by the workflow:
-
-| Secret | What it is | Where to get it |
-|---|---|---|
-| `CLOUDFLARE_API_TOKEN` | Cloudflare API token with **Account → Cloudflare Pages → Edit** (deploy needs nothing else). | dash.cloudflare.com → My Profile → API Tokens → Create Token → "Edit Cloudflare Workers" template or custom with the Pages permission; copy the value once. Set with `gh secret set CLOUDFLARE_API_TOKEN --repo DrawnUi/DrawnUi.React` (paste the value on stdin). |
-| `CLOUDFLARE_ACCOUNT_ID` | The Cloudflare account that owns the Pages project. | dash.cloudflare.com → any zone → Overview → right column "Account ID", or `npx wrangler whoami`. `gh secret set CLOUDFLARE_ACCOUNT_ID --repo DrawnUi/DrawnUi.React`. |
-
-Adding another published sample = one more `wrangler pages deploy dist/<name> --project-name <project>` step and a Pages project + custom domain for it.
+Every push to `master` deploys the demo to **https://helloreact.drawnui.net** (Cloudflare Pages); the npm package is
+released from the maintainer's machine. Both are described in [dev/PUBLISHING.md](dev/PUBLISHING.md).
