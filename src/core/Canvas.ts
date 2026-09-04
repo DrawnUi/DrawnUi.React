@@ -181,6 +181,42 @@ export class Canvas {
   /** On-screen surface (SkiaBackdrop snapshots it). */
   get Surface(): Surface | undefined { return this.surface; }
 
+  /**
+   * A picture of what is on screen right now, as PNG bytes (C# DrawnView.TakeScreenShot).
+   *
+   * The on-screen canvas cannot simply be read: an accelerated surface lives in a WebGL drawing
+   * buffer the browser clears after compositing, so both `canvas.toDataURL()` and a snapshot of
+   * the live surface come back blank. The content is therefore drawn once more into an offscreen
+   * RASTER surface, which can be read back anywhere.
+   *
+   * This is a still picture, not a frame of the loop: animators are not ticked and the frame
+   * counters do not move, so taking one never changes what the next real frame shows.
+   */
+  TakeScreenShot(): Uint8Array | null {
+    const CK = Super.CK;
+    const w = this.Element.width, h = this.Element.height;
+    if (!CK || !w || !h) return null;
+    const surface = CK.MakeSurface(w, h);
+    if (!surface) return null;
+    try {
+      const canvas = surface.getCanvas();
+      canvas.clear(Super.ParseColor(this.BackgroundColor));
+      const root = this.content;
+      if (root) {
+        const scale = this.RenderingScale;
+        root.Measure(w, h, scale);
+        root.Arrange(new SKRect(0, 0, w, h), root.WidthRequest, root.HeightRequest, scale);
+        root.Render({ Context: { Canvas: canvas, Surface: surface }, Destination: new SKRect(0, 0, w, h), Scale: scale });
+      }
+      surface.flush();
+      const image = surface.makeImageSnapshot();
+      if (!image) return null;
+      try { return image.encodeToBytes(); } finally { image.delete(); }
+    } finally {
+      surface.delete();
+    }
+  }
+
   Dispose(): void {
     this.disposed = true;
     this.Gestures = "Disabled";
