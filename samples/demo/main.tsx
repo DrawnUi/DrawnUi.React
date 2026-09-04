@@ -1,9 +1,10 @@
-import { StrictMode, useEffect, useState } from "react";
+import { StrictMode, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Canvas, SkiaShell, Super } from "drawnui-react";
 import type { Canvas as CanvasView } from "drawnui-react/core";
 import { CanvasViewContext } from "./pages/canvasView";
 import { RootPage } from "./pages/RootPage";
+import { SAMPLES } from "./pages/catalog";
 import { ImagesPage } from "./pages/ImagesPage";
 import { SvgPage } from "./pages/SvgPage";
 import { CellsPage } from "./pages/CellsPage";
@@ -59,20 +60,10 @@ const ROUTES = {
   shaders: () => <ShadersPage />,
   scroll: () => <ScrollPage />,
 };
-const TITLES = { images: "Images", svg: "SVG", cells: "Recycled cells", shapes: "Shapes", text: "Text", layouts: "Layouts", a11y: "Accessibility", transforms: "Transforms", uneven: "Uneven cells", looks: "Common Controls", snapping: "Carousel & Drawer", animations: "Lottie & GIF", shell: "Shell", editor: "Editor", keyboard: "Keyboard Input", sprites: "Sprites", shaders: "Shaders", scroll: "SkiaScroll" };
+const TITLES = Object.fromEntries(SAMPLES.map((s) => [s.route, s.title]));
 
 function App() {
   const [view, setView] = useState<CanvasView | null>(null);
-  // The served index.html carries the sample list as real HTML (crawlers, no-JS fallback); it is the pre-hydration
-  // state of the page and is removed once the canvas has drawn its first frame. Same catalog draws both, so a human
-  // sees the cards once. If the app never draws, the list stays as the fallback.
-  useEffect(() => {
-    if (!view) return;
-    let raf = 0;
-    const check = () => { if (view.FrameIndex > 0) document.querySelector(".site-samples")?.remove(); else raf = requestAnimationFrame(check); };
-    check();
-    return () => cancelAnimationFrame(raf);
-  }, [view]);
   return (
     <Canvas ref={setView} BackgroundColor="#212529" RenderingMode="Accelerated" Gestures="Enabled" style={{ height: "100%" }}>
       <CanvasViewContext.Provider value={view}>

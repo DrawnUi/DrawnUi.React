@@ -158,6 +158,12 @@ Updated whenever the port deliberately diverges or finds something worth back-po
   behaviour for DOM pages). Opinion: back-port — Blazor users tabbing through a drawn list get the same
   experience as a native page; needs a `ScrollToView`-like helper plus the overlay `focus` callback.
 
+### Static HTML for crawlers (React only)
+- **React**: `drawnUiStatic()` (`drawnui-react/vite`) generates visible semantic HTML into `#root` at build time from
+  the accessibility snapshot of the running build (headless Chrome), replaced by React's first render.
+- **.NET**: nothing comparable (Blazor sites hand-write static SEO content in `index.html`, see the drawnui-blazor
+  SEO notes). Opinion: web-only concern, no C# API to mirror; keep it a Vite plugin, never runtime.
+
 ## Rendering
 
 ### Redraw synchronously inside the resize callback
