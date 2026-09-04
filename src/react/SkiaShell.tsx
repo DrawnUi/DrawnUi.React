@@ -494,9 +494,11 @@ export const SkiaShell = forwardRef<ShellNavigation, SkiaShellProps>(function Sk
             }
           }
         })();
-      } else if (depth > history.current.length) {
-        // forward: the hash names the pages, rebuild the stack without animation (overlays cannot be restored)
+      } else {
+        // forward (depth grew), or the same depth with another hash = a plain <a href="#/route"> link or a typed hash:
+        // the hash names the pages, rebuild the stack without animation (overlays cannot be restored)
         const target = parseHash();
+        if (depth === history.current.length && target.join("/") === live.current.stack.join("/")) return;
         history.current = target.map(() => "page" as HistoryKind);
         window.history.replaceState({ [HISTORY_KEY]: history.current.length }, "", hashFor(target));
         setStacks((all) => { const next = all.slice(); next[live.current.selectedTab] = target; return next; });

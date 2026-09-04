@@ -26,9 +26,24 @@
     <!-- page background = canvas background, so nothing white shows while CanvasKit + fonts load -->
     <style>
       html, body { margin: 0; height: 100%; background: #212529; }
-      /* the canvas takes the rest of the viewport, the footer its own height: no page scrollbar */
-      body { display: flex; flex-direction: column; }
+      /* .app fills the viewport exactly as before: the canvas takes the rest, the footer its own height.
+         The generated sample list sits below the fold; the page scrolls to it from the footer or the scrollbar. */
+      .app { height: 100%; display: flex; flex-direction: column; }
       #root { flex: 1; min-height: 0; }
+      .site-samples {
+        max-width: 820px;
+        margin: 0 auto;
+        padding: 32px 24px 48px;
+        font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+        color: #adb5bd;
+      }
+      .site-samples h1 { color: #fff; font-size: 28px; margin: 0 0 8px; }
+      .site-samples p { margin: 0 0 20px; }
+      .site-samples ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+      .site-samples li a { display: block; padding: 10px 14px; border-radius: 8px; background: #2b3035; color: #adb5bd; text-decoration: none; }
+      .site-samples li a b { color: #fff; margin-right: 6px; }
+      .site-samples li a:hover, .site-samples li a:focus-visible { background: #343a40; }
+      .site-samples a { color: #9ec5fe; }
       .site-footer {
         flex: none;
         display: flex;
@@ -44,6 +59,7 @@
     </style>
   </head>
   <body>
+    <div class="app">
     <div id="root"></div>
     <footer class="site-footer">
       <a href="https://github.com/DrawnUi/DrawnUi.React">DrawnUI for React on GitHub</a>
@@ -51,6 +67,17 @@
       <a href="https://drawnui.net">DrawnUI for .NET, the engine this port follows</a>
       <a href="/skills/drawnui-react/SKILL.md">DrawnUI for React skill for AI agents</a>
     </footer>
+    </div>
+    <!-- visible for crawlers and readers without JS: generated at build time from pages/catalog.ts by vite.config.ts -->
+    <section class="site-samples">
+      <h1>DrawnUI for React sample pages</h1>
+      <p>Every page of this demo draws its UI with Skia on CanvasKit through the <a href="https://www.npmjs.com/package/drawnui-react">drawnui-react</a> package, the same controls and API as <a href="https://drawnui.net">DrawnUI for .NET</a>. Each link opens the page in the canvas above.</p>
+    <!-- samples-list -->
+    </section>
+    <script>
+      // a sample link opens the page in the canvas above: bring it back into view
+      document.querySelector(".site-samples").addEventListener("click", (e) => { if (e.target.closest('a[href^="#/"]')) scrollTo(0, 0); });
+    </script>
     <script type="module" src="./main.tsx"></script>
   </body>
 </html>
