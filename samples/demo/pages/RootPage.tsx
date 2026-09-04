@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { PUBLISH } from "../publish";
 import { SAMPLES } from "./catalog";
-import { Aria, Colors, SkiaLabel, SkiaScroll, SkiaShape, SkiaStack, SkiaSvg, SkiaWrap, Thickness, useShell } from "drawnui-react";
+import { Aria, Colors, SkiaLabel, SkiaScroll, SkiaShape, SkiaStack, SkiaSvg, SkiaWrap, TextSpan, Thickness, useShell } from "drawnui-react";
 
 
 /** Root menu styled after drawnui.net: dark body, logo + bold title, sample cards below. */
@@ -10,8 +10,6 @@ const MAX_WIDTH = 820, PAGE_PADDING = 24, GAP = 16;
 const TITLE_GRADIENTS: [string, string][] = [["#6EA8FE", "#0D6EFD"], ["#D63384", "#FD7E14"], ["#20C997", "#0DCAF0"], ["#FFC107", "#FD7E14"], ["#A98EFF", "#6610F2"], ["#0DCAF0", "#6EA8FE"]];
 
 const FOOTER_MARGIN = new Thickness(0, 16, 0, 0);
-// the footer was one string: a label drops its edge spaces, so the gaps at the joints are the wrap spacing instead
-const SPACE_WIDTH = 3.1;
 
 /** Opens the repository in a new tab; called from the drawn footer link. */
 function OpenRepository(): void {
@@ -51,12 +49,12 @@ export function RootPage() {
           ))}
         </SkiaWrap>
 
-        {/* the original single line, split only so the repository part can be its own tappable, accessible link */}
-        <SkiaWrap Spacing={SPACE_WIDTH} HorizontalOptions="Center" Margin={FOOTER_MARGIN}>
-          <SkiaLabel Text="helloreact.drawnui.net ·" FontSize={12} TextColor="#6C757D" />
-          <SkiaLabel Text="github.com/DrawnUi/DrawnUi.React" FontSize={12} TextColor="#6EA8FE" Tapped={OpenRepository} AccessibilityRole={Aria.RoleLink} AccessibilityLabel="DrawnUI for React on GitHub" />
-          <SkiaLabel Text={`· MIT · Publish ${PUBLISH}`} FontSize={12} TextColor="#6C757D" />
-        </SkiaWrap>
+        {/* the original single centred label; the repository fragment is a tappable span (coloured, no underline) */}
+        <SkiaLabel FontSize={12} TextColor="#6C757D" HorizontalOptions="Center" Margin={FOOTER_MARGIN}>
+          <TextSpan Text="helloreact.drawnui.net · " />
+          <TextSpan Text="github.com/DrawnUi/DrawnUi.React" TextColor="#6EA8FE" Tapped={OpenRepository} />
+          <TextSpan Text={` · MIT · Publish ${PUBLISH}`} />
+        </SkiaLabel>
       </SkiaStack>
       
     </SkiaScroll>
