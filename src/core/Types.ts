@@ -152,9 +152,14 @@ export type DrawImageAlignment = "Start" | "Center" | "End";
 export type ScrollOrientation = "Vertical" | "Horizontal" | "Both" | "Neither";
 
 /**
- * DrawnUi SkiaCacheType. Operations = recorded draw commands (SkPicture) replayed each frame;
+ * DrawnUi SkiaCacheType. Operations / OperationsFull = recorded draw commands (SkPicture) replayed each frame.
  * Image = offscreen surface snapshot blitted each frame (GPU-backed when the canvas is WebGL).
- * GPU / ImageDoubleBuffered / ImageComposite / ImageCompositeGPU are accepted and currently resolve to Image.
+ * ImageDoubleBuffered = an Image cache that keeps the previous one and draws it — or DrawPlaceholder when there is
+ * none — while a new one cannot be produced yet.
+ * ImageComposite / ImageCompositeGPU = an Image cache whose offscreen surface survives between records: when only
+ * children changed, their old and new bounds plus the siblings those overlap are erased and only those children are
+ * painted again.
+ * GPU resolves to Image and ImageCompositeGPU to ImageComposite; the browser has no separate GPU-only path.
  */
 export type SkiaCacheType = "None" | "Operations" | "OperationsFull" | "Image" | "ImageDoubleBuffered" | "ImageComposite" | "ImageCompositeGPU" | "GPU";
 
