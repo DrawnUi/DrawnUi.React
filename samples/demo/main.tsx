@@ -64,7 +64,7 @@ const TITLES = { images: "Images", svg: "SVG", cells: "Recycled cells", shapes: 
 function App() {
   const [view, setView] = useState<CanvasView | null>(null);
   return (
-    <Canvas ref={setView} BackgroundColor="#212529" RenderingMode="Accelerated" Gestures="Enabled" style={{ height: "100vh" }}>
+    <Canvas ref={setView} BackgroundColor="#212529" RenderingMode="Accelerated" Gestures="Enabled" style={{ height: "100%" }}>
       <CanvasViewContext.Provider value={view}>
         <SkiaShell Routes={ROUTES} Titles={TITLES}>
           <RootPage />

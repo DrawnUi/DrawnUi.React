@@ -24,10 +24,33 @@
       content="DrawnUI for React draws UI with Skia on CanvasKit, using the same engine and API as DrawnUI for .NET — npm package drawnui-react, MIT."
     />
     <!-- page background = canvas background, so nothing white shows while CanvasKit + fonts load -->
-    <style>html, body, #root { margin: 0; height: 100%; background: #212529; }</style>
+    <style>
+      html, body { margin: 0; height: 100%; background: #212529; }
+      /* the canvas takes the rest of the viewport, the footer its own height: no page scrollbar */
+      body { display: flex; flex-direction: column; }
+      #root { flex: 1; min-height: 0; }
+      .site-footer {
+        flex: none;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 20px;
+        padding: 8px 16px;
+        font: 13px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+        background: #1a1d20;
+        border-top: 1px solid #343a40;
+      }
+      .site-footer a { color: #9ec5fe; text-decoration: none; }
+      .site-footer a:hover, .site-footer a:focus-visible { text-decoration: underline; }
+    </style>
   </head>
   <body>
     <div id="root"></div>
+    <footer class="site-footer">
+      <a href="https://github.com/DrawnUi/DrawnUi.React">DrawnUI for React on GitHub</a>
+      <a href="https://www.npmjs.com/package/drawnui-react">drawnui-react on npm</a>
+      <a href="https://drawnui.net">DrawnUI for .NET, the engine this port follows</a>
+      <a href="/skills/drawnui-react/SKILL.md">DrawnUI for React skill for AI agents</a>
+    </footer>
     <script type="module" src="./main.tsx"></script>
   </body>
 </html>
