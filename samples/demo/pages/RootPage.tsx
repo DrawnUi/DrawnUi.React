@@ -1,13 +1,20 @@
 import { useEffect, useState } from "react";
 import { PUBLISH } from "../publish";
 import { SAMPLES } from "./catalog";
-import { Aria, Colors, SkiaLabel, SkiaScroll, SkiaShape, SkiaStack, SkiaSvg, SkiaWrap, Thickness, useShell } from "drawnui-react";
+import { Aria, Colors, SkiaLabel, SkiaScroll, SkiaShape, SkiaStack, SkiaSvg, SkiaWrap, TextSpan, Thickness, useShell } from "drawnui-react";
 
 
 /** Root menu styled after drawnui.net: dark body, logo + bold title, sample cards below. */
 const MAX_WIDTH = 820, PAGE_PADDING = 24, GAP = 16;
 // title gradients cycle through the drawnui.net accents
 const TITLE_GRADIENTS: [string, string][] = [["#6EA8FE", "#0D6EFD"], ["#D63384", "#FD7E14"], ["#20C997", "#0DCAF0"], ["#FFC107", "#FD7E14"], ["#A98EFF", "#6610F2"], ["#0DCAF0", "#6EA8FE"]];
+
+const FOOTER_MARGIN = new Thickness(0, 16, 0, 0);
+
+/** Opens the repository in a new tab; called from the drawn footer link. */
+function OpenRepository(): void {
+  window.open("https://github.com/DrawnUi/DrawnUi.React", "_blank", "noopener,noreferrer");
+}
 
 /** Card width in points: two columns when the page is wide enough, one otherwise (SkiaWrap flows them). */
 function useCardWidth(): number {
@@ -42,7 +49,13 @@ export function RootPage() {
           ))}
         </SkiaWrap>
 
-        <SkiaLabel Text={`helloreact.drawnui.net · github.com/DrawnUi/DrawnUi.React · MIT · Publish ${PUBLISH}`} FontSize={12} TextColor="#6C757D" HorizontalOptions="Center" Margin={new Thickness(0, 16, 0, 0)} />
+        <SkiaWrap Spacing={5} HorizontalOptions="Center" Margin={FOOTER_MARGIN}>
+          <SkiaLabel Text="helloreact.drawnui.net ·" FontSize={12} TextColor="#6C757D" />
+          <SkiaLabel FontSize={12} TextColor="#6EA8FE" Tapped={OpenRepository} AccessibilityRole={Aria.RoleLink} AccessibilityLabel="DrawnUI for React on GitHub">
+            <TextSpan Text="github.com/DrawnUi/DrawnUi.React" Underline />
+          </SkiaLabel>
+          <SkiaLabel Text={`· MIT · Publish ${PUBLISH}`} FontSize={12} TextColor="#6C757D" />
+        </SkiaWrap>
       </SkiaStack>
       
     </SkiaScroll>
