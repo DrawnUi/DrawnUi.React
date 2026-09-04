@@ -216,7 +216,7 @@ export class Canvas {
       e.type === "pointerup" ? "Released" :
       e.type === "pointercancel" ? "Cancelled" : undefined;
     if (!type) return;
-    if (type === "Moved" && !this.activeTouchIds.has(e.pointerId)) return; // hover not ported (TouchActionResult.Pointer)
+    if (type === "Moved" && !this.activeTouchIds.has(e.pointerId)) { if (e.pointerType === "mouse") this.UpdateCursor(e.offsetX, e.offsetY); return; } // hover not ported (TouchActionResult.Pointer)
     // Capture so Up outside the element still arrives; throws for synthetic events (tests) — harmless.
     if (type === "Pressed") { try { this.Element.setPointerCapture(e.pointerId); } catch { /* synthetic pointer */ } }
 
@@ -229,6 +229,21 @@ export class Canvas {
     this.OnTouchAction(args);
   };
   private readonly preventTouch = (e: TouchEvent) => e.preventDefault();
+
+  private cursorPointer = false;
+  /**
+   * DrawnUi.Blazor shows `cursor: pointer` over interactive controls through its overlay elements; here the overlay
+   * is pointer-events:none, so the mouse position is tested against the accessibility snapshot (the interactive
+   * controls' rects in points, already sorted and rate-limited) and the canvas element's cursor is switched only
+   * when the answer changes. Mouse moves only, no work without a mouse and none in the frame loop.
+   */
+  private UpdateCursor(x: number, y: number): void {
+    let hit = false;
+    for (const n of this.AccessibilityManager.Snapshot) {
+      if (n.CanInteract && x >= n.Rect.Left && x < n.Rect.Right && y >= n.Rect.Top && y < n.Rect.Bottom) { hit = true; break; }
+    }
+    if (hit !== this.cursorPointer) { this.cursorPointer = hit; this.Element.style.cursor = hit ? "pointer" : ""; }
+  }
 
   /** Mouse wheel -> TouchActionResult.Wheel (page scroll suppressed while gestures are enabled). */
   private readonly onWheel = (e: WheelEvent) => {
