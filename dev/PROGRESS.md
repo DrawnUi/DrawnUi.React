@@ -59,6 +59,7 @@ Detailed per-feature omissions: [SKIPPED.md](SKIPPED.md). Live sample: https://h
 | 2026-09-02 | Fix | `LockRatio` + `WidthRequest`: requests are locked before constraints (C# `CalculateSizeRequest`), a 40pt circle no longer balloons to a tall grid row |
 | 2026-09-02 | Grid | `SkiaLayout` Type=Grid + `SkiaGrid`: 1:1 port of `SkiaGridStructure` (star/Auto/absolute tracks, spans, spacing, implicit tracks, last-track stretch, final-cell remeasure); child `Column`/`Row`/`ColumnSpan`/`RowSpan`; Layouts snippet (grid + wrap) |
 | 2026-09-02 | Scrolling | `SkiaScroll` plain content: pan, deceleration fling cut at edges, rubber-band + spring bounce, wheel, `ScrollTo*`, `Scrolled`; physics classes `ScrollFlingAnimator`, `DecelerationTimingParameters`, `SpringWithVelocityAnimator`, `VelocityAccumulator`, `RubberBandUtils` |
+| 2026-09-04 | SEO | Demo site discoverable: static `robots.txt` (allow all, no AI-crawler rules) + `sitemap.xml` in `samples/public` (real URLs only — pages live in the hash, so the document is one URL), title/description/canonical/OG/Twitter tags in the STATIC `samples/demo/index.html` head so a crawler with no JS sees them. Verified in `dist/demo` after a build; live curl pending the deploy |
 
 ## In progress
 
