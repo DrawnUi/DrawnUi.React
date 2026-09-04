@@ -45,8 +45,8 @@ export interface StaticNode { Role: string; Label: string; Hint?: string; Href?:
  * nothing in the frame loop; an app built without the plugin finds nothing). If the app never boots it stays.
  * Removing it only shrinks the document below the fold; the mount element keeps its size, so nothing above the
  * fold moves — except that a page which scrolled only because of the block loses its scrollbar (classic scrollbars
- * on Windows/Linux then give the canvas those ~15 px back; add `html { scrollbar-gutter: stable }` if you would
- * rather keep the gutter). If the mount element is a box inside a longer page, your own content below it moves
+ * on Windows/Linux then give the canvas those ~15 px back — set `html { scrollbar-gutter: stable }` so the
+ * canvas has the same width before and after boot; the demo does). If the mount element is a box inside a longer page, your own content below it moves
  * up by the block's height when it goes; place the marker comment at the end of the body to avoid that.
  *
  * Two things to know:

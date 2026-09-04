@@ -26,6 +26,9 @@
     <!-- page background = canvas background, so nothing white shows while CanvasKit + fonts load -->
     <style>
       html, body { margin: 0; height: 100%; background: #212529; }
+      /* the crawlable block below the app gives the page a scrollbar until the first frame removes it: keep the gutter
+         so the canvas has the same width before and after boot */
+      html { scrollbar-gutter: stable; }
       /* .app is the viewport: the canvas takes the rest, the footer its own height. The crawlable block that
          drawnUiStatic generates at the marker after .app sits below the fold until the app's first frame removes it. */
       .app { height: 100%; display: flex; flex-direction: column; }
