@@ -66,6 +66,7 @@ Detailed per-feature omissions: [SKIPPED.md](SKIPPED.md). Live sample: https://h
 | 2026-09-04 | SEO | `html { scrollbar-gutter: stable }` in the demo: the block below the app gave the page a scrollbar until boot, so on classic scrollbars the canvas grew ~15 px at the first frame; the gutter is now always reserved and the canvas width is identical before and after boot (Publish 49) |
 | 2026-09-04 | Input | Pointer cursor over interactive controls (Blazor `Canvas.razor` `.xaml-a11y-interactive { cursor: pointer }` equivalent): the React overlay is pointer-events:none, so `Canvas.UpdateCursor` hit-tests mouse moves (no active pointer) against `AccessibilityManager.Snapshot` rects with `CanInteract` and sets the canvas element's `cursor` only on change. Engine hover (`IsHovered`/`OnHover`) still not ported (Publish 50) |
 | 2026-09-04 | Input | Pointer cursor over tappable `TextSpan`s: `SkiaControl.WantsPointerCursor(x, y)` (local pixels, default = `AccessibilityCanInteract`), `SkiaLabel` override tests `span.HasTapHandler && span.HitIsInside`; `Canvas.UpdateCursor` asks every snapshot node under the mouse, local point from the snapshot rect (carries the scroll offset). Verified on the root footer link (Publish 52) |
+| 2026-09-04 | Demo | HTML footer bar (`.site-footer`, added in c33a68f) removed at the owner's request: the drawn centred footer line is the footer; crawlers get the links from the generated block (Publish 53) |
 
 ## In progress
 
