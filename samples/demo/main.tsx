@@ -1,4 +1,4 @@
-import { StrictMode, useState } from "react";
+import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Canvas, SkiaShell, Super } from "drawnui-react";
 import type { Canvas as CanvasView } from "drawnui-react/core";
@@ -63,6 +63,16 @@ const TITLES = { images: "Images", svg: "SVG", cells: "Recycled cells", shapes: 
 
 function App() {
   const [view, setView] = useState<CanvasView | null>(null);
+  // The served index.html carries the sample list as real HTML (crawlers, no-JS fallback); it is the pre-hydration
+  // state of the page and is removed once the canvas has drawn its first frame. Same catalog draws both, so a human
+  // sees the cards once. If the app never draws, the list stays as the fallback.
+  useEffect(() => {
+    if (!view) return;
+    let raf = 0;
+    const check = () => { if (view.FrameIndex > 0) document.querySelector(".site-samples")?.remove(); else raf = requestAnimationFrame(check); };
+    check();
+    return () => cancelAnimationFrame(raf);
+  }, [view]);
   return (
     <Canvas ref={setView} BackgroundColor="#212529" RenderingMode="Accelerated" Gestures="Enabled" style={{ height: "100%" }}>
       <CanvasViewContext.Provider value={view}>
