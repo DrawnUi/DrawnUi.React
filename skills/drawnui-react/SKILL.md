@@ -93,10 +93,12 @@ createRoot(document.getElementById("root")!).render(
   selectable and copyable; never enable it on gesture-driven controls, the text then owns the pointer.
 - Crawlers / AI agents: `import { drawnUiStatic } from "drawnui-react/vite"`, `plugins: [react(), drawnUiStatic()]`
   (needs `playwright-core` + a Chrome at build). After `vite build` it boots the built app headlessly, reads the
-  accessibility tree of the root page and of each page a root button opens, and writes visible semantic HTML into
-  `#root` of `dist/index.html` (heading → heading, button → link, label → paragraph). React replaces it on its first
-  render, so people see it only while CanvasKit loads; check it with `curl`, not DevTools. Non-rendering bots read
-  it, Googlebot (renders JS) sees the a11y overlay instead — a control without `AccessibilityRole` is in neither.
+  accessibility tree of the root page and of each page a root button opens, and writes visible semantic HTML
+  (heading → heading, button → link, label → paragraph) after `#root` in `dist/index.html`, or at
+  `<!-- drawnui-static -->`. Below the fold when the mount element fills the viewport; the first `<Canvas>` removes
+  it after frame 1, so people never see it next to the canvas; check it with `curl`, not DevTools. Non-rendering
+  bots read it, Googlebot (renders JS) sees the a11y overlay instead — a control without `AccessibilityRole` is in
+  neither. Style via `.drawnui-static` or `render: { style: false }`.
 
 ## Debugging in the browser
 

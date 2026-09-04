@@ -105,14 +105,21 @@ export default defineConfig({ plugins: [react(), drawnUiStatic()] });
 
 After `vite build` it serves the build, opens it in headless Chrome (`playwright-core`, your dev dependency; GitHub's
 ubuntu runners ship a Chrome), lets the engine draw, reads the accessibility snapshot of the root page and of every
-page a root button opens (or the `routes` you list), and writes ordinary visible HTML into `#root` of
-`dist/index.html`: a heading is a heading, a button is a link to the page it opened, a label is a paragraph. The
-overlay's own markup (transparent text over the canvas) is never copied — in a static file it would read as hidden
-text. Nothing is hand-written, so it cannot drift from what the canvas draws.
+page a root button opens (or the `routes` you list), and writes ordinary visible HTML into `dist/index.html`: a
+heading is a heading, a button is a link to the page it opened, a label is a paragraph. The overlay's own markup
+(transparent text over the canvas) is never copied — in a static file it would read as hidden text. Nothing is
+hand-written, so it cannot drift from what the canvas draws.
 
-It is the pre-hydration state of the page: React replaces `#root`'s children on its first render, right when the
-canvas draws its first frame, so a person sees it only while CanvasKit loads and never next to the canvas. If the
-app fails to boot it stays. No runtime code, nothing in the frame loop; an app without the plugin pays nothing.
+Where it lands: right after the mount element (`#root`), or wherever you put `<!-- drawnui-static -->` in
+`index.html`. With the mount element filling the viewport that is below the fold: a visitor sees the app area
+loading, the text is a scroll away, genuinely visible, nothing collapsed or hidden. The first `<Canvas>` that mounts
+removes it once its engine has drawn frame 1 (one `querySelectorAll`, nothing in the frame loop, nothing to pay for
+an app built without the plugin). If the app never boots it stays. The mount element keeps its size, so nothing
+above the fold moves; a page that scrolled only because of the block loses its scrollbar (classic scrollbars give
+the canvas those ~15 px back — `html { scrollbar-gutter: stable }` keeps the gutter if you prefer). If the mount
+element is a box inside a longer page, put the marker at the end of the body so your own content does not move.
+Look: a default stylesheet ships with the block (inherits your `body` font and color, translucent surfaces); override
+by styling `.drawnui-static` or pass `render: { style: false }`.
 
 Two things to know. Check it with `curl` or view-source, not DevTools after boot. And crawlers that do not run
 JavaScript (GPTBot, ClaudeBot, CCBot, link previews) read this HTML, while Googlebot renders JavaScript and sees the

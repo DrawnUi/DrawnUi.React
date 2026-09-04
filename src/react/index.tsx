@@ -104,6 +104,18 @@ export interface CanvasProps {
 }
 
 /**
+ * One-shot, at the first Canvas mount: removes the HTML the `drawnUiStatic` Vite plugin generated for crawlers
+ * (`[data-drawnui-static]`, placed after the mount element). A querySelectorAll once per page, never again; an
+ * app built without the plugin finds nothing.
+ */
+let staticRemoved = false;
+function removeStaticContent(): void {
+  if (staticRemoved || typeof document === "undefined") return;
+  staticRemoved = true;
+  for (const el of document.querySelectorAll("[data-drawnui-static]")) el.remove();
+}
+
+/**
  * Mirrors DrawnUi Canvas: the bridge between the DOM (react-dom) and the drawn tree (DrawnUi reconciler).
  * Requires Super.UseDrawnUi()...BuildAsync() to have completed.
  */
@@ -119,6 +131,7 @@ export function Canvas({ BackgroundColor, RenderingMode, Gestures, children, sty
     view.current = v;
     root.current = createDrawnRoot(v);
     setEngine(v);
+    removeStaticContent(); // the constructor drew frame 1: the crawlable block (drawnUiStatic) is duplicate content from here on
     return () => { root.current?.unmount(); v.Dispose(); view.current = null; root.current = null; setEngine(null); };
     // RenderingMode is read once at surface creation, like DrawnUi.
     // eslint-disable-next-line react-hooks/exhaustive-deps
