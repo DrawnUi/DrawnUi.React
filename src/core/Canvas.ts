@@ -233,14 +233,19 @@ export class Canvas {
   private cursorPointer = false;
   /**
    * DrawnUi.Blazor shows `cursor: pointer` over interactive controls through its overlay elements; here the overlay
-   * is pointer-events:none, so the mouse position is tested against the accessibility snapshot (the interactive
-   * controls' rects in points, already sorted and rate-limited) and the canvas element's cursor is switched only
-   * when the answer changes. Mouse moves only, no work without a mouse and none in the frame loop.
+   * is pointer-events:none, so the mouse position is tested against the accessibility snapshot (the accessible
+   * controls' rects in points, already sorted and rate-limited), each hit control answering WantsPointerCursor
+   * (itself tappable, or a tappable span of a label), and the canvas element's cursor is switched only when the
+   * answer changes. Mouse moves only, no work without a mouse and none in the frame loop.
    */
   private UpdateCursor(x: number, y: number): void {
     let hit = false;
+    const scale = this.RenderingScale;
     for (const n of this.AccessibilityManager.Snapshot) {
-      if (n.CanInteract && x >= n.Rect.Left && x < n.Rect.Right && y >= n.Rect.Top && y < n.Rect.Bottom) { hit = true; break; }
+      if (x < n.Rect.Left || x >= n.Rect.Right || y < n.Rect.Top || y >= n.Rect.Bottom) continue;
+      // the control decides (whole control, or a tappable span of a label); point in pixels relative to the control's
+      // origin, taken from the snapshot rect (already carries the scroll / cache offset; a rotated control gets its bbox)
+      if (n.Source.WantsPointerCursor((x - n.Rect.Left) * scale, (y - n.Rect.Top) * scale)) { hit = true; break; }
     }
     if (hit !== this.cursorPointer) { this.cursorPointer = hit; this.Element.style.cursor = hit ? "pointer" : ""; }
   }

@@ -550,6 +550,13 @@ export class SkiaLabel extends SkiaControl {
     return super.ProcessGestures(args, apply);
   }
 
+  /** Pointer cursor over a tappable span (the label itself may not be tappable). */
+  override WantsPointerCursor(x: number, y: number): boolean {
+    if (super.WantsPointerCursor(x, y)) return true;
+    for (const span of this.Spans) if (span.HasTapHandler && span.HitIsInside(x, y)) return true;
+    return false;
+  }
+
   /** Return null to not consume the tap. */
   protected OnSpanTapped(span: TextSpan, args: SkiaGesturesParameters, apply: GestureEventProcessingInfo): SkiaControl | null {
     span.FireTap(new ControlTappedEventArgs(this, args, apply));

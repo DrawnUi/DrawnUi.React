@@ -383,6 +383,11 @@ export class SkiaControl {
   get AccessibilityCanInteract(): boolean { return this.accessibilityCanInteract ?? this.DefaultAccessibilityCanInteract(); }
   set AccessibilityCanInteract(v: boolean) { if (this.accessibilityCanInteract !== v) { this.accessibilityCanInteract = v; this.AccessibilityChanged(); } }
   protected DefaultAccessibilityCanInteract(): boolean { return !!this.Tapped; }
+  /**
+   * Whether the mouse at this point (pixels, relative to DrawingRect's origin) is over something tappable, for the
+   * host's pointer cursor. Default: the control as a whole (AccessibilityCanInteract); SkiaLabel adds its tappable spans.
+   */
+  WantsPointerCursor(_x: number, _y: number): boolean { return this.AccessibilityCanInteract; }
 
   /** aria-pressed for toggles; undefined = not a toggle. */
   get AccessibilityIsPressed(): boolean | undefined { return this.accessibilityIsPressed; }
