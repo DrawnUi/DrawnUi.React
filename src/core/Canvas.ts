@@ -252,7 +252,11 @@ export class Canvas {
       e.type === "pointerup" ? "Released" :
       e.type === "pointercancel" ? "Cancelled" : undefined;
     if (!type) return;
+    // only the primary mouse button is a touch (DrawnUi.Blazor): right / middle buttons never start a gesture, and
+    // their Up / Cancel (pointer never pressed here) is ignored too, so a right click cannot end as a Tapped
+    if (type === "Pressed" && e.pointerType === "mouse" && e.button !== 0) return;
     if (type === "Moved" && !this.activeTouchIds.has(e.pointerId)) { if (e.pointerType === "mouse") this.UpdateCursor(e.offsetX, e.offsetY); return; } // hover not ported (TouchActionResult.Pointer)
+    if ((type === "Released" || type === "Cancelled") && !this.activeTouchIds.has(e.pointerId)) return;
     // Capture so Up outside the element still arrives; throws for synthetic events (tests) — harmless.
     if (type === "Pressed") { try { this.Element.setPointerCapture(e.pointerId); } catch { /* synthetic pointer */ } }
 

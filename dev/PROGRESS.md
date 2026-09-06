@@ -67,6 +67,7 @@ Detailed per-feature omissions: [SKIPPED.md](SKIPPED.md). Live sample: https://h
 | 2026-09-04 | Input | Pointer cursor over interactive controls (Blazor `Canvas.razor` `.xaml-a11y-interactive { cursor: pointer }` equivalent): the React overlay is pointer-events:none, so `Canvas.UpdateCursor` hit-tests mouse moves (no active pointer) against `AccessibilityManager.Snapshot` rects with `CanInteract` and sets the canvas element's `cursor` only on change. Engine hover (`IsHovered`/`OnHover`) still not ported (Publish 50) |
 | 2026-09-04 | Input | Pointer cursor over tappable `TextSpan`s: `SkiaControl.WantsPointerCursor(x, y)` (local pixels, default = `AccessibilityCanInteract`), `SkiaLabel` override tests `span.HasTapHandler && span.HitIsInside`; `Canvas.UpdateCursor` asks every snapshot node under the mouse, local point from the snapshot rect (carries the scroll offset). Verified on the root footer link (Publish 52) |
 | 2026-09-04 | Demo | HTML footer bar (`.site-footer`, added in c33a68f) removed at the owner's request: the drawn centred footer line is the footer; crawlers get the links from the generated block (Publish 53) |
+| 2026-09-06 | Input | Right / middle mouse buttons no longer start a gesture (`Canvas.onPointer` drops non-primary `pointerdown` from a mouse and any Up / Cancel of a pointer that was never pressed), so a right click cannot end as a Tapped — DrawnUi.Blazor behaviour. Root page: subtitle label under the title (Publish 54) |
 
 ## In progress
 

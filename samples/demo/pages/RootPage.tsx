@@ -5,6 +5,7 @@ import { Aria, Colors, SkiaLabel, SkiaScroll, SkiaShape, SkiaStack, SkiaSvg, Ski
 
 
 /** Root menu styled after drawnui.net: dark body, logo + bold title, sample cards below. */
+const SUBTITLE_MARGIN = new Thickness(0, -12, 0, 0); // hoisted: a new Thickness per render would remeasure
 const MAX_WIDTH = 820, PAGE_PADDING = 24, GAP = 16;
 // title gradients cycle through the drawnui.net accents
 const TITLE_GRADIENTS: [string, string][] = [["#6EA8FE", "#0D6EFD"], ["#D63384", "#FD7E14"], ["#20C997", "#0DCAF0"], ["#FFC107", "#FD7E14"], ["#A98EFF", "#6610F2"], ["#0DCAF0", "#6EA8FE"]];
@@ -33,6 +34,7 @@ export function RootPage() {
       <SkiaStack Spacing={24} Padding={new Thickness(24, 24, 24, 40)} HorizontalOptions="Center" MaximumWidthRequest={820} UseCache="Image">
         <SkiaSvg Source="images/drawnui.svg" WidthRequest={120} LockRatio={1} HorizontalOptions="Center" Margin={new Thickness(0, 16, 0, 0)} AccessibilityRole={Aria.RoleImg} AccessibilityLabel="DrawnUI logo" />
         <SkiaLabel Text="DrawnUI for React" FontSize={48} FontFamily="FontTextBold" TextColor={Colors.White} HorizontalOptions="Center" AccessibilityRole={Aria.RoleHeading} />
+        <SkiaLabel Text="A UI rendering engine on top of CanvasKit: layouts, controls, gestures, effects and animations" FontSize={16} TextColor="#ADB5BD" HorizontalOptions="Center" HorizontalTextAlignment="Center" Margin={SUBTITLE_MARGIN} />
 
         {/* samples */}
         {/* two columns on wide screens, one on phones: fixed-width cards flowing in a SkiaWrap */}
