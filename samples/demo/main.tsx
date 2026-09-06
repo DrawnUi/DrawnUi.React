@@ -4,6 +4,7 @@ import { Canvas, SkiaShell, Super } from "drawnui-react";
 import type { Canvas as CanvasView } from "drawnui-react/core";
 import { CanvasViewContext } from "./pages/canvasView";
 import { RootPage } from "./pages/RootPage";
+import { DemoContextMenu, handleContextMenu } from "./pages/DemoContextMenu";
 import { SAMPLES } from "./pages/catalog";
 import { ImagesPage } from "./pages/ImagesPage";
 import { SvgPage } from "./pages/SvgPage";
@@ -65,10 +66,11 @@ const TITLES = Object.fromEntries(SAMPLES.map((s) => [s.route, s.title]));
 function App() {
   const [view, setView] = useState<CanvasView | null>(null);
   return (
-    <Canvas ref={setView} BackgroundColor="#212529" RenderingMode="Accelerated" Gestures="Enabled" style={{ height: "100%" }}>
+    <Canvas ref={setView} BackgroundColor="#212529" RenderingMode="Accelerated" Gestures="Enabled" style={{ height: "100%" }} ContextMenu={(_, e) => handleContextMenu(e)}>
       <CanvasViewContext.Provider value={view}>
         <SkiaShell Routes={ROUTES} Titles={TITLES}>
           <RootPage />
+          <DemoContextMenu />
         </SkiaShell>
       </CanvasViewContext.Provider>
     </Canvas>
