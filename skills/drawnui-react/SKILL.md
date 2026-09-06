@@ -85,6 +85,10 @@ createRoot(document.getElementById("root")!).render(
   `UseBackground` Always / Once / Never), `ShaderDoubleTexturesEffect`, `ShaderTransitionEffect`,
   `AnimatedShaderEffect`; `SkiaShaderCarousel` slides must be `UseCache="Image"`. An effect implementing
   `ProcessGestures` receives the parent's gestures first.
+- Right click / long press / Menu key: `ContextMenu={(sender, e) => { …; return true; }}` on any control (routed like
+  a tap: deepest child first, then parents, then `<Canvas ContextMenu>`); `true` suppresses the browser's canvas menu,
+  no handler = browser menu as usual. `e.Location` points, `e.Local` pixels in the control, `e.Source`
+  mouse / touch / keyboard, `e.Native` the DOM event. Only the primary mouse button starts gestures; right click never taps.
 - Keyboard: `KeyboardManager.Subscribe(down, char, up?)` (DOM `event.code` names). `SkiaEditor` focuses on tap; a
   hidden textarea feeds IME / soft keyboard / clipboard into the same editing methods.
 - Accessibility: an invisible DOM overlay mirrors accessible controls over the `aria-hidden` canvas

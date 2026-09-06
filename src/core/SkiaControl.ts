@@ -5,7 +5,7 @@ import { type IOverlayEffect, RippleAnimator, SkiaValueAnimator } from "./Animat
 import { Easing } from "./Easing";
 import type { Canvas } from "./Canvas";
 import { Aria } from "./Accessibility";
-import { ControlTappedEventArgs, GestureEventProcessingInfo, type LockTouch, SKPoint, SkiaGesturesInfo, SkiaGesturesParameters, TouchActionEventArgs } from "./Gestures";
+import { ContextMenuEventArgs, ControlTappedEventArgs, GestureEventProcessingInfo, type LockTouch, SKPoint, SkiaGesturesInfo, SkiaGesturesParameters, TouchActionEventArgs } from "./Gestures";
 import { type CachedTexture, type IPostRendererEffect, IsPostRendererEffect, type SkiaEffect } from "./SkiaEffect";
 
 /** Mirrors DrawnUi DrawingContext: ctx.Context.Canvas / Surface, ctx.Destination (pixels), ctx.Scale. */
@@ -242,6 +242,12 @@ export class SkiaControl {
 
   // ---- gesture events (single handler each; C# events map to one callback prop) ----
   Tapped?: (sender: SkiaControl, e: ControlTappedEventArgs) => void;
+  /**
+   * Context-menu request over this control (right click, long press on touch, Menu key). Return true to handle it:
+   * the browser's own canvas menu is suppressed. Routed deepest child first, then parents, then Canvas.ContextMenu.
+   * Not in DrawnUi.Net (a web concept).
+   */
+  ContextMenu?: (sender: SkiaControl, e: ContextMenuEventArgs) => boolean | void;
   ChildTapped?: (sender: SkiaControl, e: ControlTappedEventArgs) => void;
   /** Raw gesture hook: set e.Consumed = true to stop propagation (not for Up). */
   ConsumeGestures?: (sender: SkiaControl, e: SkiaGesturesInfo) => void;
@@ -976,6 +982,23 @@ export class SkiaControl {
   IsGestureForChild(child: SkiaControl, point: SKPoint): boolean {
     const local = child.TransformPointToLocalSpace(point);
     return child.HitIsInside(local.X, local.Y);
+  }
+
+  /**
+   * Routes a context-menu request like a tap: visible, non-transparent children under the point first (top-most
+   * first, each in its own transformed space), then this control's ContextMenu handler. True = handled.
+   */
+  ProcessContextMenu(point: SKPoint, e: ContextMenuEventArgs): boolean {
+    const listeners = this.GetGestureListeners();
+    for (let i = listeners.length - 1; i >= 0; i--) {
+      const listener = listeners[i];
+      if (!listener.IsVisible || listener.InputTransparent || !this.IsGestureForChild(listener, point)) continue;
+      if (listener.ProcessContextMenu(listener.TransformPointToLocalSpace(point), e)) return true;
+    }
+    if (!this.ContextMenu) return false;
+    e.Control = this;
+    e.Local = new SKPoint(point.X - this.DrawingRect.Left, point.Y - this.DrawingRect.Top);
+    return this.ContextMenu(this, e) === true;
   }
 
   /** Children that may receive gestures, top-most LAST (layouts return their Views). */

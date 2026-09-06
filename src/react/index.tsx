@@ -109,6 +109,8 @@ export interface CanvasProps {
   className?: string;
   /** Receives the engine Canvas (FPS, FrameTime, RenderingScale...). */
   ref?: Ref<CanvasView>;
+  /** Context-menu request (right click / long press / Menu key) no control handled; return true to suppress the browser menu. */
+  ContextMenu?: CanvasView["ContextMenu"];
 }
 
 /**
@@ -127,7 +129,7 @@ function removeStaticContent(): void {
  * Mirrors DrawnUi Canvas: the bridge between the DOM (react-dom) and the drawn tree (DrawnUi reconciler).
  * Requires Super.UseDrawnUi()...BuildAsync() to have completed.
  */
-export function Canvas({ BackgroundColor, RenderingMode, Gestures, children, style, className, ref: viewRef }: CanvasProps) {
+export function Canvas({ BackgroundColor, RenderingMode, Gestures, children, style, className, ref: viewRef, ContextMenu }: CanvasProps) {
   const ref = useRef<HTMLCanvasElement>(null);
   const view = useRef<CanvasView>(null);
   const root = useRef<ReturnType<typeof createDrawnRoot>>(null);
@@ -151,6 +153,7 @@ export function Canvas({ BackgroundColor, RenderingMode, Gestures, children, sty
     const v = view.current!;
     if (BackgroundColor !== undefined && v.BackgroundColor !== BackgroundColor) { v.BackgroundColor = BackgroundColor; v.Update(); }
     v.Gestures = Gestures ?? "Disabled";
+    v.ContextMenu = ContextMenu;
     root.current!.render(children);
   });
 

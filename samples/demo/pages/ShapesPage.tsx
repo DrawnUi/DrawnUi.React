@@ -1,4 +1,4 @@
-import { Colors, SkiaLabel, SkiaScroll, SkiaShape, SkiaStack, SkiaWrap, Thickness } from "drawnui-react";
+import { Colors, SkiaLabel, SkiaScroll, SkiaShape, SkiaStack, SkiaWrap, Thickness, useShell } from "drawnui-react";
 import { CornerRadius, SkiaPoint } from "drawnui-react/core";
 
 const HEART = "M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z";
@@ -18,11 +18,23 @@ function Demo({ title, children }: { title: string; children: React.ReactNode })
 
 /** SkiaShape: every Type, fill + stroke, corner radii, children clipped to the shape. */
 export function ShapesPage() {
+  const shell = useShell();
   return (
     <SkiaScroll Orientation="Vertical">
       <SkiaStack Spacing={20} Padding={new Thickness(16)}>
         <SkiaLabel Text="SkiaShape" FontSize={24} TextColor={Colors.White} HorizontalOptions="Center" />
         <SkiaLabel Text="Stroke is drawn inside the bounds; children are clipped to the shape." FontSize={13} TextColor={Colors.LightGray} HorizontalOptions="Center" />
+
+        <SkiaLabel Text="ContextMenu" FontSize={20} TextColor={Colors.White} HorizontalOptions="Center" Margin={new Thickness(0, 8, 0, 0)} />
+        <SkiaLabel Text="Right-click / long-press the shape: its ContextMenu handler takes the request and the browser menu stays away. Elsewhere on the canvas the browser menu shows as usual." FontSize={13} TextColor={Colors.LightGray} HorizontalOptions="Center" MaximumWidthRequest={680} HorizontalTextAlignment="Center" />
+        <SkiaWrap Spacing={16} HorizontalOptions="Center" MaximumWidthRequest={680}>
+          <Demo title="ContextMenu -> toast">
+            <SkiaShape Type="Rectangle" CornerRadius={12} WidthRequest={120} HeightRequest={70} HorizontalOptions="Center" VerticalOptions="Center" BackgroundColor="#0D6EFD"
+              ContextMenu={(_, e) => { shell.ShowToast(`ContextMenu at ${Math.round(e.Local.X)}, ${Math.round(e.Local.Y)} px (${e.Source})`); return true; }}>
+              <SkiaLabel Text="right-click me" FontSize={13} TextColor={Colors.White} HorizontalOptions="Center" VerticalOptions="Center" />
+            </SkiaShape>
+          </Demo>
+        </SkiaWrap>
 
         <SkiaLabel Text="FillGradient / StrokeGradient" FontSize={20} TextColor={Colors.White} HorizontalOptions="Center" Margin={new Thickness(0, 8, 0, 0)} />
         <SkiaWrap Spacing={16} HorizontalOptions="Center" MaximumWidthRequest={680}>

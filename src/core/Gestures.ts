@@ -96,6 +96,30 @@ export class SkiaGesturesInfo {
 }
 
 /** DrawnUi ControlTappedEventArgs. */
+/** Where a context-menu request came from: right click, long press (Android fires contextmenu), or the keyboard Menu key. */
+export type ContextMenuSource = "mouse" | "touch" | "keyboard";
+
+/**
+ * Arguments of SkiaControl.ContextMenu / Canvas.ContextMenu: a browser `contextmenu` request on the canvas (right
+ * click, long press on touch, the Menu key). Handlers return true to take it: the browser's own menu ("Save image")
+ * is then suppressed; otherwise it shows as usual.
+ */
+export class ContextMenuEventArgs {
+  /** Deepest control under the point that had a ContextMenu handler (set while routing). */
+  Control?: SkiaControl;
+  /** Point inside Control, in pixels relative to its DrawingRect origin (set while routing). */
+  Local: SKPoint = SKPoint.Empty;
+  constructor(
+    /** Point on the canvas, in points (CSS px). */
+    public Location: SKPoint,
+    /** Same point in pixels (canvas space). */
+    public Pixels: SKPoint,
+    public Source: ContextMenuSource,
+    /** The DOM event: modifiers, target, preventDefault if you need it yourself. */
+    public Native: MouseEvent,
+  ) {}
+}
+
 export class ControlTappedEventArgs {
   constructor(
     public Control: SkiaControl,

@@ -65,6 +65,23 @@ accessibility all live in the engine and would work identically under Vue, Svelt
 That is also why the demo pages describe DrawnUi features, not React ones: the same pages are meant to be reused as
 the showcase for other frameworks on this engine.
 
+## Context menu (right click)
+
+A right click on the canvas normally opens the browser's own menu ("Save image as…"). Only the primary mouse
+button starts a gesture, as in DrawnUi.Blazor, so a right click never fires `Tapped`; to take it, handle
+`ContextMenu` on any control, exactly like `Tapped`:
+
+```tsx
+<SkiaShape ContextMenu={(sender, e) => { openMyMenu(e.Location); return true; }} />
+<Canvas ContextMenu={(canvas, e) => true /* nothing hit: swallow the browser menu everywhere */} />
+```
+
+The request is routed like a tap: deepest visible control under the point first (through transforms), then its
+parents, then the `Canvas` prop. The first handler returning `true` takes it and the browser menu is suppressed;
+with no handler the browser menu shows as before. `e` carries `Location` (points on the canvas), `Pixels`, `Local`
+(pixels inside the handling control), `Source` (`"mouse"`, `"touch"` for a long press, `"keyboard"` for the Menu
+key) and `Native` (the DOM event, for modifiers). Web-only: DrawnUi.Net has no mouse buttons.
+
 ## Accessibility
 
 Same model as DrawnUi.Blazor: the `<canvas>` is `aria-hidden`, an invisible DOM overlay mirrors every

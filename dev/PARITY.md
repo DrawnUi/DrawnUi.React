@@ -158,6 +158,12 @@ Updated whenever the port deliberately diverges or finds something worth back-po
   behaviour for DOM pages). Opinion: back-port — Blazor users tabbing through a drawn list get the same
   experience as a native page; needs a `ScrollToView`-like helper plus the overlay `focus` callback.
 
+### ContextMenu (React only)
+- **React**: `ContextMenu` handler on controls and on the Canvas for the browser `contextmenu` request; routed like a
+  tap, `true` suppresses the browser's canvas menu.
+- **.NET**: no mouse-button model; the web heads (Blazor, Wasm) leave the browser menu alone. Opinion: same API
+  (`ContextMenu` event + `ContextMenuEventArgs`) belongs in the .NET web heads too.
+
 ### Static HTML for crawlers (React only)
 - **React**: `drawnUiStatic()` (`drawnui-react/vite`) generates visible semantic HTML into `#root` at build time from
   the accessibility snapshot of the running build (headless Chrome), replaced by React's first render.

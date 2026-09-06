@@ -5,6 +5,7 @@ import { Super } from "./Super";
 import { SkiaAccessibilityManager } from "./Accessibility";
 import { type Color, Colors, type RenderingModeType, SKRect } from "./Types";
 import {
+  ContextMenuEventArgs, type ContextMenuSource,
   GestureEventProcessingInfo, type GesturesMode, SKPoint, SkiaGesturesParameters, TouchActionEventArgs,
   type TouchActionResult, type TouchActionType,
 } from "./Gestures";
@@ -270,6 +271,22 @@ export class Canvas {
   };
   private readonly preventTouch = (e: TouchEvent) => e.preventDefault();
 
+  /** Called when no control handled a context-menu request; return true to suppress the browser's canvas menu. */
+  ContextMenu?: (sender: Canvas, e: ContextMenuEventArgs) => boolean | void;
+
+  /** DOM contextmenu (right click / long press / Menu key) -> ContextMenuEventArgs routed through the tree like a tap. */
+  private readonly onContextMenu = (e: MouseEvent) => {
+    const rect = this.Element.getBoundingClientRect();
+    const scale = this.RenderingScale;
+    const x = e.clientX - rect.left, y = e.clientY - rect.top;
+    const pointerType = (e as PointerEvent).pointerType;
+    const source: ContextMenuSource = pointerType === "touch" || pointerType === "pen" ? "touch" : pointerType === "mouse" || e.button === 2 ? "mouse" : "keyboard";
+    const args = new ContextMenuEventArgs(new SKPoint(x, y), new SKPoint(x * scale, y * scale), source, e);
+    let handled = this.content?.ProcessContextMenu(args.Pixels, args) ?? false;
+    if (!handled && this.ContextMenu) handled = this.ContextMenu(this, args) === true;
+    if (handled) e.preventDefault();
+  };
+
   private cursorPointer = false;
   /**
    * DrawnUi.Blazor shows `cursor: pointer` over interactive controls through its overlay elements; here the overlay
@@ -309,6 +326,7 @@ export class Canvas {
     el.style.touchAction = "none";
     el.style.userSelect = "none";
     for (const t of ["pointerdown", "pointermove", "pointerup", "pointercancel"]) el.addEventListener(t, this.onPointer as EventListener);
+    el.addEventListener("contextmenu", this.onContextMenu);
     el.addEventListener("wheel", this.onWheel, { passive: false });
     if (this.gestures === "Lock") el.addEventListener("touchmove", this.preventTouch, { passive: false });
   }
@@ -318,6 +336,7 @@ export class Canvas {
     el.style.touchAction = "";
     el.style.userSelect = "";
     for (const t of ["pointerdown", "pointermove", "pointerup", "pointercancel"]) el.removeEventListener(t, this.onPointer as EventListener);
+    el.removeEventListener("contextmenu", this.onContextMenu);
     el.removeEventListener("wheel", this.onWheel);
     el.removeEventListener("touchmove", this.preventTouch);
     this.activeTouchIds.clear(); this.pointerDownArgs.clear(); this.previousTouchArgs.clear();
