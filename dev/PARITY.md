@@ -161,8 +161,10 @@ Updated whenever the port deliberately diverges or finds something worth back-po
 ### ContextMenu (React only)
 - **React**: `ContextMenu` handler on controls and on the Canvas for the browser `contextmenu` request; routed like a
   tap, `true` suppresses the browser's canvas menu.
-- **.NET**: no mouse-button model; the web heads (Blazor, Wasm) leave the browser menu alone. Opinion: same API
-  (`ContextMenu` event + `ContextMenuEventArgs`) belongs in the .NET web heads too.
+- **.NET** (2026-09-06): the same API on the web heads — `SkiaControl.ContextMenu` event + `ContextMenuEventArgs`
+  (`Handled`, `Source`, `Local`), `.OnContextMenu(...)` fluent, `TouchActionResult.ContextMenu` routed through
+  `ProcessGestures` (AppoMobi.Gestures 3.11.0); Blazor via `AppoMobi.Blazor.Gestures` `OnCanvasContextMenu`, Wasm via
+  `WebInput.OnContextMenu`. Difference: C# sets `e.Handled = true`, React returns `true`.
 
 ### Static HTML for crawlers (React only)
 - **React**: `drawnUiStatic()` (`drawnui-react/vite`) generates visible semantic HTML into `#root` at build time from
