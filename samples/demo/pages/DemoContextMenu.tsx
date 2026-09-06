@@ -23,8 +23,8 @@ const CANVASKIT = (pkg.dependencies["canvaskit-wasm"] ?? "").replace(/^[\^~]/, "
 export function DemoContextMenu() {
   const shell = useShell();
   useEffect(() => {
-    current = (e) => {
-      shell.ShowToast(`drawnui-react ${pkg.version} · CanvasKit ${CANVASKIT} · ContextMenu from ${e.Source} at ${Math.round(e.Location.X)}, ${Math.round(e.Location.Y)}`, 3000);
+    current = () => {
+      shell.ShowToast(`drawnui-react ${pkg.version} · CanvasKit ${CANVASKIT}`, 3000);
       return true;
     };
     return () => { current = null; };
