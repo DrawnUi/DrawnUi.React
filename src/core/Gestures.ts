@@ -28,9 +28,25 @@ export class DistanceInfo {
   Velocity = SKPoint.Empty;
 }
 
+/** AppoMobi.Gestures MouseButton: which button pressed / released (DOM button 0..4). */
+export type MouseButton = "Left" | "Middle" | "Right" | "XButton1" | "XButton2" | "Extended";
+export type PointerDeviceType = "Mouse" | "Touch" | "Pen";
+
+/** AppoMobi.Gestures PointerData: the device and button behind a Down / Up / Tapped (every button is delivered). */
+export class PointerData {
+  Button: MouseButton = "Left";
+  /** 1 = Left, 2 = Right, 3 = Middle, 4+ = extended, like AppoMobi.Gestures. */
+  ButtonNumber = 1;
+  DeviceType: PointerDeviceType = "Mouse";
+  /** DOM `buttons` bitmask of the buttons held (1 left, 2 right, 4 middle, 8 back, 16 forward). */
+  PressedButtons = 0;
+}
+
 /** AppoMobi.Gestures TouchActionEventArgs. */
 export class TouchActionEventArgs {
   Id = 0;
+  /** Device and button of this event (mouse, pen, touch); undefined for wheel. */
+  Pointer?: PointerData;
   Type: TouchActionType = "Pressed";
   /** Pixels. */
   Location = SKPoint.Empty;

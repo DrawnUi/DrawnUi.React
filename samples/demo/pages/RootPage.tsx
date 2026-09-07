@@ -40,7 +40,7 @@ export function RootPage() {
         {/* two columns on wide screens, one on phones: fixed-width cards flowing in a SkiaWrap */}
         <SkiaWrap Spacing={GAP} HorizontalOptions="Fill">
           {SAMPLES.map((s, i) => (
-            <SkiaShape key={s.route} Type="Rectangle" CornerRadius={12} BackgroundColor="#2B3035" StrokeColor="#373B3E" StrokeWidth={1} WidthRequest={cardWidth} AnimationTapped="Ripple" Tapped={() => void shell.GoToAsync(s.route)}
+            <SkiaShape key={s.route} Type="Rectangle" CornerRadius={12} BackgroundColor="#2B3035" StrokeColor="#373B3E" StrokeWidth={1} WidthRequest={cardWidth} AnimationTapped="Ripple" Tapped={(_, e) => { if ((e.Parameters.Event.Pointer?.Button ?? "Left") === "Left") void shell.GoToAsync(s.route); }}
               AccessibilityRole={Aria.RoleButton} AccessibilityLabel={s.title} AccessibilityHint={s.text}>
               <SkiaStack Spacing={6} Padding={new Thickness(24, 20, 48, 20)}>
                 <SkiaLabel Text={s.title} FontSize={22} FontFamily="FontTextBold" TextColor={Colors.White} FillGradient={{ Type: "Linear", Angle: 0, Colors: TITLE_GRADIENTS[i % TITLE_GRADIENTS.length] }} AccessibilityRole={Aria.RolePresentation} />

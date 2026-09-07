@@ -6,7 +6,7 @@ import { SkiaAccessibilityManager } from "./Accessibility";
 import { type Color, Colors, type RenderingModeType, SKRect } from "./Types";
 import {
   ContextMenuEventArgs, type ContextMenuSource,
-  GestureEventProcessingInfo, type GesturesMode, SKPoint, SkiaGesturesParameters, TouchActionEventArgs,
+  GestureEventProcessingInfo, PointerData, type GesturesMode, SKPoint, SkiaGesturesParameters, TouchActionEventArgs,
   type TouchActionResult, type TouchActionType,
 } from "./Gestures";
 
@@ -253,11 +253,8 @@ export class Canvas {
       e.type === "pointerup" ? "Released" :
       e.type === "pointercancel" ? "Cancelled" : undefined;
     if (!type) return;
-    // only the primary mouse button is a touch (DrawnUi.Blazor): right / middle buttons never start a gesture, and
-    // their Up / Cancel (pointer never pressed here) is ignored too, so a right click cannot end as a Tapped
-    if (type === "Pressed" && e.pointerType === "mouse" && e.button !== 0) return;
     if (type === "Moved" && !this.activeTouchIds.has(e.pointerId)) { if (e.pointerType === "mouse") this.UpdateCursor(e.offsetX, e.offsetY); return; } // hover not ported (TouchActionResult.Pointer)
-    if ((type === "Released" || type === "Cancelled") && !this.activeTouchIds.has(e.pointerId)) return;
+    if ((type === "Released" || type === "Cancelled") && !this.activeTouchIds.has(e.pointerId)) return; // Up of a pointer that never pressed here
     // Capture so Up outside the element still arrives; throws for synthetic events (tests) — harmless.
     if (type === "Pressed") { try { this.Element.setPointerCapture(e.pointerId); } catch { /* synthetic pointer */ } }
 
@@ -267,6 +264,14 @@ export class Canvas {
     args.Type = type;
     args.Scale = this.RenderingScale;
     args.Location = new SKPoint((e.clientX - rect.left) * this.RenderingScale, (e.clientY - rect.top) * this.RenderingScale);
+    // every mouse button is delivered with its PointerData (AppoMobi.Gestures): a right click is a Down / Up / Tapped
+    // with Button "Right" for games and custom controls, and a ContextMenu on top
+    const pd = new PointerData();
+    pd.Button = e.button === 0 ? "Left" : e.button === 1 ? "Middle" : e.button === 2 ? "Right" : e.button === 3 ? "XButton1" : e.button === 4 ? "XButton2" : "Extended";
+    pd.ButtonNumber = e.button === 1 ? 3 : e.button === 2 ? 2 : e.button + 1;
+    pd.DeviceType = e.pointerType === "touch" ? "Touch" : e.pointerType === "pen" ? "Pen" : "Mouse";
+    pd.PressedButtons = e.buttons;
+    args.Pointer = pd;
     this.OnTouchAction(args);
   };
   private readonly preventTouch = (e: TouchEvent) => e.preventDefault();

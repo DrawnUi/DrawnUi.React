@@ -67,11 +67,13 @@ the showcase for other frameworks on this engine.
 
 ## Context menu (right click)
 
-A right click on the canvas normally opens the browser's own menu ("Save image as…"). Only the primary mouse
-button starts a gesture, as in DrawnUi.Blazor, so a right click never fires `Tapped`; to take it, handle
-`ContextMenu` on any control, exactly like `Tapped`:
+A right click on the canvas normally opens the browser's own menu ("Save image as…"). Every mouse button goes
+through the gesture pipeline as in DrawnUi.Net (`e.Parameters.Event.Pointer.Button` says which), so a right click is
+a `Tapped` with `Button` `"Right"` for games and custom controls; a handler that should act on the primary button only
+checks it. To take the browser menu request, handle `ContextMenu` on any control, exactly like `Tapped`:
 
 ```tsx
+<SkiaShape Tapped={(s, e) => { if ((e.Parameters.Event.Pointer?.Button ?? "Left") === "Left") open(); }} />
 <SkiaShape ContextMenu={(sender, e) => { openMyMenu(e.Location); return true; }} />
 <Canvas ContextMenu={(canvas, e) => true /* nothing hit: swallow the browser menu everywhere */} />
 ```
