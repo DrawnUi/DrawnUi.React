@@ -400,8 +400,38 @@ export class Canvas {
     for (const args of batch) this.ProcessGestures(root, args);
   }
 
+  /**
+   * The control that consumed the current gesture keeps it until it lets go (DrawnUi Canvas.HadInput). Without this a
+   * gesture is re-routed by the pointer position on every event, so anything the finger drags away from — a drag
+   * handle, a slider thumb, a button being held — stops receiving Panning the moment the pointer leaves its box.
+   * Single pointer, which is what the web gives us here; C# keeps a set for multi-touch.
+   */
+  private gestureOwner: SkiaControl | null = null;
+
+  /** DrawnUi IsSavedGesture: the types replayed to the owner instead of being routed again. */
+  private static IsSavedGesture(type: SkiaGesturesParameters["Type"]): boolean {
+    return type === "Panning" || type === "Wheel" || type === "Up";
+  }
+
   /** Entry into the control tree, same shape as DrawnUi Canvas.ProcessGestures. */
   protected ProcessGestures(root: SkiaControl, args: SkiaGesturesParameters): SkiaControl | null {
-    return root.ProcessGestures(args, new GestureEventProcessingInfo(args.Event.Location, SKPoint.Empty, SKPoint.Empty, null));
+    const info = () => new GestureEventProcessingInfo(args.Event.Location, SKPoint.Empty, SKPoint.Empty, null);
+
+    if (args.Type === "Down") this.gestureOwner = null;
+    else if (this.gestureOwner && Canvas.IsSavedGesture(args.Type)) {
+      const owner = this.gestureOwner;
+      const alive = !!owner.Superview && owner.IsVisible && !owner.InputTransparent;
+      const consumed = alive ? owner.OnSkiaGestureEvent(args, info()) : null;
+      if (consumed) {
+        // it still wants the gesture: nobody else sees this one (C# skips the tree pass for a saved gesture)
+        this.gestureOwner = args.Type === "Up" ? null : consumed;
+        return consumed;
+      }
+      this.gestureOwner = null; // it let go (a button whose press turned into a pan): route normally again
+    }
+
+    const consumed = root.ProcessGestures(args, info());
+    this.gestureOwner = consumed && args.Type !== "Up" ? consumed : null;
+    return consumed;
   }
 }

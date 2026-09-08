@@ -24,6 +24,7 @@ import { KeyboardPage } from "./pages/KeyboardPage";
 import { SpritesPage } from "./pages/SpritesPage";
 import { ShadersPage } from "./pages/ShadersPage";
 import { ScrollPage } from "./pages/ScrollPage";
+import { ReorderPage } from "./pages/ReorderPage";
 import { Aria } from "drawnui-react";
 import { SkiaButton as SkiaButtonCtrl, SkiaLabel as SkiaLabelCtrl } from "drawnui-react/core";
 
@@ -66,6 +67,7 @@ const ROUTES = {
   sprites: () => <SpritesPage />,
   shaders: () => <ShadersPage />,
   scroll: () => <ScrollPage />,
+  reorder: () => <ReorderPage />,
 };
 const TITLES = Object.fromEntries(SAMPLES.map((s) => [s.route, s.title]));
 

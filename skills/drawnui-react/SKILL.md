@@ -100,6 +100,11 @@ createRoot(document.getElementById("root")!).render(
   no handler = browser menu as usual. `e.Location` points, `e.Local` pixels in the control, `e.Source`
   mouse / touch / keyboard, `e.Native` the DOM event. Every mouse button still taps (`e.Parameters.Event.Pointer.Button`
   "Left" / "Right" / "Middle" / "XButton1"…, `DeviceType`, `PressedButtons`): a handler meant for the primary button only checks it.
+- A control that consumes a gesture keeps it until it stops consuming, so a drag survives the finger leaving the
+  control. To drag inside a `SkiaScroll` (the scroll owns vertical pans), take `Down` on a handle with
+  `ConsumeGestures`, set `scroll.RespondsToGestures = false` for the drag and restore it on `Up`, and count travel in
+  CONTENT space (pointer movement plus what the list scrolled underneath) so edge auto-scroll keeps advancing the row.
+  Reordering the array as you go is cheap: the layout applies a permutation in place, see the `#/reorder` demo page.
 - Keyboard: `KeyboardManager.Subscribe(down, char, up?)` (DOM `event.code` names). `SkiaEditor` focuses on tap; a
   hidden textarea feeds IME / soft keyboard / clipboard into the same editing methods.
 - Accessibility: an invisible DOM overlay mirrors accessible controls over the `aria-hidden` canvas

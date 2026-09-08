@@ -21,5 +21,6 @@ export const SAMPLES: { route: string; title: string; text: string }[] = [
   { route: "shaders", title: "Shaders", text: "SkiaShaderEffect — SkSL on any control (iImage1, iTime, iMouse, custom uniforms, touch ripples) and SkiaShaderCarousel gl-transitions" },
   { route: "sprites", title: "Sprites", text: "SkiaSprite spritesheets and a SkiaSpriteSet warrior on a tile board, moved with the keyboard (FastRepro sprites)" },
   { route: "transforms", title: "Transforms", text: "Rotation, Scale, Skew, Translation, Opacity — hit-testing through them, *ToAsync animations" },
+  { route: "reorder", title: "Drag to reorder", text: "Drag a row by its grip: the list reorders in place, keeps its measured heights and its scroll offset, and holding at an edge keeps it moving" },
   { route: "a11y", title: "Accessibility", text: "ARIA overlay over the canvas — roles, labels, hints, toggles, live regions, keyboard" },
 ];
