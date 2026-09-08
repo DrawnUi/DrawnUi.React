@@ -67,14 +67,17 @@ export class SkiaButton extends SkiaLayout {
 
   get UsingControlStyle(): ResolvedControlStyle { return ResolveControlStyle(this.ControlStyle); }
 
-  /** C# Create*StyleContent defaults: accent, corner radius, font size/weight, minimum content size. */
-  private static Look(s: ResolvedControlStyle): { bg: Color; radius: number; font: number; weight: number; minH: number; shadow?: SkiaShadow } {
+  /**
+   * C# Create*StyleContent defaults: accent, corner radius, font size/weight, minimum content size.
+   * Every C# style calls SetDefaultMinimumContentSize(100, minH), so the width floor is 100 everywhere.
+   */
+  private static Look(s: ResolvedControlStyle): { bg: Color; radius: number; font: number; weight: number; minW: number; minH: number; shadow?: SkiaShadow } {
     switch (s) {
-      case "Cupertino": return { bg: "#007AFF", radius: 8, font: 17, weight: 600, minH: 36, shadow: new SkiaShadow({ X: 0, Y: 1, Blur: 2, Opacity: 0.2, Color: Colors.Black }) };
-      case "Material": return { bg: "#2196F3", radius: 4, font: 14, weight: 0, minH: 40, shadow: new SkiaShadow({ X: 0, Y: 2, Blur: 4, Opacity: 0.3, Color: Colors.Black }) };
-      case "Material3": return { bg: "#6750A4", radius: 20, font: 14, weight: 0, minH: 40 };
-      case "Windows": return { bg: "#0078D7", radius: 4, font: 15, weight: 500, minH: 32, shadow: new SkiaShadow({ X: 0, Y: 1, Blur: 1, Opacity: 0.2, Color: Colors.Black }) };
-      default: return { bg: "#DC143C", radius: 8, font: 15, weight: 0, minH: 41 };
+      case "Cupertino": return { bg: "#007AFF", radius: 8, font: 17, weight: 600, minW: 100, minH: 36, shadow: new SkiaShadow({ X: 0, Y: 1, Blur: 2, Opacity: 0.2, Color: Colors.Black }) };
+      case "Material": return { bg: "#2196F3", radius: 4, font: 14, weight: 0, minW: 100, minH: 40, shadow: new SkiaShadow({ X: 0, Y: 2, Blur: 4, Opacity: 0.3, Color: Colors.Black }) };
+      case "Material3": return { bg: "#6750A4", radius: 20, font: 14, weight: 0, minW: 100, minH: 40 };
+      case "Windows": return { bg: "#0078D7", radius: 4, font: 15, weight: 500, minW: 100, minH: 32, shadow: new SkiaShadow({ X: 0, Y: 1, Blur: 1, Opacity: 0.2, Color: Colors.Black }) };
+      default: return { bg: "#DC143C", radius: 8, font: 15, weight: 0, minW: 100, minH: 41 };
     }
   }
 
@@ -85,7 +88,11 @@ export class SkiaButton extends SkiaLayout {
     this.frame.StrokeColor = this.StrokeColor;
     this.frame.StrokeWidth = this.StrokeWidth;
     if ((this.frame.Shadows[0] as SkiaShadow | undefined) !== look.shadow) this.frame.Shadows = look.shadow ? [look.shadow] : [];
-    if (this.MinimumHeightRequest < 0 && this.UsingControlStyle !== "Unset") this.MinimumHeightRequest = look.minH;
+    // C# SetDefaultMinimumContentSize(100, minH) from the style builder: a style default only where the app left the
+    // size unset, skipped on a Fill axis. C# adds Margins because it compares the minimum against a margin-inclusive
+    // size; here Measure applies it to the margin-excluded size and adds the margin after, so the plain value is used.
+    if (this.WidthRequest < 0 && this.MinimumWidthRequest < 0 && this.HorizontalOptions !== "Fill") this.MinimumWidthRequest = look.minW;
+    if (this.HeightRequest < 0 && this.MinimumHeightRequest < 0 && this.VerticalOptions !== "Fill") this.MinimumHeightRequest = look.minH;
     this.label.Text = this.Text;
     this.label.TextColor = this.TextColor;
     this.label.FontSize = this.FontSize === 15 ? look.font : this.FontSize;
