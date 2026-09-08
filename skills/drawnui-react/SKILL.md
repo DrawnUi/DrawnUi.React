@@ -72,6 +72,9 @@ createRoot(document.getElementById("root")!).render(
   `MeasureItemsStrategy` (`MeasureFirst` default / `MeasureAll` / `MeasureVisible`), `Split` / `SplitAlign` /
   `DynamicColumns` / `Invert` for Wrap / Row / Grid (those realize every item; the single-column Column is the
   virtualized list). Appending to `ItemsSource` keeps measured rows, prepending keeps the visible rows in place, and reordering the same items (drag to reorder) keeps every measured height and the scroll offset; any other change rebuilds.
+- A stack packs its children along its axis: a child's `VerticalOptions="Center"` cannot centre it in a column's
+  leftover space (nor `HorizontalOptions` in a row). Use `SkiaLayer` (absolute) when a child has to sit in the
+  middle of a bigger box, which is also how a full-height drag handle keeps its icon centred.
 - Code-behind controls: `new MySprite()` then `host.AddSubView(x)` in `useEffect`, and on cleanup
   `host.RemoveSubView(x); x.Dispose()`. JSX children are disposed by the renderer when they unmount.
 - `SkiaScroll` extras are JSX children with a `Tag`: `Tag="Header"`, `"Footer"`, `"RefreshIndicator"`,
@@ -105,6 +108,12 @@ createRoot(document.getElementById("root")!).render(
   `ConsumeGestures`, set `scroll.RespondsToGestures = false` for the drag and restore it on `Up`, and count travel in
   CONTENT space (pointer movement plus what the list scrolled underneath) so edge auto-scroll keeps advancing the row.
   Reordering the array as you go is cheap: the layout applies a permutation in place, see the `#/reorder` demo page.
+- Lifted drag (the row floats over the list instead of only swapping places): the ghost cannot live in a recycled
+  cell, put it in an `InputTransparent` overlay layer that covers the page, above the scroll that clips the list.
+  Size it from the row's `DrawingRect`, move it with `Left` / `Top` in points plus `RepaintComposition()` per frame,
+  and read the scale off the overlay, not the ghost: a hidden control is never measured, so its `RenderingScale` is
+  still 1. Blank the real row while it is lifted, so the travelling gap shows where the drop lands, and re-read the
+  target row's rect on each frame of the drop animation, because the list is still catching up with the last move.
 - Keyboard: `KeyboardManager.Subscribe(down, char, up?)` (DOM `event.code` names). `SkiaEditor` focuses on tap; a
   hidden textarea feeds IME / soft keyboard / clipboard into the same editing methods.
 - Accessibility: an invisible DOM overlay mirrors accessible controls over the `aria-hidden` canvas

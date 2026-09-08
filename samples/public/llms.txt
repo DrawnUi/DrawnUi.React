@@ -20,7 +20,7 @@ npm i drawnui-react@preview react react-dom
 
 ## Demo
 
-- https://helloreact.drawnui.net — root menu with one page per feature area: images, SVG, recycled cells, shapes, text, layouts, SkiaScroll (header / footer / scroll bars / refresh / snapping), carousel & drawer, Lottie & GIF, shell (pages, popups, modals, toasts, tabs), editor, keyboard input, sprites, shaders, transforms, accessibility, common controls.
+- https://helloreact.drawnui.net — root menu with one page per feature area: images, SVG, recycled cells, shapes, text, layouts, SkiaScroll (header / footer / scroll bars / refresh / snapping), carousel & drawer, Lottie & GIF, shell (pages, popups, modals, toasts, tabs), editor, keyboard input, sprites, shaders, transforms, drag to reorder, accessibility, common controls.
 - Pages describe DrawnUI features, not React ones: the same demos are meant to be reused for other frameworks on this engine.
 
 ## Docs
