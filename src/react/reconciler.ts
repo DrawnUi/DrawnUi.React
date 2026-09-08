@@ -92,6 +92,8 @@ const hostConfig: Cfg & Record<string, unknown> = {
     const ctor = Registry[type];
     if (!ctor) throw new Error(`DrawnUi: unknown control <${type}>`);
     const inst = new ctor();
+    // ConfigureStyles defaults first, the JSX props below override them (a TextSpan is not a control, it has none)
+    (inst as Partial<SkiaControl>).ApplyInitialStyles?.(true);
     applyProps(inst, null, props);
     return inst as SkiaControl;
   },

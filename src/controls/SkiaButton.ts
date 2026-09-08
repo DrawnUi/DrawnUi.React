@@ -55,6 +55,11 @@ export class SkiaButton extends SkiaLayout {
     this.label.VerticalOptions = "Center";
     this.AddSubView(this.frame);
     this.AddSubView(this.label);
+    // C# ButtonLabel is styled when the button builds its content, and ApplyProperties then overwrites FontFamily with
+    // the button's own (empty by default) value, which the style no longer touches. Same order here: style the caption
+    // now, MeasureAbsolute below pushes SkiaButton.FontFamily over it every measure.
+    this.frame.ApplyInitialStyles(true);
+    this.label.ApplyInitialStyles(true);
   }
 
   /** Set to `Aria.RoleButton` to expose every button (React extension). */

@@ -46,18 +46,22 @@ Updated whenever the port deliberately diverges or finds something worth back-po
   at the main font's width). Opinion: worth back-porting to .NET — a single fallback cannot cover arrows (Math) and
   ♥/★ (Symbols 2) at once, which is exactly the split `AddSymbols()` ships.
 
-### An empty FontFamily resolves to a different face
-- **React**: `Super.ResolveTypeface("")` falls back to `Super.DefaultFontAlias`, i.e. the FIRST font the app registered
-  in `ConfigureFonts`, so text with no `FontFamily` looks like the rest of the app.
-- **.NET**: `SkiaFontManager.GetFont("")` returns `DefaultTypeface` = `SKTypeface.CreateDefault()`, the Skia built-in
-  face, whatever the app registered.
-- Visible where a control leaves the family empty by default: `SkiaButton.FontFamily` defaults to `""` on both sides and
-  is pushed to the button label, so the SAME fiddle (FontText = OpenSans) renders button captions in OpenSans on React
-  and in the Skia default (monospace-looking on WASM, where there are no system fonts) on .NET. Found 2026-09-08 by the
-  fiddle session comparing the Cells preset in both languages.
-- Opinion: React's rule is the useful one and worth back-porting — a button caption drawn in a face the app never
-  registered reads as a bug, and on WASM there is no system font to make the .NET fallback sensible. Not changed here:
-  it would alter every unstyled `SkiaButton` on both sides, so it is the owner's call, not a silent port fix.
+### An empty FontFamily resolves to the Skia built-in face on both sides (settled 2026-09-08)
+- **Both, since 2026-09-08**: an empty family resolves to the Skia built-in face — `SKTypeface.CreateDefault()` in
+  .NET, `CK.Typeface.GetDefault()` in React — and an app that wants its own font everywhere registers it as a style
+  default, which is what the .NET Blazor sandbox and the Fiddle already do
+  (`ConfigureStyles(styles => styles.AddStyle({ TargetType: SkiaLabel, ApplyToDerivedTypes: true, Setters: { FontFamily: "FontText" } }))`).
+- **Was**: React fell back to `Super.DefaultFontAlias`, the first registered font, so unstyled text looked like the rest
+  of the app while .NET drew it in the Skia face. Owner's call was to keep .NET as it is and align React, which needed
+  `ConfigureStyles` ported first — until then React had no way to express the app-wide default.
+- Visible where a control leaves the family empty by default: `SkiaButton.FontFamily` is `""` on both sides and is
+  pushed to the caption label after that label was styled, so button captions draw in the Skia face while every other
+  label follows the app style. React reproduces the order by styling the button's own frame and label when the button
+  builds them (`ApplyInitialStyles(true)` in the constructor), the way C# styles `ButtonLabel` at init and then
+  overwrites `FontFamily` in `ApplyProperties`. Found 2026-09-08 by the fiddle session comparing the Cells preset.
+- Opinion kept for the record: a button caption drawn in a face the app never registered still reads as a bug, and on
+  WASM there is no system font behind it. The owner decided .NET stays as it is, so the divergence is closed by React
+  matching .NET rather than the other way round; an app that dislikes the look sets `FontFamily` on the button.
 - Worst case for the current .NET rule is the Fiddle: Blazor WASM has nothing behind `SKTypeface.CreateDefault()`, so
   every unstyled C# button in every published snippet draws in Skia's embedded face while the app has its own fonts
   registered and used everywhere else. The Fiddle also has the same five-button toolbar preset in C# and in TSX, so the

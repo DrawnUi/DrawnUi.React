@@ -1,4 +1,5 @@
 import { Thickness } from "./Types";
+import { StylesCollection } from "./Styles";
 // the "full" build: same API plus Skottie (SkiaLottie) and the paragraph module; +0.9 MB raw over the default build
 import CanvasKitInit from "canvaskit-wasm/bin/full/canvaskit.js";
 import type { CanvasKit, Font, Typeface } from "canvaskit-wasm";
@@ -27,12 +28,22 @@ export class FontCollection {
   }
 }
 
-/** Mirrors DrawnUi.Net DrawnUiBuilder: Super.UseDrawnUi().ConfigureFonts(...).BuildAsync(). */
+/** Mirrors DrawnUi.Net DrawnUiBuilder: Super.UseDrawnUi().ConfigureFonts(...).ConfigureStyles(...).BuildAsync(). */
 export class DrawnUiBuilder {
   private readonly fonts = new FontCollection();
 
   ConfigureFonts(configure: (fonts: FontCollection) => void): DrawnUiBuilder {
     configure(this.fonts);
+    return this;
+  }
+
+  /**
+   * Mirrors DrawnUi.Net ConfigureStyles: property defaults per control type, applied to every control unless the app
+   * sets that property itself. The usual one, same as the .NET Blazor / Fiddle hosts:
+   * `styles.AddStyle({ TargetType: SkiaLabel, ApplyToDerivedTypes: true, Setters: { FontFamily: "FontText" } })`.
+   */
+  ConfigureStyles(configure: (styles: StylesCollection) => void): DrawnUiBuilder {
+    configure(new StylesCollection());
     return this;
   }
 
@@ -58,7 +69,8 @@ export class DrawnUiBuilder {
       Super.DefaultTypeface ??= face;
       if (!Super.DefaultFontAlias) Super.DefaultFontAlias = f.Alias;
     }
-    Super.DefaultTypeface ??= Super.CK.Typeface.GetDefault() ?? undefined;
+    Super.SkiaDefaultTypeface ??= Super.CK.Typeface.GetDefault() ?? undefined;
+    Super.DefaultTypeface ??= Super.SkiaDefaultTypeface;
   }
 }
 
@@ -99,6 +111,8 @@ export class Super {
   static readonly Fonts = new Map<string, Map<number, Typeface>>();
   /** First registered font, or CanvasKit's built-in one. */
   static DefaultTypeface?: Typeface;
+  /** CanvasKit's built-in face: what an empty FontFamily resolves to, like C# SKTypeface.CreateDefault(). */
+  static SkiaDefaultTypeface?: Typeface;
   private static readonly fontCache = new Map<string, Font>();
 
   static UseDrawnUi(): DrawnUiBuilder { return new DrawnUiBuilder(); }
@@ -140,7 +154,10 @@ export class Super {
 
   /** Nearest registered weight of the alias (empty alias = the first registered family); reports the weight actually used. */
   private static ResolveTypeface(alias: string | undefined, weight: number): { Typeface: Typeface | null; Weight: number } {
-    const weights = Super.Fonts.get(alias || Super.DefaultFontAlias);
+    // No family: the Skia built-in face, like C# SkiaFontManager.GetFont("") -> SKTypeface.CreateDefault(). An app that
+    // wants its own font everywhere registers it as a style default (ConfigureStyles), exactly as the .NET hosts do.
+    if (!alias) return { Typeface: Super.SkiaDefaultTypeface ?? Super.DefaultTypeface ?? null, Weight: 400 };
+    const weights = Super.Fonts.get(alias);
     const target = weight > 0 ? weight : 400;
     if (weights && weights.size > 0) {
       if (weights.has(target)) return { Typeface: weights.get(target)!, Weight: target };

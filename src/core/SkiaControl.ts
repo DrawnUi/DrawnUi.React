@@ -1,5 +1,6 @@
 import type { Canvas as SkCanvas, Image, Path, SkPicture, Surface } from "canvaskit-wasm";
 import { Super } from "./Super";
+import { SkiaStyles } from "./Styles";
 import { type Color, Colors, type LayoutOptions, SKRect, ScaledSize, type SkiaCacheType, type SkiaGradient, type SkiaTouchAnimation, Thickness } from "./Types";
 import { type IOverlayEffect, RippleAnimator, SkiaValueAnimator } from "./Animators";
 import { Easing } from "./Easing";
@@ -255,6 +256,18 @@ export class SkiaControl {
   // ---- tree ----
   Parent?: SkiaControl;
   /** Containers override; a leaf control cannot host children. */
+  private styledInitially = false;
+
+  /**
+   * C# ApplyInitialStyles: takes the property defaults registered with `ConfigureStyles` for this control's class.
+   * The reconciler calls it with `atConstruction` right after `new`, before the JSX props, so props win; a control
+   * built in code-behind is styled on its first measure and keeps whatever the code already set.
+   */
+  ApplyInitialStyles(atConstruction = false): void {
+    this.styledInitially = true;
+    if (!SkiaStyles.IsEmpty) SkiaStyles.Apply(this, atConstruction);
+  }
+
   AddSubView(_control: SkiaControl): void { throw new Error(`DrawnUi: ${this.constructor.name} cannot host children`); }
   InsertSubView(_index: number, control: SkiaControl): void { this.AddSubView(control); }
   RemoveSubView(_control: SkiaControl): void {}
@@ -279,6 +292,7 @@ export class SkiaControl {
    * this is what keeps a cached tree from re-measuring text every frame.
    */
   Measure(widthConstraint: number, heightConstraint: number, scale: number): ScaledSize {
+    if (!this.styledInitially) this.ApplyInitialStyles(false);
     if (!this.NeedMeasure && this.RenderingScale === scale
       && Object.is(this.lastWidthConstraint, widthConstraint) && Object.is(this.lastHeightConstraint, heightConstraint)) {
       return this.MeasuredSize;

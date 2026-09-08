@@ -1,5 +1,6 @@
 export * from "./core/Types";
 export * from "./core/Gestures";
+export * from "./core/Styles";
 export * from "./core/Easing";
 export * from "./core/Animators";
 export * from "./core/ScrollAnimators";

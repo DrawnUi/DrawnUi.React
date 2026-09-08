@@ -32,6 +32,9 @@ await Super.UseDrawnUi()
     .AddFont("fonts/OpenSans-Semibold.ttf", "FontText", 600)   // FontAttributes="Bold" / FontWeight={600}
     .AddSymbols()   // FontSymbols / FontSymbols2 (arrows, math) shipped subsets, like DrawnUi.Blazor
     .AddEmojis())   // FontEmoji
+  .ConfigureStyles((styles) => styles.AddStyle({   // property defaults per control type, like DrawnUi.Net
+    TargetType: SkiaLabel, ApplyToDerivedTypes: true, Setters: { FontFamily: "FontText" },
+  }))
   .BuildAsync();    // loads CanvasKit + fonts; render the first <Canvas> after this
 
 SkiaLabel.DefaultAccessibilityRole = Aria.RoleText;      // classes from "drawnui-react/core"
@@ -46,6 +49,12 @@ createRoot(document.getElementById("root")!).render(
 
 - No glyph = silently dropped, never tofu-substituted: set `FontFamilyFallback="FontSymbols,FontSymbols2,FontEmoji"`
   on labels / editors that show symbols or emoji. No CJK font is shipped; register your own.
+- A control with no `FontFamily` draws in CanvasKit's built-in face, not your font (same as DrawnUi.Net). Register the
+  app default with `ConfigureStyles` as above, and note it does not reach button captions: `SkiaButton` pushes its own
+  (empty) `FontFamily` onto its label, so give the button `FontFamily="FontText"` when you want your font there — that
+  is the .NET behaviour too.
+- Styles are defaults: the JSX props of a control always win, and a control built in code-behind keeps whatever your
+  code set before its first measure. `BasedOn`, `Triggers` and the per-control `Style` property are not ported.
 - Give the page the canvas background (`html, body, #root { background: … }`) so nothing flashes while WASM loads.
 
 ## Composition rules (React on top of the `drawnui` skill)

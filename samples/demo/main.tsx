@@ -35,6 +35,13 @@ await Super.UseDrawnUi()
     .AddFont("fonts/OpenSans-Semibold.ttf", "FontTextBold")
     .AddSymbols() // FontSymbols / FontSymbols2 (arrows, math, misc) shipped subsets, like DrawnUi.Blazor
     .AddEmojis()) // FontEmoji (Noto Color Emoji faces + hands subset)
+  // Same style the .NET Blazor sandbox and the Fiddle register: every label defaults to the app font. Without it a
+  // control that leaves FontFamily empty draws in the Skia built-in face, on this engine as on .NET.
+  .ConfigureStyles((styles) => styles.AddStyle({
+    TargetType: SkiaLabelCtrl,
+    ApplyToDerivedTypes: true,
+    Setters: { FontFamily: "FontText" },
+  }))
   .BuildAsync();
 
 // Accessibility: every label is read as text, every button is a button (React extension; C# opts in per control).
