@@ -46,6 +46,19 @@ Updated whenever the port deliberately diverges or finds something worth back-po
   at the main font's width). Opinion: worth back-porting to .NET — a single fallback cannot cover arrows (Math) and
   ♥/★ (Symbols 2) at once, which is exactly the split `AddSymbols()` ships.
 
+### An empty FontFamily resolves to a different face
+- **React**: `Super.ResolveTypeface("")` falls back to `Super.DefaultFontAlias`, i.e. the FIRST font the app registered
+  in `ConfigureFonts`, so text with no `FontFamily` looks like the rest of the app.
+- **.NET**: `SkiaFontManager.GetFont("")` returns `DefaultTypeface` = `SKTypeface.CreateDefault()`, the Skia built-in
+  face, whatever the app registered.
+- Visible where a control leaves the family empty by default: `SkiaButton.FontFamily` defaults to `""` on both sides and
+  is pushed to the button label, so the SAME fiddle (FontText = OpenSans) renders button captions in OpenSans on React
+  and in the Skia default (monospace-looking on WASM, where there are no system fonts) on .NET. Found 2026-09-08 by the
+  fiddle session comparing the Cells preset in both languages.
+- Opinion: React's rule is the useful one and worth back-porting — a button caption drawn in a face the app never
+  registered reads as a bug, and on WASM there is no system font to make the .NET fallback sensible. Not changed here:
+  it would alter every unstyled `SkiaButton` on both sides, so it is the owner's call, not a silent port fix.
+
 ### Markdown parser
 - C# `SkiaRichLabel` parses with CommonMark.NET; React ships a small hand-written parser (headings, lists, fenced
   code, inline emphasis/code/links, escapes). Same span output rules (`SpanWithAttributes`), same style properties.
