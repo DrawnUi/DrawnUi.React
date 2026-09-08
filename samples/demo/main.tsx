@@ -37,11 +37,10 @@ await Super.UseDrawnUi()
     .AddEmojis()) // FontEmoji (Noto Color Emoji faces + hands subset)
   // Same style the .NET Blazor sandbox and the Fiddle register: every label defaults to the app font. Without it a
   // control that leaves FontFamily empty draws in the Skia built-in face, on this engine as on .NET.
-  .ConfigureStyles((styles) => styles.AddStyle({
-    TargetType: SkiaLabelCtrl,
-    ApplyToDerivedTypes: true,
-    Setters: { FontFamily: "FontText" },
-  }))
+  .ConfigureStyles((styles) => styles
+    .AddStyle({ TargetType: SkiaLabelCtrl, ApplyToDerivedTypes: true, Setters: { FontFamily: "FontText" } })
+    // a button pushes its own FontFamily onto its caption, so the label style above never reaches it: style the button
+    .AddStyle({ TargetType: SkiaButtonCtrl, ApplyToDerivedTypes: true, Setters: { FontFamily: "FontText" } }))
   .BuildAsync();
 
 // Accessibility: every label is read as text, every button is a button (React extension; C# opts in per control).
