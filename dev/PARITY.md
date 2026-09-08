@@ -58,6 +58,10 @@ Updated whenever the port deliberately diverges or finds something worth back-po
 - Opinion: React's rule is the useful one and worth back-porting — a button caption drawn in a face the app never
   registered reads as a bug, and on WASM there is no system font to make the .NET fallback sensible. Not changed here:
   it would alter every unstyled `SkiaButton` on both sides, so it is the owner's call, not a silent port fix.
+- Worst case for the current .NET rule is the Fiddle: Blazor WASM has nothing behind `SKTypeface.CreateDefault()`, so
+  every unstyled C# button in every published snippet draws in Skia's embedded face while the app has its own fonts
+  registered and used everywhere else. The Fiddle also has the same five-button toolbar preset in C# and in TSX, so the
+  change can be confirmed or refuted with one side-by-side capture, the way the 100pt width floor was.
 
 ### Markdown parser
 - C# `SkiaRichLabel` parses with CommonMark.NET; React ships a small hand-written parser (headings, lists, fenced
