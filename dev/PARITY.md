@@ -67,6 +67,19 @@ Updated whenever the port deliberately diverges or finds something worth back-po
   registered and used everywhere else. The Fiddle also has the same five-button toolbar preset in C# and in TSX, so the
   change can be confirmed or refuted with one side-by-side capture, the way the 100pt width floor was.
 
+### A reorder moves the measured heights, it does not just rebind
+- **.NET** (`HandleStructurePreservingMove` / `ApplyMoveChange`, 2026-09-08): an `ObservableCollection.Move` rebinds the
+  contexts and deliberately touches no structure — the rows keep their heights and the arrange pass re-flows them from
+  their bound views, so permuting the measured sizes changed nothing observable there.
+- **React**: the same user action arrives as a new array, and the measured heights are index-keyed arrays that arrange
+  reads directly (`itemHeights`, `mvHeights` / `mvPrefix`), with no view to re-flow from. So the port detects the
+  permutation and moves each height with its item; under `MeasureVisible` the exact prefix is rebuilt over the leading
+  measured run, because an item that was never measured can land inside it. Same outcome, different mechanism, and the
+  difference is forced by where the two engines keep row geometry.
+- Verified 2026-09-08 in the browser on the demo's `MeasureVisible` list, scrolled ~2300 pt down, reordering two rows
+  far above the viewport: rows, pixel position and `measured 200/200` all unchanged, no cell re-created. The same swap
+  routed through the rebuild path (cloned items, so not a permutation) moved the content by a row.
+
 ### Markdown parser
 - C# `SkiaRichLabel` parses with CommonMark.NET; React ships a small hand-written parser (headings, lists, fenced
   code, inline emphasis/code/links, escapes). Same span output rules (`SpanWithAttributes`), same style properties.
@@ -192,6 +205,15 @@ Updated whenever the port deliberately diverges or finds something worth back-po
   the accessibility snapshot of the running build (headless Chrome), replaced by React's first render.
 - **.NET**: nothing comparable (Blazor sites hand-write static SEO content in `index.html`, see the drawnui-blazor
   SEO notes). Opinion: web-only concern, no C# API to mirror; keep it a Vite plugin, never runtime.
+
+### The scroll never derives its viewport from a measure constraint
+- **.NET** (fixed 2026-09-08): `InitializeViewport` ran on any measure pass, including one with an infinite constraint
+  on the scrolling axis, concluded "everything fits" and reset the offset to the top; a sibling changing size was
+  enough to throw a scrolled list back. The fix returns early until a pass constrains the axis.
+- **React**: nothing to port. `ContentOffsetBounds` is computed in `OnLayoutChanged`, which runs inside `Arrange` from
+  the arranged `DrawingRect`, so a measure pass — constrained or not — never touches the offset or the bounds.
+  Verified by measuring the demo's scroll with an infinite height while scrolled 2288 pt down: offset and bounds
+  identical afterwards, visible rows unmoved.
 
 ## Rendering
 

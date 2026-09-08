@@ -71,7 +71,7 @@ createRoot(document.getElementById("root")!).render(
   (build the visuals in the constructor, override `SetContent(item)`). `RecyclingTemplate`,
   `MeasureItemsStrategy` (`MeasureFirst` default / `MeasureAll` / `MeasureVisible`), `Split` / `SplitAlign` /
   `DynamicColumns` / `Invert` for Wrap / Row / Grid (those realize every item; the single-column Column is the
-  virtualized list). Appending to `ItemsSource` keeps measured rows; a new array reference is diffed.
+  virtualized list). Appending to `ItemsSource` keeps measured rows, prepending keeps the visible rows in place, and reordering the same items (drag to reorder) keeps every measured height and the scroll offset; any other change rebuilds.
 - Code-behind controls: `new MySprite()` then `host.AddSubView(x)` in `useEffect`, and on cleanup
   `host.RemoveSubView(x); x.Dispose()`. JSX children are disposed by the renderer when they unmount.
 - `SkiaScroll` extras are JSX children with a `Tag`: `Tag="Header"`, `"Footer"`, `"RefreshIndicator"`,

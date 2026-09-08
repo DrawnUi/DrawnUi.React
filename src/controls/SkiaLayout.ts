@@ -90,7 +90,9 @@ export class SkiaLayout extends SkiaControl {
    */
   private ApplyIncrementalChange(old: readonly unknown[], items: readonly unknown[]): boolean {
     const n = items.length, o = old.length;
-    if (n <= o || o === 0) return false;
+    if (o === 0) return false;
+    if (n === o) return this.ApplyReorderChange(old, items);
+    if (n < o) return false;
     const k = n - o;
     const scale = this.RenderingScale, gap = this.Spacing * scale, w = this.measuredWidthPx;
     if (this.MeasureItemsStrategy === "MeasureFirst" && this.uniformHeight <= 0) return false;
@@ -131,6 +133,53 @@ export class SkiaLayout extends SkiaControl {
       return true;
     }
     return false;
+  }
+
+  /**
+   * Same items in another order — a drag-to-reorder, or any code writing a permuted array. DrawnUi handles the
+   * matching `ObservableCollection.Move` by keeping the structure and only rebinding the contexts, because its
+   * arrange re-flows each row from its bound view (`HandleStructurePreservingMove` / `ApplyMoveChange`, 2026-09-08).
+   * The measured heights here are index-keyed and authoritative, so they travel with their items instead: nothing is
+   * remeasured, the extent cannot change, and the scroll keeps its offset. Rebuilding instead would reset
+   * `MeasureVisible` to "exact for the first screen, estimated after" and throw a scrolled list back towards the top.
+   * Returns false when the two arrays are not a permutation of each other, so a real content change still rebuilds.
+   */
+  private ApplyReorderChange(old: readonly unknown[], items: readonly unknown[]): boolean {
+    const n = items.length;
+    if (this.MeasureItemsStrategy === "MeasureAll" && this.itemHeights.length !== n) return false;
+    if (this.MeasureItemsStrategy === "MeasureVisible" && this.mvHeights.length !== n) return false;
+
+    const moved: number[] = [];
+    for (let i = 0; i < n; i++) if (old[i] !== items[i]) moved.push(i);
+    if (moved.length === 0) { this.ChildrenFactory.UpdateItems(items); return true; } // same order, new array reference
+
+    // every slot that changed must hold an item that was in one of those slots before, otherwise this is not a reorder
+    const free = new Map<unknown, number[]>();
+    for (const i of moved) { const q = free.get(old[i]); if (q) q.push(i); else free.set(old[i], [i]); }
+    const from = new Int32Array(n);
+    for (let i = 0; i < n; i++) from[i] = i;
+    for (const i of moved) {
+      const q = free.get(items[i]);
+      if (!q || q.length === 0) return false;
+      from[i] = q.shift()!;
+    }
+
+    if (this.MeasureItemsStrategy === "MeasureAll") {
+      const was = this.itemHeights;
+      this.itemHeights = Array.from({ length: n }, (_, i) => was[from[i]]);
+    } else if (this.MeasureItemsStrategy === "MeasureVisible") {
+      const was = this.mvHeights, heights = new Float64Array(n);
+      for (let i = 0; i < n; i++) heights[i] = was[from[i]];
+      this.mvHeights = heights;
+      // an item that was never measured can land inside the exact prefix: rebuild it over the leading measured run
+      this.mvPrefix = new Float64Array(n + 1);
+      this.mvMeasured = 0;
+      this.MvExtendPrefix(this.Spacing * this.RenderingScale);
+    }
+    // MeasureFirst has one height for every row, so a reorder is a pure rebind there (same as the C# note).
+
+    this.ChildrenFactory.UpdateItems(items);
+    return true;
   }
 
   /** Factory creating one cell (DrawnUi DataTemplate). Cells receive the item as BindingContext. */
