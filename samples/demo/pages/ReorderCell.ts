@@ -1,7 +1,7 @@
 import { Colors, SkiaDynamicDrawnCell, SkiaLabel, SkiaLayer, SkiaShape, SkiaStack, Thickness } from "drawnui-react/core";
 import type { SkiaControl, SkiaGesturesInfo, SkiaScroll } from "drawnui-react/core";
 
-export interface ReorderItem { Id: number; Title: string; Color: string }
+export interface ReorderItem { Id: number; Title: string; Tag: string; Color: string }
 
 /** What the page lends every cell so a drag can move the item, scroll the list under it and carry the ghost. */
 export interface DragHost {
@@ -100,7 +100,7 @@ export class ReorderCell extends SkiaDynamicDrawnCell {
     const item = ctx as ReorderItem;
     this.grip.AccessibilityLabel = `Reorder ${item.Title}`;
     this.title.Text = item.Title;
-    this.badge.Text = `#${item.Id}`;
+    this.badge.Text = item.Tag;
     this.frame.StrokeColor = item.Color;
 
     // the ghost is standing in for this row: leave the gap it is going to drop into

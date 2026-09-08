@@ -4,11 +4,35 @@ import type { SkiaLabel as SkiaLabelCtrl, SkiaLayout as SkiaLayoutCtrl, SkiaScro
 import { ReorderCell, type DragHost, type ReorderItem } from "./ReorderCell";
 
 const COLORS = ["#0D6EFD", "#6610F2", "#D63384", "#FD7E14", "#20C997", "#0DCAF0", "#FFC107"];
-const INITIAL: ReorderItem[] = Array.from({ length: 60 }, (_, i) => ({
-  Id: i + 1,
-  Title: `Row ${String(i + 1).padStart(2, "0")} · drag me by the grip`,
-  Color: COLORS[i % COLORS.length],
-}));
+/** Android's language preferences, in their own name and locale tag. Latin, Cyrillic and Greek only: the demo
+ *  registers OpenSans and nothing else, and a script it has no glyphs for would draw a row of tofu. */
+const LANGUAGES: [string, string][] = [
+  ["English (United States)", "en-US"], ["Español (España)", "es-ES"], ["Français (France)", "fr-FR"],
+  ["Deutsch (Deutschland)", "de-DE"], ["Italiano (Italia)", "it-IT"], ["Português (Brasil)", "pt-BR"],
+  ["Nederlands (Nederland)", "nl-NL"], ["Svenska (Sverige)", "sv-SE"], ["Norsk bokmål (Norge)", "nb-NO"],
+  ["Dansk (Danmark)", "da-DK"], ["Suomi (Suomi)", "fi-FI"], ["Íslenska (Ísland)", "is-IS"],
+  ["Polski (Polska)", "pl-PL"], ["Čeština (Česko)", "cs-CZ"], ["Slovenčina (Slovensko)", "sk-SK"],
+  ["Magyar (Magyarország)", "hu-HU"], ["Română (România)", "ro-RO"], ["Hrvatski (Hrvatska)", "hr-HR"],
+  ["Slovenščina (Slovenija)", "sl-SI"], ["Bosanski (Bosna i Hercegovina)", "bs-BA"], ["Shqip (Shqipëri)", "sq-AL"],
+  ["Lietuvių (Lietuva)", "lt-LT"], ["Latviešu (Latvija)", "lv-LV"], ["Eesti (Eesti)", "et-EE"],
+  ["Русский (Россия)", "ru-RU"],
+  ["Українська (Україна)", "uk-UA"],
+  ["Беларуская (Беларусь)", "be-BY"],
+  ["Български (България)", "bg-BG"],
+  ["Македонски (Македонија)", "mk-MK"],
+  ["Српски (Србија)", "sr-RS"],
+  ["Қазақша (Қазақстан)", "kk-KZ"],
+  ["Кыргызча (Кыргызстан)", "ky-KG"],
+  ["Монгол (Монгол)", "mn-MN"],
+  ["Ελληνικά (Ελλάδα)", "el-GR"],
+  ["Türkçe (Türkiye)", "tr-TR"], ["Azərbaycan (Azərbaycan)", "az-AZ"],
+  ["Oʻzbekcha (Oʻzbekiston)", "uz-UZ"], ["Català (Espanya)", "ca-ES"], ["Galego (España)", "gl-ES"],
+  ["Euskara (Espainia)", "eu-ES"], ["Gaeilge (Éire)", "ga-IE"], ["Gàidhlig (Alba)", "gd-GB"],
+  ["Cymraeg (Cymru)", "cy-GB"], ["Malti (Malta)", "mt-MT"], ["Bahasa Indonesia (Indonesia)", "id-ID"],
+  ["Bahasa Melayu (Malaysia)", "ms-MY"], ["Filipino (Pilipinas)", "fil-PH"], ["Tiếng Việt (Việt Nam)", "vi-VN"],
+  ["Kiswahili (Kenya)", "sw-KE"], ["Afrikaans (Suid-Afrika)", "af-ZA"],
+];
+const INITIAL: ReorderItem[] = LANGUAGES.map(([Title, Tag], i) => ({ Id: i + 1, Title, Tag, Color: COLORS[i % COLORS.length] }));
 const SPACING = 6;
 const STATUS_HEIGHT = 58;
 /** How long the released ghost takes to glide into its slot. */
@@ -32,7 +56,7 @@ const BADGE_MARGIN = new Thickness(0, 0, 14, 0);
  */
 export function ReorderPage() {
   const [items, setItems] = useState<ReorderItem[]>(INITIAL);
-  const [status, setStatus] = useState("drag a row by its grip, or use the buttons");
+  const [status, setStatus] = useState("drag a language by its grip, or use the buttons");
   const scroll = useRef<SkiaScrollCtrl>(null);
   const rows = useRef<SkiaLayoutCtrl>(null);
   const overlay = useRef<SkiaLayoutCtrl>(null);
@@ -47,7 +71,7 @@ export function ReorderPage() {
 
   const report = useCallback((what: string) => {
     const offset = scroll.current?.ViewportOffsetY ?? 0;
-    setStatus(`${what} · offset ${offset.toFixed(0)} pt · order ${live.current.slice(0, 6).map((i) => i.Id).join(", ")}…`);
+    setStatus(`${what} · offset ${offset.toFixed(0)} pt · ${live.current.slice(0, 5).map((i) => i.Tag).join(", ")}…`);
   }, []);
 
   const move = useCallback((from: number, to: number) => {
@@ -117,7 +141,7 @@ export function ReorderPage() {
         grabOffset.current = (pointerY - rect.Top) / scale();
         dragging.current = item;
         if (ghostTitle.current) ghostTitle.current.Text = item.Title;
-        if (ghostBadge.current) ghostBadge.current.Text = `#${item.Id}`;
+        if (ghostBadge.current) ghostBadge.current.Text = item.Tag;
         g.StrokeColor = item.Color;
         g.WidthRequest = rect.Width / scale();
         g.HeightRequest = rect.Height / scale();
@@ -154,7 +178,7 @@ export function ReorderPage() {
   return (
     <SkiaLayer VerticalOptions="Fill">
       <SkiaStack Spacing={2} Margin={new Thickness(0, 8, 0, 0)}>
-        <SkiaLabel Text={`${items.length} rows · drag by the grip, hold at an edge to keep going`} FontSize={13} TextColor={Colors.LightGray} HorizontalOptions="Center" />
+        <SkiaLabel Text={`${items.length} languages in order of preference · drag by the grip, hold at an edge to keep going`} FontSize={13} TextColor={Colors.LightGray} HorizontalOptions="Center" />
         <SkiaLabel Text={status} FontSize={12} TextColor="#6EA8FE" HorizontalOptions="Center" />
       </SkiaStack>
 
@@ -196,7 +220,7 @@ export function ReorderPage() {
       </SkiaLayer>
 
       <SkiaWrap Spacing={6} Margin={new Thickness(8, 0, 8, 8)} HorizontalOptions="Center" VerticalOptions="End">
-        <SkiaButton Text="Move #1 below #10" FontSize={13} BackgroundColor="#495057" Tapped={() => { move(0, 9); report("moved 1 → 10"); }} />
+        <SkiaButton Text="1st below 10th" FontSize={13} BackgroundColor="#495057" Tapped={() => { move(0, 9); report("moved 1st below 10th"); }} />
         <SkiaButton Text="Reverse" FontSize={13} BackgroundColor="#495057" Tapped={() => { live.current = live.current.slice().reverse(); setItems(live.current); report("reversed"); }} />
         <SkiaButton Text="Reset" FontSize={13} BackgroundColor="#495057" Tapped={() => { live.current = INITIAL; setItems(INITIAL); report("reset"); }} />
       </SkiaWrap>
