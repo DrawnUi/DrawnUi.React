@@ -183,13 +183,13 @@ export function ReorderPage() {
           IsVisible={false}
           Shadows={GHOST_SHADOW}
         >
-          <SkiaStack WidthRequest={26} HorizontalOptions="Start" VerticalOptions="Fill" Margin={GRIP_MARGIN}>
+          <SkiaLayer WidthRequest={26} HorizontalOptions="Start" VerticalOptions="Fill" Margin={GRIP_MARGIN}>
             <SkiaStack Spacing={3} VerticalOptions="Center" HorizontalOptions="Fill">
               {[0, 1, 2].map((i) => (
                 <SkiaShape key={i} Type="Rectangle" CornerRadius={1} HeightRequest={2} WidthRequest={16} BackgroundColor="#BFDBFE" HorizontalOptions="Center" />
               ))}
             </SkiaStack>
-          </SkiaStack>
+          </SkiaLayer>
           <SkiaLabel ref={ghostTitle} FontSize={14} TextColor={Colors.White} VerticalOptions="Center" Margin={TITLE_MARGIN} />
           <SkiaLabel ref={ghostBadge} FontSize={12} TextColor="#BFDBFE" HorizontalOptions="End" VerticalOptions="Center" Margin={BADGE_MARGIN} />
         </SkiaShape>

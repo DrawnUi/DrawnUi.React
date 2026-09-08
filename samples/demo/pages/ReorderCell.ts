@@ -1,4 +1,4 @@
-import { Colors, SkiaDynamicDrawnCell, SkiaLabel, SkiaShape, SkiaStack, Thickness } from "drawnui-react/core";
+import { Colors, SkiaDynamicDrawnCell, SkiaLabel, SkiaLayer, SkiaShape, SkiaStack, Thickness } from "drawnui-react/core";
 import type { SkiaControl, SkiaGesturesInfo, SkiaScroll } from "drawnui-react/core";
 
 export interface ReorderItem { Id: number; Title: string; Color: string }
@@ -40,7 +40,7 @@ const EDGE_STEP = 7;
  */
 export class ReorderCell extends SkiaDynamicDrawnCell {
   private readonly frame = new SkiaShape();
-  private readonly grip = new SkiaStack();
+  private readonly grip = new SkiaLayer(); // absolute: a stack would pack the bars at the top of the row
   private readonly title = new SkiaLabel();
   private readonly badge = new SkiaLabel();
 
@@ -66,7 +66,6 @@ export class ReorderCell extends SkiaDynamicDrawnCell {
     this.frame.BackgroundColor = "#111827";
     this.frame.StrokeWidth = 1;
 
-    this.grip.Spacing = 3;
     this.grip.WidthRequest = 26;
     this.grip.HorizontalOptions = "Start"; // a SkiaStack fills by default, and a Fill child is stretched at arrange
     this.grip.VerticalOptions = "Fill";    // the whole row height is grabbable, the bars just sit in the middle
