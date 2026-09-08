@@ -53,9 +53,15 @@ Adding another published sample = one more `wrangler pages deploy dist/<name> --
 `drawnui-react` is published from a maintainer machine by the npm user `drawnui` (scope `@drawnui` is reserved by
 that username). npm requires either 2FA on the account or a granular access token with "bypass 2FA" to publish.
 
+The maintainer machine keeps that token in the user-level `~/.npmrc` (`//registry.npmjs.org/:_authToken=`), so
+`npm publish` and `npm whoami` just work. **Leave it there.** npm shows a token value once at creation, and creating a
+replacement needs the account password typed into npmjs.com by hand, so deleting the token after a release costs a
+manual step every time; it was revoked twice for "hygiene" and both times the next release stalled. Rotate it only
+when it actually leaks or expires (write-capable tokens expire in 7 days by default, 90 days maximum, so a long-lived
+one has to be created with an explicit expiry).
+
 1. Bump `version` in `package.json` (previews: `0.1.0-preview.N`, dist-tag `preview`).
 2. `npm run build:lib` (also run by `prepublishOnly`), optionally `npm pack` and install the tarball in a throwaway
    Vite app to check `exports`, types and the CanvasKit `.wasm` asset.
-3. `npm publish --access public --tag preview` (with 2FA: add `--otp=<code>`; with a token: pass it through an env
-   override, never write it to `.npmrc`).
+3. `npm publish --access public --tag preview` (with 2FA on the account instead of a token: add `--otp=<code>`).
 4. `npm view drawnui-react version dist-tags` (the registry lags ~20 s).
