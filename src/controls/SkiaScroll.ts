@@ -438,6 +438,15 @@ export class SkiaScroll extends SkiaControl {
     const width = Math.max(0, this.ContentSize.Units.Width + (this.Orientation === "Horizontal" ? extra : 0) - viewportW);
     const height = Math.max(0, this.ContentSize.Units.Height + (this.Orientation !== "Horizontal" ? extra : 0) - viewportH);
     this.ContentOffsetBounds = new SKRect(-width, -height, 0, 0);
+    // C# InitializeViewport: pull an offset the new bounds no longer contain back inside them, here where
+    // the bounds change. Shrinking content (fewer items) otherwise leaves the viewport parked past its end
+    // with nothing on screen. Skipped under a live pan, a fling / bounce or pull-to-refresh, where being
+    // past the edge is intentional (rubber band, refresh indicator).
+    if (!this.IsUserPanning && !this.IsScrolling && !this.isRefreshing) {
+      const c = this.ClampOffset(this.offsetX, this.offsetY, this.ContentOffsetBounds, true);
+      this.ViewportOffsetX = c.X;
+      this.ViewportOffsetY = c.Y;
+    }
     this.ArrangeContent();
     this.CheckLoadMore();
   }
