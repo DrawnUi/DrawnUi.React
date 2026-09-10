@@ -617,11 +617,29 @@ export class SkiaScroll extends SkiaControl {
     if (!layout || !items || items.length === 0 || !this.content) return;
     const i = Math.max(0, Math.min(items.length - 1, index));
     const scale = this.RenderingScale;
-    const layoutTopPts = (layout.DrawingRect.Top - this.content.DrawingRect.Top) / scale;
-    let target = layoutTopPts + layout.GetItemOffsetPixels(i) / scale;
-    if (option === "End") target -= this.DrawingRect.Height / scale - layout.GetItemOffsetPixels(i + 1) / scale + layout.GetItemOffsetPixels(i) / scale;
-    else if (option === "Center") target -= this.DrawingRect.Height / scale / 2;
-    this.ScrollTo(this.offsetX, -target, animate ? this.ScrollingSpeedMs / 1000 : 0, true);
+    const horizontal = this.Orientation === "Horizontal";
+    const viewport = (horizontal ? this.DrawingRect.Width : this.DrawingRect.Height) / scale;
+    // Item start and size in points, relative to the content start along the scroll axis.
+    let itemStart: number, itemSize: number;
+    if (!horizontal && layout.Type === "Column" && layout.Split <= 1) {
+      // The virtualized list: cells past the viewport are not realized, the structure knows their offsets.
+      itemStart = (layout.DrawingRect.Top - this.content.DrawingRect.Top + layout.GetItemOffsetPixels(i)) / scale;
+      itemSize = (layout.GetItemOffsetPixels(i + 1) - layout.GetItemOffsetPixels(i)) / scale;
+    } else {
+      // A templated Row / Wrap / Grid realizes every item (C# non-list layouts are not virtualized): read the cell's
+      // arranged rect, like C# reads the structure cell's Destination.
+      const cell = layout.ChildrenFactory.GetViewForIndex(i);
+      if (!cell) return;
+      const r = cell.DrawingRect, c = this.content.DrawingRect;
+      itemStart = (horizontal ? r.Left - c.Left : r.Top - c.Top) / scale;
+      itemSize = (horizontal ? r.Width : r.Height) / scale;
+    }
+    let target = itemStart;
+    if (option === "End") target -= viewport - itemSize;
+    else if (option === "Center") target -= (viewport - itemSize) / 2;
+    const time = animate ? this.ScrollingSpeedMs / 1000 : 0;
+    if (horizontal) this.ScrollTo(-target, this.offsetY, time, true);
+    else this.ScrollTo(this.offsetX, -target, time, true);
   }
 
   private StopAnimators(): void {
