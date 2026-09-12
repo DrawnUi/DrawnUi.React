@@ -86,10 +86,18 @@ createRoot(document.getElementById("root")!).render(
   or `GoToAsync("detail", true, { id: 7 })`, `useShell()` inside pages (`GoBackAsync`, `OpenPopupAsync`,
   `PushModalAsync`, `ShowToast`, tabs), `Navigating` (set `e.Cancel`) / `Navigated` / `RouteChanged`, browser
   history + deep links (`UseBrowserHistory`), safe-area `Insets`.
+- Colors are DrawnUi strings everywhere: `#RGB`, `#ARGB`, `#RRGGBB`, `#AARRGGBB` (alpha FIRST, as in MAUI / C#), or
+  `rgb()` / `rgba()`. When app code paints with CanvasKit directly (an offscreen `Surface`, a `Paint`), convert with
+  `Super.ParseColor(color)`; never call `CK.parseColorString` (CSS order, reads `#22FFFFFF` as opaque cyan) or build
+  `CK.Color(...)` from a DrawnUi string. `#RRGGBBAA` must never surface in app code.
 - Caching is the same plan as C#: `UseCache="Image"` on stable subtrees, `"Operations"` for vector content (the
   default on shapes and labels), `"ImageComposite"` for a layer whose children change independently (only the
   dirty children are re-recorded; `LastCompositeRecord` reports what happened), `None` for per-frame painters.
-  Shader effects need an Image-type cache on their control.
+  Shader effects need an Image-type cache on their control. That cache is only the shader's INPUT: a
+  post-render effect runs on every frame its control is drawn (measured: one shader pass per drag frame on
+  a moving sibling). For a static result under something that moves, wrap the control in a parent with
+  `UseCache="Image"` — the parent records the shaded output once and blits it; its own `TranslationX` /
+  `RepaintComposition()` do not stale that cache (measured: 0 shader passes over a 20-step drag).
 - Invalidation vocabulary when writing custom controls: `Update()` = remeasure + redraw; `InvalidateCache()` = own
   content changed; `RepaintComposition()` = my transform / paint changed, ancestor caches go stale; `Repaint()` =
   just ask for a frame. A control that changes its own drawing calls `InvalidateCache(); RepaintComposition();`.
@@ -98,6 +106,14 @@ createRoot(document.getElementById("root")!).render(
   `UseBackground` Always / Once / Never), `ShaderDoubleTexturesEffect`, `ShaderTransitionEffect`,
   `AnimatedShaderEffect`; `SkiaShaderCarousel` slides must be `UseCache="Image"`. An effect implementing
   `ProcessGestures` receives the parent's gestures first.
+- `<Canvas Gestures>`: `"Enabled"` shares input with the host page like MAUI's `Enabled` inside a native scroll view,
+  so a canvas embedded in a longer page never traps page scrolling. Touch: a finger pan along an axis the page can
+  scroll scrolls the page (the canvas pointer is cancelled, a `SkiaScroll` settles without flinging), taps and the
+  other axis stay on the canvas; a page that cannot scroll (a full-page app) keeps every touch. Wheel: the page scrolls
+  unless a control used it (a `SkiaScroll` that moved, a `ConsumeGestures` handler that set `Consumed`; a
+  `BlockGesturesBelow` layer that only blocks does not count). `"Lock"` keeps all input: use it for a widget whose own
+  vertical drags (inner list, drawer, drag to reorder) must win inside a scrolling page. A custom control overriding
+  `ProcessGestures` to act on a wheel sets `args.Event.Handled = true` so the page does not scroll too.
 - Right click / long press / Menu key: `ContextMenu={(sender, e) => { …; return true; }}` on any control (routed like
   a tap: deepest child first, then parents, then `<Canvas ContextMenu>`); `true` suppresses the browser's canvas menu,
   no handler = browser menu as usual. `e.Location` points, `e.Local` pixels in the control, `e.Source`
@@ -120,6 +136,13 @@ createRoot(document.getElementById("root")!).render(
   (`AccessibilityRole`, `AccessibilityLabel`, `AccessibilityHint`, `AccessibilityIsPressed`, `AccessibilityLive`,
   `Aria.RolePresentation` to hide). `AccessibilityTextSelectable` (opt-in) makes a label's text natively
   selectable and copyable; never enable it on gesture-driven controls, the text then owns the pointer.
+- Pointer (hand) cursor over tappable things: a `Tapped` handler alone does NOT show it. The control must also be in
+  the accessibility overlay, so give it a role: `AccessibilityRole={Aria.RoleButton}` on a tappable card, row or
+  shape, with `AccessibilityRole={Aria.RolePresentation}` on the labels inside so the card stays one target.
+  `SkiaButton` has no default role: set `SkiaButton.DefaultAccessibilityRole = Aria.RoleButton` once at startup.
+  Switch, checkbox, radio and slider carry their roles already. A control driven only by `ConsumeGestures` (a drag
+  grip) has no `Tapped`, so it needs `AccessibilityCanInteract={true}` as well. A `TextSpan` with `Tapped` gets the
+  hand over just that span when its label has a role.
 - Crawlers / AI agents: `import { drawnUiStatic } from "drawnui-react/vite"`, `plugins: [react(), drawnUiStatic()]`
   (needs `playwright-core` + a Chrome at build). After `vite build` it boots the built app headlessly, reads the
   accessibility tree of the root page and of each page a root button opens, and writes visible semantic HTML
