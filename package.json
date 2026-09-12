@@ -1,6 +1,6 @@
 {
   "name": "drawnui-react",
-  "version": "0.1.0-preview.6",
+  "version": "0.1.0-preview.7",
   "description": "DrawnUi for React: the DrawnUi (.NET) drawn-UI engine in TypeScript on CanvasKit (Skia WASM). Same controls, same PascalCase API as DrawnUi.Net.",
   "license": "MIT",
   "author": "Nick Kovalsky (AppoMobi)",
