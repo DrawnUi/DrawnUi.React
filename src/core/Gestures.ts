@@ -60,6 +60,11 @@ export class TouchActionEventArgs {
   DeltaTimeMs = 0;
   /** Mouse wheel: Delta > 0 = wheel down (browser deltaY sign). */
   Wheel = { Delta: 0 };
+  /**
+   * AppoMobi TouchActionEventArgs.Handled: set by a control that actually used the event. The canvas prevents the
+   * browser default (the page scrolling under the wheel) only for a Handled event in `Gestures="Enabled"`.
+   */
+  Handled = false;
 
   /** Same as the .NET helper: derives Start/End/Delta/Total from the previous event of the same pointer. */
   static FillDistanceInfo(current: TouchActionEventArgs, previous: TouchActionEventArgs | undefined): void {

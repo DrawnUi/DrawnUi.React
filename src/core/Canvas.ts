@@ -312,9 +312,14 @@ export class Canvas {
     if (hit !== this.cursorPointer) { this.cursorPointer = hit; this.Element.style.cursor = hit ? "pointer" : ""; }
   }
 
-  /** Mouse wheel -> TouchActionResult.Wheel (page scroll suppressed while gestures are enabled). */
+  /**
+   * Mouse wheel -> TouchActionResult.Wheel.
+   * Lock keeps every wheel on the canvas. Enabled shares it with the page, like DrawnUi.Blazor's
+   * TouchHandlingStyle.Manual: the page scrolls unless a control consumed this wheel. The browser needs that answer
+   * inside this handler, so the wheel is processed now instead of at the next frame (Blazor does the same, for the
+   * same reason); pending gestures are flushed first so the event order is kept.
+   */
   private readonly onWheel = (e: WheelEvent) => {
-    e.preventDefault();
     const rect = this.Element.getBoundingClientRect();
     const args = new TouchActionEventArgs();
     args.Id = -1;
@@ -323,8 +328,27 @@ export class Canvas {
     args.Location = new SKPoint((e.clientX - rect.left) * this.RenderingScale, (e.clientY - rect.top) * this.RenderingScale);
     args.StartingLocation = args.Location;
     args.Wheel = { Delta: e.deltaY !== 0 ? e.deltaY : e.deltaX };
-    this.OnGestureEvent(args, "Wheel");
+    if (this.gestures === "Lock") {
+      e.preventDefault();
+      this.OnGestureEvent(args, "Wheel");
+      return;
+    }
+    if (this.ProcessGestureNow(args, "Wheel")) e.preventDefault();
   };
+
+  /**
+   * Processes one gesture immediately (after whatever is queued) and reports whether a control USED it: a consumer
+   * that marked the event Handled, or any consumer that is not a `BlockGesturesBelow` layer. A blocker returns itself
+   * for every gesture it keeps from the controls below (a shell page, a popup backdrop), which is not a use: counting
+   * it would block the page wheel over every shell app.
+   */
+  private ProcessGestureNow(args: TouchActionEventArgs, result: TouchActionResult): boolean {
+    this.ProcessPendingGestures();
+    const root = this.content;
+    const consumed = root ? this.ProcessGestures(root, SkiaGesturesParameters.Create(result, args)) : null;
+    this.Update();
+    return !!consumed && (args.Handled || !consumed.BlockGesturesBelow);
+  }
 
   private AttachInput(): void {
     const el = this.Element;

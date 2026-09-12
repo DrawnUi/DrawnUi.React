@@ -1046,13 +1046,13 @@ export class SkiaControl {
     if (this.ConsumeGestures) {
       const sent = new SkiaGesturesInfo(args, apply);
       this.ConsumeGestures(this, sent);
-      if (args.Type !== "Up" && sent.Consumed) return this;
+      if (args.Type !== "Up" && sent.Consumed) { args.Event.Handled = true; return this; }
     }
 
     // C# EffectsGestureProcessors: attached effects that process gestures (ISkiaGestureProcessor) see them first
     if (!this.DisableEffects) for (const e of this.visualEffects) {
       const p = (e as unknown as { ProcessGestures?: (a: SkiaGesturesParameters, i: GestureEventProcessingInfo) => SkiaControl | null }).ProcessGestures;
-      if (typeof p === "function" && p.call(e, args, apply) && args.Type !== "Up") return this;
+      if (typeof p === "function" && p.call(e, args, apply) && args.Type !== "Up") { args.Event.Handled = true; return this; }
     }
 
     if (this.CheckChildrenGesturesLocked(args.Type)) return consumedDefault;

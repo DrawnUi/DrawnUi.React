@@ -679,7 +679,9 @@ export class SkiaScroll extends SkiaControl {
       const child = super.ProcessGestures(args, apply);
       if (child && child !== this) return child;
       if (!this.RespondsToGestures) return child ?? consumedDefault;
-      return this.ApplyWheelScroll(e.Wheel.Delta) ? this : consumedDefault;
+      if (!this.ApplyWheelScroll(e.Wheel.Delta)) return consumedDefault; // at its edge: not used, the page may take it
+      e.Handled = true;
+      return this;
     }
 
     this.velocityY = e.Distance.Velocity.Y / scale;

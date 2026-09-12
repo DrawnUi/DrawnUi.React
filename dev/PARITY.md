@@ -80,6 +80,19 @@ Updated whenever the port deliberately diverges or finds something worth back-po
   far above the viewport: rows, pixel position and `measured 200/200` all unchanged, no cell re-created. The same swap
   routed through the rebuild path (cloned items, so not a permutation) moved the content by a row.
 
+### Gestures="Enabled" shares the wheel per event, not by a sticky lock
+- **.NET** (DrawnUi.Blazor `TouchEffect`, `TouchHandlingStyle.Manual`): the canvas sets `WIllLock` Locked when a control
+  consumes a Panning or Wheel and Unlocked when a Panning is not consumed, resetting to Initial on Down / Up; the wheel
+  policy prevents the page default while Locked. An unconsumed wheel never unlocks, so after a wheel scrolled an inner
+  list, wheeling over a part of the canvas that does not scroll still blocks the page until the next press.
+- **React**: the wheel's own result decides: processed immediately in the DOM handler, default prevented only when a
+  control USED that wheel (marked `Handled`, or a consumer that is not a `BlockGesturesBelow` layer). A blocker returns
+  itself for everything it keeps from the controls below, and a shell page is one (C# `SkiaViewSwitcher` sets it on
+  the visible page too), so in Blazor a shell app blocks the page wheel over its whole canvas. Before this, React prevented every wheel in both modes, so `Enabled` behaved like `Lock`
+  and a canvas embedded in a longer HTML page stopped the page from scrolling under the mouse.
+- **Opinion**: per-event is what "share if not consumed" means; the Blazor lock only needs the sticky state for pointer
+  moves, where one Down starts a whole gesture.
+
 ### Markdown parser
 - C# `SkiaRichLabel` parses with CommonMark.NET; React ships a small hand-written parser (headings, lists, fenced
   code, inline emphasis/code/links, escapes). Same span output rules (`SpanWithAttributes`), same style properties.

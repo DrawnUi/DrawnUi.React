@@ -102,7 +102,10 @@ export const SkiaDrawer = "SkiaDrawer" as unknown as FC<LayoutProps<SkiaDrawerCt
 export interface CanvasProps {
   BackgroundColor?: Color;
   RenderingMode?: RenderingModeType;
-  /** Disabled (default) / Enabled / Lock, like DrawnUi Canvas.Gestures. */
+  /**
+   * Disabled (default) / Enabled / Lock, like DrawnUi Canvas.Gestures. Enabled shares the mouse wheel with the page
+   * (it scrolls unless a control consumed the wheel), Lock keeps every wheel. Touch never pans the page in either.
+   */
   Gestures?: GesturesMode;
   children?: ReactNode;
   style?: CSSProperties;
