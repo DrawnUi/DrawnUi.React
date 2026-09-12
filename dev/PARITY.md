@@ -102,6 +102,11 @@ Updated whenever the port deliberately diverges or finds something worth back-po
   start, it cannot be decided mid-gesture): attach, window / html / body resize, and after every touch. When the browser
   takes the pan it cancels the pointer; `SkiaScroll` settles on a cancel instead of flinging from the moves that arrived
   before it (same fix in C# `SkiaScroll`). A page that cannot scroll keeps every touch, so full-page apps are unchanged.
+- **Iframes** (2026-09-12): a full-viewport app in a frame has a document that cannot scroll, and a cross-origin parent
+  cannot be read, so the own-document check alone gave `none` and a widget embedded on a landing page never let the
+  page scroll by touch. Framed (`window.self !== window.top`) now always counts the vertical axis. Same rule in
+  AppoMobi.Blazor.Gestures 3.11.3 and `drawnui-web.js`. Cost: a framed `Enabled` app loses its own vertical touch
+  drags; such apps use `Lock`.
 - **Opinion**: this is the only browser mapping of MAUI's parent intercept; the per-gesture "share unless consumed" that
   Blazor's `Manual` does for the wheel cannot exist for touch, because the choice is made before the canvas sees a move.
 

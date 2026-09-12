@@ -109,7 +109,9 @@ createRoot(document.getElementById("root")!).render(
 - `<Canvas Gestures>`: `"Enabled"` shares input with the host page like MAUI's `Enabled` inside a native scroll view,
   so a canvas embedded in a longer page never traps page scrolling. Touch: a finger pan along an axis the page can
   scroll scrolls the page (the canvas pointer is cancelled, a `SkiaScroll` settles without flinging), taps and the
-  other axis stay on the canvas; a page that cannot scroll (a full-page app) keeps every touch. Wheel: the page scrolls
+  other axis stay on the canvas; a page that cannot scroll (a full-page app) keeps every touch. Inside an iframe the
+  embedding page cannot be inspected, so it is assumed to scroll vertically: a framed widget hands vertical pans to it
+  (use `"Lock"` for a framed app that needs its own vertical drags). Wheel: the page scrolls
   unless a control used it (a `SkiaScroll` that moved, a `ConsumeGestures` handler that set `Consumed`; a
   `BlockGesturesBelow` layer that only blocks does not count). `"Lock"` keeps all input: use it for a widget whose own
   vertical drags (inner list, drawer, drag to reorder) must win inside a scrolling page. A custom control overriding
