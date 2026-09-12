@@ -107,6 +107,12 @@ Updated whenever the port deliberately diverges or finds something worth back-po
   page scroll by touch. Framed (`window.self !== window.top`) now always counts the vertical axis. Same rule in
   AppoMobi.Blazor.Gestures 3.11.3 and `drawnui-web.js`. Cost: a framed `Enabled` app loses its own vertical touch
   drags; such apps use `Lock`.
+- **Claimed touches** (2026-09-13): touch-action alone let iOS Safari take an off-axis drag from a control that had
+  already consumed the Down (a before/after handle panning sideways lost its drag to the page). `Enabled` now processes
+  a touch Down immediately and, when a control used it, default-prevents that touch's `touchmove` until it ends:
+  closer to MAUI, where a child that handles the gesture can keep the parent from intercepting. A non-passive
+  `touchmove` listener makes the browser consult the main thread before it scrolls over the canvas. Cost: a touch
+  that starts on a `SkiaCarousel` (it always consumes Down) no longer scrolls the page.
 - **Opinion**: this is the only browser mapping of MAUI's parent intercept; the per-gesture "share unless consumed" that
   Blazor's `Manual` does for the wheel cannot exist for touch, because the choice is made before the canvas sees a move.
 

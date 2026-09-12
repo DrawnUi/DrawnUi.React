@@ -293,9 +293,13 @@ export class Canvas {
     pd.PressedButtons = e.buttons;
     args.Pointer = pd;
     this.OnTouchAction(args);
-    if (type === "Released" || type === "Cancelled") this.UpdateTouchAction();
+    if (type === "Released" || type === "Cancelled") { this.claimedTouches.delete(e.pointerId); this.UpdateTouchAction(); }
   };
   private readonly preventTouch = (e: TouchEvent) => e.preventDefault();
+  /** Gestures="Enabled": touch / pen pointers whose Down a control used (see OnTouchAction). */
+  private readonly claimedTouches = new Set<number>();
+  /** Gestures="Enabled": while a claimed touch is down the page may not take its drag. */
+  private readonly preventClaimedTouch = (e: TouchEvent) => { if (this.claimedTouches.size > 0 && e.cancelable) e.preventDefault(); };
 
   /** Called when no control handled a context-menu request; return true to suppress the browser's canvas menu. */
   ContextMenu?: (sender: Canvas, e: ContextMenuEventArgs) => boolean | void;
@@ -421,6 +425,7 @@ export class Canvas {
     el.addEventListener("contextmenu", this.onContextMenu);
     el.addEventListener("wheel", this.onWheel, { passive: false });
     if (this.gestures === "Lock") el.addEventListener("touchmove", this.preventTouch, { passive: false });
+    else if (this.gestures === "Enabled") el.addEventListener("touchmove", this.preventClaimedTouch, { passive: false });
   }
 
   private DetachInput(): void {
@@ -434,6 +439,8 @@ export class Canvas {
     el.removeEventListener("contextmenu", this.onContextMenu);
     el.removeEventListener("wheel", this.onWheel);
     el.removeEventListener("touchmove", this.preventTouch);
+    el.removeEventListener("touchmove", this.preventClaimedTouch);
+    this.claimedTouches.clear();
     this.activeTouchIds.clear(); this.pointerDownArgs.clear(); this.previousTouchArgs.clear();
   }
 
@@ -449,6 +456,15 @@ export class Canvas {
       args.IsInContact = true;
       this.pointerDownArgs.set(id, args);
       this.previousTouchArgs.set(id, args);
+      // Gestures="Enabled", touch or pen: page scrolling was left to touch-action alone, and iOS Safari still takes an
+      // off-axis drag from the page axis (pointercancel mid-gesture, w3c/pointerevents#303). So the Down is processed
+      // now, like the wheel (queued gestures first, same "used" rule): when a control used it the touch is claimed and
+      // its touchmoves are default-prevented until it ends. It is not queued as well, so it is processed exactly once and
+      // the Panning / Up that follow keep their order. An unclaimed touch shares the page as before.
+      if (this.gestures === "Enabled" && args.Pointer && args.Pointer.DeviceType !== "Mouse") {
+        if (this.ProcessGestureNow(args, "Down")) this.claimedTouches.add(id);
+        return;
+      }
       this.OnGestureEvent(args, "Down");
       return;
     }

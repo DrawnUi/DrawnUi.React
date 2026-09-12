@@ -111,7 +111,9 @@ createRoot(document.getElementById("root")!).render(
   scroll scrolls the page (the canvas pointer is cancelled, a `SkiaScroll` settles without flinging), taps and the
   other axis stay on the canvas; a page that cannot scroll (a full-page app) keeps every touch. Inside an iframe the
   embedding page cannot be inspected, so it is assumed to scroll vertically: a framed widget hands vertical pans to it
-  (use `"Lock"` for a framed app that needs its own vertical drags). Wheel: the page scrolls
+  (use `"Lock"` for a framed app that needs its own vertical drags). A touch that starts on a control using its Down (a `ConsumeGestures` handler
+  that sets `Consumed`, a slider, a carousel) is claimed: the page does not take that drag, so a sideways drag cannot be
+  stolen mid-gesture (iOS Safari ignores `touch-action` for off-axis drags). Touches starting elsewhere share the page. Wheel: the page scrolls
   unless a control used it (a `SkiaScroll` that moved, a `ConsumeGestures` handler that set `Consumed`; a
   `BlockGesturesBelow` layer that only blocks does not count). `"Lock"` keeps all input: use it for a widget whose own
   vertical drags (inner list, drawer, drag to reorder) must win inside a scrolling page. A custom control overriding
