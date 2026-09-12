@@ -93,6 +93,18 @@ Updated whenever the port deliberately diverges or finds something worth back-po
 - **Opinion**: per-event is what "share if not consumed" means; the Blazor lock only needs the sticky state for pointer
   moves, where one Down starts a whole gesture.
 
+### Gestures="Enabled" hands touch pans to the page along the axes it can scroll
+- **.NET MAUI**: `Enabled` inside a native scroll view lets the parent intercept the pans it scrolls in; the canvas
+  keeps taps and the other axis. **DrawnUi.Blazor / DrawnUi.Wasm** used `touch-action:none` for `Enabled` too, so a
+  finger on the canvas never scrolled the page. Both heads now follow the MAUI rule as well (AppoMobi.Blazor.Gestures
+  3.11.2, `drawnui-web.js`).
+- **React**: `touch-action` is set to the page's scrollable axes before a touch starts (the browser reads it at touch
+  start, it cannot be decided mid-gesture): attach, window / html / body resize, and after every touch. When the browser
+  takes the pan it cancels the pointer; `SkiaScroll` settles on a cancel instead of flinging from the moves that arrived
+  before it (same fix in C# `SkiaScroll`). A page that cannot scroll keeps every touch, so full-page apps are unchanged.
+- **Opinion**: this is the only browser mapping of MAUI's parent intercept; the per-gesture "share unless consumed" that
+  Blazor's `Manual` does for the wheel cannot exist for touch, because the choice is made before the canvas sees a move.
+
 ### Markdown parser
 - C# `SkiaRichLabel` parses with CommonMark.NET; React ships a small hand-written parser (headings, lists, fenced
   code, inline emphasis/code/links, escapes). Same span output rules (`SpanWithAttributes`), same style properties.

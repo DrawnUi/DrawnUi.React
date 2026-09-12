@@ -103,8 +103,9 @@ export interface CanvasProps {
   BackgroundColor?: Color;
   RenderingMode?: RenderingModeType;
   /**
-   * Disabled (default) / Enabled / Lock, like DrawnUi Canvas.Gestures. Enabled shares the mouse wheel with the page
-   * (it scrolls unless a control consumed the wheel), Lock keeps every wheel. Touch never pans the page in either.
+   * Disabled (default) / Enabled / Lock, like DrawnUi Canvas.Gestures. Enabled shares input with the page like MAUI's
+   * Enabled inside a native scroll view: a touch pan along an axis the page can scroll scrolls the page, and the wheel
+   * scrolls it unless a control used the wheel. A page that cannot scroll keeps every touch. Lock keeps all input.
    */
   Gestures?: GesturesMode;
   children?: ReactNode;

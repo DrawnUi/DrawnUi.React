@@ -273,6 +273,7 @@ export class Canvas {
     pd.PressedButtons = e.buttons;
     args.Pointer = pd;
     this.OnTouchAction(args);
+    if (type === "Released" || type === "Cancelled") this.UpdateTouchAction();
   };
   private readonly preventTouch = (e: TouchEvent) => e.preventDefault();
 
@@ -350,9 +351,48 @@ export class Canvas {
     return !!consumed && (args.Handled || !consumed.BlockGesturesBelow);
   }
 
+  /**
+   * The page axes a touch pan over the canvas hands to the browser: "pan-y" when the page (or a scrolling ancestor) can
+   * scroll vertically, "pan-x" horizontally, both, or "none". Mirrors MAUI's Gestures="Enabled" inside a native scroll
+   * view, where the parent takes the pans it scrolls in.
+   */
+  private static PageScrollAxes(el: HTMLElement): string {
+    const scrolls = (v: string) => v === "auto" || v === "scroll" || v === "overlay";
+    const clips = (v: string) => v === "hidden" || v === "clip";
+    let x = false, y = false;
+    for (let n = el.parentElement; n && n !== document.body && n !== document.documentElement; n = n.parentElement) {
+      const st = getComputedStyle(n);
+      if (!y && scrolls(st.overflowY) && n.scrollHeight > n.clientHeight + 1) y = true;
+      if (!x && scrolls(st.overflowX) && n.scrollWidth > n.clientWidth + 1) x = true;
+    }
+    // the viewport scrolls unless html or body clips it
+    const root = document.scrollingElement ?? document.documentElement;
+    const hs = getComputedStyle(document.documentElement), bs = getComputedStyle(document.body);
+    if (!y && !clips(hs.overflowY) && !clips(bs.overflowY) && root.scrollHeight > root.clientHeight + 1) y = true;
+    if (!x && !clips(hs.overflowX) && !clips(bs.overflowX) && root.scrollWidth > root.clientWidth + 1) x = true;
+    return x && y ? "pan-x pan-y" : y ? "pan-y" : x ? "pan-x" : "none";
+  }
+
+  /**
+   * Gestures="Enabled" shares touch pans with the page like MAUI's Enabled inside a native scroll view: along an axis
+   * the page can scroll, the browser takes the pan (and sends pointercancel), taps and the other axis stay on the
+   * canvas. A page that cannot scroll, and Lock, keep every touch. The browser reads touch-action when a touch starts,
+   * so it is kept current ahead of time: on attach, when the window / html / body resize, and after every touch.
+   */
+  private readonly UpdateTouchAction = (): void => {
+    if (this.gestures === "Disabled") return;
+    const pan = this.gestures === "Enabled" ? Canvas.PageScrollAxes(this.Element) : "none";
+    if (this.Element.style.touchAction !== pan) this.Element.style.touchAction = pan;
+  };
+  private pageObserver?: ResizeObserver;
+
   private AttachInput(): void {
     const el = this.Element;
-    el.style.touchAction = "none";
+    this.UpdateTouchAction();
+    window.addEventListener("resize", this.UpdateTouchAction);
+    this.pageObserver = new ResizeObserver(this.UpdateTouchAction);
+    this.pageObserver.observe(document.documentElement);
+    this.pageObserver.observe(document.body);
     el.style.userSelect = "none";
     for (const t of ["pointerdown", "pointermove", "pointerup", "pointercancel"]) el.addEventListener(t, this.onPointer as EventListener);
     el.addEventListener("contextmenu", this.onContextMenu);
@@ -363,6 +403,9 @@ export class Canvas {
   private DetachInput(): void {
     const el = this.Element;
     el.style.touchAction = "";
+    window.removeEventListener("resize", this.UpdateTouchAction);
+    this.pageObserver?.disconnect();
+    this.pageObserver = undefined;
     el.style.userSelect = "";
     for (const t of ["pointerdown", "pointermove", "pointerup", "pointercancel"]) el.removeEventListener(t, this.onPointer as EventListener);
     el.removeEventListener("contextmenu", this.onContextMenu);

@@ -729,6 +729,9 @@ export class SkiaScroll extends SkiaControl {
       const swipeThreshold = SkiaScroll.ThesholdSwipeOnUp * scale;
       let vx = finalVelocity.X * this.ChangeVelocityScrolled;
       let vy = finalVelocity.Y * this.ChangeVelocityScrolled;
+      // a cancelled pointer (the browser took the pan to scroll the page, or a parent intercepted it) settles in place:
+      // flinging from the few moves that arrived before the cancel would scroll the list while the page scrolls
+      if (e.Type === "Cancelled") { vx = 0; vy = 0; }
       let fling = false;
 
       if (this.OverScrolled) {
