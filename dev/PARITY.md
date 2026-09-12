@@ -110,6 +110,14 @@ Updated whenever the port deliberately diverges or finds something worth back-po
 - **Opinion**: this is the only browser mapping of MAUI's parent intercept; the per-gesture "share unless consumed" that
   Blazor's `Manual` does for the wheel cannot exist for touch, because the choice is made before the canvas sees a move.
 
+### WillFirstTimeDraw fires on a frame without the JSX content
+- **.NET** (`DrawnView.OnDrawSurface`): `WillFirstTimeDraw` is raised before the first `Draw` once `CanRender`; the
+  content set in XAML or code is normally already attached, so that first frame draws it.
+- **React**: the engine draws frame 1 synchronously in its constructor (the canvas is painted before the browser shows
+  it), and React renders the children into the tree afterwards. `WillFirstTimeDraw` therefore fires for a frame that
+  only clears to `BackgroundColor`; the content arrives on a later frame. Use `WasDrawn` (or the first `WasDrawn` after
+  your content mounted) when you need a frame that shows the tree.
+
 ### Markdown parser
 - C# `SkiaRichLabel` parses with CommonMark.NET; React ships a small hand-written parser (headings, lists, fenced
   code, inline emphasis/code/links, escapes). Same span output rules (`SpanWithAttributes`), same style properties.

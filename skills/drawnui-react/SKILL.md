@@ -157,6 +157,7 @@ createRoot(document.getElementById("root")!).render(
 ## Debugging in the browser
 
 - The `Canvas` ref exposes the engine view: `FPS`, `FrameTime`, `RenderingScale`, `AccessibilityManager.Snapshot`.
+  Draw events as props (DrawnView names): `WillFirstTimeDraw={(canvas, ctx) => …}` runs once right before the first frame, `WasDrawn={(canvas) => …}` after every frame (keep it cheap, it runs at frame rate); `canvas.WasRendered` becomes true after the first frame. The first frame is drawn before your JSX content mounts, so it shows only the background.
 - The accessibility overlay is the easiest automation hook: every accessible control is a DOM node with
   `role` / `aria-label` positioned over its drawn rect (labels expose their text). Drive UI tests through it.
 - Nothing repaints while idle: an animation or a scroll must request frames (`Repaint()`, animators). If something

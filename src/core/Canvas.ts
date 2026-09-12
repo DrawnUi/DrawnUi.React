@@ -1,5 +1,5 @@
 import type { GrDirectContext, Surface, WebGLContextHandle } from "canvaskit-wasm";
-import type { CachedObject, SkiaControl } from "./SkiaControl";
+import type { CachedObject, DrawingContext, SkiaControl } from "./SkiaControl";
 import type { AnimatorBase } from "./Animators";
 import { Super } from "./Super";
 import { SkiaAccessibilityManager } from "./Accessibility";
@@ -29,6 +29,19 @@ export class Canvas {
   /** Frames per second over the last second of drawn frames. */
   FPS = 0;
   private frameTimes: number[] = [];
+
+  /** DrawnView.WasRendered: a frame has been drawn on a ready surface (set after the first one completes). */
+  WasRendered = false;
+  /** DrawnView.CanRender: the surface (and its GPU context when accelerated) is ready to draw. */
+  get CanRender(): boolean { return !!this.surface && !this.disposed; }
+  /**
+   * DrawnView.WillFirstTimeDraw: raised once, right before the first frame drawn on a ready surface, with that
+   * frame's drawing context. The engine draws its first frame while it is being constructed (so the page never shows
+   * an unpainted canvas): pass it through the constructor's `init` to receive that frame.
+   */
+  WillFirstTimeDraw?: (sender: Canvas, context: DrawingContext["Context"]) => void;
+  /** DrawnView.WasDrawn: raised after every frame has been drawn (the C# event passes no context). */
+  WasDrawn?: (sender: Canvas) => void;
   /** Registry + rate-limited snapshot of accessible controls, rendered by the DOM overlay (DrawnUi AccessibilityManager). */
   readonly AccessibilityManager = new SkiaAccessibilityManager();
 
@@ -49,8 +62,10 @@ export class Canvas {
   private disposed = false;
   private readonly observer: ResizeObserver;
 
-  constructor(readonly Element: HTMLCanvasElement) {
+  /** `init` runs before the first frame is drawn: the place to attach `WillFirstTimeDraw` / `WasDrawn` for that frame. */
+  constructor(readonly Element: HTMLCanvasElement, init?: (canvas: Canvas) => void) {
     if (!Super.CK) throw new Error("DrawnUi: call Super.UseDrawnUi()...BuildAsync() before creating a Canvas");
+    init?.(this);
     this.observer = new ResizeObserver(() => this.OnResized());
     this.observer.observe(Element);
     this.OnResized();
@@ -121,6 +136,8 @@ export class Canvas {
     const started = performance.now();
     this.ProcessPendingGestures();
     const executed = this.ExecuteAnimators(Math.round(started * 1_000_000));
+    const canRender = this.CanRender;
+    if (canRender && !this.WasRendered) this.WillFirstTimeDraw?.(this, { Canvas: canvas, Surface: this.surface });
     canvas.clear(Super.ParseColor(this.BackgroundColor));
     const root = this.content;
     if (root) {
@@ -138,6 +155,9 @@ export class Canvas {
     while (this.frameTimes.length && this.frameTimes[0] < now - 1000) this.frameTimes.shift();
     this.FPS = this.frameTimes.length;
     if (executed > 0) this.Update(); // animators running: keep frames coming
+    // C# order: WasDrawn at the end of the frame, then the frame counts as rendered
+    this.WasDrawn?.(this);
+    if (!this.WasRendered && canRender) this.WasRendered = true;
   }
 
   // ---- deferred disposal (DrawnUi DisposeObject: never delete Skia objects mid-frame) ----

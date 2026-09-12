@@ -115,6 +115,10 @@ export interface CanvasProps {
   ref?: Ref<CanvasView>;
   /** Context-menu request (right click / long press / Menu key) no control handled; return true to suppress the browser menu. */
   ContextMenu?: CanvasView["ContextMenu"];
+  /** DrawnView.WillFirstTimeDraw: once, right before the first frame is drawn, with its drawing context. */
+  WillFirstTimeDraw?: CanvasView["WillFirstTimeDraw"];
+  /** DrawnView.WasDrawn: after every drawn frame. */
+  WasDrawn?: CanvasView["WasDrawn"];
 }
 
 /**
@@ -133,15 +137,19 @@ function removeStaticContent(): void {
  * Mirrors DrawnUi Canvas: the bridge between the DOM (react-dom) and the drawn tree (DrawnUi reconciler).
  * Requires Super.UseDrawnUi()...BuildAsync() to have completed.
  */
-export function Canvas({ BackgroundColor, RenderingMode, Gestures, children, style, className, ref: viewRef, ContextMenu }: CanvasProps) {
+export function Canvas({ BackgroundColor, RenderingMode, Gestures, children, style, className, ref: viewRef, ContextMenu, WillFirstTimeDraw, WasDrawn }: CanvasProps) {
   const ref = useRef<HTMLCanvasElement>(null);
   const view = useRef<CanvasView>(null);
   const root = useRef<ReturnType<typeof createDrawnRoot>>(null);
   const [engine, setEngine] = useState<CanvasView | null>(null);
 
   useLayoutEffect(() => {
-    const v = new CanvasView(ref.current!);
-    if (RenderingMode) v.RenderingMode = RenderingMode;
+    // the engine draws frame 1 inside its constructor: the draw events and the rendering mode must be on it before that
+    const v = new CanvasView(ref.current!, (c) => {
+      if (RenderingMode) c.RenderingMode = RenderingMode;
+      c.WillFirstTimeDraw = WillFirstTimeDraw;
+      c.WasDrawn = WasDrawn;
+    });
     view.current = v;
     root.current = createDrawnRoot(v);
     setEngine(v);
@@ -158,6 +166,8 @@ export function Canvas({ BackgroundColor, RenderingMode, Gestures, children, sty
     if (BackgroundColor !== undefined && v.BackgroundColor !== BackgroundColor) { v.BackgroundColor = BackgroundColor; v.Update(); }
     v.Gestures = Gestures ?? "Disabled";
     v.ContextMenu = ContextMenu;
+    v.WillFirstTimeDraw = WillFirstTimeDraw;
+    v.WasDrawn = WasDrawn;
     root.current!.render(children);
   });
 
