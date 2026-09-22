@@ -50,18 +50,24 @@ Adding another published sample = one more `wrangler pages deploy dist/<name> --
 
 ## npm package
 
-`drawnui-react` is published from a maintainer machine by the npm user `drawnui` (scope `@drawnui` is reserved by
-that username). npm requires either 2FA on the account or a granular access token with "bypass 2FA" to publish.
+`drawnui-react` is published by GitHub Actions through npm **Trusted Publishing** (OIDC): no token anywhere.
+`.github/workflows/publish.yml` in `DrawnUi/DrawnUi.React` is registered as the trusted publisher of the package
+(npmjs.com → package → Settings → Trusted Publisher; the package is owned by the npm user `drawnui`, scope `@drawnui`
+is reserved by that username). Every publish carries SLSA provenance, and the version goes out as dist-tag `latest`
+(npm 11 refuses a prerelease without an explicit `--tag`, and previews are the only line for now).
 
-The maintainer machine keeps that token in the user-level `~/.npmrc` (`//registry.npmjs.org/:_authToken=`), so
-`npm publish` and `npm whoami` just work. **Leave it there.** npm shows a token value once at creation, and creating a
-replacement needs the account password typed into npmjs.com by hand, so deleting the token after a release costs a
-manual step every time; it was revoked twice for "hygiene" and both times the next release stalled. Rotate it only
-when it actually leaks or expires (write-capable tokens expire in 7 days by default, 90 days maximum, so a long-lived
-one has to be created with an explicit expiry).
+1. Bump `version` in `package.json` (previews: `0.1.0-preview.N`), commit, push.
+2. Tag and release: `git tag v0.1.0-preview.N && git push origin v0.1.0-preview.N`, then
+   `gh release create v0.1.0-preview.N --title ... --notes ... --latest`. Publishing the release runs the workflow.
+   For a release that already exists: `gh workflow run publish.yml -f tag=v0.1.0-preview.N`.
+3. `gh run watch` — the job checks the tag equals `v<package.json version>`, builds `dist/` via `prepublishOnly`,
+   publishes, then polls `npm view drawnui-react dist-tags.latest` until it equals the version (registry lags ~20 s).
+4. Optionally `npm pack` locally and install the tarball in a throwaway Vite app to check `exports`, types and the
+   CanvasKit `.wasm` asset before tagging.
 
-1. Bump `version` in `package.json` (previews: `0.1.0-preview.N`, dist-tag `preview`).
-2. `npm run build:lib` (also run by `prepublishOnly`), optionally `npm pack` and install the tarball in a throwaway
-   Vite app to check `exports`, types and the CanvasKit `.wasm` asset.
-3. `npm publish --access public --tag preview` (with 2FA on the account instead of a token: add `--otp=<code>`).
-4. `npm view drawnui-react version dist-tags` (the registry lags ~20 s).
+Account facts: `drawnui` has 2FA via a security key. The key is a software passkey registered from the maintainer
+machine's shared Chrome through the CDP `WebAuthn` domain; the credential and the recovery codes live in
+`C:/Users/taubl/.npm-passkey.json` (outside every repo). To pass the "Use security key" prompt on npmjs.com, attach a
+virtual authenticator to the tab, import that credential with `WebAuthn.addCredential`, emulate focus
+(`Emulation.setFocusEmulationEnabled`, otherwise `navigator.credentials` throws "page does not have focus") and click
+the button while the CDP session stays attached. Changing package settings (trusted publisher, access) needs this.
