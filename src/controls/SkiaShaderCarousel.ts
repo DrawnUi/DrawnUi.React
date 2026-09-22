@@ -140,6 +140,12 @@ export class SkiaShaderCarousel extends SkiaCarousel {
   /** Slides never move: the transition effect renders the change (C# AnimateVisibleChild no-op). */
   protected override SlideOffset(_offset: SKPoint): SKPoint { return SKPoint.Empty; }
 
+  /**
+   * Slides all sit on the same rect, so only the selected one may take gestures: otherwise the topmost slide in the
+   * gesture list (the last on-screen one, a neighbour exactly one width away counts as on screen) caught every tap.
+   */
+  protected override IsSlideHitTestable(index: number): boolean { return index === this.SelectedIndex; }
+
   override ProcessGestures(args: SkiaGesturesParameters, apply: GestureEventProcessingInfo): SkiaControl | null {
     if (args.Type === "Down") {
       const interrupted = this.InTransition;

@@ -973,13 +973,21 @@ export class SkiaControl {
     this.Repaint();
   }
 
+  /**
+   * DrawnUi IsParentIndependent: this control's size never changes the layout around it, so its own invalidation
+   * stops here (ancestors composite again, nothing above re-measures). The parent re-measures it on draw when
+   * NeedMeasure is set. Used by SkiaScroll for its scroll bars.
+   */
+  IsParentIndependent = false;
+
   /** Size or content may have changed: this control and all ancestors remeasure and re-record. */
   InvalidateMeasure(): void {
     this.NeedMeasure = true;
     this.cacheDirty = true;
     this.compositeFull = true; // structure may change: a composite cannot patch it
     this.effectsMarginCache = undefined;
-    if (this.Parent) this.Parent.InvalidateMeasure();
+    if (this.Parent && this.IsParentIndependent) this.RepaintComposition();
+    else if (this.Parent) this.Parent.InvalidateMeasure();
     else this.Superview?.Update();
   }
 

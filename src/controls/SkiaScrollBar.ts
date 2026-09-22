@@ -1,5 +1,5 @@
 import type { Color, ScrollOrientation } from "../core/Types";
-import { Colors, Thickness } from "../core/Types";
+import { Colors, SKRect, Thickness } from "../core/Types";
 import { SkiaLayout } from "./SkiaLayout";
 import { SkiaShape } from "./SkiaShape";
 
@@ -14,6 +14,12 @@ export type ScrollBarDock = "End" | "Start";
  */
 export interface IScrollBar {
   SetScrollProgress(orientation: ScrollOrientation, progress: number, thumbSizeRatio: number, overscrollPts: number, isScrolling: boolean): void;
+  /** Optional desktop behavior: the bar takes the gesture that starts on it (thumb drag, track press). */
+  IsDraggable?: boolean;
+  /** Canvas pixels; true when the point is on the bar and a drag starts. */
+  BeginDrag?(x: number, y: number): boolean;
+  /** Scroll progress 0..1 for the pointer during a drag started by BeginDrag. */
+  GetDragProgress?(x: number, y: number): number;
 }
 
 /**
@@ -45,6 +51,19 @@ export class SkiaScrollBar extends SkiaLayout implements IScrollBar {
   /** Fade out after scrolling stops. */
   AutoHide = true;
   HideDelaySecs = 1;
+  /** Duration in seconds of the fade-out once HideDelaySecs has passed. */
+  HideDurationSecs = 0.25;
+  /**
+   * Lets the user drag the thumb and press the track to jump there (desktop scroll bar behavior). The owning
+   * SkiaScroll then takes the whole gesture, from down to up, when it starts on the bar. Default false: the bar only
+   * indicates and every gesture passes through to the content.
+   */
+  IsDraggable = false;
+  /** Extra grab area in points on both sides of the bar, across the scrolling axis, so a thin bar is easy to hit with a mouse. */
+  GrabPadding = 8;
+  private thumbOffsetPts = 0;
+  private dragGrabPx = 0;
+  private hasTravel = false;
 
   protected readonly thumb = new SkiaShape();
   protected readonly track = new SkiaShape();
@@ -59,6 +78,7 @@ export class SkiaScrollBar extends SkiaLayout implements IScrollBar {
     this.UseCache = "Operations";
     this.HorizontalOptions = "Fill"; this.VerticalOptions = "Fill";
     this.InputTransparent = true; // display only, gestures pass through
+    this.IsParentIndependent = true; // the bar's look (thumb squashed on overscroll) never changes the layout around it
     this.Opacity = 0; // hidden until the first scroll
     this.track.Type = "Rectangle"; this.track.BackgroundColor = this.trackColor; this.track.UseCache = "Operations";
     this.thumb.Type = "Rectangle"; this.thumb.BackgroundColor = this.thumbColor; this.thumb.UseCache = "Operations";
@@ -92,6 +112,8 @@ export class SkiaScrollBar extends SkiaLayout implements IScrollBar {
     if (overscrollPts !== 0) thumbLen = Math.max(this.MinThumbSize / 2, thumbLen - Math.abs(overscrollPts)); // squash on bounce
     const travel = track - thumbLen;
     const offset = Math.max(0, Math.min(1, progress)) * travel;
+    this.thumbOffsetPts = offset;
+    this.hasTravel = travel > 0;
     if (Math.abs(thumbLen - this.lastThumbLen) > 0.5) {
       this.lastThumbLen = thumbLen;
       if (orientation === "Horizontal") this.thumb.WidthRequest = thumbLen; else this.thumb.HeightRequest = thumbLen;
@@ -101,7 +123,7 @@ export class SkiaScrollBar extends SkiaLayout implements IScrollBar {
     this.CancelHide();
     this.Opacity = 1;
     if (this.AutoHide && !isScrolling) {
-      this.hideTimer = window.setTimeout(() => { this.hideTimer = 0; this.hideAbort = new AbortController(); void this.FadeToAsync(0, 250, undefined, this.hideAbort.signal); }, this.HideDelaySecs * 1000);
+      this.hideTimer = window.setTimeout(() => { this.hideTimer = 0; this.hideAbort = new AbortController(); void this.FadeToAsync(0, Math.max(0, this.HideDurationSecs * 1000), undefined, this.hideAbort.signal); }, this.HideDelaySecs * 1000);
     }
     this.RepaintComposition();
   }
@@ -109,6 +131,39 @@ export class SkiaScrollBar extends SkiaLayout implements IScrollBar {
   private CancelHide(): void {
     if (this.hideTimer) { clearTimeout(this.hideTimer); this.hideTimer = 0; }
     this.hideAbort?.abort(); this.hideAbort = undefined;
+  }
+
+  /**
+   * Called by the owning scroll on touch down, coordinates in canvas pixels. True when the point is on the bar (track
+   * plus GrabPadding) and a drag starts: on the thumb it keeps the grab point, on the track the thumb jumps to center
+   * under the pointer.
+   */
+  BeginDrag(x: number, y: number): boolean {
+    if (!this.IsDraggable || !this.hasTravel) return false;
+    const scale = this.RenderingScale || 1;
+    const track = this.track.DrawingRect;
+    const pad = this.GrabPadding * scale;
+    const vertical = this.orientation !== "Horizontal";
+    const hit = vertical ? new SKRect(track.Left - pad, track.Top, track.Right + pad, track.Bottom) : new SKRect(track.Left, track.Top - pad, track.Right, track.Bottom + pad);
+    if (x < hit.Left || x > hit.Right || y < hit.Top || y > hit.Bottom) return false;
+    // an auto-hidden bar that gets grabbed shows again right away: never drag something invisible
+    this.CancelHide();
+    this.Opacity = 1;
+    const pos = vertical ? y - track.Top : x - track.Left;
+    const thumbStart = this.thumbOffsetPts * scale, thumbLen = this.lastThumbLen * scale;
+    this.dragGrabPx = pos >= thumbStart && pos <= thumbStart + thumbLen ? pos - thumbStart : thumbLen / 2;
+    this.RepaintComposition();
+    return true;
+  }
+
+  /** Scroll progress 0..1 for the pointer position during a drag started by BeginDrag, coordinates in canvas pixels. */
+  GetDragProgress(x: number, y: number): number {
+    const scale = this.RenderingScale || 1;
+    const track = this.track.DrawingRect;
+    const vertical = this.orientation !== "Horizontal";
+    const pos = (vertical ? y - track.Top : x - track.Left) - this.dragGrabPx;
+    const travel = (vertical ? track.Height : track.Width) - this.lastThumbLen * scale;
+    return travel > 0 ? Math.max(0, Math.min(1, pos / travel)) : 0;
   }
 
   protected override OnDisposing(): void { this.CancelHide(); super.OnDisposing(); }

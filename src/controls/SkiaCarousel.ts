@@ -432,7 +432,7 @@ export class SkiaCarousel extends SnappingLayout {
       if (this.IsTemplated) view.Measure(inner.Width, inner.Height, scale); // recycled cells carry new content
       view.Arrange(this.SlideRect(inner, this.SlideOffset(cell.offset), scale), view.WidthRequest, view.HeightRequest, scale);
       view.Render(ctx);
-      if (cell.visible) visible.push(view);
+      if (cell.visible && this.IsSlideHitTestable(cell.index)) visible.push(view);
     }
     this.visibleViews = visible;
   }
@@ -442,6 +442,13 @@ export class SkiaCarousel extends SnappingLayout {
       ? SKRect.Create(inner.Left, inner.Top + offset.Y * scale, inner.Width, inner.Height)
       : SKRect.Create(inner.Left + offset.X * scale, inner.Top, inner.Width, inner.Height);
   }
+
+  /**
+   * Whether the slide at `index` takes part in hit-testing for the frame being rendered (C# IsSlideHitTestable).
+   * Every slide drawn on screen does by default; a carousel whose slides share one rect (SkiaShaderCarousel) narrows
+   * this to the slide the user actually sees.
+   */
+  protected IsSlideHitTestable(_index: number): boolean { return true; }
 
   protected override GetGestureListeners(): readonly SkiaControl[] { return this.visibleViews; }
 

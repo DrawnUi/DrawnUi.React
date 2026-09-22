@@ -79,7 +79,8 @@ createRoot(document.getElementById("root")!).render(
   `host.RemoveSubView(x); x.Dispose()`. JSX children are disposed by the renderer when they unmount.
 - `SkiaScroll` extras are JSX children with a `Tag`: `Tag="Header"`, `"Footer"`, `"RefreshIndicator"`,
   `"ScrollBar"`, `"ScrollBarHorizontal"`; everything else is the single `Content`. Header modes: in the flow,
-  `HeaderSticky`, `HeaderBehind` + `HeaderParallaxRatio`; `ScrollBarsVisibility`, `RefreshEnabled` +
+  `HeaderSticky`, `HeaderBehind` + `HeaderParallaxRatio`; `ScrollBarsVisibility`, or `<SkiaScrollBar Tag="ScrollBar" IsDraggable />`
+  for a desktop bar the user can drag (thumb drag, track press; `HideDelaySecs` / `HideDurationSecs` auto-hide); `RefreshEnabled` +
   `RefreshCommand`, `SnapToChildren`, `TrackIndexPosition` / `CurrentIndex`.
 - A Fill child inside a `SkiaRow` auto-sizes (C# rule). Use a `SkiaGrid` with `*` columns, or the stack itself.
 - `SkiaShell` (React-level): `Routes` (page factories receive the navigation arguments), `GoToAsync("detail?id=7")`

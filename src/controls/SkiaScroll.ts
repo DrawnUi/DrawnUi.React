@@ -97,7 +97,7 @@ export class SkiaScroll extends SkiaControl {
   }
   /** C# UpdateScrollBarIndicator: pushes progress / thumb ratio / overscroll / scrolling state when any changed. */
   protected UpdateScrollBarIndicator(): void {
-    const isScrolling = this.IsScrolling || this.IsUserPanning;
+    const isScrolling = this.IsScrolling || this.IsUserPanning || !!this.draggedScrollBar;
     const scale = this.RenderingScale;
     const viewportH = this.DrawingRect.Height / scale, viewportW = this.DrawingRect.Width / scale;
     const extentH = this.ContentSize.Units.Height + this.HeaderExtentPts + this.FooterExtentPts, extentW = this.ContentSize.Units.Width + this.HeaderExtentPts + this.FooterExtentPts;
@@ -517,7 +517,13 @@ export class SkiaScroll extends SkiaControl {
     if (this.footer && this.footer.IsVisible && onScreen(this.footer)) this.footer.Render(ctx);
     if (this.RefreshEnabled && this.refreshIndicator && this.refreshIndicator.IsVisible && (this.OverScrolled || this.isRefreshing)) this.refreshIndicator.Render(ctx);
     this.UpdateScrollBarIndicator();
-    for (const bar of [this.scrollBar, this.scrollBarHorizontal]) if (bar && bar.IsVisible && bar.Opacity > 0) bar.Render(ctx);
+    for (const bar of [this.scrollBar, this.scrollBarHorizontal]) {
+      if (!bar || !bar.IsVisible || bar.Opacity <= 0) continue;
+      // the bar is parent-independent: its thumb resizing (squash on a bounce) invalidates the bar alone, so it is
+      // re-measured here on draw instead of dragging the scroll and every ancestor through a measure each frame
+      if (bar.NeedMeasure) { const r = this.DrawingRect; bar.Measure(r.Width, r.Height, this.RenderingScale); bar.Arrange(r, bar.WidthRequest, bar.HeightRequest, this.RenderingScale); }
+      bar.Render(ctx);
+    }
     canvas.restoreToCount(saved);
   }
 
@@ -662,10 +668,61 @@ export class SkiaScroll extends SkiaControl {
     this.panningCurrentOffsetPts = new SKPoint(this.offsetX, this.offsetY);
   }
 
+  private draggedScrollBar?: IScrollBar & SkiaControl;
+  private scrollBarOwnsGesture = false;
+
+  /**
+   * Thumb drag and track press on a ScrollBar / ScrollBarHorizontal with IsDraggable set (C# ProcessScrollBarGestures).
+   * A gesture that starts on the bar belongs to it until the next down: the content neither pans nor gets the tap.
+   * True when the gesture was handled here.
+   */
+  protected ProcessScrollBarGestures(args: SkiaGesturesParameters, apply: GestureEventProcessingInfo): boolean {
+    if (args.Type === "Down") {
+      this.draggedScrollBar = undefined;
+      this.scrollBarOwnsGesture = false;
+      const draggable = (b?: IScrollBar & SkiaControl) => b && b.IsDraggable && b.BeginDrag && b.GetDragProgress ? b : undefined;
+      const v = draggable(this.scrollBar), h = draggable(this.scrollBarHorizontal);
+      if (!v && !h) return false;
+      const x = apply.MappedLocation.X + apply.ChildOffset.X, y = apply.MappedLocation.Y + apply.ChildOffset.Y;
+      if (v && v.BeginDrag!(x, y)) this.draggedScrollBar = v;
+      else if (h && h.BeginDrag!(x, y)) this.draggedScrollBar = h;
+      if (!this.draggedScrollBar) return false;
+      this.scrollBarOwnsGesture = true;
+      this.StopScrolling();
+      this.ApplyScrollBarDrag(x, y);
+      args.Event.Handled = true; // used: a touch on the bar is claimed, the page must not take the drag
+      return true;
+    }
+    if (!this.scrollBarOwnsGesture) return false;
+    if (!this.draggedScrollBar) return args.Type === "Tapped" || args.Type === "LongPressing"; // released already: only the tap that follows belongs to the bar
+    if (args.Type === "Panning") {
+      this.ApplyScrollBarDrag(apply.MappedLocation.X + apply.ChildOffset.X, apply.MappedLocation.Y + apply.ChildOffset.Y);
+      args.Event.Handled = true;
+    } else if (args.Type === "Up") {
+      this.draggedScrollBar = undefined;
+      this.scrollBarLast = undefined; // push the idle state so an auto-hiding bar fades again
+      this.scrollBarHLast = undefined;
+      this.Repaint();
+    }
+    return true;
+  }
+
+  private ApplyScrollBarDrag(x: number, y: number): void {
+    const bar = this.draggedScrollBar;
+    if (!bar) return;
+    const progress = bar.GetDragProgress!(x, y);
+    const b = this.ContentOffsetBounds;
+    if (bar === this.scrollBarHorizontal) this.ViewportOffsetX = this.ClampOffset(-progress * b.Width, this.offsetY, b, true).X;
+    else this.ViewportOffsetY = this.ClampOffset(this.offsetX, -progress * b.Height, b, true).Y;
+    this.Repaint();
+  }
+
   override ProcessGestures(args: SkiaGesturesParameters, apply: GestureEventProcessingInfo): SkiaControl | null {
     const consumedDefault = this.BlockGesturesBelow ? this : null;
     const scale = this.RenderingScale;
     const e = args.Event;
+
+    if (this.ProcessScrollBarGestures(args, apply)) return this;
 
     if (args.Type === "Down") {
       this.hadDown = true;
@@ -678,7 +735,7 @@ export class SkiaScroll extends SkiaControl {
       // a nested scroll under the pointer takes the wheel first; the outer one scrolls when the inner is at its edge
       const child = super.ProcessGestures(args, apply);
       if (child && child !== this) return child;
-      if (!this.RespondsToGestures) return child ?? consumedDefault;
+      if (!this.RespondsToGestures || this.Orientation === "Neither") return child ?? consumedDefault; // Neither: not used, a parent scroll may take it
       if (!this.ApplyWheelScroll(e.Wheel.Delta)) return consumedDefault; // at its edge: not used, the page may take it
       e.Handled = true;
       return this;
@@ -690,7 +747,7 @@ export class SkiaScroll extends SkiaControl {
       (this.Orientation === "Vertical" && Math.abs(e.Distance.Total.X) > Math.abs(e.Distance.Total.Y) && Math.abs(e.Distance.Total.X) > SkiaScroll.ScrollVelocityThreshold * scale) ||
       (this.Orientation === "Horizontal" && Math.abs(e.Distance.Total.Y) > Math.abs(e.Distance.Total.X) && Math.abs(e.Distance.Total.Y) > SkiaScroll.ScrollVelocityThreshold * scale);
 
-    if (args.Type === "Panning" && this.RespondsToGestures && this.hadDown) {
+    if (args.Type === "Panning" && this.RespondsToGestures && this.hadDown && this.Orientation !== "Neither") {
       if (!this.IsUserPanning) {
         // A child may own the pan (slider, nested horizontal scroll); ask once before taking over.
         const childConsumed = super.ProcessGestures(args, apply);

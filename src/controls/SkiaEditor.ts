@@ -243,6 +243,11 @@ export class SkiaEditor extends SkiaShape {
   protected override MeasureAbsolute(w: number, h: number, scale: number): ScaledSize {
     const px = this.Padding.HorizontalThickness * scale, py = this.Padding.VerticalThickness * scale;
     const innerW = isFinite(w) ? Math.max(0, w - px) : Infinity;
+    // Single-line: the label is Start-aligned and measures to its content, so Center / End alignment had nothing to
+    // align in. Give it the field as a MINIMUM: short text centers in the field, longer text still grows past it and
+    // scrolls (C# 2e334ddd).
+    const minWidth = !this.IsMultiline && this.horizontalTextAlignment !== "Start" && isFinite(innerW) && innerW > 0 ? innerW / scale : -1;
+    if (this.Label.MinimumWidthRequest !== minWidth) { this.Label.MinimumWidthRequest = minWidth; this.Label.NeedMeasure = true; }
     const labelSize = this.Label.Measure(this.IsMultiline ? innerW : Infinity, Infinity, scale);
     if (this.placeholder.IsVisible) this.placeholder.Measure(innerW, Infinity, scale);
     const lineH = this.Label.MeasuredLineHeight || this.placeholder.MeasuredLineHeight || this.GetSingleLineHeightPts() * scale;
