@@ -6,6 +6,8 @@ through a custom `react-reconciler` renderer.
 
 Check out latest playbook: [helloreact.drawnui.net](https://helloreact.drawnui.net/) 👈
 
+Playground to use and test live: [drawfiddle.com](https://drawfiddle.com/) 👈
+
 *Work in progress*: the goal is same API surface and semantics as DrawnUi (.NET) — same control names, same PascalCase
 property names, same measure/arrange/paint contract — so knowledge and docs transfer 1:1.
 
