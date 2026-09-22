@@ -1,0 +1,54 @@
+name: Publish drawnui-react to npm
+
+# Trusted Publishing (OIDC): npm trusts this workflow file in this repository, no token anywhere.
+# Runs when a GitHub release is published (the tag is the version), or by hand for a given tag.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish (e.g. v0.1.0-preview.10)"
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: publish-npm
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - name: npm with trusted publishing support
+        run: npm install -g npm@latest && npm --version
+      - run: npm ci
+      - name: Tag must match package.json
+        run: |
+          TAG="${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.event.release.tag_name }}"
+          VERSION=$(node -p "require('./package.json').version")
+          echo "tag=$TAG version=$VERSION"
+          test "$TAG" = "v$VERSION"
+      - name: Publish (prepublishOnly builds dist/)
+        run: npm publish --access public --provenance
+      - name: Verify on the registry
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          for i in $(seq 1 20); do
+            LATEST=$(npm view drawnui-react dist-tags.latest 2>/dev/null || true)
+            echo "latest=$LATEST"
+            test "$LATEST" = "$VERSION" && exit 0
+            sleep 15
+          done
+          exit 1
