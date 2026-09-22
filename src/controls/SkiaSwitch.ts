@@ -30,11 +30,6 @@ export class SkiaSwitch extends SkiaToggle {
     return table[s]?.[name];
   }
 
-  private SetContentSize(w: number, h: number): void {
-    if (this.WidthRequest < 0) this.WidthRequest = w;
-    if (this.HeightRequest < 0) this.HeightRequest = h;
-  }
-
   protected override CreateDefaultContent(): void {
     const frame = new SkiaShape(); frame.Tag = "Frame"; frame.Type = "Rectangle"; frame.HorizontalOptions = "Fill"; frame.VerticalOptions = "Fill";
     const thumb = new SkiaShape(); thumb.Tag = "Thumb"; thumb.Type = "Circle"; thumb.HorizontalOptions = "Start"; thumb.VerticalOptions = "Fill"; thumb.LockRatio = -1;

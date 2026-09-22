@@ -35,11 +35,6 @@ export class SkiaCheckbox extends SkiaToggle {
     return table[this.UsingControlStyle]?.[name];
   }
 
-  private SetContentSize(w: number, h: number): void {
-    if (this.WidthRequest < 0) this.WidthRequest = w;
-    if (this.HeightRequest < 0) this.HeightRequest = h;
-  }
-
   protected override CreateDefaultContent(): void {
     const off = new SkiaShape(); off.Tag = "FrameOff"; off.Type = "Rectangle"; off.HorizontalOptions = "Fill"; off.VerticalOptions = "Fill";
     const on = new SkiaShape(); on.Tag = "FrameOn"; on.Type = "Rectangle"; on.HorizontalOptions = "Fill"; on.VerticalOptions = "Fill";

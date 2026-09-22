@@ -6,11 +6,18 @@ import { SkiaLayout } from "./SkiaLayout";
 
 /**
  * Mirrors DrawnUi SkiaToggle: base of SkiaSwitch / SkiaCheckbox / SkiaRadioButton. Tapped flips IsToggled,
- * `Toggled` reports user changes, `ControlStyle` selects the look the default content is built with (once, at first
- * measure, like C# CreateDefaultContent). Colors left unset take the style defaults (C# SetStyleDefault).
+ * `Toggled` reports user changes, `ControlStyle` selects the look the default content is built with (at first
+ * measure, like C# CreateDefaultContent; a later change rebuilds it, C# RebuildDefaultContent). Colors left unset
+ * take the style defaults (C# SetStyleDefault).
  */
 export abstract class SkiaToggle extends SkiaLayout {
-  ControlStyle: PrebuiltControlStyle = "Unset";
+  private controlStyle: PrebuiltControlStyle = "Unset";
+  get ControlStyle(): PrebuiltControlStyle { return this.controlStyle; }
+  set ControlStyle(v: PrebuiltControlStyle) {
+    if (this.controlStyle === v) return;
+    this.controlStyle = v;
+    this.RebuildDefaultContent();
+  }
   /** Fires on every IsToggled change; C# fires only on user/external changes, not on DefaultValue application. */
   Toggled?: (sender: SkiaToggle, value: boolean) => void;
   DefaultValue = false;
@@ -58,10 +65,37 @@ export abstract class SkiaToggle extends SkiaLayout {
     this.NotifyAccessibility();
   }
 
-  /** Builds the look once (C# CreateDefaultContent) — subclasses add their views here. */
+  /** Builds the look (C# CreateDefaultContent) — subclasses add their views here; called again after a rebuild. */
   protected abstract CreateDefaultContent(): void;
   /** Pushes IsToggled + colors into the views (C# ApplyProperties). */
   abstract ApplyProperties(): void;
+
+  /** Size requests the style pinned (C# SetDefaultContentSize / SetDefaultMinimumContentSize); a rebuild releases only these. */
+  private stylePinned: ("WidthRequest" | "HeightRequest" | "MinimumHeightRequest")[] = [];
+
+  /** C# SetDefaultContentSize: the style's size, only where the app left the request unset. */
+  protected SetContentSize(w: number, h: number): void {
+    if (this.WidthRequest < 0) { this.WidthRequest = w; this.stylePinned.push("WidthRequest"); }
+    if (this.HeightRequest < 0) { this.HeightRequest = h; this.stylePinned.push("HeightRequest"); }
+  }
+
+  /** C# SetDefaultMinimumContentSize (height only): the style's minimum, only where the app left it unset. */
+  protected SetMinimumContentHeight(h: number): void {
+    if (this.MinimumHeightRequest < 0) { this.MinimumHeightRequest = h; this.stylePinned.push("MinimumHeightRequest"); }
+  }
+
+  /**
+   * C# RebuildDefaultContent: drops the content built for the previous style and the sizes it pinned (the app's own
+   * requests stay), so the next Measure builds the current style. No-op before the first build.
+   */
+  RebuildDefaultContent(): void {
+    if (!this.contentCreated) return;
+    this.Children = [];
+    for (const p of this.stylePinned) this[p] = -1;
+    this.stylePinned = [];
+    this.contentCreated = false;
+    this.Update();
+  }
 
   /** Content (and the size requests the style sets) must exist before Measure reads WidthRequest/HeightRequest. */
   override Measure(widthConstraint: number, heightConstraint: number, scale: number): ScaledSize {

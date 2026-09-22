@@ -47,7 +47,7 @@ export class SkiaRadioButton extends SkiaToggle {
   }
 
   protected override CreateDefaultContent(): void {
-    if (this.MinimumHeightRequest < 0) this.MinimumHeightRequest = 24;
+    this.SetMinimumContentHeight(24);
     const s = this.usingStyle;
     const size = s === "Unset" ? 18 : 20;
     const box = new SkiaLayout(); box.Type = "Absolute"; box.HeightRequest = size; box.LockRatio = 1; box.VerticalOptions = "Center";
