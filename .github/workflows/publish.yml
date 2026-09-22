@@ -41,7 +41,8 @@ jobs:
           echo "tag=$TAG version=$VERSION"
           test "$TAG" = "v$VERSION"
       - name: Publish (prepublishOnly builds dist/)
-        run: npm publish --access public --provenance
+        # newer npm refuses a prerelease without an explicit tag; we ship every version as latest
+        run: npm publish --access public --provenance --tag latest
       - name: Verify on the registry
         run: |
           VERSION=$(node -p "require('./package.json').version")
