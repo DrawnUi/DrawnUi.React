@@ -67,6 +67,11 @@ Updated whenever the port deliberately diverges or finds something worth back-po
   registered and used everywhere else. The Fiddle also has the same five-button toolbar preset in C# and in TSX, so the
   change can be confirmed or refuted with one side-by-side capture, the way the 100pt width floor was.
 
+### `Views` of a templated layout: realized cells here, empty on .NET
+- **React**: `SkiaLayout.Views` returns `ChildrenFactory.GetViewsInUse()` when templated, so a page can walk its live rows (the reorder demo's `RowRect` / `RefreshRows`).
+- **.NET**: recycled cells never enter `Views`; the realized rows live in the `ViewsAdapter` (`ChildrenFactory.GetCellInUseOrNull(index)`, `GetCellsInUse()` since 1.10.6.18). The 1:1 port of ReorderPage to HelloMaui / HelloWpf walked `Views`, found nothing, and the lifted-row ghost silently never showed (fixed 2026-09-24 in DrawnUi 24a0994d).
+- **Opinion**: keep the React shortcut (it is what a React page expects), but any port back to .NET must go through `ChildrenFactory`.
+
 ### A reorder moves the measured heights, it does not just rebind
 - **.NET** (`HandleStructurePreservingMove` / `ApplyMoveChange`, 2026-09-08): an `ObservableCollection.Move` rebinds the
   contexts and deliberately touches no structure — the rows keep their heights and the arrange pass re-flows them from
