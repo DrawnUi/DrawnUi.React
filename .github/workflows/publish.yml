@@ -44,12 +44,14 @@ jobs:
         # newer npm refuses a prerelease without an explicit tag; we ship every version as latest
         run: npm publish --access public --provenance --tag latest
       - name: Verify on the registry
+        # npm holds a new version in "Validating" (automated review) for minutes before it is served; wait up to 30 min
         run: |
           VERSION=$(node -p "require('./package.json').version")
-          for i in $(seq 1 20); do
+          for i in $(seq 1 60); do
             LATEST=$(npm view drawnui-react dist-tags.latest 2>/dev/null || true)
             echo "latest=$LATEST"
             test "$LATEST" = "$VERSION" && exit 0
-            sleep 15
+            sleep 30
           done
+          echo "still validating on npmjs.com after 30 min; check https://www.npmjs.com/package/drawnui-react?activeTab=versions"
           exit 1
