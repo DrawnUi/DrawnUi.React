@@ -73,7 +73,7 @@ createRoot(document.getElementById("root")!).render(
   to module constants or `useMemo` / `useCallback`. Primitive props are diffed by value.
 - Templated lists: `ItemsSource={array}` + `ItemTemplate={template}`; cells extend `SkiaDynamicDrawnCell`
   (build the visuals in the constructor, override `SetContent(item)`). `RecyclingTemplate`,
-  `MeasureItemsStrategy` (`MeasureFirst` default / `MeasureAll` / `MeasureVisible`), `Split` / `SplitAlign` /
+  `MeasureItemsStrategy` (`MeasureAll` default / `MeasureFirst` = uniform rows, set it explicitly / `MeasureVisible`), `Split` / `SplitAlign` /
   `DynamicColumns` / `Invert` for Wrap / Row / Grid (those realize every item; the single-column Column is the
   virtualized list). Appending to `ItemsSource` keeps measured rows, prepending keeps the visible rows in place, and reordering the same items (drag to reorder) keeps every measured height and the scroll offset; any other change rebuilds.
 - A stack packs its children along its axis: a child's `VerticalOptions="Center"` cannot centre it in a column's

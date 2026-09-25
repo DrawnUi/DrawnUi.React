@@ -9,7 +9,7 @@ import { SkiaGridStructure } from "./GridStructure";
  *
  * Templated mode (ItemsSource + ItemTemplate) is a Column only: cells are created through the ViewsAdapter for
  * the indexes inside the visible viewport (+ VirtualisationInflated), everything else is arithmetic —
- * MeasureFirst measures one cell and assumes uniform size, MeasureAll measures every item once.
+ * MeasureAll (default) measures every item once, MeasureFirst measures one cell and assumes uniform size.
  */
 export class SkiaLayout extends SkiaControl {
   /** Layout type. SkiaShape redeclares it as ShapeType (any shape value lays out as Absolute), like the C# hidden Type. */
@@ -38,7 +38,8 @@ export class SkiaLayout extends SkiaControl {
   DynamicColumns = false;
   /** Templated Grid: fill column-major (top to bottom, then next column) instead of row-major (C# Invert). */
   Invert = false;
-  MeasureItemsStrategy: MeasuringStrategy = "MeasureFirst";
+  /** Default MeasureAll (DrawnUi 1.10.6.20): every item keeps its own size; MeasureFirst is explicit uniform rows. */
+  MeasureItemsStrategy: MeasuringStrategy = "MeasureAll";
   /** Realized views per item (Disabled) or a recycled pool for the visible range (Enabled). */
   readonly ChildrenFactory = new ViewsAdapter(this);
   FirstVisibleIndex = -1;
@@ -47,7 +48,7 @@ export class SkiaLayout extends SkiaControl {
   private itemsSource?: readonly unknown[];
   private itemTemplate?: () => SkiaControl;
   private structureDirty = true;
-  /** Per-item heights in pixels (MeasureAll) or a single uniform height (MeasureFirst). */
+  /** Per-item heights in pixels (MeasureAll, the default) or a single uniform height (MeasureFirst). */
   private itemHeights: number[] = [];
   private uniformHeight = 0;
   private measuredWidthPx = 0;
