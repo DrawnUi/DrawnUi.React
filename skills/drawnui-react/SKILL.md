@@ -17,6 +17,10 @@ when C# has one.
 npm i drawnui-react@preview react react-dom
 ```
 
+- New app: start from the starter template instead of writing the Vite / startup / canvas setup by hand:
+  https://github.com/DrawnUi/DrawnUi.Net/tree/main/tpls/React/EmptyCode (copy the folder, `npm install`,
+  `npm run dev`). The UI is `src/MainPage.tsx`, startup and fonts are in `src/main.tsx`, assets in `public`.
+
 - `drawnui-react` = React tags + every engine type. `drawnui-react/core` = the engine only (no React), for
   code-behind classes, cells, effects.
 - ES modules + `.d.ts`. CanvasKit's `.wasm` is referenced through a `?url` import: use Vite or a bundler that
