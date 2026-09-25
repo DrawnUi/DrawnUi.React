@@ -40,6 +40,7 @@ export * from "./controls/SkiaBackdrop";
 export * from "./controls/SkiaEditor";
 export * from "./controls/SkiaSprite";
 export * from "./controls/SkiaSpriteSet";
+export * from "./controls/DrawnGame";
 export * from "./core/KeyboardManager";
 export * from "./controls/AnimatedFramesRenderer";
 export * from "./controls/SkiaLottie";

@@ -77,6 +77,10 @@ createRoot(document.getElementById("root")!).render(
   middle of a bigger box, which is also how a full-height drag handle keeps its icon centred.
 - Code-behind controls: `new MySprite()` then `host.AddSubView(x)` in `useEffect`, and on cleanup
   `host.RemoveSubView(x); x.Dispose()`. JSX children are disposed by the renderer when they unmount.
+- Games: subclass `DrawnGame` (engine class, DrawnUi.Gaming API): build sprites in the constructor, `StartLoop()`
+  (it waits for attach), override `GameLoop(deltaSeconds)` and `OnKeyDown` / `OnKeyUp` (DOM `event.code` names), move
+  cached sprites with `Left` / `Top`. Pause on `document.hidden` and `Resume()` on return, else the first frame back
+  carries the whole hidden time as its delta. Reference: the demo's `#/pong` page (`samples/demo/pages/pong`).
 - `SkiaScroll` extras are JSX children with a `Tag`: `Tag="Header"`, `"Footer"`, `"RefreshIndicator"`,
   `"ScrollBar"`, `"ScrollBarHorizontal"`; everything else is the single `Content`. Header modes: in the flow,
   `HeaderSticky`, `HeaderBehind` + `HeaderParallaxRatio`; `ScrollBarsVisibility`, or `<SkiaScrollBar Tag="ScrollBar" IsDraggable />`

@@ -2,7 +2,7 @@ import type { Canvas as SkCanvas, Image, Path, SkPicture, Surface } from "canvas
 import { Super } from "./Super";
 import { SkiaStyles } from "./Styles";
 import { type Color, Colors, type LayoutOptions, SKRect, ScaledSize, type SkiaCacheType, type SkiaGradient, type SkiaTouchAnimation, Thickness } from "./Types";
-import { type IOverlayEffect, RippleAnimator, SkiaValueAnimator } from "./Animators";
+import { type AnimatorBase, type IOverlayEffect, RippleAnimator, SkiaValueAnimator } from "./Animators";
 import { Easing } from "./Easing";
 import type { Canvas } from "./Canvas";
 import { Aria } from "./Accessibility";
@@ -206,6 +206,11 @@ export class SkiaControl {
   AnimationTappedSpeed = 0;
   /** Overlay effects drawn above this control's content every frame (ripple etc). */
   readonly PostAnimators: IOverlayEffect[] = [];
+  /**
+   * C# PendingUnattachedAnimators: animators started while no Canvas was above this control yet (e.g. a game loop
+   * started in a constructor). They start on the control's first arrange, where C# starts them in SuperViewChanged.
+   */
+  PendingUnattachedAnimators?: AnimatorBase[];
 
   // ---- visual effects (C# VisualEffects: attached SkiaEffect objects) ----
   private visualEffects: SkiaEffect[] = [];
@@ -366,8 +371,17 @@ export class SkiaControl {
     const y = availT + SkiaControl.Align(this.VerticalOptions, fullH, h);
     this.DrawingRect = SKRect.Create(x, y, w, h);
     this.OnLayoutChanged();
+    if (this.PendingUnattachedAnimators) this.StartPendingAnimators();
     // DrawnUi OnLayoutReady: an accessible control registers itself on its first layout
     if (!this.registeredWithAccessibility && this.IsAccessibilityElement) this.NotifyAccessibility();
+  }
+
+  /** C# SuperViewChanged: starts the animators queued before this control was attached. */
+  private StartPendingAnimators(): void {
+    if (!this.Superview) return;
+    const pending = this.PendingUnattachedAnimators!;
+    this.PendingUnattachedAnimators = undefined;
+    for (const animator of pending) animator.Start();
   }
 
   // ---- accessibility (DrawnUi ISkiaAccessibilityNode) ----
@@ -938,6 +952,7 @@ export class SkiaControl {
     for (const c of this.ownAnimations.values()) c.abort();
     this.ownAnimations.clear();
     for (const e of [...this.PostAnimators]) (e as { Stop?: () => void }).Stop?.();
+    this.PendingUnattachedAnimators = undefined;
     this.PostAnimators.length = 0;
     this.DestroyRenderingObject();
     this.compositeSurface?.delete(); this.compositeSurface = undefined;

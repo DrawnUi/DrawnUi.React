@@ -39,7 +39,13 @@ export class AnimatorBase {
       if (typeof effect.Render !== "function") throw new Error("Post animator must implement IOverlayEffect");
       if (!parent.PostAnimators.includes(effect)) parent.PostAnimators.push(effect);
     }
-    const ok = parent.Superview?.RegisterAnimator(this) ?? false;
+    const superview = parent.Superview;
+    const ok = superview?.RegisterAnimator(this) ?? false;
+    // C# SkiaControl.RegisterAnimator: not attached yet, queue it; the parent starts it on its first arrange
+    if (!superview && !parent.IsDisposed) {
+      const pending = parent.PendingUnattachedAnimators ??= [];
+      if (!pending.includes(this)) pending.push(this);
+    }
     parent.Repaint();
     return ok;
   }
@@ -51,6 +57,8 @@ export class AnimatorBase {
       const i = parent.PostAnimators.indexOf(this as unknown as IOverlayEffect);
       if (i >= 0) parent.PostAnimators.splice(i, 1);
     }
+    const pending = parent.PendingUnattachedAnimators?.indexOf(this) ?? -1;
+    if (pending >= 0) parent.PendingUnattachedAnimators!.splice(pending, 1);
     parent.Superview?.UnregisterAnimator(this.Uid);
   }
 
@@ -97,6 +105,24 @@ export class AnimatorBase {
     if (this.IsRunning === value) return;
     this.IsRunning = value;
     if (value) this.OnStart?.(); else this.OnStop?.();
+  }
+}
+
+/**
+ * DrawnUi ActionOnTickAnimator: runs `action(frameTimeNanos)` on every frame until stopped, a game loop for
+ * DrawnGame or any per-frame work.
+ */
+export class ActionOnTickAnimator extends AnimatorBase {
+  private readonly action: (frameTimeNanos: number) => void;
+
+  constructor(parent: SkiaControl, action: (frameTimeNanos: number) => void) {
+    super(parent);
+    this.action = action;
+  }
+
+  override TickFrame(frameTimeNanos: number): boolean {
+    this.action(frameTimeNanos);
+    return super.TickFrame(frameTimeNanos);
   }
 }
 

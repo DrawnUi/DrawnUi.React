@@ -25,6 +25,7 @@ import { SpritesPage } from "./pages/SpritesPage";
 import { ShadersPage } from "./pages/ShadersPage";
 import { ScrollPage } from "./pages/ScrollPage";
 import { ReorderPage } from "./pages/ReorderPage";
+import { PongPage } from "./pages/PongPage";
 import { Aria } from "drawnui-react";
 import { SkiaButton as SkiaButtonCtrl, SkiaLabel as SkiaLabelCtrl } from "drawnui-react/core";
 
@@ -34,6 +35,7 @@ await Super.UseDrawnUi()
     .AddFont("fonts/OpenSans-Regular.ttf", "FontText")
     .AddFont("fonts/OpenSans-Semibold.ttf", "FontText", 600) // FontAttributes="Bold" / FontWeight={600} pick this face
     .AddFont("fonts/OpenSans-Semibold.ttf", "FontTextBold")
+    .AddFont("fonts/Orbitron-Regular.ttf", "FontGame") // Pong score and messages, as in the .NET Pong samples
     .AddSymbols() // FontSymbols / FontSymbols2 (arrows, math, misc) shipped subsets, like DrawnUi.Blazor
     .AddEmojis()) // FontEmoji (Noto Color Emoji faces + hands subset)
   // Same style the .NET Blazor sandbox and the Fiddle register: every label defaults to the app font. Without it a
@@ -68,6 +70,7 @@ const ROUTES = {
   shaders: () => <ShadersPage />,
   scroll: () => <ScrollPage />,
   reorder: () => <ReorderPage />,
+  pong: () => <PongPage />,
 };
 const TITLES = Object.fromEntries(SAMPLES.map((s) => [s.route, s.title]));
 

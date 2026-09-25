@@ -135,7 +135,12 @@ export class Canvas {
   private Draw(canvas: import("canvaskit-wasm").Canvas): void {
     const started = performance.now();
     this.ProcessPendingGestures();
-    const executed = this.ExecuteAnimators(Math.round(started * 1_000_000));
+    // Animators run on the frame's vsync time (inside a rAF callback document.timeline.currentTime is the frame
+    // timestamp), not on when this callback happened to start: callback starts drift by several ms around vsync
+    // (measured 12..23 ms between frames shown 16.7 ms apart), and a game loop moving by speed * delta then
+    // jumps unevenly on screen.
+    const frameTime = Number(document.timeline?.currentTime ?? started);
+    const executed = this.ExecuteAnimators(Math.round(frameTime * 1_000_000));
     const canRender = this.CanRender;
     if (canRender && !this.WasRendered) this.WillFirstTimeDraw?.(this, { Canvas: canvas, Surface: this.surface });
     canvas.clear(Super.ParseColor(this.BackgroundColor));

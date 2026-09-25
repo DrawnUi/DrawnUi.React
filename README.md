@@ -67,6 +67,15 @@ accessibility all live in the engine and would work identically under Vue, Svelt
 That is also why the demo pages describe DrawnUi features, not React ones: the same pages are meant to be reused as
 the showcase for other frameworks on this engine.
 
+## Games
+
+`DrawnGame` (from DrawnUi.Gaming) is ported: a layout with a game loop. Subclass it, build your sprites in the
+constructor, call `StartLoop()`, and override `GameLoop(deltaSeconds)` and `OnKeyDown` / `OnKeyUp` (DOM `event.code`
+names). Move sprites with `Left` / `Top` on cached controls, as in C#. The demo's `#/pong` page is the .NET Pong
+sample (`src/Shared/Samples/Pong.Shared`) ported line for line: the game classes are plain TypeScript in
+`samples/demo/pages/pong`, mounted from `PongPage.tsx` with `AddSubView`, and a small `RescalingLayout` fits the
+360×640 field to any screen by changing the children's rendering scale.
+
 ## Context menu (right click)
 
 A right click on the canvas normally opens the browser's own menu ("Save image as…"). Every mouse button goes

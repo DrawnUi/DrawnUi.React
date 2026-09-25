@@ -4,6 +4,17 @@ Behavioural differences between the two implementations that are NOT plain omiss
 [SKIPPED.md](SKIPPED.md)). Each entry says what differs, why, and whether the .NET side should adopt it.
 Updated whenever the port deliberately diverges or finds something worth back-porting.
 
+## Animators
+
+### Animators run on vsync time
+- **React**: `Canvas` ticks animators with the frame's vsync timestamp (`document.timeline.currentTime` inside the
+  rAF callback). Measured in the Pong demo: frames reached the screen 16.68 ms ± 0.08 apart, while the callback
+  start (`performance.now()`, the old clock) drifted 12..23 ms between frames; a ball moving by `speed × delta`
+  jumped 5..10 px per displayed frame (spread 10%). On vsync time: 3% (the rest is whole-pixel blit snapping).
+- **.NET**: Blazor sets `FrameTime = Super.GetCurrentTimeNanos()` when the paint starts, the old React behaviour.
+- **Opinion**: back-port to DrawnUi.Blazor: pass the `requestAnimationFrame` timestamp (`drawnui-frameloop.js`
+  already receives it) through to `FrameTime`.
+
 ## Scrolling
 
 ### Viewport offset snapped to device pixels while moving
