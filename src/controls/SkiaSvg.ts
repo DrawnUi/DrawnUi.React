@@ -44,7 +44,7 @@ export class SkiaSvg extends SkiaControl {
     if (!value) { this.Clear(); return; }
     const generation = ++this.loadGeneration;
     this.IsLoading = true;
-    fetch(value)
+    fetch(Super.ResolveAssetUrl(value))
       .then((r) => { if (!r.ok) throw new Error(`DrawnUi: ${r.status} loading svg '${value}'`); return r.text(); })
       .then((text) => { if (generation === this.loadGeneration) return this.Decode(text, value, generation); })
       .catch((e: Error) => { if (generation !== this.loadGeneration) return; this.IsLoading = false; this.Error?.(this, e); });

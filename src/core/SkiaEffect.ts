@@ -248,7 +248,7 @@ export class SkiaShaderEffect extends SkiaEffect implements IPostRendererEffect 
   // ---- compilation ----
   private static async FetchText(url: string): Promise<string> {
     let p = sourceCache.get(url);
-    if (!p) { p = fetch(url).then((r) => { if (!r.ok) throw new Error(`${r.status} ${url}`); return r.text(); }); sourceCache.set(url, p); }
+    if (!p) { p = fetch(Super.ResolveAssetUrl(url)).then((r) => { if (!r.ok) throw new Error(`${r.status} ${url}`); return r.text(); }); sourceCache.set(url, p); }
     return p;
   }
 

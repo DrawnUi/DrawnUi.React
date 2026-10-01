@@ -146,7 +146,7 @@ export class SkiaGif extends AnimatedFramesRenderer {
   /** Loads (does not apply) a GIF; C# LoadSource. */
   async LoadSource(source: string): Promise<GifAnimation | undefined> {
     if (!source) return undefined;
-    const r = await fetch(source);
+    const r = await fetch(Super.ResolveAssetUrl(source));
     if (!r.ok) throw new Error(`${r.status} ${source}`);
     const animation = new GifAnimation();
     animation.LoadFromBytes(await r.arrayBuffer());

@@ -266,6 +266,13 @@ Updated whenever the port deliberately diverges or finds something worth back-po
 - **.NET**: nothing comparable (Blazor sites hand-write static SEO content in `index.html`, see the drawnui-blazor
   SEO notes). Opinion: web-only concern, no C# API to mirror; keep it a Vite plugin, never runtime.
 
+### Versioned public files (React only)
+- **React**: `drawnUiAssetStamps()` (`drawnui-react/vite`) hashes the public folder at build time; every engine
+  loader fetches through `Super.ResolveAssetUrl`, which adds `?v=<hash>`, so a returning visitor never pairs new
+  code with an old font, image, sprite sheet, shader or animation kept by the browser.
+- **.NET**: assets ship inside the app package (MAUI / desktop) or the Blazor `_framework` fingerprints; no API.
+  Opinion: web-only concern; the hook is one replaceable function, the plugin stays build-time.
+
 ### The scroll never derives its viewport from a measure constraint
 - **.NET** (fixed 2026-09-08): `InitializeViewport` ran on any measure pass, including one with an infinite constraint
   on the scrolling axis, concluded "everything fits" and reset the offset to the top; a sibling changing size was

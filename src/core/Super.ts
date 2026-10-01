@@ -54,7 +54,7 @@ export class DrawnUiBuilder {
     for (const f of this.fonts.Fonts) {
       let face = loaded.get(f.Source);
       if (!face) {
-        const data = await (await fetch(f.Source)).arrayBuffer();
+        const data = await (await fetch(Super.ResolveAssetUrl(f.Source))).arrayBuffer();
         face = Super.CK.Typeface.MakeFreeTypeFaceFromData(data) ?? undefined;
         if (!face) throw new Error(`DrawnUi: cannot load font '${f.Source}'`);
         loaded.set(f.Source, face);
@@ -119,6 +119,20 @@ export class Super {
 
   /** Master switch: false makes every control render uncached (DrawnUi Super.CacheEnabled). */
   static CacheEnabled = true;
+
+  /**
+   * Address every engine loader fetches a source from (images, sprites, fonts, SVG, GIF, Lottie, shaders); caches
+   * stay keyed by the source itself. Web-only, no C# counterpart. Default: a file listed in
+   * `globalThis.DrawnUiAssetStamps` (written into index.html by the `drawnUiAssetStamps()` Vite plugin) gets
+   * `?v=<content hash>`, so a browser never keeps an old copy of a changed file. Replace it to map sources elsewhere.
+   */
+  static ResolveAssetUrl = (source: string): string => {
+    const stamps = (globalThis as { DrawnUiAssetStamps?: Record<string, string> }).DrawnUiAssetStamps;
+    if (!stamps) return source;
+    const q = source.indexOf("?");
+    const v = stamps[(q < 0 ? source : source.slice(0, q)).replace(/^\.?\//, "")];
+    return v ? `${source}${q < 0 ? "?" : "&"}v=${v}` : source;
+  };
 
   private static readonly colorCache = new Map<string, Float32Array>();
 

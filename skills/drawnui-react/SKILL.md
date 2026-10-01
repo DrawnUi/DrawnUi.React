@@ -156,6 +156,11 @@ createRoot(document.getElementById("root")!).render(
   Switch, checkbox, radio and slider carry their roles already. A control driven only by `ConsumeGestures` (a drag
   grip) has no `Tapped`, so it needs `AccessibilityCanInteract={true}` as well. A `TextSpan` with `Tapped` gets the
   hand over just that span when its label has a role.
+- Fresh files after every deploy: `import { drawnUiAssetStamps } from "drawnui-react/vite"`, add `drawnUiAssetStamps()`
+  to `plugins`. It hashes every file in the public folder at build time and puts the map into index.html; every
+  engine loader (images, sprites, fonts, SVG, GIF, Lottie, shaders) fetches through `Super.ResolveAssetUrl`, which
+  adds `?v=<hash>`, so browsers and CDNs can cache those files for long without serving an old copy after a change.
+  Bundled files already have hashed names. Replace `Super.ResolveAssetUrl` to map sources yourself (a CDN prefix).
 - Crawlers / AI agents: `import { drawnUiStatic } from "drawnui-react/vite"`, `plugins: [react(), drawnUiStatic()]`
   (needs `playwright-core` + a Chrome at build). After `vite build` it boots the built app headlessly, reads the
   accessibility tree of the root page and of each page a root button opens, and writes visible semantic HTML

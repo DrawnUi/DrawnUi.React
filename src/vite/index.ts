@@ -1,10 +1,42 @@
 /**
- * Vite helpers for DrawnUi.React apps: `import { drawnUiStatic } from "drawnui-react/vite"`.
+ * Vite helpers for DrawnUi.React apps: `import { drawnUiStatic, drawnUiAssetStamps } from "drawnui-react/vite"`.
  * Build-time only; the runtime bundle never imports this module and the frame loop knows nothing about it.
  */
-import { readFileSync, writeFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { createHash } from "node:crypto";
+import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 import type { Plugin, ResolvedConfig } from "vite";
+
+/**
+ * Versioned addresses for the files of the public folder (fonts, images, sprites, shaders, Lottie, favicon). Their
+ * names never change, and a browser or CDN may keep them for hours, so after a publish a returning visitor could
+ * get new code with an old file. On build every public file gets a short content hash: index.html receives the map
+ * as `globalThis.DrawnUiAssetStamps` (read by `Super.ResolveAssetUrl`, which every engine loader fetches through)
+ * and its own `href` / `src` links to public files get `?v=<hash>`. A changed file gets a new address, an unchanged
+ * one keeps its address and stays cached. Bundled files (hashed names) need nothing. The dev server is left alone.
+ */
+export function drawnUiAssetStamps(): Plugin {
+  let stamps: Record<string, string> = {};
+  return {
+    name: "drawnui-asset-stamps",
+    apply: "build",
+    configResolved(config) {
+      const dir = config.publicDir;
+      if (!dir) return;
+      for (const rel of readdirSync(dir, { recursive: true }) as string[]) {
+        const file = join(dir, rel);
+        if (statSync(file).isFile()) stamps[rel.replace(/\\/g, "/")] = createHash("sha256").update(readFileSync(file)).digest("hex").slice(0, 10);
+      }
+    },
+    transformIndexHtml(html) {
+      const stamped = html.replace(/\b(href|src)="([^"?#:]+)"/g, (m, attr: string, url: string) => {
+        const v = stamps[url.replace(/^\.?\//, "")];
+        return v ? `${attr}="${url}?v=${v}"` : m;
+      });
+      return { html: stamped, tags: [{ tag: "script", children: `globalThis.DrawnUiAssetStamps=${JSON.stringify(stamps)}`, injectTo: "head-prepend" }] };
+    },
+  };
+}
 
 export interface DrawnUiStaticOptions {
   /**

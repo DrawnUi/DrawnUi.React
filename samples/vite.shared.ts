@@ -1,6 +1,7 @@
 import react from "@vitejs/plugin-react";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
+import { drawnUiAssetStamps } from "../src/vite"; // consumers: import { drawnUiAssetStamps } from "drawnui-react/vite"
 
 /**
  * Shared Vite setup for every sample. A sample is a folder under samples/ with its own
@@ -19,7 +20,7 @@ export function defineSample(configFileUrl: string) {
     root: sampleDir,
     base,
     publicDir: fileURLToPath(new URL("./public", import.meta.url)),
-    plugins: [react()],
+    plugins: [react(), drawnUiAssetStamps()],
     resolve: {
       alias: [
         { find: "drawnui-react/core", replacement: fileURLToPath(new URL("./src/index.ts", new URL("../", import.meta.url))) },

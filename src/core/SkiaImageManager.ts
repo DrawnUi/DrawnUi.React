@@ -51,7 +51,7 @@ export class SkiaImageManager {
   }
 
   private async Fetch(source: string, signal?: AbortSignal): Promise<Image> {
-    const response = await fetch(source, signal ? { signal } : undefined);
+    const response = await fetch(Super.ResolveAssetUrl(source), signal ? { signal } : undefined);
     if (!response.ok) throw new Error(`DrawnUi: ${response.status} loading image '${source}'`);
     const image = Super.CK.MakeImageFromEncoded(await response.arrayBuffer());
     if (!image) throw new Error(`DrawnUi: cannot decode image '${source}'`);

@@ -153,7 +153,7 @@ export class SkiaLottie extends AnimatedFramesRenderer {
     if (cached) return Promise.resolve(cached);
     let p = SkiaLottie.inFlight.get(source);
     if (!p) {
-      p = fetch(source).then(async (r) => { if (!r.ok) throw new Error(`${r.status} ${source}`); const json = await r.text(); SkiaLottie.CachedAnimations.set(source, json); return json; })
+      p = fetch(Super.ResolveAssetUrl(source)).then(async (r) => { if (!r.ok) throw new Error(`${r.status} ${source}`); const json = await r.text(); SkiaLottie.CachedAnimations.set(source, json); return json; })
         .finally(() => SkiaLottie.inFlight.delete(source));
       SkiaLottie.inFlight.set(source, p);
     }
