@@ -1,7 +1,7 @@
 import { StrictMode, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Canvas, SkiaShell, Super } from "drawnui-react";
-import type { Canvas as CanvasView } from "drawnui-react/core";
+import { Canvas, SkiaLabelFps, SkiaLayer, SkiaShell, Super } from "drawnui-react";
+import { type Canvas as CanvasView, SkiaImageManager, Thickness } from "drawnui-react/core";
 import { CanvasViewContext } from "./pages/canvasView";
 import { RootPage } from "./pages/RootPage";
 import { DemoContextMenu, handleContextMenu } from "./pages/DemoContextMenu";
@@ -73,16 +73,21 @@ const ROUTES = {
   pong: () => <PongPage />,
 };
 const TITLES = Object.fromEntries(SAMPLES.map((s) => [s.route, s.title]));
+const FPS_MARGIN = new Thickness(0, 0, 4, 24);
 
 function App() {
   const [view, setView] = useState<CanvasView | null>(null);
   return (
     <Canvas ref={setView} BackgroundColor="#212529" RenderingMode="Accelerated" Gestures="Enabled" style={{ height: "100%" }} ContextMenu={(_, e) => handleContextMenu(e)}>
       <CanvasViewContext.Provider value={view}>
-        <SkiaShell Routes={ROUTES} Titles={TITLES}>
-          <RootPage />
-          <DemoContextMenu />
-        </SkiaShell>
+        <SkiaLayer VerticalOptions="Fill">
+          <SkiaShell Routes={ROUTES} Titles={TITLES}>
+            <RootPage />
+            <DemoContextMenu />
+          </SkiaShell>
+          {/* dev server only, like the .NET samples' #if DEBUG SkiaLabelFps */}
+          {import.meta.env.DEV && <SkiaLabelFps Margin={FPS_MARGIN} VerticalOptions="End" HorizontalOptions="End" Rotation={-45} BackgroundColor="#8B0000" TextColor="#FFFFFF" ZIndex={110} />}
+        </SkiaLayer>
       </CanvasViewContext.Provider>
     </Canvas>
   );
@@ -93,3 +98,8 @@ createRoot(document.getElementById("root")!).render(
     <App />
   </StrictMode>,
 );
+
+// The Images page photo (also the Shell backdrop and the Scroll header), warmed once the first screen is up so the
+// first visit to Images shows it at once instead of black tiles.
+const preloadPhoto = () => void SkiaImageManager.Instance.PreloadImages(["images/baboon.jpg"], "Low");
+if ("requestIdleCallback" in window) requestIdleCallback(preloadPhoto); else setTimeout(preloadPhoto, 1000);

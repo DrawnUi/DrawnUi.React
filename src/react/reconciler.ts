@@ -6,6 +6,7 @@ import { SkiaControl } from "../core/SkiaControl";
 import { SkiaLabel } from "../controls/SkiaLabel";
 import { TextSpan } from "../controls/TextSpan";
 import { SkiaRichLabel } from "../controls/SkiaRichLabel";
+import { SkiaLabelFps } from "../controls/SkiaLabelFps";
 import { SkiaSwitch } from "../controls/SkiaSwitch";
 import { SkiaCheckbox } from "../controls/SkiaCheckbox";
 import { SkiaRadioButton } from "../controls/SkiaRadioButton";
@@ -37,7 +38,7 @@ type HostInstance = SkiaControl | TextSpan;
 
 /** JSX tag name -> engine class. Add a control here to expose it to React. */
 export const Registry: Record<string, new () => HostInstance> = {
-  SkiaLayout, SkiaStack, SkiaRow, SkiaLayer, SkiaWrap, SkiaGrid, SkiaDecoratedGrid, SkiaBackdrop, SkiaEditor, SkiaSprite, SkiaSpriteSet, SkiaLabel, SkiaRichLabel, TextSpan, SkiaHotspot, SkiaButton, SkiaImage, SkiaImageTiles, SkiaSvg, SkiaLottie, SkiaGif, SkiaScroll, SkiaScrollBar, RefreshIndicator, SkiaShape, SkiaFrame,
+  SkiaLayout, SkiaStack, SkiaRow, SkiaLayer, SkiaWrap, SkiaGrid, SkiaDecoratedGrid, SkiaBackdrop, SkiaEditor, SkiaSprite, SkiaSpriteSet, SkiaLabel, SkiaLabelFps, SkiaRichLabel, TextSpan, SkiaHotspot, SkiaButton, SkiaImage, SkiaImageTiles, SkiaSvg, SkiaLottie, SkiaGif, SkiaScroll, SkiaScrollBar, RefreshIndicator, SkiaShape, SkiaFrame,
   SkiaSwitch, SkiaCheckbox, SkiaRadioButton, SkiaProgress, SkiaSlider, SkiaCarousel, SkiaShaderCarousel, SkiaDrawer,
 };
 

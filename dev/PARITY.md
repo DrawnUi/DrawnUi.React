@@ -285,6 +285,17 @@ Updated whenever the port deliberately diverges or finds something worth back-po
   paint); Windows `DrawnSwapChainPanel` already owns surface recreation.
 - **Opinion**: no action; noted so the web behaviour is understood as intentional.
 
+### SkiaLabelFps never asks for a frame
+- **React**: the text changes only on frames that running animators request (`Canvas.AnimatingControls` not empty):
+  scroll inertia, wheel scrolls, transitions, Lottie, game loops. An idle canvas draws nothing and the counter keeps
+  the last value measured; a finger drag without an animator does not refresh it. The label re-measures itself on
+  draw (parent-independent; React layouts do not re-arrange children per frame).
+- **.NET**: `Draw` sets `Text` from `Superview.FPS` on every draw, so each changed value invalidates the label
+  (whether that keeps an idle .NET canvas redrawing was not measured). `ForceRefresh` registers it as an animator.
+- **Opinion**: keep. React `Canvas.FPS` counts the frames drawn in the last second, so a counter that asked for a
+  frame for every new value would feed its own number (a frame raises the count, the new text asks for another
+  frame) and keep an idle canvas drawing.
+
 ### SVG rendering
 - **React**: no SVG module in CanvasKit's npm build → browser decodes, raster per displayed size, `TintColor` via
   `SrcIn`. Effects that operate on the SVG picture (`FillGradient`, FontAwesome duotone) are not reproducible this way.

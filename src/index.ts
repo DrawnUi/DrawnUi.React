@@ -12,6 +12,7 @@ export * from "./core/Accessibility";
 export * from "./controls/SkiaLabel";
 export * from "./controls/TextSpan";
 export * from "./controls/SkiaRichLabel";
+export * from "./controls/SkiaLabelFps";
 export * from "./core/ControlStyle";
 export * from "./core/ImageEffects";
 export * from "./controls/SkiaToggle";

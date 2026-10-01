@@ -5,6 +5,7 @@ import type { SkiaControl } from "../core/SkiaControl";
 import type { SkiaLabel as SkiaLabelCtrl } from "../controls/SkiaLabel";
 import type { TextSpan as TextSpanCtrl } from "../controls/TextSpan";
 import type { SkiaRichLabel as SkiaRichLabelCtrl } from "../controls/SkiaRichLabel";
+import type { SkiaLabelFps as SkiaLabelFpsCtrl } from "../controls/SkiaLabelFps";
 import type { SkiaSwitch as SkiaSwitchCtrl } from "../controls/SkiaSwitch";
 import type { SkiaCheckbox as SkiaCheckboxCtrl } from "../controls/SkiaCheckbox";
 import type { SkiaRadioButton as SkiaRadioButtonCtrl } from "../controls/SkiaRadioButton";
@@ -62,6 +63,8 @@ export const SkiaGrid = "SkiaGrid" as unknown as FC<LayoutProps<SkiaLayoutCtrl>>
 /** Grid drawing gradient separator lines in its spacing (C# SkiaDecoratedGrid). */
 export const SkiaDecoratedGrid = "SkiaDecoratedGrid" as unknown as FC<LayoutProps<SkiaDecoratedGridCtrl>>;
 export const SkiaLabel = "SkiaLabel" as unknown as FC<LayoutProps<SkiaLabelCtrl>>;
+/** Canvas FPS counter (C# SkiaLabelFps); its value changes only on frames running animators request anyway. */
+export const SkiaLabelFps = "SkiaLabelFps" as unknown as FC<LeafProps<SkiaLabelFpsCtrl>>;
 /** Markdown label (C# SkiaRichLabel): Text is markdown, rendered as spans; LinkTapped for [text](url). */
 export const SkiaRichLabel = "SkiaRichLabel" as unknown as FC<LeafProps<SkiaRichLabelCtrl>>;
 /** Child of <SkiaLabel>: a styled fragment (C# TextSpan). */
