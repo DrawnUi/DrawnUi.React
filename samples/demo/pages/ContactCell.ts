@@ -1,4 +1,4 @@
-import { Colors, SkiaDynamicDrawnCell, SkiaLabel, SkiaLayout, SkiaShape, Thickness } from "drawnui-react/core";
+import { Aria, Colors, SkiaDynamicDrawnCell, SkiaLabel, SkiaLayout, SkiaShape, Thickness } from "drawnui-react/core";
 
 /** Recycled cell, the DrawnUi way: visuals built once in the ctor, SetContent runs on every rebind. */
 export class ContactCell extends SkiaDynamicDrawnCell {
@@ -16,6 +16,7 @@ export class ContactCell extends SkiaDynamicDrawnCell {
     this.UseCache = "Image"; // the DrawnUi cell recipe: one bitmap per cell, blitted while scrolling
     this.AnimationTapped = "Ripple";
     this.Tapped = () => onTap(this.BindingContext as number);
+    this.AccessibilityRole = Aria.RoleButton; // a node: Tab / the arrows reach it, Enter taps it
 
     const avatar = new SkiaShape();
     avatar.Type = "Circle";
@@ -40,6 +41,8 @@ export class ContactCell extends SkiaDynamicDrawnCell {
     this.subtitle.FontSize = 12;
     this.subtitle.TextColor = "#94A3B8";
     this.subtitle.MaxLines = 1; // ellipsis on narrow screens
+    // the cell is one node read by its label: its texts stay out of the accessibility tree
+    for (const label of [this.initials, this.title, this.subtitle]) label.AccessibilityRole = Aria.RolePresentation;
     column.AddSubView(this.title);
     column.AddSubView(this.subtitle);
 
@@ -52,5 +55,6 @@ export class ContactCell extends SkiaDynamicDrawnCell {
     this.initials.Text = `${i % 100}`;
     this.title.Text = `Contact ${i}`;
     this.subtitle.Text = `Recycled drawn cell #${i} — scroll me fast`;
+    this.AccessibilityLabel = `Contact ${i}`;
   }
 }

@@ -5,6 +5,7 @@ import { type Color, Colors, type LayoutOptions, SKRect, ScaledSize, type SkiaCa
 import { type AnimatorBase, type IOverlayEffect, RippleAnimator, SkiaValueAnimator } from "./Animators";
 import { Easing } from "./Easing";
 import type { Canvas } from "./Canvas";
+import type { InputKey } from "./KeyboardManager";
 import { Aria } from "./Accessibility";
 import { ContextMenuEventArgs, ControlTappedEventArgs, GestureEventProcessingInfo, type LockTouch, SKPoint, SkiaGesturesInfo, SkiaGesturesParameters, TouchActionEventArgs } from "./Gestures";
 import { type CachedTexture, type IPostRendererEffect, IsPostRendererEffect, type SkiaEffect } from "./SkiaEffect";
@@ -413,8 +414,12 @@ export class SkiaControl {
   get AccessibilityHint(): string | undefined { return this.accessibilityHint; }
   set AccessibilityHint(v: string | undefined) { if (this.accessibilityHint !== v) { this.accessibilityHint = v; this.AccessibilityChanged(); } }
 
-  /** Tab stop + activation; unset = true when the control handles Tapped. */
-  get AccessibilityCanInteract(): boolean { return this.accessibilityCanInteract ?? this.DefaultAccessibilityCanInteract(); }
+  /**
+   * Whether keyboard navigation and assistive technology may focus and use this node: the explicit value, else the class
+   * default (true when the control handles Tapped), and in both cases only while a tap could reach the control
+   * (CanReceiveGesture), so Tab, Enter / Space and screen-reader activation never use a control the pointer cannot.
+   */
+  get AccessibilityCanInteract(): boolean { return (this.accessibilityCanInteract ?? this.DefaultAccessibilityCanInteract()) && this.CanReceiveGesture("Tapped"); }
   set AccessibilityCanInteract(v: boolean) { if (this.accessibilityCanInteract !== v) { this.accessibilityCanInteract = v; this.AccessibilityChanged(); } }
   protected DefaultAccessibilityCanInteract(): boolean { return !!this.Tapped; }
   /**
@@ -489,6 +494,28 @@ export class SkiaControl {
 
   /** Overlay focus arrives on / leaves this node (inputs may activate their sink here). */
   OnAccessibilityFocused(_focused: boolean): void {}
+
+  /**
+   * Keyboard navigation hands this control the keys it may use while it holds keyboard focus (ArrowLeft / Right / Up /
+   * Down, Home, End, PageUp, PageDown, DOM `event.code` names). Return true when the key was used; the default uses none,
+   * so the key moves focus inside the arrow-key group around the control.
+   */
+  OnAccessibilityKey(_key: InputKey): boolean { return false; }
+
+  /**
+   * Whether a pointer gesture of this kind would reach this control, by the rules the gesture dispatch applies: the
+   * control and every ancestor draw, none of them is InputTransparent, no ancestor keeps this gesture from its children
+   * (LockChildrenGestures, PassNone included) and the control accepts input (AcceptsInput). Opacity does not count, as
+   * for the pointer. Keyboard navigation uses it: Tapped for Tab and Enter / Space, Panning for the arrow keys.
+   */
+  CanReceiveGesture(gesture: SkiaGesturesParameters["Type"]): boolean {
+    if (!this.IsVisible || this.IsDisposed || this.InputTransparent || !this.AcceptsInput()) return false;
+    for (let p = this.Parent; p; p = p.Parent) if (!p.IsVisible || p.IsDisposed || p.InputTransparent || p.CheckChildrenGesturesLocked(gesture)) return false;
+    return true;
+  }
+
+  /** False while the control ignores gestures itself, e.g. a disabled button. Default true. */
+  protected AcceptsInput(): boolean { return true; }
 
   NotifyAccessibilityFocused(focused: boolean): void { this.Superview?.AccessibilityManager.NotifyFocused(focused ? this : undefined); }
 

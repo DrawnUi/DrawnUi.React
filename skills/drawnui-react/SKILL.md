@@ -144,6 +144,14 @@ createRoot(document.getElementById("root")!).render(
   and read the scale off the overlay, not the ghost: a hidden control is never measured, so its `RenderingScale` is
   still 1. Blank the real row while it is lifted, so the travelling gap shows where the drop lands, and re-read the
   target row's rect on each frame of the drop animation, because the list is still catching up with the last move.
+- Keyboard navigation (the DrawnUi.Net contract): Tab / Shift+Tab walk interactive nodes in reading order, Enter /
+  Space activate, arrows / Home / End / PageUp / PageDown go to the focused control first (override
+  `OnAccessibilityKey(key)` and return true when used; `SkiaSlider` steps), then to its group. Give a list or a row of
+  buttons a group role (`Aria.RoleList`, `RoleGrid`, `RoleToolbar`, `RoleRadioGroup`, `RoleTabList`, `RoleMenu`,
+  `RoleMenuBar`, `RoleListBox`): it becomes one Tab stop and the arrows walk its items by index, recycled cells
+  included (scrolled in, then focused). Cells need a role and a label (set `AccessibilityLabel` in `SetContent`).
+  Only what the pointer can use is reachable: `InputTransparent`, a locking `LockChildrenGestures` above, a disabled
+  `SkiaButton` take a node out. A `SkiaEditor` is a Tab stop; Tab leaves it for the next node.
 - Keyboard: `KeyboardManager.Subscribe(down, char, up?)` (DOM `event.code` names). `SkiaEditor` focuses on tap; a
   hidden textarea feeds IME / soft keyboard / clipboard into the same editing methods.
 - Accessibility: an invisible DOM overlay mirrors accessible controls over the `aria-hidden` canvas

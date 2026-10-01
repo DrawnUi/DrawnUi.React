@@ -1,5 +1,6 @@
 import { type CSSProperties, type FC, type ReactNode, type Ref, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
-import type { AccessibilityNode } from "../core/Accessibility";
+import { type AccessibilityNode, SkiaAccessibilityManager } from "../core/Accessibility";
+import { TextInputProxy } from "../core/TextInputProxy";
 import { Canvas as CanvasView } from "../core/Canvas";
 import type { SkiaControl } from "../core/SkiaControl";
 import type { SkiaLabel as SkiaLabelCtrl } from "../controls/SkiaLabel";
@@ -24,7 +25,7 @@ import type { SkiaScrollBar as SkiaScrollBarCtrl } from "../controls/SkiaScrollB
 import type { RefreshIndicator as RefreshIndicatorCtrl } from "../controls/RefreshIndicator";
 import type { SkiaSvg as SkiaSvgCtrl } from "../controls/SkiaSvg";
 import type { SkiaBackdrop as SkiaBackdropCtrl } from "../controls/SkiaBackdrop";
-import type { SkiaEditor as SkiaEditorCtrl } from "../controls/SkiaEditor";
+import { SkiaEditor as SkiaEditorCtrl } from "../controls/SkiaEditor";
 import type { SkiaSprite as SkiaSpriteCtrl } from "../controls/SkiaSprite";
 import type { SkiaSpriteSet as SkiaSpriteSetCtrl } from "../controls/SkiaSpriteSet";
 import type { SkiaLottie as SkiaLottieCtrl } from "../controls/SkiaLottie";
@@ -194,19 +195,48 @@ const A11Y_CSS = `
 .drawnui-a11y-text>span::selection{background:rgba(110,168,254,.55);color:transparent}
 `;
 
+const NAVIGATION_KEYS = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"]);
+
 /**
- * Invisible ARIA elements mirroring the accessible drawn controls, positioned over the canvas.
- * Improvement over DrawnUi.Blazor: `pointer-events:none`, so hover and every pointer gesture still reach the canvas —
- * keyboard (Tab / Enter / Space) and screen-reader activation arrive as DOM events and are routed back as a Tapped.
+ * Invisible ARIA elements mirroring the accessible drawn controls, positioned over the canvas (the DrawnUi.Blazor
+ * overlay). Improvement over DrawnUi.Blazor: `pointer-events:none`, so hover and every pointer gesture still reach the
+ * canvas. Keyboard and screen-reader input arrive as DOM events: Enter / Space activate (a Tapped), the navigation keys
+ * go to the focused control and then to its arrow-key group; a group is one Tab stop (roving tabindex).
  */
 function AccessibilityOverlay({ view }: { view: CanvasView }) {
   const [nodes, setNodes] = useState<AccessibilityNode[]>(() => view.AccessibilityManager.Snapshot);
+  // keyboard focus moved by the manager (arrow keys in a group): focus that node's element once it is rendered
+  const [focusRequest, setFocusRequest] = useState<{ id: number } | undefined>();
+  // the Tab stop of a group moves with keyboard focus: re-render on focus
+  const [, setFocusTick] = useState(0);
   useEffect(() => {
     const mgr = view.AccessibilityManager;
     setNodes(mgr.Snapshot);
     const off = mgr.OnChanged(() => setNodes(mgr.Snapshot));
     const offLive = mgr.OnLiveRegionUpdated(() => { mgr.ForceRebuildOnNextFrame(); view.Update(); });
-    return () => { off(); offLive(); };
+    const offFocus = mgr.OnKeyboardFocusRequested((node) => { setNodes(mgr.Snapshot); setFocusRequest({ id: node.AccessibilityId }); });
+    return () => { off(); offLive(); offFocus(); };
+  }, [view]);
+  const elementOf = (id: number) => overlayRef.current?.querySelector<HTMLElement>(`[data-a11y-id="${id}"]`) ?? undefined;
+  useLayoutEffect(() => {
+    if (!focusRequest) return;
+    setFocusRequest(undefined);
+    elementOf(focusRequest.id)?.focus({ preventScroll: true });
+  }, [focusRequest]);
+  // Tab / Shift+Tab in a text field leave it for the next node, also after a click into it: DOM focus goes to the
+  // field's own element (without taking the caret again) and the browser's Tab moves on from there
+  const tabbingOut = useRef(0);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const editor = SkiaEditorCtrl.Focused;
+      if (e.key !== "Tab" || !editor || editor.Superview !== view || !TextInputProxy.IsProxyTarget(e.target)) return;
+      const el = elementOf(editor.AccessibilityId);
+      if (!el) return;
+      tabbingOut.current = editor.AccessibilityId;
+      el.focus({ preventScroll: true });
+    };
+    document.addEventListener("keydown", onKey, true);
+    return () => document.removeEventListener("keydown", onKey, true);
   }, [view]);
   // selectable text spans take pointer events: the wheel over them is re-dispatched to the canvas so drawn scrolls keep working
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -239,17 +269,31 @@ function AccessibilityOverlay({ view }: { view: CanvasView }) {
       <style>{A11Y_CSS}</style>
       {nodes.map((n) => {
         const pos: CSSProperties = { left: n.Rect.Left, top: n.Rect.Top, width: n.Rect.Width, height: n.Rect.Height };
-        const activate = () => n.Source.OnAccessibilityActivated();
+        const activate = () => SkiaAccessibilityManager.Activate(n.Source);
         return n.CanInteract ? (
-          <div key={n.Id} role={n.Role} aria-label={n.Label} title={n.Hint}
+          <div key={n.Id} data-a11y-id={n.Id} role={n.Role} aria-label={n.Label} title={n.Hint}
             aria-pressed={n.Role === "button" ? n.IsPressed : undefined}
             aria-checked={n.Role === "switch" || n.Role === "checkbox" || n.Role === "radio" ? n.IsPressed : undefined}
             aria-live={n.Live as "polite" | "assertive" | undefined}
-            tabIndex={0} className="drawnui-a11y-node" style={{ ...pos, fontSize: 0, userSelect: "none" }}
+            tabIndex={view.AccessibilityManager.IsTabStop(n.Source) ? 0 : -1} className="drawnui-a11y-node" style={{ ...pos, fontSize: 0, userSelect: "none" }}
             onClick={activate}
-            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); activate(); } }}
-            onFocus={(e) => { pin({ currentTarget: e.currentTarget.parentElement as HTMLDivElement } as React.SyntheticEvent<HTMLDivElement>); SkiaScrollCtrl.EnsureVisible(n.Source); n.Source.OnAccessibilityFocused(true); n.Source.NotifyAccessibilityFocused(true); }}
-            onBlur={() => { n.Source.OnAccessibilityFocused(false); n.Source.NotifyAccessibilityFocused(false); }}>
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") { e.preventDefault(); activate(); }
+              else if (NAVIGATION_KEYS.has(e.key) && SkiaAccessibilityManager.Key(n.Source, e.key)) e.preventDefault();
+            }}
+            onFocus={(e) => {
+              pin({ currentTarget: e.currentTarget.parentElement as HTMLDivElement } as React.SyntheticEvent<HTMLDivElement>);
+              SkiaScrollCtrl.EnsureVisible(n.Source); // inside every enclosing scroll
+              if (tabbingOut.current === n.Id) tabbingOut.current = 0; // leaving a text field: it keeps no caret
+              else n.Source.OnAccessibilityFocused(true); // a text field takes the caret, as after a click
+              n.Source.NotifyAccessibilityFocused(true);
+              setFocusTick((t) => t + 1);
+            }}
+            onBlur={(e) => {
+              if (TextInputProxy.IsProxyTarget(e.relatedTarget)) return; // a text field moved DOM focus to its own input
+              n.Source.OnAccessibilityFocused(false);
+              n.Source.NotifyAccessibilityFocused(false);
+            }}>
             {n.Label}
           </div>
         ) : n.TextLines ? (

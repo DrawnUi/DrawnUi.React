@@ -66,6 +66,8 @@ export class SkiaButton extends SkiaLayout {
   static override DefaultAccessibilityRole?: string;
   protected override DefaultAccessibilityLabel(): string | undefined { return this.Text || undefined; }
   protected override DefaultAccessibilityCanInteract(): boolean { return !this.IsDisabled; }
+  /** A disabled button ignores taps, so keyboard navigation skips it too. */
+  protected override AcceptsInput(): boolean { return !this.IsDisabled; }
 
   /** The button's own BackgroundColor/CornerRadius/Stroke are the frame's; the button itself paints nothing. */
   protected override PaintBackground(): void {}

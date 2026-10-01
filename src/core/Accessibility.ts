@@ -1,3 +1,4 @@
+import type { InputKey } from "./KeyboardManager";
 import type { SkiaControl } from "./SkiaControl";
 import { SKRect } from "./Types";
 
@@ -14,11 +15,27 @@ export const Aria = {
   RoleSeparator: "separator", RoleProgressBar: "progressbar", RoleTooltip: "tooltip", RoleDialog: "dialog",
   RoleAlertDialog: "alertdialog", RoleStatus: "status", RoleAlert: "alert", RoleGroup: "group", RoleRegion: "region",
   RoleNavigation: "navigation", RoleMain: "main",
+  // containers of items: with one of these roles a layout is an arrow-key group (IsCompositeRole)
+  RoleGrid: "grid", RoleToolbar: "toolbar", RoleRadioGroup: "radiogroup", RoleMenuBar: "menubar",
   /** Removes the control from the accessibility tree even when a default role would apply (inner label of a button). */
   RolePresentation: "presentation",
   // live regions
   LivePolite: "polite", LiveAssertive: "assertive",
+  /**
+   * Container roles whose items the arrow keys walk (C# Aria.IsCompositeRole): a layout with one of them is one Tab stop,
+   * its current item, and the arrow keys move between its items.
+   */
+  IsCompositeRole(role?: string): boolean {
+    return role === "list" || role === "listbox" || role === "grid" || role === "toolbar" || role === "radiogroup"
+      || role === "tablist" || role === "menu" || role === "menubar";
+  },
 } as const;
+
+/** What the group logic reads from a layout and a scroll, by shape: core modules never import the controls (load order). */
+interface GroupLayout { Type: string; Split: number; IsTemplated: boolean; ItemsSource?: readonly unknown[]; ChildrenFactory: { GetViewForIndex(index: number): SkiaControl | undefined } }
+interface GroupScroll { Content?: SkiaControl; ScrollToIndex(index: number, animate: boolean, option?: "Start" | "End"): void }
+const asLayout = (c: SkiaControl): GroupLayout | undefined => ("ChildrenFactory" in c && "Split" in c ? c as unknown as GroupLayout : undefined);
+const asScroll = (c: SkiaControl): GroupScroll | undefined => ("ScrollToIndex" in c && "ViewportOffsetY" in c ? c as unknown as GroupScroll : undefined);
 
 /** One laid-out text line exposed for native selection (AccessibilityTextSelectable): CSS px relative to the node. */
 export interface AccessibilityTextLine { Text: string; Left: number; Top: number; Width: number; Height: number; FontFamily: string; FontWeight: number; FontSize: number }
@@ -51,6 +68,7 @@ export class SkiaAccessibilityManager {
   private pending = 0;
   private readonly changed = new Set<() => void>();
   private readonly liveUpdated = new Set<(node: SkiaControl) => void>();
+  private readonly keyboardFocusRequested = new Set<(node: SkiaControl) => void>();
 
   /** Minimum milliseconds between snapshot rebuilds. */
   MinUpdateIntervalMs = 1000;
@@ -62,7 +80,149 @@ export class SkiaAccessibilityManager {
   /** Fired immediately (bypassing the rate limit) when a live-region node's value changes. */
   OnLiveRegionUpdated(cb: (node: SkiaControl) => void): () => void { this.liveUpdated.add(cb); return () => this.liveUpdated.delete(cb); }
 
-  NotifyFocused(node?: SkiaControl): void { if (this.FocusedNode !== node) this.FocusedNode = node; }
+  /**
+   * Keyboard focus moved by the manager itself (arrow keys in a group): the overlay moves DOM focus to that node's
+   * element (C# KeyboardFocusRequested). Returns the unsubscribe function.
+   */
+  OnKeyboardFocusRequested(cb: (node: SkiaControl) => void): () => void { this.keyboardFocusRequested.add(cb); return () => this.keyboardFocusRequested.delete(cb); }
+
+  NotifyFocused(node?: SkiaControl): void {
+    if (this.FocusedNode === node) return;
+    this.NoteFocus(node);
+    this.FocusedNode = node;
+  }
+
+  /**
+   * Enter / Space from keyboard navigation or a screen reader: activates the node only while a tap could reach it
+   * (AccessibilityCanInteract), the rule every head applies.
+   */
+  static Activate(node?: SkiaControl): boolean {
+    if (!node || !node.AccessibilityCanInteract) return false;
+    node.OnAccessibilityActivated();
+    return true;
+  }
+
+  /**
+   * Arrow keys, Home / End, PageUp / PageDown for the node in keyboard focus: the control gets them first, only while a
+   * pan could reach it (a slider steps its value); keys it does not use move keyboard focus between the items of the
+   * group around it (MoveInGroup). True when the key was used.
+   */
+  static Key(node: SkiaControl | undefined, key: InputKey): boolean {
+    if (!node) return false;
+    if (node.CanReceiveGesture("Panning") && node.OnAccessibilityKey(key)) return true;
+    return node.Superview?.AccessibilityManager.MoveInGroup(node, key) ?? false;
+  }
+
+  // ---- arrow-key groups (C# SkiaAccessibilityManager, "Arrow-key groups") ----
+
+  /** Last focused node of each group: where Tab enters the group. */
+  private readonly groupFocus = new WeakMap<SkiaControl, SkiaControl>();
+  private groupRequest?: { Group: SkiaControl; Scroll?: GroupScroll; Index: number; Step: number; Deadline: number; ScrollIssued: boolean };
+
+  /**
+   * The arrow-key group around `control`: its nearest ancestor with a composite role (Aria.IsCompositeRole, e.g.
+   * Aria.RoleList on a SkiaStack), and the item of that group holding the control (one of its children, a cell).
+   */
+  static TryFindGroup(control: SkiaControl): { Group: SkiaControl; Item: SkiaControl } | undefined {
+    for (let child = control, parent = control.Parent; parent; child = parent, parent = parent.Parent) {
+      if (Aria.IsCompositeRole(parent.AccessibilityRole)) return { Group: parent, Item: child };
+    }
+    return undefined;
+  }
+
+  /** Remembers where keyboard focus is inside its group, so the next Tab into the group lands there. */
+  private NoteFocus(node?: SkiaControl): void {
+    const found = node && SkiaAccessibilityManager.TryFindGroup(node);
+    if (found) this.groupFocus.set(found.Group, node!);
+  }
+
+  /**
+   * Whether Tab / Shift+Tab stop on this node. A group of items is one Tab stop, like a native list: its current item
+   * (the one keyboard focus last had there, else the group's first usable node) plus the controls inside that same
+   * item; the arrow keys move between items. Every node outside a group is a stop.
+   */
+  IsTabStop(node: SkiaControl): boolean {
+    const found = SkiaAccessibilityManager.TryFindGroup(node);
+    if (!found) return true;
+    let stopItem: SkiaControl | undefined;
+    const remembered = this.groupFocus.get(found.Group);
+    const current = remembered && !remembered.IsDisposed && remembered.AccessibilityCanInteract && this.Snapshot.some((n) => n.Source === remembered)
+      ? SkiaAccessibilityManager.TryFindGroup(remembered) : undefined;
+    if (current && current.Group === found.Group) stopItem = current.Item;
+    else {
+      for (const n of this.Snapshot) {
+        if (!n.Source.AccessibilityCanInteract) continue;
+        const g = SkiaAccessibilityManager.TryFindGroup(n.Source);
+        if (g && g.Group === found.Group) { stopItem = g.Item; break; }
+      }
+    }
+    return !stopItem || stopItem === found.Item;
+  }
+
+  /**
+   * Moves keyboard focus between the items of the group around `focused`, by item index like a native list: Down / Up in
+   * a Column, Right / Left in a Row, all four in a Wrap, a Grid or a Split layout (Up / Down by one row), Home / End to the
+   * first / last item, PageDown / PageUp by one viewport of the scroll around it. No wrap at the ends. The target is the
+   * item itself when it is an interactive node, else its first interactive node; items the pointer cannot use are
+   * skipped. An item not realized (recycled cells) is scrolled in with ScrollToIndex when the group is the scroll's
+   * content, and focused once drawn. True when the key belongs to the group.
+   */
+  MoveInGroup(focused: SkiaControl, key: InputKey): boolean {
+    const found = SkiaAccessibilityManager.TryFindGroup(focused);
+    if (!found) return false;
+    const { Group: group, Item: item } = found;
+    const scroll = FindScroll(group), axis = AxisOf(group), count = ItemCount(group);
+    const current = this.groupRequest?.Group === group ? this.groupRequest.Index : IndexOf(group, item);
+    if (current < 0 || count < 1) return false;
+    const row = axis === "Both" ? RowLength(group, item) : 1;
+    const vertical = axis !== "Horizontal";
+    const page = () => PageSize(scroll!, item, vertical) * row;
+    let target: number, step: number;
+    if ((key === "ArrowDown" && axis === "Vertical") || (key === "ArrowRight" && axis !== "Vertical")) { target = current + 1; step = 1; }
+    else if ((key === "ArrowUp" && axis === "Vertical") || (key === "ArrowLeft" && axis !== "Vertical")) { target = current - 1; step = -1; }
+    else if (key === "ArrowDown" && axis === "Both") { target = Math.min(count - 1, current + row); step = 1; }
+    else if (key === "ArrowUp" && axis === "Both") { target = Math.max(0, current - row); step = -1; }
+    else if (key === "Home") { target = 0; step = 1; }
+    else if (key === "End") { target = count - 1; step = -1; }
+    else if (key === "PageDown" && scroll) { target = Math.min(count - 1, current + page()); step = 1; }
+    else if (key === "PageUp" && scroll) { target = Math.max(0, current - page()); step = -1; }
+    else return false;
+    if (target < 0 || target >= count || target === current) return true; // at the end of the group nothing happens, the key still belongs to it
+    this.groupRequest = { Group: group, Scroll: scroll, Index: target, Step: step, Deadline: performance.now() + 3000, ScrollIssued: false };
+    group.Superview?.Update(); // resolved at the end of the next frame, together with the snapshot
+    return true;
+  }
+
+  /** Frame end: focus the requested item once it is drawn, skipping items that cannot take input. */
+  private ProcessGroupFocus(scale: number, w: number, h: number, requestFrame: () => void): void {
+    const request = this.groupRequest;
+    if (!request) return;
+    const cell = ItemAt(request.Group, request.Index);
+    if (cell && IsDrawn(cell)) {
+      const node = FindTarget(cell);
+      if (node) { this.groupRequest = undefined; this.FocusFromKeyboard(node, scale, w, h); return; }
+      // this item cannot take input: go on to the next one in the same direction
+      request.Index += request.Step;
+      if (request.Index < 0 || request.Index >= ItemCount(request.Group)) { this.groupRequest = undefined; return; }
+      request.Deadline = performance.now() + 3000;
+      request.ScrollIssued = false;
+    } else if (performance.now() > request.Deadline || request.Group.IsDisposed) { this.groupRequest = undefined; return; }
+    if (!request.ScrollIssued) {
+      request.ScrollIssued = true;
+      const next = ItemAt(request.Group, request.Index);
+      if ((!next || !IsDrawn(next)) && request.Scroll && request.Scroll.Content === request.Group) {
+        request.Scroll.ScrollToIndex(request.Index, true, request.Step > 0 ? "End" : "Start");
+      }
+    }
+    requestFrame(); // keep frames coming until the item is drawn
+  }
+
+  private FocusFromKeyboard(node: SkiaControl, scale: number, w: number, h: number): void {
+    this.Rebuild(scale, w, h); // the overlay looks the node up in the snapshot: make sure it is there now
+    this.NoteFocus(node);
+    this.FocusedNode = node;
+    for (const cb of this.keyboardFocusRequested) cb(node);
+  }
 
   Register(node: SkiaControl): void { this.nodes.add(node); this.dirty = true; }
 
@@ -91,6 +251,7 @@ export class SkiaAccessibilityManager {
    * per MinUpdateIntervalMs otherwise (keeps rects in sync with scrolling); notifies only when the snapshot differs.
    */
   OnFrameEnd(scale: number, canvasWidthPx: number, canvasHeightPx: number, requestFrame: () => void): void {
+    this.ProcessGroupFocus(scale, canvasWidthPx, canvasHeightPx, requestFrame);
     if (this.nodes.size === 0 && this.Snapshot.length === 0) return;
     const now = performance.now();
     const wait = this.MinUpdateIntervalMs - (now - this.lastRebuild);
@@ -99,8 +260,12 @@ export class SkiaAccessibilityManager {
       if (!this.pending) this.pending = window.setTimeout(() => { this.pending = 0; requestFrame(); }, wait);
       return;
     }
+    this.Rebuild(scale, canvasWidthPx, canvasHeightPx);
+  }
+
+  private Rebuild(scale: number, canvasWidthPx: number, canvasHeightPx: number): void {
     this.dirty = false;
-    this.lastRebuild = now;
+    this.lastRebuild = performance.now();
 
     const list: AccessibilityNode[] = [];
     for (const n of this.nodes) {
@@ -120,6 +285,19 @@ export class SkiaAccessibilityManager {
       });
     }
     list.sort((a, b) => a.Rect.Top - b.Rect.Top || a.Rect.Left - b.Rect.Left);
+    // reading order: nodes whose tops are within half the smaller height form one row, read left to right, so a row of
+    // vertically centered controls of different heights keeps its visual order (C# RectComparer + LeftComparer)
+    for (let start = 0, i = 1; i <= list.length; i++) {
+      if (i < list.length) {
+        const first = list[start].Rect, next = list[i].Rect;
+        if (next.Top - first.Top < Math.min(first.Height, next.Height) / 2) continue;
+      }
+      if (i - start > 1) {
+        const row = list.slice(start, i).sort((a, b) => a.Rect.Left - b.Rect.Left);
+        for (let k = 0; k < row.length; k++) list[start + k] = row[k];
+      }
+      start = i;
+    }
     if (SkiaAccessibilityManager.Same(list, this.Snapshot)) return;
     this.Snapshot = list;
     for (const cb of this.changed) cb();
@@ -142,6 +320,79 @@ export class SkiaAccessibilityManager {
     }
     return true;
   }
+}
+
+// ---- group helpers (duck-typed layouts and scrolls) ----
+
+/** Children of a control (a layout's Views, a scroll's Content). */
+function ViewsOf(c: SkiaControl): readonly SkiaControl[] {
+  if ("Views" in c) return (c as unknown as { Views: readonly SkiaControl[] }).Views;
+  const content = (c as unknown as { Content?: SkiaControl }).Content;
+  return content ? [content] : [];
+}
+
+function FindScroll(group: SkiaControl): GroupScroll | undefined {
+  for (let p = group.Parent; p; p = p.Parent) { const s = asScroll(p); if (s) return s; }
+  return undefined;
+}
+
+/** Down / Up in a Column, Right / Left in a Row, all four in a Wrap, a Grid or a Split layout. */
+function AxisOf(group: SkiaControl): "Vertical" | "Horizontal" | "Both" {
+  const l = asLayout(group);
+  if (!l) return "Vertical";
+  if (l.Type === "Column") return l.Split <= 1 ? "Vertical" : "Both";
+  if (l.Type === "Row") return "Horizontal";
+  if (l.Type === "Absolute") return "Vertical";
+  return "Both";
+}
+
+/** Items per row of a 2D group: Split when set, else the items sharing the row of `item`. */
+function RowLength(group: SkiaControl, item: SkiaControl): number {
+  const l = asLayout(group);
+  if (l && l.Split > 1) return l.Split;
+  const top = item.GetAccessibilityPixelRect();
+  if (top.Height <= 0) return 1;
+  const mid = (top.Top + top.Bottom) / 2;
+  let count = 0;
+  for (const child of ViewsOf(group)) { const r = child.GetAccessibilityPixelRect(); if (r.Height > 0 && Math.abs((r.Top + r.Bottom) / 2 - mid) < top.Height / 2) count++; }
+  return Math.max(1, count);
+}
+
+function ItemCount(group: SkiaControl): number {
+  const l = asLayout(group);
+  return l?.IsTemplated ? l.ItemsSource?.length ?? 0 : ViewsOf(group).length;
+}
+
+function IndexOf(group: SkiaControl, item: SkiaControl): number {
+  const l = asLayout(group);
+  return l?.IsTemplated ? item.ContextIndex : ViewsOf(group).indexOf(item);
+}
+
+/** The view of an item: the realized cell of a templated layout (none when its cell is not in use), else the child. */
+function ItemAt(group: SkiaControl, index: number): SkiaControl | undefined {
+  const l = asLayout(group);
+  if (l?.IsTemplated) { const v = l.ChildrenFactory.GetViewForIndex(index); return v && v.ContextIndex === index ? v : undefined; }
+  return index >= 0 && index < ViewsOf(group).length ? ViewsOf(group)[index] : undefined;
+}
+
+/** Arranged on the canvas: realized and laid out (a templated layout keeps only the cells it draws in use). */
+function IsDrawn(control: SkiaControl): boolean {
+  const r = control.GetAccessibilityPixelRect();
+  return !!control.Superview && r.Width > 0 && r.Height > 0;
+}
+
+/** Items per viewport of the scroll around the group. */
+function PageSize(scroll: GroupScroll, item: SkiaControl, vertical: boolean): number {
+  const v = (scroll as unknown as SkiaControl).DrawingRect, size = item.MeasuredSize.Pixels;
+  const viewport = vertical ? v.Height : v.Width, s = vertical ? size.Height : size.Width;
+  return s > 0 ? Math.max(1, Math.floor(viewport / s)) : 1;
+}
+
+/** The item itself when it is an interactive node, else its first interactive node in tree order. */
+function FindTarget(item: SkiaControl): SkiaControl | undefined {
+  if (item.IsAccessibilityElement && item.AccessibilityCanInteract) return item;
+  for (const child of ViewsOf(item)) { const found = FindTarget(child); if (found) return found; }
+  return undefined;
 }
 
 /** True when any ancestor is hidden (IsVisible false or Opacity 0): the subtree is not drawn, so it gets no nodes. */

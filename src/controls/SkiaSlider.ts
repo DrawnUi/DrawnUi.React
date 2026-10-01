@@ -207,5 +207,31 @@ export class SkiaSlider extends SkiaControl {
   }
 
   protected override DefaultAccessibilityCanInteract(): boolean { return this.RespondsToGestures; }
+
+  /** Enter / Space do nothing: the base taps the center, which would jump the value to the middle. */
+  override OnAccessibilityActivated(): void {}
+
+  /**
+   * Keyboard adjustment while the slider holds keyboard focus (C# SkiaSlider.OnAccessibilityKey): Right / Up increase and
+   * Left / Down decrease by Step (a hundredth of the range when Step is 0), PageUp / PageDown move a tenth of the range,
+   * Home / End go to Min / Max. A ranged slider moves its End thumb, which stops at Start.
+   */
+  override OnAccessibilityKey(key: string): boolean {
+    if (!this.RespondsToGestures) return false;
+    const range = this.Max - this.Min, small = this.Step > 0 ? this.Step : range / 100, large = Math.max(small, range / 10);
+    const low = this.EnableRange ? this.Start : this.Min;
+    let value: number;
+    switch (key) {
+      case "ArrowRight": case "ArrowUp": value = this.End + small; break;
+      case "ArrowLeft": case "ArrowDown": value = this.End - small; break;
+      case "PageUp": value = this.End + large; break;
+      case "PageDown": value = this.End - large; break;
+      case "Home": value = low; break;
+      case "End": value = this.Max; break;
+      default: return false;
+    }
+    this.End = Math.min(this.Max, Math.max(low, value));
+    return true;
+  }
   protected override DefaultAccessibilityLabel(): string | undefined { return this.EnableRange ? `${this.start} – ${this.end}` : `${this.end}`; }
 }

@@ -428,6 +428,16 @@ Updated whenever the port deliberately diverges or finds something worth back-po
 
 ## Accessibility
 
+### Keyboard navigation through the DOM overlay
+- **React**: as DrawnUi.Blazor, the overlay elements are the keyboard focus: roving tabindex for arrow-key groups, the
+  browser's Tab order, `:focus-visible` as the focus ring. A focus request from the manager (arrow keys) rebuilds the
+  snapshot at once and focuses the element after the overlay rendered. Tab / Shift+Tab inside a `SkiaEditor` (its
+  hidden textarea holds DOM focus) move focus to the editor's own overlay element without taking the caret again, then
+  the browser's Tab moves on, so the next node keeps the keyboard. An item counts as drawn when it is in use and laid
+  out (C# `WasInLastFrame`: React keeps only drawn cells in use).
+- **.NET**: MAUI Windows / WPF draw the ring on the canvas and track `KeyboardFocusNode`; Escape leaves the drawn nodes.
+- **Opinion**: same contract; the canvas ring and Escape are not needed where the browser owns focus.
+
 ### Selectable text is opt-in
 - **React**: `AccessibilityTextSelectable` (default false) puts a label's lines into the overlay as real text with pointer events; the text then owns the pointer (selection), so it is never enabled implicitly — custom controls would lose taps and pans under their labels. ARIA roles / labels stay unaffected.
 - **.NET**: no selectable labels (only `SkiaEditor` selects).

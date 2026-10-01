@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import { Colors, SkiaButton, SkiaLabel, SkiaLayer, SkiaScroll, SkiaStack, SkiaWrap, Thickness } from "drawnui-react";
+import { Aria, Colors, SkiaButton, SkiaLabel, SkiaLayer, SkiaScroll, SkiaStack, SkiaWrap, Thickness } from "drawnui-react";
 import type { SkiaLayout as SkiaLayoutCtrl, SkiaScroll as SkiaScrollCtrl } from "drawnui-react/core";
 import { useCanvasView } from "./canvasView";
 import { ContactCell } from "./ContactCell";
@@ -27,6 +27,7 @@ export function CellsPage() {
         <SkiaStack
           ref={feed}
           ItemsSource={ITEMS}
+          AccessibilityRole={Aria.RoleList} // keyboard group: one Tab stop, the arrows walk all 100 000 items
           ItemTemplate={template}
           RecyclingTemplate="Enabled"
           MeasureItemsStrategy="MeasureFirst"
@@ -35,8 +36,8 @@ export function CellsPage() {
         />
       </SkiaScroll>
 
-      {/* jump toolbar: wraps on narrow screens */}
-      <SkiaWrap Spacing={6} Margin={new Thickness(8, 0, 8, 36)} HorizontalOptions="Center" VerticalOptions="End">
+      {/* jump toolbar: wraps on narrow screens; a keyboard group: one Tab stop, the arrows move between the buttons */}
+      <SkiaWrap AccessibilityRole={Aria.RoleToolbar} Spacing={6} Margin={new Thickness(8, 0, 8, 36)} HorizontalOptions="Center" VerticalOptions="End">
         <SkiaButton Text="HOME" FontSize={12} BackgroundColor="#0D6EFD" WidthRequest={104} Tapped={() => jump(0)} />
         <SkiaButton Text="BACKWARD" FontSize={12} BackgroundColor="#0D6EFD" WidthRequest={104} Tapped={() => jump((feed.current?.FirstVisibleIndex ?? 0) - 5)} />
         <SkiaButton Text="MIDDLE" FontSize={12} BackgroundColor="#0D6EFD" WidthRequest={104} Tapped={() => jump(ITEMS.length / 2)} />

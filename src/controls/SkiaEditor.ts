@@ -408,7 +408,14 @@ export class SkiaEditor extends SkiaShape {
     return this;
   }
 
-  override OnAccessibilityActivated(): void { this.IsFocused = true; }
+  /** A text field is a Tab stop by default, like a native text box, with no Tapped handler needed. */
+  protected override DefaultAccessibilityCanInteract(): boolean { return true; }
+  /** Keyboard navigation reached the field (Tab) or left it: take the caret and the input sink like a native text box, or release them. */
+  override OnAccessibilityFocused(focused: boolean): void { this.IsFocused = focused; }
+  /** Enter / Space on the field while it has no caret start editing; while editing they are text. */
+  override OnAccessibilityActivated(): void { if (!this.IsFocused) this.OnAccessibilityFocused(true); }
+  /** While editing, arrows, Home / End and PageUp / PageDown belong to the text: they never move a surrounding group. */
+  override OnAccessibilityKey(_key: string): boolean { return this.IsFocused; }
   protected override DefaultAccessibilityLabel(): string | undefined { return this.text || this.placeholderText || undefined; }
 
   // ---- editing API (C# names) ----
