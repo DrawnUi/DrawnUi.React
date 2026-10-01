@@ -18,6 +18,8 @@ export class ViewsAdapter {
   constructor(private readonly parent: SkiaControl) {}
 
   get PoolSize(): number { return this.pool.length; }
+  /** The items views are bound to. */
+  get Items(): readonly unknown[] { return this.items; }
   get InUseCount(): number { return this.inUse.size; }
 
   /** New template / items / mode: every realized view is dropped (DrawnUi ApplyItemsSource). */
@@ -53,16 +55,20 @@ export class ViewsAdapter {
   /** The realized view for an index, if any (no creation). */
   GetViewForIndex(index: number): SkiaControl | undefined { return this.inUse.get(index); }
 
-  /** View bound to items[index]: existing, recycled from the pool, or freshly created. */
-  GetOrCreateViewForIndex(index: number): SkiaControl | undefined {
+  /**
+   * View bound to items[index]: existing, recycled from the pool, or freshly created. `quiet`: bound before it is
+   * attached, so the rebind invalidates the view alone and not the layout, which measures or draws it right away.
+   */
+  GetOrCreateViewForIndex(index: number, quiet = false): SkiaControl | undefined {
     const existing = this.inUse.get(index);
     if (existing) return existing;
     if (!this.template || index < 0 || index >= this.items.length) return undefined;
     let view = this.recycling === "Enabled" ? this.pool.pop() : undefined;
     if (!view) { view = this.template(); this.Created++; }
-    view.Parent = this.parent;
+    if (!quiet) view.Parent = this.parent;
     view.ContextIndex = index;
     view.BindingContext = this.items[index];
+    view.Parent = this.parent;
     this.inUse.set(index, view);
     return view;
   }

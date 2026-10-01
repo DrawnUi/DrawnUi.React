@@ -263,7 +263,7 @@ export function LayoutsPage() {
             <SkiaButton Text="- item" BackgroundColor="#0D6EFD" FontSize={12} Tapped={() => setCount((c) => Math.max(1, c - 1))} />
           </SkiaWrap>
         </Card>
-        <Card title="SkiaRow ItemsSource (same cells, laid out horizontally, every item realized)">
+        <Card title="SkiaRow ItemsSource (the same recycled cells, laid out horizontally)">
           <SkiaRow Spacing={8} ItemsSource={items.slice(0, 5)} ItemTemplate={template} />
         </Card>
         <Card title={`SkiaDecoratedGrid ItemsSource · Split=4 · ColumnSpacing / RowSpacing 1 · gradient lines in the spacing`}>

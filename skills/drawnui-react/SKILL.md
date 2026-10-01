@@ -74,8 +74,9 @@ createRoot(document.getElementById("root")!).render(
 - Templated lists: `ItemsSource={array}` + `ItemTemplate={template}`; cells extend `SkiaDynamicDrawnCell`
   (build the visuals in the constructor, override `SetContent(item)`). `RecyclingTemplate`,
   `MeasureItemsStrategy` (`MeasureAll` default / `MeasureFirst` = uniform rows, set it explicitly / `MeasureVisible`), `Split` / `SplitAlign` /
-  `DynamicColumns` / `Invert` for Wrap / Row / Grid (those realize every item; the single-column Column is the
-  virtualized list). Appending to `ItemsSource` keeps measured rows, prepending keeps the visible rows in place, and reordering the same items (drag to reorder) keeps every measured height and the scroll offset; any other change rebuilds.
+  `DynamicColumns` / `Invert` for Wrap / Row / Grid. The single-column Column is the virtualized list; a templated Row /
+  Wrap / Grid / split Column follows `RecyclingTemplate` too: `Enabled` binds pooled views only to the slots on screen
+  (every slot when the layout sits under a cached parent), `Disabled` keeps one view per item. Appending to `ItemsSource` keeps measured rows, prepending keeps the visible rows in place, and reordering the same items (drag to reorder) keeps every measured height and the scroll offset; any other change rebuilds.
 - A stack packs its children along its axis: a child's `VerticalOptions="Center"` cannot centre it in a column's
   leftover space (nor `HorizontalOptions` in a row). Use `SkiaLayer` (absolute) when a child has to sit in the
   middle of a bigger box, which is also how a full-height drag handle keeps its icon centred.

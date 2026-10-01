@@ -1,15 +1,82 @@
 import { type DrawingContext, SkiaControl } from "../core/SkiaControl";
 import { ViewsAdapter } from "../core/ViewsAdapter";
-import { type GridLength, type LayoutType, type MeasuringStrategy, type RecyclingTemplate, SKRect, ScaledSize, type ShapeType, Thickness } from "../core/Types";
+import { type GridLength, type LayoutOptions, type LayoutType, type MeasuringStrategy, type RecyclingTemplate, SKRect, ScaledSize, type ShapeType, Thickness } from "../core/Types";
 import { SkiaGridStructure } from "./GridStructure";
+
+/**
+ * The place of one item in a recycled templated Row / Wrap / Grid / split Column. C# measures the structure on one
+ * template instance bound to each item in turn: Measure here binds a pooled view to the item, keeps its size, the
+ * constraints and what the template decided for that item, then gives the view back unless the item is on screen.
+ * The same item measured again with the same constraints keeps its size without a rebind (as the list keeps its item
+ * heights: a new ItemsSource array is how content changes). Arrange only records the slot; the drawing pass binds a
+ * view to each slot it draws.
+ */
+class TemplatedSlot {
+  IsVisible = true;
+  Row = 0;
+  Column = 0;
+  RowSpan = 1;
+  ColumnSpan = 1;
+  HorizontalOptions: LayoutOptions = "Start";
+  VerticalOptions: LayoutOptions = "Start";
+  Margin = Thickness.Zero;
+  WidthRequest = -1;
+  HeightRequest = -1;
+  MinimumWidthRequest = -1;
+  MinimumHeightRequest = -1;
+  MeasuredSize = ScaledSize.Default;
+  WidthConstraint = Infinity;
+  HeightConstraint = Infinity;
+  /** The rect the layout arranged this slot in (pixels). */
+  Destination = SKRect.Empty;
+  /** The view last arranged in this slot and the Destination it got, so an unchanged view is not arranged twice. */
+  ArrangedView?: SkiaControl;
+  ArrangedFor?: SKRect;
+  private measuredItem: unknown;
+  private measuredScale = 0;
+
+  constructor(readonly Index: number, private readonly factory: ViewsAdapter) {}
+
+  Measure(widthConstraint: number, heightConstraint: number, scale: number): ScaledSize {
+    const shown = this.factory.GetViewForIndex(this.Index), item = this.factory.Items[this.Index];
+    if (!shown && item === this.measuredItem && scale === this.measuredScale
+      && Object.is(widthConstraint, this.WidthConstraint) && Object.is(heightConstraint, this.HeightConstraint)) return this.MeasuredSize;
+    const view = shown ?? this.factory.GetOrCreateViewForIndex(this.Index, true);
+    if (!view) return (this.MeasuredSize = ScaledSize.Default);
+    this.MeasuredSize = view.Measure(widthConstraint, heightConstraint, scale);
+    this.measuredItem = item;
+    this.measuredScale = scale;
+    this.WidthConstraint = widthConstraint;
+    this.HeightConstraint = heightConstraint;
+    this.IsVisible = view.IsVisible;
+    this.RowSpan = view.RowSpan;
+    this.ColumnSpan = view.ColumnSpan;
+    this.HorizontalOptions = view.HorizontalOptions;
+    this.VerticalOptions = view.VerticalOptions;
+    this.Margin = view.Margin;
+    this.WidthRequest = view.WidthRequest;
+    this.HeightRequest = view.HeightRequest;
+    this.MinimumWidthRequest = view.MinimumWidthRequest;
+    this.MinimumHeightRequest = view.MinimumHeightRequest;
+    if (!shown) this.factory.ReleaseViewAt(this.Index);
+    return this.MeasuredSize;
+  }
+
+  Arrange(destination: SKRect, _widthRequest?: number, _heightRequest?: number, _scale?: number): void { this.Destination = destination; }
+}
+
+/** What a layout pass measures and arranges: a control, or the slot of a recycled templated item. */
+type LayoutChild = SkiaControl | TemplatedSlot;
 
 /**
  * Mirrors DrawnUi SkiaLayout (Absolute / Column / Row / Wrap / Grid).
  * Column/Row give children an infinite main axis (MAUI stack semantics: Fill on the main axis = auto-sized).
  *
- * Templated mode (ItemsSource + ItemTemplate) is a Column only: cells are created through the ViewsAdapter for
- * the indexes inside the visible viewport (+ VirtualisationInflated), everything else is arithmetic —
- * MeasureAll (default) measures every item once, MeasureFirst measures one cell and assumes uniform size.
+ * Templated mode (ItemsSource + ItemTemplate): a single-column Column is the virtualized list, cells are created through
+ * the ViewsAdapter for the indexes inside the visible viewport (+ VirtualisationInflated), everything else is arithmetic —
+ * MeasureAll (default) measures every item once, MeasureFirst measures one cell and assumes uniform size. A templated
+ * Row / Wrap / Grid / split Column follows RecyclingTemplate: Enabled measures every item on pooled views and binds views
+ * only to the slots drawn, Disabled keeps one view per item.
  */
 export class SkiaLayout extends SkiaControl {
   /** Layout type. SkiaShape redeclares it as ShapeType (any shape value lays out as Absolute), like the C# hidden Type. */
@@ -29,7 +96,14 @@ export class SkiaLayout extends SkiaControl {
   GridStructure?: SkiaGridStructure;
 
   // ---- templated children (same names as DrawnUi) ----
-  RecyclingTemplate: RecyclingTemplate = "Enabled";
+  private recyclingTemplate: RecyclingTemplate = "Enabled";
+  /** Enabled: views come from a pool and are bound to the items being drawn; Disabled: one view per item, never rebound. */
+  get RecyclingTemplate(): RecyclingTemplate { return this.recyclingTemplate; }
+  set RecyclingTemplate(value: RecyclingTemplate) {
+    if (this.recyclingTemplate === value) return;
+    this.recyclingTemplate = value;
+    if (this.itemTemplate) this.ApplyItemsSource(); // the pool follows the mode
+  }
   /** Column count for Column / Wrap content and a templated Grid (0 = free flow); C# Split. */
   Split = 0;
   /** Split > 0: every slot keeps the same width (true) or the cell keeps its measured width (C# SplitAlign). */
@@ -192,19 +266,32 @@ export class SkiaLayout extends SkiaControl {
   }
 
   get IsTemplated(): boolean { return !!this.itemTemplate && !!this.itemsSource; }
-  /** The virtualized list case: a templated single-column Column. Templated Row / Wrap / Grid realize every item. */
+  /** The virtualized list case: a templated single-column Column. */
   private get IsTemplatedList(): boolean { return this.IsTemplated && this.Type === "Column" && this.Split <= 1; }
-  /** Views taking part in the layout pass: static children, or every item of a templated Row / Wrap / Grid (C# non-list layouts are not virtualized). */
-  private LayoutViews(): readonly SkiaControl[] {
+  /** A templated Row / Wrap / Grid / split Column with RecyclingTemplate Enabled: slots measured on pooled views, views bound to the slots drawn. */
+  private get IsRecycledLayout(): boolean { return this.IsTemplated && !this.IsTemplatedList && this.recyclingTemplate === "Enabled"; }
+  /** Slots of a recycled layout, one per item. */
+  private slots?: TemplatedSlot[];
+  /**
+   * What the layout pass measures and arranges: static children; the slots of a recycled templated layout; or, with
+   * RecyclingTemplate Disabled, one realized view per item.
+   */
+  private LayoutViews(): readonly LayoutChild[] {
     if (!this.IsTemplated) return this.views;
-    const n = this.itemsSource!.length, out: SkiaControl[] = [];
+    const n = this.itemsSource!.length;
+    if (this.IsRecycledLayout) {
+      if (this.slots?.length !== n) this.slots = Array.from({ length: n }, (_, i) => new TemplatedSlot(i, this.ChildrenFactory));
+      return this.slots;
+    }
+    const out: SkiaControl[] = [];
     for (let i = 0; i < n; i++) { const v = this.ChildrenFactory.GetOrCreateViewForIndex(i); if (v) out.push(v); }
     return out;
   }
 
   /** Drops realized cells and rebuilds the structure (DrawnUi ApplyItemsSource). */
   ApplyItemsSource(): void {
-    this.ChildrenFactory.Initialize(this.itemTemplate, this.itemsSource ?? [], this.RecyclingTemplate);
+    this.ChildrenFactory.Initialize(this.itemTemplate, this.itemsSource ?? [], this.recyclingTemplate);
+    this.slots = undefined;
     this.structureDirty = true;
     this.InvalidateMeasure();
   }
@@ -313,7 +400,7 @@ export class SkiaLayout extends SkiaControl {
   }
 
   /** Wrap rows computed by the last measure: [childIndex, x, y, w, h] in pixels relative to the padded box. */
-  private wrapSlots: { view: SkiaControl; x: number; y: number; w: number; h: number }[] = [];
+  private wrapSlots: { view: LayoutChild; x: number; y: number; w: number; h: number }[] = [];
 
   /** Wrap, or a Column with Split > 1 (C# lays a multi-column Column out like a wrap with fixed slots). */
   private get IsWrapFlow(): boolean { return this.Type === "Wrap" || (this.Type === "Column" && this.Split > 1); }
@@ -367,7 +454,7 @@ export class SkiaLayout extends SkiaControl {
         else { v.Row = Math.floor(i / split); v.Column = i % split; }
       });
     }
-    const g = new SkiaGridStructure(this, wPts, hPts, scale);
+    const g = new SkiaGridStructure(this, wPts, hPts, scale, this.LayoutViews());
     g.DecompressStars(wPts, hPts);
     const needAutoWidth = this.WidthRequest < 0 && this.HorizontalOptions !== "Fill";
     const needAutoHeight = this.HeightRequest < 0 && this.VerticalOptions !== "Fill";
@@ -510,6 +597,19 @@ export class SkiaLayout extends SkiaControl {
 
   protected override OnLayoutChanged(): void {
     if (this.IsTemplatedList) return; // cells are arranged per frame for the visible range only
+    this.ArrangeChildren();
+    // views on screen follow their slots also when a cache above skips the drawing pass (gestures, accessibility)
+    if (this.IsRecycledLayout) {
+      const scale = this.RenderingScale;
+      for (const v of this.ChildrenFactory.GetViewsInUse()) {
+        const s = this.slots?.[v.ContextIndex];
+        if (s) { v.Arrange(s.Destination, v.WidthRequest, v.HeightRequest, scale); s.ArrangedView = v; s.ArrangedFor = s.Destination; }
+      }
+    }
+  }
+
+  /** Static children and realized views are arranged; the slots of a recycled layout record where their item goes. */
+  private ArrangeChildren(): void {
     const scale = this.RenderingScale;
     const p = this.Padding;
     const r = this.DrawingRect;
@@ -550,10 +650,57 @@ export class SkiaLayout extends SkiaControl {
 
   protected override Paint(ctx: DrawingContext): void {
     if (this.IsTemplatedList) { this.PaintTemplated(ctx); return; }
+    if (this.IsRecycledLayout) { this.PaintSlots(ctx); return; }
     const composing = this.IsRenderingWithComposition;
     for (const v of this.GetOrderedSubviews()) if (!composing || this.DirtyChildrenInternal.has(v)) v.Render(ctx);
   }
-  protected override GetCompositeChildren(): readonly SkiaControl[] { return this.IsTemplatedList ? [] : this.GetOrderedSubviews(); }
+  protected override GetCompositeChildren(): readonly SkiaControl[] { return this.IsTemplatedList || this.IsRecycledLayout ? [] : this.GetOrderedSubviews(); }
+
+  private readonly drawnSlots = new Set<number>();
+
+  /**
+   * Recycled templated layout (C# DrawStack): a view from the pool is bound to each slot that can be seen and drawn
+   * there; the views of the other slots go back to the pool.
+   */
+  private PaintSlots(ctx: DrawingContext): void {
+    const slots = this.slots ?? [], f = this.ChildrenFactory, scale = this.RenderingScale, area = this.SlotsArea();
+    const drawn = this.drawnSlots;
+    drawn.clear();
+    for (const s of slots) {
+      const d = s.Destination;
+      if (s.IsVisible && d.Right > area.Left && d.Left < area.Right && d.Bottom > area.Top && d.Top < area.Bottom) drawn.add(s.Index);
+    }
+    f.ReleaseExcept(drawn);
+    this.FirstVisibleIndex = this.LastVisibleIndex = -1;
+    for (const i of drawn) {
+      const s = slots[i], view = f.GetOrCreateViewForIndex(i, true);
+      if (!view) continue;
+      // a view last measured for another item is measured for this one; the whole size is compared because a Wrap has
+      // no main-axis size key (C# 3d7bd78f)
+      const has = view.MeasuredSize.Pixels, want = s.MeasuredSize.Pixels;
+      if (Math.abs(has.Width - want.Width) > 1 || Math.abs(has.Height - want.Height) > 1) view.NeedMeasure = true;
+      const size = view.MeasuredSize;
+      view.Measure(s.WidthConstraint, s.HeightConstraint, scale);
+      if (s.ArrangedView !== view || s.ArrangedFor !== s.Destination || view.MeasuredSize !== size) {
+        view.Arrange(s.Destination, view.WidthRequest, view.HeightRequest, scale);
+        s.ArrangedView = view; s.ArrangedFor = s.Destination;
+      }
+      view.Render(ctx);
+      if (this.FirstVisibleIndex < 0) this.FirstVisibleIndex = i;
+      this.LastVisibleIndex = i;
+    }
+  }
+
+  /**
+   * Where slots are drawn (C# GetOnScreenVisibleArea): what can be seen, inflated by VirtualisationInflated. Under a
+   * cache (this layout's or an ancestor's, below the nearest scroll) every slot, because the cache is blitted later at
+   * other offsets.
+   */
+  private SlotsArea(): SKRect {
+    for (let c: SkiaControl | undefined = this; c && !("ViewportOffsetY" in c); c = c.Parent) if (c.UsingCacheType !== "None") return this.DrawingRect;
+    const v = this.GetVisibleViewport(), inflate = this.VirtualisationInflated * this.RenderingScale;
+    return new SKRect(v.Left - inflate, v.Top - inflate, v.Right + inflate, v.Bottom + inflate);
+  }
 
   /** Realizes, binds, arranges and draws only the cells intersecting the visible viewport (+ inflation). */
   private PaintTemplated(ctx: DrawingContext): void {

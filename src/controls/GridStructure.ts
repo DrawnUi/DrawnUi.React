@@ -49,6 +49,10 @@ class Cell {
 
 interface GridSpan { Key: string; Start: number; Length: number; IsColumn: boolean; Requested: number }
 
+/** What the structure reads from a child: a control, or the slot of a recycled templated item (measured on a pooled view). */
+export type GridChild = Pick<SkiaControl, "IsVisible" | "Row" | "Column" | "RowSpan" | "ColumnSpan" | "HorizontalOptions" | "VerticalOptions"
+  | "MinimumWidthRequest" | "MinimumHeightRequest" | "Margin" | "MeasuredSize" | "Measure">;
+
 /**
  * Port of DrawnUi SkiaGridStructure (itself adapted from the MAUI Grid manager). Works in POINTS: constraints come in
  * already reduced by the grid's padding, cells are returned relative to the padded box. Children are measured in
@@ -59,20 +63,21 @@ export class SkiaGridStructure {
   readonly Columns: DefinitionInfo[];
   readonly ColumnSpacing: number;
   readonly RowSpacing: number;
-  private readonly children: SkiaControl[];
+  private readonly children: GridChild[];
   private readonly cells: Cell[] = [];
   private readonly spans = new Map<string, GridSpan>();
   private readonly explicitWidth: number;
   private readonly explicitHeight: number;
 
-  constructor(private readonly grid: SkiaLayout, private readonly widthConstraint: number, private readonly heightConstraint: number, private readonly scale: number) {
+  constructor(private readonly grid: SkiaLayout, private readonly widthConstraint: number, private readonly heightConstraint: number, private readonly scale: number,
+    children: readonly GridChild[] = grid.Views) {
     this.ColumnSpacing = grid.ColumnSpacing;
     this.RowSpacing = grid.RowSpacing;
     this.explicitWidth = grid.WidthRequest;
     this.explicitHeight = grid.HeightRequest;
     this.Rows = this.InitializeTracks(grid.RowDefinitions, grid.DefaultRowDefinition);
     this.Columns = this.InitializeTracks(grid.ColumnDefinitions, grid.DefaultColumnDefinition);
-    this.children = grid.Views.filter((v) => v.IsVisible);
+    this.children = children.filter((v) => v.IsVisible);
     this.InitializeCells();
     this.MeasureCells();
   }
@@ -119,7 +124,7 @@ export class SkiaGridStructure {
   TopEdgeOfRow(row: number): number { let y = 0; for (let n = 0; n < row; n++) y += this.Rows[n].Size + this.RowSpacing; return y; }
 
   /** Cell rectangle in points relative to the padded box (+ offsets). */
-  GetCellBoundsFor(view: SkiaControl, xOffset = 0, yOffset = 0): { Left: number; Top: number; Width: number; Height: number } {
+  GetCellBoundsFor(view: GridChild, xOffset = 0, yOffset = 0): { Left: number; Top: number; Width: number; Height: number } {
     const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
     const firstColumn = clamp(view.Column, 0, this.Columns.length - 1);
     const columnSpan = clamp(view.ColumnSpan, 1, this.Columns.length - firstColumn);
@@ -145,7 +150,7 @@ export class SkiaGridStructure {
   }
 
   /** Points -> pixels for Measure; negative/NaN = unconstrained. */
-  private MeasurePx(child: SkiaControl, wPts: number, hPts: number) {
+  private MeasurePx(child: GridChild, wPts: number, hPts: number) {
     const w = wPts < 0 ? Infinity : wPts * this.scale;
     const h = hPts < 0 ? Infinity : Math.round(hPts * this.scale);
     return child.Measure(w, h, this.scale).Units;
@@ -214,7 +219,7 @@ export class SkiaGridStructure {
     }
   }
 
-  private ResolveStars(defs: DefinitionInfo[], availableSpace: number, cellCheck: (c: Cell) => boolean, dimension: (c: SkiaControl) => number): void {
+  private ResolveStars(defs: DefinitionInfo[], availableSpace: number, cellCheck: (c: Cell) => boolean, dimension: (c: GridChild) => number): void {
     let starCount = 0;
     for (const d of defs) if (d.IsStar) starCount += d.Value;
     if (starCount === 0) return;
@@ -276,7 +281,7 @@ export class SkiaGridStructure {
   }
 
   /** Stars shrink to what their cells actually need (so an auto-sized grid does not take the whole constraint). */
-  private CompressStars(defs: DefinitionInfo[], isStar: (c: Cell) => boolean, start: (c: Cell) => number, span: (c: Cell) => number, constraint: number, dimension: (v: SkiaControl) => number): void {
+  private CompressStars(defs: DefinitionInfo[], isStar: (c: Cell) => boolean, start: (c: Cell) => number, span: (c: Cell) => number, constraint: number, dimension: (v: GridChild) => number): void {
     const copy = defs.map((d) => { const c = new DefinitionInfo(d.Unit === "Absolute" ? d.Value : d.Unit === "Auto" ? "Auto" : `${d.Value}*`); c.Size = d.IsStar ? 0 : d.Size; return c; });
     for (const cell of this.cells) {
       if (!isStar(cell)) continue;

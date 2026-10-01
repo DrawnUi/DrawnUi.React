@@ -399,8 +399,19 @@ Updated whenever the port deliberately diverges or finds something worth back-po
 
 ## Layouts
 
-### Templated Row / Wrap / Grid are not virtualized
-- **React**: every item is realized through the `ViewsAdapter` (the C# non-list layouts also measure and draw all cells); only the templated single-column Column is the virtualized list.
+### Templated Row / Wrap / Grid follow RecyclingTemplate (Nick, 2026-10-01)
+- **React**: with `RecyclingTemplate="Enabled"` a templated Row / Wrap / Grid / split Column measures each item through a
+  slot bound to a pooled view (released right after unless the item is on screen), arranges only the slots, and binds
+  views to the slots drawn (the viewport + `VirtualisationInflated`; every slot under a cache, as C#
+  `GetOnScreenVisibleArea`). A view measured for another item is measured again when its whole size differs from the
+  slot (C# 3d7bd78f). A slot keeps its size for the same item and constraints, so invalidating the layout does not
+  rebind the items off screen (the list keeps its item heights the same way). Views on screen follow their slots on
+  every layout change, also when a cached ancestor skips the drawing pass. `Disabled` keeps one view per item.
+- **.NET**: Column / Row / Wrap recycle through `DrawStack`; the templated Grid realizes one view per item whatever the
+  setting (`SkiaLayout.Grid.cs:36`), Nick to decide whether it follows.
+- Check: `npm run check:recycling` (Node + CanvasKit): identical pixels Enabled vs Disabled at 12 scroll offsets and
+  after items change; a 1000-item Split=3 wrap: first frame 18-24 ms vs 88-91 ms, a frame after invalidation 3.5-4 vs
+  10-11 ms, a scroll frame 4.1-5.1 vs 9.1-10.2 ms, 27 views vs 1000 (software surface).
 
 ### `OnChildrenInitialized` order in SkiaCarousel
 - see SkiaShaderCarousel above.
