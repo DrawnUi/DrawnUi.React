@@ -846,7 +846,7 @@ export class SkiaScroll extends SkiaControl {
   /**
    * One wheel notch = WheelLineSize points, hard-clamped, animated over AutoScrollingSpeedMs. An event moves by its share
    * of a notch (Canvas.WheelDeltaPerNotch), so a touchpad's many small events scroll as far as the fingers moved (C#
-   * aaa871c3). Events arriving while the previous one is still animating add onto its target, so a fast wheel spin
+   * aaa871c3); an event under half a notch moves the content at once (no glide). Events arriving while the previous one is still animating add onto its target, so a fast wheel spin
    * travels N steps instead of restarting from the barely-moved current offset.
    */
   private ApplyWheelScroll(delta: number): boolean {
@@ -863,7 +863,11 @@ export class SkiaScroll extends SkiaControl {
     if ((step < 0 && base <= min) || (step > 0 && base >= max)) return false; // at the edge: let an outer scroll take it
     let x = this.offsetX, y = this.offsetY;
     if (horizontal) x = base + step; else y = base + step;
-    this.ScrollTo(x, y, this.AutoScrollingSpeedMs / 1000, true);
+    // a notch glides over AutoScrollingSpeedMs; smaller events (a touchpad, a free-spinning or high-resolution wheel) come
+    // as a stream and move the content at once, as the browser scrolls a page: easing each one over 600 ms kept the
+    // content behind the fingers, a visible delay before it started to move
+    const glide = perNotch <= 0 || Math.abs(delta) >= perNotch / 2;
+    this.ScrollTo(x, y, glide ? this.AutoScrollingSpeedMs / 1000 : 0, true);
     return true;
   }
 }

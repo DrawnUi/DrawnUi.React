@@ -428,6 +428,14 @@ Updated whenever the port deliberately diverges or finds something worth back-po
 
 ## Accessibility
 
+### Wheel events under half a notch move at once
+- **React**: an event smaller than half of `Canvas.WheelDeltaPerNotch` (a touchpad, a free-spinning or high-resolution
+  wheel) sets the offset directly; a notch glides over `AutoScrollingSpeedMs` (600 ms). Gliding every small event kept
+  the content 600 ms behind a Mac touchpad (Nick: a delay before it starts to scroll).
+- **.NET**: every wheel event glides over AutoScrollingSpeedMs (`SkiaScroll.ApplyWheelScroll`); touchpad latency on
+  Blazor / Wasm / MAUI Mac not measured.
+- **Opinion**: browsers apply touchpad deltas directly and smooth only notches; the .NET heads may want the same rule.
+
 ### Keyboard navigation through the DOM overlay
 - **React**: as DrawnUi.Blazor, the overlay elements are the keyboard focus: roving tabindex for arrow-key groups, the
   browser's Tab order, `:focus-visible` as the focus ring. A focus request from the manager (arrow keys) rebuilds the
