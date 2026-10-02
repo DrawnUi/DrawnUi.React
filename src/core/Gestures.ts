@@ -58,8 +58,11 @@ export class TouchActionEventArgs {
   Timestamp = performance.now();
   /** ms since the previous event of the same pointer. */
   DeltaTimeMs = 0;
-  /** Mouse wheel: Delta > 0 = wheel down (browser deltaY sign). */
-  Wheel = { Delta: 0 };
+  /**
+   * Mouse wheel: Delta > 0 = wheel down / right (browser sign). IsHorizontal: the event is along the X axis (a tilting
+   * wheel, the sideways part of a two-finger touchpad swipe), as C# WheelEventArgs.IsHorizontal.
+   */
+  Wheel: { Delta: number; IsHorizontal?: boolean } = { Delta: 0 };
   /**
    * AppoMobi TouchActionEventArgs.Handled: set by a control that actually used the event. The canvas prevents the
    * browser default (the page scrolling under the wheel) only for a Handled event in `Gestures="Enabled"`.

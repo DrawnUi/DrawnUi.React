@@ -140,6 +140,7 @@ export class Canvas {
     // (measured 12..23 ms between frames shown 16.7 ms apart), and a game loop moving by speed * delta then
     // jumps unevenly on screen.
     const frameTime = Number(document.timeline?.currentTime ?? started);
+    this.FrameTimeNanos = Math.round(frameTime * 1_000_000);
     const executed = this.ExecuteAnimators(Math.round(frameTime * 1_000_000));
     const canRender = this.CanRender;
     if (canRender && !this.WasRendered) this.WillFirstTimeDraw?.(this, { Canvas: canvas, Surface: this.surface });
@@ -209,6 +210,8 @@ export class Canvas {
    * fingers moved. 0 = units unknown: every event scrolls one line.
    */
   WheelDeltaPerNotch = 100;
+  /** Vsync time of the last frame the animators ran on (nanoseconds, the performance.now() timeline). */
+  FrameTimeNanos = 0;
 
   /** On-screen surface (SkiaBackdrop snapshots it). */
   get Surface(): Surface | undefined { return this.surface; }
@@ -363,9 +366,11 @@ export class Canvas {
     args.Scale = this.RenderingScale;
     args.Location = new SKPoint((e.clientX - rect.left) * this.RenderingScale, (e.clientY - rect.top) * this.RenderingScale);
     args.StartingLocation = args.Location;
-    // lines and pages to pixels, then the dominant axis (the .NET browser heads, fc8980c1)
+    // lines and pages to pixels, then the dominant axis (the .NET browser heads, fc8980c1); a vertical scroll leaves
+    // horizontal events alone (C# ba03cb20)
     const factor = e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? 800 : 1;
-    args.Wheel = { Delta: (Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX) * factor };
+    const horizontal = Math.abs(e.deltaX) > Math.abs(e.deltaY);
+    args.Wheel = { Delta: (horizontal ? e.deltaX : e.deltaY) * factor, IsHorizontal: horizontal };
     if (this.gestures === "Lock") {
       e.preventDefault();
       this.OnGestureEvent(args, "Wheel");

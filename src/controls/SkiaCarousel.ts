@@ -484,6 +484,9 @@ export class SkiaCarousel extends SnappingLayout {
         if (!this.IsUserPanning) {
           const movex = Math.abs(e.Distance.Total.X), movey = Math.abs(e.Distance.Total.Y);
           const along = this.IsVertical ? movey : movex, across = this.IsVertical ? movex : movey;
+          // a first move too short to tell the direction decides nothing yet (a 1 CSS px move at devicePixelRatio 2):
+          // marking it wrong kept the whole drag dead until the next press (DrawnUi.Rust c6b22e3; C# decides on every move)
+          if (along < scale * 2 && across < scale * 2) return consumedDefault;
           if (along < scale * 2 || across > along) { this.wrongDirection = true; return consumedDefault; }
         }
         if (!this.IsUserFocused) resetPan();

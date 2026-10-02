@@ -55,6 +55,7 @@
     "sync:skills": "node dev/sync-skills.mjs",
     "check:recycling": "node dev/check.mjs dev/check-recycling.ts",
     "check:keyboard": "node dev/check.mjs dev/check-keyboard.ts",
+    "check:wheel": "node dev/check.mjs dev/check-wheel.ts",
     "site:extras": "node dev/site-extras.mjs dist/demo",
     "build:lib": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
     "prepublishOnly": "npm run build:lib",

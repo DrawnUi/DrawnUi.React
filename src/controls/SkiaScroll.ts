@@ -736,6 +736,8 @@ export class SkiaScroll extends SkiaControl {
       const child = super.ProcessGestures(args, apply);
       if (child && child !== this) return child;
       if (!this.RespondsToGestures || this.Orientation === "Neither") return child ?? consumedDefault; // Neither: not used, a parent scroll may take it
+      // a vertical scroll leaves horizontal events (the sideways part of a diagonal swipe) to whatever is around it
+      if (e.Wheel.IsHorizontal && this.Orientation === "Vertical") return child ?? consumedDefault;
       if (!this.ApplyWheelScroll(e.Wheel.Delta)) return consumedDefault; // at its edge: not used, the page may take it
       e.Handled = true;
       return this;
@@ -868,6 +870,13 @@ export class SkiaScroll extends SkiaControl {
     // content behind the fingers, a visible delay before it started to move
     const glide = perNotch <= 0 || Math.abs(delta) >= perNotch / 2;
     this.ScrollTo(x, y, glide ? this.AutoScrollingSpeedMs / 1000 : 0, true);
+    // a restarted glide starts at the event, not at its first frame: a fast trackpad swipe sends a notch-sized event
+    // before every frame, and a glide drawn at progress 0 on each of them left the content standing still until the
+    // events stopped, then it jumped (DrawnUi.Rust dfe36fe). Never before the last frame, at most one frame back.
+    if (glide && running.IsRunning) {
+      const event = performance.now() * 1_000_000;
+      running.StartFrameTimeNanos = running.LastFrameTimeNanos = Math.max(this.Superview?.FrameTimeNanos ?? 0, event - 16_666_667);
+    }
     return true;
   }
 }
