@@ -157,6 +157,7 @@ export class SkiaShaderEffect extends SkiaEffect implements IPostRendererEffect 
     if (this.frozenOwned && this.frozen) this.DisposeImage(this.frozen.Image);
     this.frozen = undefined;
     this.frozenOwned = false;
+    this.frozenAt = undefined;
   }
 
   private DisposeImage(image: Image): void {
@@ -185,6 +186,17 @@ export class SkiaShaderEffect extends SkiaEffect implements IPostRendererEffect 
     return { Image: image, Bounds: destination, Origin: { X: ox, Y: oy } };
   }
 
+  /** Where the parent was when the texture was frozen (Once): the texture moves with it, as its cache does. */
+  private frozenAt?: { X: number; Y: number };
+  private ParentOrigin(): { X: number; Y: number } { const r = this.Parent?.DrawingRect; return { X: r?.Left ?? 0, Y: r?.Top ?? 0 }; }
+  private FollowParent(texture: CachedTexture | undefined): CachedTexture | undefined {
+    if (!texture || !this.frozenAt) return texture;
+    const now = this.ParentOrigin(), dx = now.X - this.frozenAt.X, dy = now.Y - this.frozenAt.Y;
+    if (dx === 0 && dy === 0) return texture;
+    const b = texture.Bounds;
+    return { Image: texture.Image, Bounds: new SKRect(b.Left + dx, b.Top + dy, b.Right + dx, b.Bottom + dy), Origin: texture.Origin && { X: texture.Origin.X + dx, Y: texture.Origin.Y + dy } };
+  }
+
   /** C# GetPrimaryTexture: the parent's cache, a frozen snapshot (Once) or nothing (Never). */
   protected GetPrimaryTexture(_ctx: DrawingContext, _destination: SKRect): CachedTexture | undefined {
     switch (this.UseBackground) {
@@ -195,9 +207,9 @@ export class SkiaShaderEffect extends SkiaEffect implements IPostRendererEffect 
           let snapshot = this.Parent?.CachedImage;
           let owned = false;
           if (!snapshot && this.AutoCreateInputTexture) { snapshot = this.CreateSnapshot(_ctx, _destination); owned = true; }
-          if (snapshot) { this.frozen = snapshot; this.frozenOwned = owned; this.AquiredBackground = true; }
+          if (snapshot) { this.frozen = snapshot; this.frozenOwned = owned; this.AquiredBackground = true; this.frozenAt = this.ParentOrigin(); }
         }
-        return this.frozen;
+        return this.FollowParent(this.frozen);
       default:
         return this.Parent?.CachedImage;
     }

@@ -436,6 +436,14 @@ Updated whenever the port deliberately diverges or finds something worth back-po
   Blazor / Wasm / MAUI Mac not measured.
 - **Opinion**: browsers apply touchpad deltas directly and smooth only notches; the .NET heads may want the same rule.
 
+### Cache textures follow their control
+- **React**: scrolled content is re-arranged to new absolute positions (a cached child is blitted at its current
+  aligned rect), so `CachedImage` reports where the cache is shown now, not where it was recorded; effects sampling
+  another control's cache (ShaderDoubleTexturesEffect `ControlFrom` / `ControlTo`) and frozen `Once` textures follow
+  their control.
+- **.NET / Rust**: `CachedImage` keeps the cache's own bounds; Rust draws scroll content through a translated canvas,
+  so those bounds stay valid.
+
 ### Keyboard navigation through the DOM overlay
 - **React**: as DrawnUi.Blazor, the overlay elements are the keyboard focus: roving tabindex for arrow-key groups, the
   browser's Tab order, `:focus-visible` as the focus ring. A focus request from the manager (arrow keys) rebuilds the

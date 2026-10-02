@@ -239,10 +239,17 @@ export class SkiaControl {
     if (this.DisableEffects || this.EffectPostRenderers.length === 0) return [];
     return this.EffectPostRenderers.filter((e) => e.NeedApply);
   }
-  /** C# CachedImage: the cached texture and the canvas rect it was rasterized over (Image caches only). */
+  /**
+   * C# CachedImage: the cached texture (Image caches only) and the canvas rect it covers NOW. Scrolled content is
+   * re-arranged here, not drawn through a translated canvas, so a cache recorded before its control moved is blitted
+   * at the control's current aligned rect (RenderContent) and its record-time Bounds are stale: an effect sampling it
+   * there (the slides of a SkiaShaderCarousel after the page scrolled) was off by the scroll amount.
+   */
   get CachedImage(): CachedTexture | undefined {
     const c = this.RenderObject;
-    return c?.Image ? { Image: c.Image, Bounds: c.Bounds } : undefined;
+    if (!c?.Image) return undefined;
+    const r = this.AlignedCacheRect(c.Scale);
+    return { Image: c.Image, Bounds: SKRect.Create(r.Left, r.Top, c.Bounds.Width, c.Bounds.Height) };
   }
   /** Clip overlay effects to the control's shape (CreateClip). */
   ClipEffects = true;
