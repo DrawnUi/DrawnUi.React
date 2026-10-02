@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Colors, Easing, KeyboardManager, SkiaButton, SkiaLabel, SkiaLayer, SkiaRow, SkiaScroll, SkiaShape, SkiaSprite, SkiaStack, SkiaWrap, Thickness } from "drawnui-react";
+import { Colors, Easing, KeyboardManager, SkiaButton, SkiaLabel, SkiaLayer, SkiaScroll, SkiaShape, SkiaSprite, SkiaStack, SkiaWrap, Thickness } from "drawnui-react";
 import type { SkiaLayout as SkiaLayoutCtrl, SkiaSprite as SkiaSpriteCtrl } from "drawnui-react/core";
 import { WarriorSprite } from "./WarriorSprite";
 
@@ -80,7 +80,9 @@ export function SpritesPage() {
         <SkiaLabel Text="Sprites" FontSize={24} TextColor={Colors.White} HorizontalOptions="Center" />
 
         <Card title={`SkiaSprite — Source="anims/BlueWarrior/Warrior_Idle.png" Columns={8} Rows={1} · ${info}`}>
-          <SkiaRow Spacing={16}>
+          {/* a wrap, not a row: a row measures its children with an unbounded width, so the controls column took one
+              endless line and the card cut it; here it gets the card's width on its own line, and the sprites wrap on phones */}
+          <SkiaWrap Spacing={16}>
             <SkiaSprite ref={sprite} Source="anims/BlueWarrior/Warrior_Idle.png" Columns={8} Rows={1} FramesPerSecond={fps} Repeat={-1} WidthRequest={160} HeightRequest={160} BackgroundColor="#212529" UseCache="Image"
               Success={(s) => setInfo(`${s.TotalFrames} frames · ${s.FrameWidth}×${s.FrameHeight} px · ${Math.round(s.DurationMs)} ms`)} Error={(_, e) => setInfo(`error: ${e.message}`)} />
             <SkiaSprite Source="anims/RedWarrior/Warrior_Attack1.png" Columns={4} Rows={1} FramesPerSecond={8} Repeat={-1} WidthRequest={160} HeightRequest={160} BackgroundColor="#212529" UseCache="Image" />
@@ -93,7 +95,7 @@ export function SpritesPage() {
               </SkiaWrap>
               <SkiaLabel Text="Frames are cut from the sheet by Columns × Rows, transparent borders trimmed per frame (C# SpriteFrameImage), nearest sampling; the animator runs 0..DurationMs and picks the frame by time." FontSize={12} TextColor="#ADB5BD" HorizontalOptions="Fill" />
             </SkiaStack>
-          </SkiaRow>
+          </SkiaWrap>
         </Card>
 
         <Card title={`SkiaSpriteSet warrior on a tile board — arrows / WASD move, Space attacks · tile ${pos.col},${pos.row} · ${state}`}>
