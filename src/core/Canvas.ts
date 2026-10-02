@@ -203,6 +203,12 @@ export class Canvas {
 
   /** Frames drawn so far (SkiaBackdrop uses it to refresh once after a cached record). */
   FrameIndex = 0;
+  /**
+   * DrawnView.WheelDeltaPerNotch: the Wheel.Delta one mouse-wheel notch produces, 100 CSS pixels in Chrome and Edge. A
+   * scroll moves by the event's share of a notch, so a touchpad, which sends many small events, scrolls as far as the
+   * fingers moved. 0 = units unknown: every event scrolls one line.
+   */
+  WheelDeltaPerNotch = 100;
 
   /** On-screen surface (SkiaBackdrop snapshots it). */
   get Surface(): Surface | undefined { return this.surface; }
@@ -357,7 +363,9 @@ export class Canvas {
     args.Scale = this.RenderingScale;
     args.Location = new SKPoint((e.clientX - rect.left) * this.RenderingScale, (e.clientY - rect.top) * this.RenderingScale);
     args.StartingLocation = args.Location;
-    args.Wheel = { Delta: e.deltaY !== 0 ? e.deltaY : e.deltaX };
+    // lines and pages to pixels, then the dominant axis (the .NET browser heads, fc8980c1)
+    const factor = e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? 800 : 1;
+    args.Wheel = { Delta: (Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX) * factor };
     if (this.gestures === "Lock") {
       e.preventDefault();
       this.OnGestureEvent(args, "Wheel");

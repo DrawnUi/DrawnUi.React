@@ -16,7 +16,7 @@ export interface ScaledPoint { Units: SKPoint; Pixels: SKPoint }
  * Mirrors DrawnUi SkiaScroll (plain content, no header/footer/refresh/virtualization yet).
  * Offsets are in POINTS and <= 0 while inside bounds (content moves up/left as you scroll).
  * Physics ported 1:1: deceleration fling (rate = 1 - FrictionScrolled/100) cut at the content edge,
- * rubber-band overscroll while dragging, spring bounce back on release, wheel = WheelLineSize per notch.
+ * rubber-band overscroll while dragging, spring bounce back on release, wheel = WheelLineSize per notch (an event moves by its share of a notch).
  */
 export class SkiaScroll extends SkiaControl {
   static WheelLineSize = 150;
@@ -844,15 +844,20 @@ export class SkiaScroll extends SkiaControl {
   }
 
   /**
-   * One wheel notch = WheelLineSize points, hard-clamped, animated over AutoScrollingSpeedMs.
-   * Notches arriving while the previous one is still animating add onto its target, so a fast wheel
-   * spin travels N steps instead of restarting from the barely-moved current offset.
+   * One wheel notch = WheelLineSize points, hard-clamped, animated over AutoScrollingSpeedMs. An event moves by its share
+   * of a notch (Canvas.WheelDeltaPerNotch), so a touchpad's many small events scroll as far as the fingers moved (C#
+   * aaa871c3). Events arriving while the previous one is still animating add onto its target, so a fast wheel spin
+   * travels N steps instead of restarting from the barely-moved current offset.
    */
   private ApplyWheelScroll(delta: number): boolean {
-    const step = SkiaScroll.WheelLineSize * -Math.sign(delta); // wheel down = content up = more negative offset
+    const perNotch = this.Superview?.WheelDeltaPerNotch ?? 0;
+    const lines = perNotch > 0 ? delta / perNotch : Math.sign(delta);
+    const step = -SkiaScroll.WheelLineSize * lines; // wheel down = content up = more negative offset
     const horizontal = this.Orientation === "Horizontal";
-    const running = horizontal ? this.animatorFlingX : this.animatorFlingY;
-    const base = running.IsRunning && running.Parameters ? running.Parameters.Destination : horizontal ? this.offsetX : this.offsetY;
+    // the target the running wheel / ScrollTo move lands on: Parameters.Destination is where its deceleration curve would
+    // end if it ran on, beyond that target, so continuing from it overshot more with every event (a touchpad swipe flew away)
+    const running = horizontal ? this.animatorFlingX : this.animatorFlingY, target = horizontal ? this.scrollToTargetX : this.scrollToTargetY;
+    const base = running.IsRunning && target !== null ? target : horizontal ? this.offsetX : this.offsetY;
     const b = this.ContentOffsetBounds;
     const min = horizontal ? b.Left : b.Top, max = horizontal ? b.Right : b.Bottom;
     if ((step < 0 && base <= min) || (step > 0 && base >= max)) return false; // at the edge: let an outer scroll take it
