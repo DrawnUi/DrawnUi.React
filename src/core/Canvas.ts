@@ -61,11 +61,20 @@ export class Canvas {
   private frameId = 0;
   private disposed = false;
   private readonly observer: ResizeObserver;
+  /** The WebGL context is lost: no frames until the browser restores it. */
+  private contextLost = false;
+  /**
+   * Bumped when the WebGL context was restored: every GPU object made before (Image caches, picture caches that may
+   * replay them, kept composite surfaces, effect textures) is remade at its next draw (DrawnUi.Rust Gpu::epoch).
+   */
+  GpuEpoch = 0;
 
   /** `init` runs before the first frame is drawn: the place to attach `WillFirstTimeDraw` / `WasDrawn` for that frame. */
   constructor(readonly Element: HTMLCanvasElement, init?: (canvas: Canvas) => void) {
     if (!Super.CK) throw new Error("DrawnUi: call Super.UseDrawnUi()...BuildAsync() before creating a Canvas");
     init?.(this);
+    Element.addEventListener("webglcontextlost", this.onContextLost);
+    Element.addEventListener("webglcontextrestored", this.onContextRestored);
     this.observer = new ResizeObserver(() => this.OnResized());
     this.observer.observe(Element);
     this.OnResized();
@@ -73,7 +82,7 @@ export class Canvas {
 
   /** Request a redraw (full measure + arrange + render) on the next animation frame. */
   Update(): void {
-    if (this.frameId || !this.surface || this.disposed) return;
+    if (this.frameId || !this.surface || this.disposed || this.contextLost) return;
     const surface = this.surface;
     this.frameId = surface.requestAnimationFrame((c) => {
       this.frameId = 0;
@@ -117,16 +126,46 @@ export class Canvas {
     this.RenderingScale = dpr;
     this.Element.width = w;
     this.Element.height = h;
+    if (this.contextLost) return; // the restore makes the surface at this size
     this.ReleaseSurface();
     this.surface = this.CreateSurface(w, h);
     if (!this.surface) throw new Error("DrawnUi: cannot create surface");
     this.DrawNow();
   }
 
+  /** WebGL context lost: keep the browser restoring it (preventDefault) and stop the frames. */
+  private readonly onContextLost = (e: Event) => {
+    e.preventDefault();
+    this.contextLost = true;
+    if (this.frameId) { cancelAnimationFrame(this.frameId); this.frameId = 0; }
+  };
+
+  /**
+   * WebGL context restored (as DrawnUi.Rust and the C# Wasm / Blazor heads): every GL object of the lost generation is
+   * gone. The old Skia context is abandoned first, while its own GL handle is current and before the new context makes
+   * any object, so its GL calls reach only lost-generation objects. CanvasKit exposes no `abandonContext`;
+   * `releaseResourcesAndAbandonContext` is its only way to abandon, and after it freeing an old image or surface makes no
+   * GL call. Then the same WebGL object is registered again (the old handle deleted first, which clears the canvas'
+   * context object) with a new GrContext and surface; GpuEpoch makes the old generation's GPU objects remake themselves.
+   */
+  private readonly onContextRestored = () => {
+    if (this.disposed) return;
+    if (this.grContext) this.grContext.releaseResourcesAndAbandonContext();
+    this.surface?.delete();
+    this.surface = undefined;
+    this.grContext?.delete();
+    this.grContext = undefined;
+    if (this.glHandle) { Super.CK.deleteContext(this.glHandle); this.glHandle = undefined; }
+    this.contextLost = false;
+    this.GpuEpoch++;
+    this.surface = this.CreateSurface(this.Element.width, this.Element.height);
+    this.DrawNow();
+  };
+
   /** Draws one frame immediately (outside the rAF loop) and presents it. */
   private DrawNow(): void {
     const surface = this.surface;
-    if (!surface || this.disposed) return;
+    if (!surface || this.disposed || this.contextLost) return;
     this.Draw(surface.getCanvas());
     surface.flush();
     this.DrainDisposeQueue();
@@ -254,6 +293,8 @@ export class Canvas {
 
   Dispose(): void {
     this.disposed = true;
+    this.Element.removeEventListener("webglcontextlost", this.onContextLost);
+    this.Element.removeEventListener("webglcontextrestored", this.onContextRestored);
     this.Gestures = "Disabled";
     this.observer.disconnect();
     this.content?.Dispose();

@@ -186,6 +186,10 @@ export class SkiaShaderEffect extends SkiaEffect implements IPostRendererEffect 
     return { Image: image, Bounds: destination, Origin: { X: ox, Y: oy } };
   }
 
+  private frozenEpoch = 0;
+  /** Canvas.GpuEpoch: GPU textures made before a WebGL context restore are made again. */
+  protected GpuEpoch(): number { return this.Parent?.Superview?.GpuEpoch ?? 0; }
+
   /** Where the parent was when the texture was frozen (Once): the texture moves with it, as its cache does. */
   private frozenAt?: { X: number; Y: number };
   private ParentOrigin(): { X: number; Y: number } { const r = this.Parent?.DrawingRect; return { X: r?.Left ?? 0, Y: r?.Top ?? 0 }; }
@@ -202,12 +206,12 @@ export class SkiaShaderEffect extends SkiaEffect implements IPostRendererEffect 
     switch (this.UseBackground) {
       case "Never": return undefined;
       case "Once":
-        if (!this.AquiredBackground || !this.frozen) {
+        if (!this.AquiredBackground || !this.frozen || this.frozenEpoch !== this.GpuEpoch()) { // a frozen texture of a lost GPU context is taken again
           this.ReleaseFrozenSnapshot();
           let snapshot = this.Parent?.CachedImage;
           let owned = false;
           if (!snapshot && this.AutoCreateInputTexture) { snapshot = this.CreateSnapshot(_ctx, _destination); owned = true; }
-          if (snapshot) { this.frozen = snapshot; this.frozenOwned = owned; this.AquiredBackground = true; this.frozenAt = this.ParentOrigin(); }
+          if (snapshot) { this.frozen = snapshot; this.frozenOwned = owned; this.AquiredBackground = true; this.frozenAt = this.ParentOrigin(); this.frozenEpoch = this.GpuEpoch(); }
         }
         return this.FollowParent(this.frozen);
       default:
@@ -399,8 +403,8 @@ export class ShaderDoubleTexturesEffect extends SkiaShaderEffect {
   private secondarySource = "";
   private primaryImage?: Image;
   private secondaryImage?: Image;
-  private resizedPrimary?: { source: Image; w: number; h: number; image: Image };
-  private resizedSecondary?: { source: Image; w: number; h: number; image: Image };
+  private resizedPrimary?: { source: Image; w: number; h: number; epoch: number; image: Image };
+  private resizedSecondary?: { source: Image; w: number; h: number; epoch: number; image: Image };
   private secondary?: Shader;
 
   private LoadTexture(url: string, done: (image: Image) => void): void {
@@ -414,7 +418,8 @@ export class ShaderDoubleTexturesEffect extends SkiaShaderEffect {
     if (!d || d.Width <= 0 || d.Height <= 0) return undefined;
     const w = Math.round(d.Width), h = Math.round(d.Height);
     const cur = slot === "p" ? this.resizedPrimary : this.resizedSecondary;
-    if (cur && cur.source === source && cur.w === w && cur.h === h) return cur.image;
+    const epoch = this.GpuEpoch();
+    if (cur && cur.source === source && cur.w === w && cur.h === h && cur.epoch === epoch) return cur.image;
     const main = ctx.Context.Surface;
     if (!main) return undefined;
     const surface = main.makeSurface({ ...main.imageInfo(), width: w, height: h });
@@ -426,7 +431,7 @@ export class ShaderDoubleTexturesEffect extends SkiaShaderEffect {
     const image = surface.makeImageSnapshot();
     surface.delete();
     cur?.image.delete();
-    const entry = { source, w, h, image };
+    const entry = { source, w, h, epoch, image };
     if (slot === "p") this.resizedPrimary = entry; else this.resizedSecondary = entry;
     if (slot === "s") { this.secondary?.delete(); this.secondary = undefined; }
     return image;

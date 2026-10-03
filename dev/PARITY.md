@@ -444,6 +444,15 @@ Updated whenever the port deliberately diverges or finds something worth back-po
 - **.NET / Rust**: `CachedImage` keeps the cache's own bounds; Rust draws scroll content through a translated canvas,
   so those bounds stay valid.
 
+### WebGL context restore abandons with releaseResourcesAndAbandonContext
+- **React**: CanvasKit 0.42 exposes no `abandonContext`; `releaseResourcesAndAbandonContext` is the only way to abandon
+  a GrDirectContext. It runs first on restore, with the old GL handle current (CanvasKit makes a context's own handle
+  current before each of its calls) and before the new context creates any object, so its GL calls reach only
+  lost-generation objects and free their ids; after it, freeing an old image or surface makes no GL call.
+- **.NET / Rust**: `AbandonContext(false)` / `abandon()` with no GL calls.
+- **Opinion**: same effect on the web (the restored WebGL object ignores lost-generation objects); switch to
+  `abandonContext` if a CanvasKit release exposes it.
+
 ### Keyboard navigation through the DOM overlay
 - **React**: as DrawnUi.Blazor, the overlay elements are the keyboard focus: roving tabindex for arrow-key groups, the
   browser's Tab order, `:focus-visible` as the focus ring. A focus request from the manager (arrow keys) rebuilds the

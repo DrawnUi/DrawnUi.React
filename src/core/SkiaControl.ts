@@ -33,6 +33,9 @@ export class CachedObject {
     readonly Image?: Image,
   ) {}
 
+  /** Canvas.GpuEpoch it was made in: after a WebGL context restore it is remade (a picture may replay old GPU images). */
+  Epoch = 0;
+
   /** Replays the cache with its top-left moved to (left, top). */
   Draw(canvas: SkCanvas, left: number, top: number): void {
     const CK = Super.CK;
@@ -669,7 +672,9 @@ export class SkiaControl {
       for (const e of post) e.Render(own);
     } else {
       const r = cacheType === "Operations" ? this.ExpandedCacheRect(ctx.Scale) : this.AlignedCacheRect(ctx.Scale);
-      const stale = this.cacheDirty || !this.RenderObject || this.RenderObject.Type !== cacheType
+      const epoch = this.Superview?.GpuEpoch ?? 0;
+      if (this.RenderObjectPrevious && this.RenderObjectPrevious.Epoch !== epoch) this.DisposePrevious(); // made on a lost GPU context
+      const stale = this.cacheDirty || !this.RenderObject || this.RenderObject.Type !== cacheType || this.RenderObject.Epoch !== epoch
         || this.RenderObject.Scale !== ctx.Scale
         || Math.round(this.RenderObject.Bounds.Width) !== Math.round(r.Width) || Math.round(this.RenderObject.Bounds.Height) !== Math.round(r.Height);
       if (stale) this.CreateRenderingObject({ ...ctx, Destination: this.DrawingRect }, cacheType);
@@ -721,6 +726,7 @@ export class SkiaControl {
       const picture = recorder.finishRecordingAsPicture();
       recorder.delete();
       this.RenderObject = new CachedObject("Operations", r, ctx.Scale, picture);
+      this.RenderObject.Epoch = this.Superview?.GpuEpoch ?? 0;
     } else if (cacheType === "ImageComposite") {
       this.CreateCompositeRenderingObject(ctx, r, w, h);
     } else {
@@ -735,6 +741,7 @@ export class SkiaControl {
       const image = offscreen.makeImageSnapshot();
       offscreen.delete();
       this.RenderObject = new CachedObject(cacheType, r, ctx.Scale, undefined, image);
+      this.RenderObject.Epoch = this.Superview?.GpuEpoch ?? 0;
     }
     this.cacheDirty = false;
   }
@@ -751,7 +758,9 @@ export class SkiaControl {
     if (!main) { this.PaintContent(ctx); return; }
     let surface = this.compositeSurface;
     const prev = this.RenderObject;
-    const sameGeometry = !!surface && !!prev && prev.Type === "ImageComposite" && prev.Scale === ctx.Scale
+    const epoch = this.Superview?.GpuEpoch ?? 0;
+    // the kept surface belongs to the GPU context it was made on: after a context restore it is made again
+    const sameGeometry = !!surface && !!prev && prev.Type === "ImageComposite" && prev.Scale === ctx.Scale && prev.Epoch === epoch
       && Math.round(prev.Bounds.Width) === w && Math.round(prev.Bounds.Height) === h;
     if (!sameGeometry) { surface?.delete(); surface = main.makeSurface({ ...main.imageInfo(), width: w, height: h }) ?? undefined; this.compositeSurface = surface; }
     if (!surface) { this.PaintContent(ctx); return; }
@@ -805,6 +814,7 @@ export class SkiaControl {
     const image = surface.makeImageSnapshot();
     const old = this.RenderObject;
     this.RenderObject = new CachedObject("ImageComposite", r, ctx.Scale, undefined, image);
+    this.RenderObject.Epoch = epoch;
     if (old) { const sv = this.Superview; if (sv) sv.DisposeObject(old); else old.Dispose(); }
   }
 
