@@ -112,8 +112,10 @@ export class SkiaLabel extends SkiaControl {
   override AddSubView(control: SkiaControl | TextSpan): void { this.InsertSubView(this.Spans.length, control); }
   override InsertSubView(index: number, control: SkiaControl | TextSpan): void {
     if (!(control instanceof TextSpan)) throw new Error("DrawnUi: SkiaLabel children must be <TextSpan>");
+    const at = control.Parent === this ? this.Spans.indexOf(control) : -1; // already a span: a move, never a 2nd copy
+    if (at >= 0) { this.Spans.splice(at, 1); if (at < index) index--; }
     control.Parent = this;
-    this.Spans.splice(index, 0, control);
+    this.Spans.splice(Math.min(Math.max(0, index), this.Spans.length), 0, control);
     this.Update();
   }
   override RemoveSubView(control: SkiaControl | TextSpan): void {

@@ -8,9 +8,9 @@ import esbuild from "esbuild";
 
 const ck = createRequire(import.meta.url).resolve("canvaskit-wasm/bin/full/canvaskit.js");
 const entry = process.argv[2];
-const outfile = join(tmpdir(), `drawnui-${basename(entry, ".ts")}.cjs`);
+const outfile = join(tmpdir(), `drawnui-${basename(entry).replace(/\.tsx?$/, "")}.cjs`);
 await esbuild.build({
-  entryPoints: [entry], outfile, bundle: true, platform: "node", format: "cjs", target: "node20", logLevel: "warning",
+  entryPoints: [entry], outfile, bundle: true, platform: "node", format: "cjs", target: "node20", logLevel: "warning", jsx: "automatic",
   banner: { js: `globalThis.CanvasKitInit = require(${JSON.stringify(ck)}); globalThis.window ??= globalThis;` },
   plugins: [{ name: "stub-wasm-url", setup(b) { b.onResolve({ filter: /\?url$/ }, (a) => ({ path: a.path, namespace: "stub" })); b.onLoad({ filter: /.*/, namespace: "stub" }, () => ({ contents: "export default ''", loader: "js" })); } }],
 });

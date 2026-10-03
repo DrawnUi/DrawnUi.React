@@ -284,6 +284,12 @@ export class SkiaControl {
     if (!SkiaStyles.IsEmpty) SkiaStyles.Apply(this, atConstruction);
   }
 
+  /**
+   * C# IsChildrenItem: added by the app (JSX children or the `Children` list), not a part the control made itself. A new
+   * `Children` list drops only these, so a control's own parts keep their place.
+   */
+  IsChildrenItem = false;
+
   AddSubView(_control: SkiaControl): void { throw new Error(`DrawnUi: ${this.constructor.name} cannot host children`); }
   InsertSubView(_index: number, control: SkiaControl): void { this.AddSubView(control); }
   RemoveSubView(_control: SkiaControl): void {}

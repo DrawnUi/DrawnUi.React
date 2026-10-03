@@ -74,6 +74,12 @@ const noop = () => {};
 type HostContext = Record<string, never>;
 const hostContext: HostContext = {};
 
+function appendChild(parent: SkiaControl, child: SkiaControl): void {
+  if (parent instanceof SkiaLayout) return parent.InsertChild(child);
+  child.IsChildrenItem = true;
+  parent.AddSubView(child);
+}
+
 type Cfg = Reconciler.HostConfig<string, Props, Canvas, SkiaControl, never, never, never, never, SkiaControl, HostContext, null, number, -1, null>;
 
 // Record<string, unknown> absorbs members that react-reconciler 0.33 reads but @types 0.32 does not declare yet.
@@ -101,12 +107,14 @@ const hostConfig: Cfg & Record<string, unknown> = {
   createTextInstance(text: string): never {
     throw new Error(`DrawnUi: raw text "${text}" is not allowed, use <SkiaLabel Text="..." />`);
   },
-  appendInitialChild: (parent: SkiaControl, child: SkiaControl) => parent.AddSubView(child),
-  appendChild: (parent: SkiaControl, child: SkiaControl) => parent.AddSubView(child),
+  // JSX children are the app's children (C# IsChildrenItem): a layout keeps them in JSX order inside the slots they
+  // occupy, so its own parts keep their place; an existing child passed again is a move
+  appendInitialChild: (parent: SkiaControl, child: SkiaControl) => appendChild(parent, child),
+  appendChild: (parent: SkiaControl, child: SkiaControl) => appendChild(parent, child),
   insertBefore: (parent: SkiaControl, child: SkiaControl, before: SkiaControl) => {
-    const index = parent instanceof SkiaLayout ? parent.Views.indexOf(before)
-      : parent instanceof SkiaLabel ? parent.Spans.indexOf(before as unknown as TextSpan) : 0;
-    parent.InsertSubView(index, child);
+    if (parent instanceof SkiaLayout) return parent.InsertChild(child, before);
+    child.IsChildrenItem = true;
+    parent.InsertSubView(parent instanceof SkiaLabel ? parent.Spans.indexOf(before as unknown as TextSpan) : 0, child);
   },
   removeChild: (parent: SkiaControl, child: SkiaControl) => parent.RemoveSubView(child),
   appendChildToContainer: (canvas: Canvas, child: SkiaControl) => { canvas.Content = child; },

@@ -326,9 +326,53 @@ export class SkiaLayout extends SkiaControl {
   get Views(): readonly SkiaControl[] { return this.IsTemplated ? this.ChildrenFactory.GetViewsInUse() : this.views; }
   /** Settable children list like DrawnUi Children (ignored while templated). */
   get Children(): readonly SkiaControl[] { return this.views; }
+  /**
+   * C# Children reset (ChildrenCollectionSync, 66a1eb02): the app's children the new list no longer holds are removed,
+   * the ones it gained are added, then all of them take the list's order inside the slots app children occupy, so the
+   * parts a control made itself keep their place.
+   */
   set Children(value: readonly SkiaControl[]) {
+    const keep = new Set(value);
+    for (const v of [...this.views]) if (v.IsChildrenItem && !keep.has(v)) this.RemoveSubView(v);
+    const inViews = new Set(this.views);
+    for (const v of value) { v.IsChildrenItem = true; if (!inViews.has(v)) this.AddSubView(v); }
+    this.OrderChildren(value);
+  }
+
+  /**
+   * C# Insert / Move of a Children collection (the reconciler's appendChild / insertBefore): `child` goes before
+   * `before` among the app's children, or last without it. A new child is attached at the end of the views and an
+   * append stops there; otherwise the app's children take their new order inside the slots they occupy.
+   */
+  InsertChild(child: SkiaControl, before?: SkiaControl): void {
+    child.IsChildrenItem = true;
+    const attached = child.Parent === this && this.views.includes(child);
+    if (!attached) this.AddSubView(child);
+    if (!attached && !before) return;
+    const order = this.views.filter((v) => v.IsChildrenItem && v !== child);
+    const at = before ? order.indexOf(before) : -1;
+    order.splice(at < 0 ? order.length : at, 0, child);
+    this.OrderChildren(order);
+  }
+
+  /** C# OrderViews: the given children, in their order, inside the slots they occupy in the views; nothing else moves. */
+  private OrderChildren(ordered: readonly SkiaControl[]): void {
+    const inViews = new Set(this.views);
+    const present = ordered.filter((v) => inViews.delete(v));
+    if (present.length < 2) return;
+    const isChild = new Set(present);
+    let next = 0, changed = false;
+    for (let i = 0; i < this.views.length && next < present.length; i++) {
+      if (!isChild.has(this.views[i])) continue;
+      if (this.views[i] !== present[next]) { this.views[i] = present[next]; changed = true; }
+      next++;
+    }
+    if (changed) { this.orderedViews = undefined; this.InvalidateMeasure(); }
+  }
+
+  /** C# ClearChildren: removes every subview, the control's own parts included. */
+  ClearChildren(): void {
     for (const v of [...this.views]) this.RemoveSubView(v);
-    for (const v of value) this.AddSubView(v);
   }
 
   private orderedViews?: SkiaControl[];
@@ -356,8 +400,11 @@ export class SkiaLayout extends SkiaControl {
   override AddSubView(control: SkiaControl): void { this.InsertSubView(this.views.length, control); }
 
   override InsertSubView(index: number, control: SkiaControl): void {
+    // already a child: a move (React reorders keyed children by inserting an existing one elsewhere), never a 2nd copy
+    const at = control.Parent === this ? this.views.indexOf(control) : -1;
+    if (at >= 0) { this.views.splice(at, 1); if (at < index) index--; }
     control.Parent = this;
-    this.views.splice(index, 0, control);
+    this.views.splice(Math.min(Math.max(0, index), this.views.length), 0, control);
     this.orderedViews = undefined;
     this.InvalidateMeasure();
   }

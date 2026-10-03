@@ -90,7 +90,7 @@ export abstract class SkiaToggle extends SkiaLayout {
    */
   RebuildDefaultContent(): void {
     if (!this.contentCreated) return;
-    this.Children = [];
+    this.ClearChildren();
     for (const p of this.stylePinned) this[p] = -1;
     this.stylePinned = [];
     this.contentCreated = false;
