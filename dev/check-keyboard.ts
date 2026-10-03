@@ -1,8 +1,9 @@
 // Keyboard and accessibility contract of DrawnUi.Net (drawnui-cross 6c), checked in Node without a browser
 // (`npm run check:keyboard`): reading order by rows, input eligibility (CanReceiveGesture), arrow-key groups (one Tab
 // stop, arrows by index across recycled cells scrolled in on demand, a toolbar of buttons skipping a disabled one),
-// keys to the focused control first (slider steps). The DOM overlay itself (roving tabindex, Tab out of an editor)
-// needs the browser.
+// keys to the focused control first (slider steps), Up / Down in a Wrap without Split by the first row's length,
+// each name said once (a group card and its heading, a card button and its title), aria-disabled for a control role
+// that takes no input. The DOM overlay itself (roving tabindex, Tab out of an editor) needs the browser.
 import { readFileSync } from "node:fs";
 import {
   Super, SkiaScroll, SkiaStack, SkiaWrap, SkiaLayer, SkiaRow, SkiaButton, SkiaSlider, SkiaDynamicDrawnCell, SkiaLabel,
@@ -11,7 +12,7 @@ import {
 
 declare const CanvasKitInit: (o: { locateFile: () => string }) => Promise<any>;
 const ROOT = process.cwd();
-const W = 400, H = 700, SCALE = 1;
+const W = 400, H = 900, SCALE = 1;
 
 /** Stands in for the engine Canvas: what controls and animators call on their Superview. */
 class FakeCanvas {
@@ -73,7 +74,21 @@ class Cell extends SkiaDynamicDrawnCell {
   // a recycled templated Wrap, Split 3: a 2D group (all four arrows, Up / Down by one row)
   const grid = new SkiaWrap(); grid.AccessibilityRole = Aria.RoleGrid; grid.Split = 3; grid.Spacing = 4; grid.Margin = new Thickness(0, 530, 0, 0);
   grid.ItemTemplate = () => new Cell(); grid.ItemsSource = Array.from({ length: 9 }, (_, i) => 100 + i);
-  for (const c of [row, toolbar, slider, locked, scroll, grid]) page.AddSubView(c);
+  // a Wrap without Split: 12 tiles, 10 per row
+  const tiles = new SkiaWrap(); tiles.AccessibilityRole = Aria.RoleGrid; tiles.Spacing = 4; tiles.Margin = new Thickness(0, 670, 0, 0);
+  const tileButtons = Array.from({ length: 12 }, (_, i) => { const b = button(`${i + 1}`, 20); b.WidthRequest = 36; return b; });
+  for (const b of tileButtons) tiles.AddSubView(b);
+  // names said once: a group card and its heading, a card button and its title text, a card button and a selectable title
+  const text = (t: string, role: string, selectable = false) => { const l = new SkiaLabel(); l.Text = t; l.AccessibilityRole = role; l.AccessibilityTextSelectable = selectable; return l; };
+  const card = (label: string, top: number, role: string, child: SkiaLabel) => {
+    const c = new SkiaStack(); c.AccessibilityRole = role; c.AccessibilityLabel = label; c.Margin = new Thickness(0, top, 0, 0);
+    if (role === Aria.RoleButton) c.Tapped = () => {};
+    c.AddSubView(child); return c;
+  };
+  const groupTitle = text("Group card", Aria.RoleHeading), buttonTitle = text("Button card", Aria.RoleText), selectTitle = text("Select card", Aria.RoleText, true);
+  const groupCard = card("Group card", 730, Aria.RoleGroup, groupTitle), buttonCard = card("Button card", 780, Aria.RoleButton, buttonTitle);
+  const selectCard = card("Select card", 830, Aria.RoleButton, selectTitle);
+  for (const c of [row, toolbar, slider, locked, scroll, grid, tiles, groupCard, buttonCard, selectCard]) page.AddSubView(c);
 
   const frame = () => {
     for (const a of [...fake.AnimatingControls.values()]) a.TickFrame(performance.now() * 1e6);
@@ -153,6 +168,23 @@ class Cell extends SkiaDynamicDrawnCell {
     moves.push(focusRequested?.AccessibilityLabel ?? "-");
   }
   check("grid Split 3: Down / Up by a row, Left / Right by an item", moves.join() === "Item 107,Item 104,Item 101,Item 100,Item 101", moves.join());
+
+  // 2D group without Split: Up / Down by the length of the first row, also from the short last row
+  mgr.NotifyFocused(tileButtons[11]);
+  await press(tileButtons[11], "ArrowUp");
+  check("wrap without Split: Up from 12 (short last row) -> 2", (focusRequested as SkiaButton | undefined)?.Text === "2", (focusRequested as SkiaButton | undefined)?.Text);
+  await press(tileButtons[1], "ArrowDown");
+  check("wrap without Split: Down from 2 -> 12", (focusRequested as SkiaButton | undefined)?.Text === "12", (focusRequested as SkiaButton | undefined)?.Text);
+
+  // each name said once in the flat overlay
+  const node = (c: SkiaControl) => mgr.Snapshot.find((n) => n.Source === c);
+  check("group card has no name, its heading says it", !!node(groupCard) && node(groupCard)!.Label === undefined && node(groupTitle)?.Label === "Group card");
+  check("card button keeps its name, its title text is left out", node(buttonCard)?.Label === "Button card" && !node(buttonTitle));
+  check("selectable title text stays", node(selectCard)?.Label === "Select card" && !!node(selectTitle));
+
+  // aria-disabled: a control role that takes no input, never a group or a text
+  check("disabled button is Disabled and no Tab stop", node(tools[2])?.Disabled === true && !mgr.IsTabStop(tools[2]));
+  check("enabled button, group and text are not Disabled", node(tools[0])?.Disabled === false && node(groupCard)?.Disabled === false && node(groupTitle)?.Disabled === false);
 
   console.log(failures ? `FAIL: ${failures} checks` : "OK: keyboard contract");
   process.exit(failures ? 1 : 0);

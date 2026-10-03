@@ -298,14 +298,14 @@ function AccessibilityOverlay({ view }: { view: CanvasView }) {
           </div>
         ) : n.TextLines ? (
           // AccessibilityTextSelectable: one positioned span per drawn line, in the drawn font, so the browser selects and copies it like HTML
-          <div key={n.Id} role={n.Role} title={n.Hint} aria-live={n.Live as "polite" | "assertive" | undefined} className="drawnui-a11y-node drawnui-a11y-text" style={pos}>
+          <div key={n.Id} role={n.Role} title={n.Hint} aria-disabled={n.Disabled || undefined} aria-live={n.Live as "polite" | "assertive" | undefined} className="drawnui-a11y-node drawnui-a11y-text" style={pos}>
             {n.TextLines.map((l, i) => (
               <span key={i} data-w={l.Width} style={{ left: l.Left, top: l.Top, height: l.Height, fontFamily: l.FontFamily, fontWeight: l.FontWeight, fontSize: l.FontSize, lineHeight: `${l.Height}px` }}>{l.Text}{i < n.TextLines!.length - 1 ? "\n" : ""}</span>
             ))}
           </div>
         ) : (
           // static text is exposed as real (transparent) text content; aria-label only for roles that need a name
-          <div key={n.Id} role={n.Role} aria-label={n.Role === "text" ? undefined : n.Label} title={n.Hint} aria-live={n.Live as "polite" | "assertive" | undefined} className="drawnui-a11y-node" style={pos}>
+          <div key={n.Id} role={n.Role} aria-label={n.Role === "text" ? undefined : n.Label} title={n.Hint} aria-disabled={n.Disabled || undefined} aria-live={n.Live as "polite" | "assertive" | undefined} className="drawnui-a11y-node" style={pos}>
             {n.Label}
           </div>
         );

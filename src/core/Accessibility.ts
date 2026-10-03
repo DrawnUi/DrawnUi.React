@@ -29,6 +29,16 @@ export const Aria = {
     return role === "list" || role === "listbox" || role === "grid" || role === "toolbar" || role === "radiogroup"
       || role === "tablist" || role === "menu" || role === "menubar";
   },
+  /**
+   * Roles a user operates (C# Aria.IsInteractiveRole, as DrawnUi.Rust is_control_role): a node with one of them that
+   * cannot take input is read as disabled (aria-disabled). C# also lists listbox and scrollbar; here a listbox is an
+   * arrow-key group and groups are never disabled.
+   */
+  IsInteractiveRole(role?: string): boolean {
+    return role === "button" || role === "link" || role === "checkbox" || role === "radio" || role === "switch"
+      || role === "slider" || role === "spinbutton" || role === "textbox" || role === "searchbox" || role === "combobox"
+      || role === "option" || role === "tab" || role === "menuitem" || role === "menuitemcheckbox" || role === "menuitemradio";
+  },
 } as const;
 
 /** What the group logic reads from a layout and a scroll, by shape: core modules never import the controls (load order). */
@@ -48,6 +58,8 @@ export interface AccessibilityNode {
   Role: string;
   Rect: SKRect;
   CanInteract: boolean;
+  /** A role a user operates (Aria.IsInteractiveRole) that cannot take input: aria-disabled, no tab stop. */
+  Disabled: boolean;
   IsPressed?: boolean;
   Live?: string;
   Source: SkiaControl;
@@ -174,7 +186,7 @@ export class SkiaAccessibilityManager {
     const scroll = FindScroll(group), axis = AxisOf(group), count = ItemCount(group);
     const current = this.groupRequest?.Group === group ? this.groupRequest.Index : IndexOf(group, item);
     if (current < 0 || count < 1) return false;
-    const row = axis === "Both" ? RowLength(group, item) : 1;
+    const row = axis === "Both" ? RowLength(group) : 1;
     const vertical = axis !== "Horizontal";
     const page = () => PageSize(scroll!, item, vertical) * row;
     let target: number, step: number;
@@ -267,7 +279,7 @@ export class SkiaAccessibilityManager {
     this.dirty = false;
     this.lastRebuild = performance.now();
 
-    const list: AccessibilityNode[] = [];
+    let list: AccessibilityNode[] = [];
     for (const n of this.nodes) {
       if (!n.Superview) { this.nodes.delete(n); n.OnAccessibilityUnregistered(); continue; } // detached from the tree
       if (!n.IsVisible || !n.IsAccessibilityElement || n.AccessibilityRole === Aria.RolePresentation) continue;
@@ -281,9 +293,11 @@ export class SkiaAccessibilityManager {
         Id: n.AccessibilityId, Label: n.AccessibilityLabel, Hint: n.AccessibilityHint, Role: n.AccessibilityRole!,
         Rect: new SKRect(px.Left / scale, px.Top / scale, px.Right / scale, px.Bottom / scale),
         CanInteract: n.AccessibilityCanInteract, IsPressed: n.AccessibilityIsPressed, Live: n.AccessibilityLive, Source: n,
+        Disabled: !n.AccessibilityCanInteract && Aria.IsInteractiveRole(n.AccessibilityRole),
         TextLines: n.AccessibilityTextSelectable ? n.GetAccessibilityTextLines(scale) : undefined,
       });
     }
+    list = SayNamesOnce(list);
     list.sort((a, b) => a.Rect.Top - b.Rect.Top || a.Rect.Left - b.Rect.Left);
     // reading order: nodes whose tops are within half the smaller height form one row, read left to right, so a row of
     // vertically centered controls of different heights keeps its visual order (C# RectComparer + LeftComparer)
@@ -307,7 +321,7 @@ export class SkiaAccessibilityManager {
     if (a.length !== b.length) return false;
     for (let i = 0; i < a.length; i++) {
       const x = a[i], y = b[i];
-      if (x.Source !== y.Source || x.Label !== y.Label || x.Hint !== y.Hint || x.Role !== y.Role || x.CanInteract !== y.CanInteract
+      if (x.Source !== y.Source || x.Label !== y.Label || x.Hint !== y.Hint || x.Role !== y.Role || x.CanInteract !== y.CanInteract || x.Disabled !== y.Disabled
         || x.IsPressed !== y.IsPressed || x.Live !== y.Live
         || Math.abs(x.Rect.Left - y.Rect.Left) > 0.5 || Math.abs(x.Rect.Top - y.Rect.Top) > 0.5
         || Math.abs(x.Rect.Right - y.Rect.Right) > 0.5 || Math.abs(x.Rect.Bottom - y.Rect.Bottom) > 0.5) return false;
@@ -320,6 +334,26 @@ export class SkiaAccessibilityManager {
     }
     return true;
   }
+}
+
+/**
+ * Each name is said once in the flat overlay (DrawnUi.Rust said_by_child): a text or a heading whose label repeats the
+ * label of the node it is in (its nearest ancestor node) is said by one of them. Under an interactive node (a card
+ * button) the child is left out, the button keeps its name; under any other node (a group card and its title) the
+ * node loses its name and the heading says it. Selectable text (TextLines) always stays.
+ */
+function SayNamesOnce(list: AccessibilityNode[]): AccessibilityNode[] {
+  const bySource = new Map<SkiaControl, AccessibilityNode>(list.map((x) => [x.Source, x]));
+  const said = new Set<AccessibilityNode>();
+  for (const x of list) {
+    if (!x.Label || x.TextLines || (x.Role !== Aria.RoleText && x.Role !== Aria.RoleHeading)) continue;
+    let owner: AccessibilityNode | undefined;
+    for (let p = x.Source.Parent; p && !owner; p = p.Parent) owner = bySource.get(p);
+    if (!owner || owner.Label !== x.Label) continue;
+    if (owner.CanInteract) said.add(x);
+    else owner.Label = undefined;
+  }
+  return said.size ? list.filter((x) => !said.has(x)) : list;
 }
 
 // ---- group helpers (duck-typed layouts and scrolls) ----
@@ -347,10 +381,16 @@ function AxisOf(group: SkiaControl): "Vertical" | "Horizontal" | "Both" {
 }
 
 /** Items per row of a 2D group: Split when set, else the items sharing the row of `item`. */
-function RowLength(group: SkiaControl, item: SkiaControl): number {
+/**
+ * Items per row of a 2D group: the Split, else the items on the row of the group's first item. C# counts the focused
+ * item's row, which the short last row of a wrap leaves short (Up from it skipped items); DrawnUi.Rust afef66f.
+ */
+function RowLength(group: SkiaControl): number {
   const l = asLayout(group);
   if (l && l.Split > 1) return l.Split;
-  const top = item.GetAccessibilityPixelRect();
+  const first = ItemAt(group, 0) ?? FirstRealized(group);
+  if (!first) return 1;
+  const top = first.GetAccessibilityPixelRect();
   if (top.Height <= 0) return 1;
   const mid = (top.Top + top.Bottom) / 2;
   let count = 0;
@@ -373,6 +413,13 @@ function ItemAt(group: SkiaControl, index: number): SkiaControl | undefined {
   const l = asLayout(group);
   if (l?.IsTemplated) { const v = l.ChildrenFactory.GetViewForIndex(index); return v && v.ContextIndex === index ? v : undefined; }
   return index >= 0 && index < ViewsOf(group).length ? ViewsOf(group)[index] : undefined;
+}
+
+/** The realized item with the lowest index (item 0 of a scrolled recycled group may not be realized). */
+function FirstRealized(group: SkiaControl): SkiaControl | undefined {
+  let best: SkiaControl | undefined;
+  for (const v of ViewsOf(group)) if (!best || IndexOf(group, v) < IndexOf(group, best)) best = v;
+  return best;
 }
 
 /** Arranged on the canvas: realized and laid out (a templated layout keeps only the cells it draws in use). */

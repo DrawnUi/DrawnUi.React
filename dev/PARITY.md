@@ -246,6 +246,25 @@ Updated whenever the port deliberately diverges or finds something worth back-po
   outside it; rects are re-read from `DrawingRect`, so they follow scrolling. Behavioural difference: a removed
   node can linger up to `MinUpdateIntervalMs` in the DOM. Pooled recycled cells get `Parent = undefined` on release.
 
+### Each name said once in the flat overlay (React and Rust only)
+- **React / Rust**: a text or heading whose label repeats the label of the node it is in is said once: under an
+  interactive node the child is left out, under any other node (a group card) the node loses its name and the heading
+  says it. Selectable text always stays. The web overlay is flat, so a group's name and its heading are read one after
+  the other.
+- **.NET**: no such rule yet.
+
+### Disabled control roles: listbox and scrollbar are left out
+- **React / Rust**: `Aria.IsInteractiveRole` (aria-disabled for a control role that takes no input) lists button,
+  link, checkbox, radio, switch, slider, spinbutton, textbox, searchbox, combobox, option, tab, menuitem,
+  menuitemcheckbox, menuitemradio.
+- **.NET**: `Aria.IsInteractiveRole` also lists listbox and scrollbar.
+- **Why**: a listbox is an arrow-key group here, and groups are never disabled.
+
+### Row length of a 2D arrow-key group is the first row's
+- **React / Rust**: Up / Down in a Wrap or Grid without Split move by the number of items on the group's first row.
+- **.NET**: `SkiaAccessibilityManager.RowLength` counts the focused item's row; from the short last row of a wrap, Up
+  skips items (12 tiles at 10 per row: Up from 12 goes to 10). This is a C# bug, reported to the C# side.
+
 ### Focus scrolls the drawn content into view
 - **React-only**: when keyboard focus lands on an overlay node that is outside its `SkiaScroll` viewport,
   `SkiaScroll.EnsureVisible(control)` animates every scroll ancestor so the control is visible (browser
