@@ -158,6 +158,10 @@ createRoot(document.getElementById("root")!).render(
   (`AccessibilityRole`, `AccessibilityLabel`, `AccessibilityHint`, `AccessibilityIsPressed`, `AccessibilityLive`,
   `Aria.RolePresentation` to hide). `AccessibilityTextSelectable` (opt-in) makes a label's text natively
   selectable and copyable; never enable it on gesture-driven controls, the text then owns the pointer.
+  Each name is said once: a text or heading inside a node, repeating that node's label, is read only once (a card
+  button keeps its name and the title is left out; a group card loses its name and its heading says it). A control
+  role (button, link, checkbox, switch, slider, textbox, tab, option, menu item...) that cannot take input is
+  `aria-disabled` and gets no tab stop.
 - Pointer (hand) cursor over tappable things: a `Tapped` handler alone does NOT show it. The control must also be in
   the accessibility overlay, so give it a role: `AccessibilityRole={Aria.RoleButton}` on a tappable card, row or
   shape, with `AccessibilityRole={Aria.RolePresentation}` on the labels inside so the card stays one target.
