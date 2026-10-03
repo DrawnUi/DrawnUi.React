@@ -3,11 +3,12 @@
 // stop, arrows by index across recycled cells scrolled in on demand, a toolbar of buttons skipping a disabled one),
 // keys to the focused control first (slider steps), Up / Down in a Wrap without Split by the first row's length,
 // each name said once (a group card and its heading, a card button and its title), aria-disabled for a control role
-// that takes no input. The DOM overlay itself (roving tabindex, Tab out of an editor) needs the browser.
+// that takes no input, a drawn editor leaving the keys of other elements and of the input method alone (C# 845b26e9).
+// The DOM overlay itself (roving tabindex, Tab out of an editor) needs the browser.
 import { readFileSync } from "node:fs";
 import {
   Super, SkiaScroll, SkiaStack, SkiaWrap, SkiaLayer, SkiaRow, SkiaButton, SkiaSlider, SkiaDynamicDrawnCell, SkiaLabel,
-  SkiaAccessibilityManager, Aria, SKRect, Thickness, type SkiaControl, type AnimatorBase,
+  SkiaAccessibilityManager, Aria, SKRect, Thickness, SkiaEditor, KeyboardManager, type SkiaControl, type AnimatorBase,
 } from "../src/index.ts";
 
 declare const CanvasKitInit: (o: { locateFile: () => string }) => Promise<any>;
@@ -185,6 +186,30 @@ class Cell extends SkiaDynamicDrawnCell {
   // aria-disabled: a control role that takes no input, never a group or a text
   check("disabled button is Disabled and no Tab stop", node(tools[2])?.Disabled === true && !mgr.IsTabStop(tools[2]));
   check("enabled button, group and text are not Disabled", node(tools[0])?.Disabled === false && node(groupCard)?.Disabled === false && node(groupTitle)?.Disabled === false);
+
+  // a drawn editor acts only on keys nothing else owns: the page or the canvas (its hidden textarea's keys arrive as
+  // input events), never a page control's keys or an input method's (C# 845b26e9, GitHub #231)
+  const editor = new SkiaEditor();
+  let submitted = 0; editor.TextSubmitted = () => { submitted++; };
+  const key = (code: string, tagName: string, extra: Partial<KeyboardEvent> = {}) => {
+    const e = { code, key: code === "Space" ? " " : code, target: { tagName }, isComposing: false, keyCode: 0, defaultPrevented: false, ...extra } as KeyboardEvent & { defaultPrevented: boolean };
+    (e as { preventDefault(): void }).preventDefault = () => { e.defaultPrevented = true; };
+    return e;
+  };
+  const down = (e: KeyboardEvent) => { (editor as unknown as { OnKeyDown(k: string, e: KeyboardEvent): void }).OnKeyDown(e.code, e); return e.defaultPrevented; };
+  const char = (ch: string, e: KeyboardEvent) => { (editor as unknown as { onKeyChar(c: string, e: KeyboardEvent): void }).onKeyChar(ch, e); return e.defaultPrevented; };
+  editor.Text = "abc"; editor.CursorPosition = 3;
+  check("page keys: Backspace deletes and is taken", down(key("Backspace", "BODY")) && editor.Text === "ab", editor.Text);
+  check("a page button keeps Enter (no submit, not taken)", !down(key("Enter", "BUTTON")) && submitted === 0);
+  check("a page input keeps Backspace", !down(key("Backspace", "INPUT")) && editor.Text === "ab", editor.Text);
+  check("an overlay node keeps its arrows", !down(key("ArrowLeft", "DIV")) && editor.CursorPosition === 2, `${editor.CursorPosition}`);
+  check("a page select keeps a typed character", !char("x", key("KeyX", "SELECT")) && editor.Text === "ab", editor.Text);
+  check("a canvas key types", char("x", key("KeyX", "CANVAS")) && editor.Text === "abx", editor.Text);
+  check("an IME composition keeps its arrows", !down(key("ArrowLeft", "TEXTAREA", { isComposing: true })) && editor.CursorPosition === 3, `${editor.CursorPosition}`);
+  check("an IME composition keeps Escape (editor stays focused)", !down(key("Escape", "BODY", { keyCode: 229 } as Partial<KeyboardEvent>)));
+  check("a soft keyboard's Unidentified key is not acted on", !down(key("Backspace", "BODY", { key: "Unidentified" })) && editor.Text === "abx", editor.Text);
+  check("Backspace is Backspace, Delete is Delete", KeyboardManager.IsOwnedByElement(key("Backspace", "HTML")) === false
+    && (editor.CursorPosition = 1, down(key("Delete", "BODY")) && editor.Text === "ax"), editor.Text);
 
   console.log(failures ? `FAIL: ${failures} checks` : "OK: keyboard contract");
   process.exit(failures ? 1 : 0);

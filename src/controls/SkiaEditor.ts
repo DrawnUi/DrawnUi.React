@@ -76,7 +76,10 @@ export class SkiaEditor extends SkiaShape {
   private stubSelectionStop = -1;
   private selectionMovingEdge = -1;
   private readonly onKeyDown = (key: InputKey, e: KeyboardEvent) => this.OnKeyDown(key, e);
-  private readonly onKeyChar = (ch: string, e: KeyboardEvent) => { e.preventDefault(); this.StubTypeText(ch); };
+  private readonly onKeyChar = (ch: string, e: KeyboardEvent) => {
+    if (KeyboardManager.IsOwnedByElement(e) || KeyboardManager.IsInputMethodKey(e)) return; // a page control or the IME owns it
+    e.preventDefault(); this.StubTypeText(ch);
+  };
   private selectionAnchor = -1;
   private dragSelecting = false;
   private styleApplied: Record<string, unknown> = {};
@@ -473,6 +476,9 @@ export class SkiaEditor extends SkiaShape {
   private OnKeyDown(key: InputKey, e: KeyboardEvent): void {
     const shift = KeyboardManager.IsShiftPressed, ctrl = KeyboardManager.IsControlPressed, alt = KeyboardManager.IsAltPressed;
     const handled = () => e.preventDefault();
+    // keys of another element (a page field or button, an overlay node) and of the input method are not the editor's:
+    // a composition keeps its arrows, Escape and Backspace (C# 845b26e9, GitHub #231)
+    if (KeyboardManager.IsInputMethodKey(e) || (KeyboardManager.IsOwnedByElement(e) && !TextInputProxy.IsProxyTarget(e.target))) return;
     // with the hidden textarea focused these keys become input / clipboard events there and are applied from those
     if (TextInputProxy.IsActive(this) && TextInputProxy.IsProxyTarget(e.target) && (key === "Backspace" || key === "Delete" || key === "Enter" || key === "NumpadEnter" || (ctrl && (key === "KeyC" || key === "KeyX" || key === "KeyV")))) return;
     switch (key) {

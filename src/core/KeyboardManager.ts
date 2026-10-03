@@ -48,6 +48,26 @@ export class KeyboardManager {
     KeyboardManager.keyDown.delete(down); KeyboardManager.keyChar.delete(char); if (up) KeyboardManager.keyUp.delete(up);
   }
 
+  /**
+   * Hooks observe keys, they never take them from the element that owns them (C# 845b26e9, GitHub #231). True when a
+   * focused DOM element is the key's target: a page input, textarea, select, button, link or contenteditable, an
+   * accessibility overlay node, the drawn editor's hidden textarea. False when the key goes to the page itself (body,
+   * html) or the canvas. A handler that acts on keys (edits, moves, calls preventDefault) skips owned keys, except
+   * those of its own element.
+   */
+  static IsOwnedByElement(e: KeyboardEvent): boolean {
+    const tag = (e.target as { tagName?: string } | null)?.tagName;
+    return !!tag && tag !== "BODY" && tag !== "HTML" && tag !== "CANVAS";
+  }
+
+  /**
+   * The key belongs to the input method (an IME composition, a soft keyboard): isComposing, keyCode 229, key "Process"
+   * or "Unidentified". Its result arrives as input events (TextInputProxy), never act on the key itself.
+   */
+  static IsInputMethodKey(e: KeyboardEvent): boolean {
+    return e.isComposing || e.keyCode === 229 || e.key === "Process" || e.key === "Unidentified";
+  }
+
   /** JS blurExternalTextInput: a page text input outside the canvas would keep receiving the keys. */
   static BlurExternalTextInput(): void {
     const a = typeof document !== "undefined" ? document.activeElement as HTMLElement | null : null;

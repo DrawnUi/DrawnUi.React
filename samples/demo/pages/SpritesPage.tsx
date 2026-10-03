@@ -65,6 +65,7 @@ export function SpritesPage() {
 
   useEffect(() => {
     const down = (key: string, e: KeyboardEvent) => {
+      if (KeyboardManager.IsOwnedByElement(e)) return; // a focused control (an overlay node, a page field) keeps its keys
       const map: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1], KeyA: [-1, 0], KeyD: [1, 0], KeyW: [0, -1], KeyS: [0, 1] };
       if (map[key]) { e.preventDefault(); void moveRef.current(...map[key]); }
       else if (key === "Space") { e.preventDefault(); attackRef.current(); }

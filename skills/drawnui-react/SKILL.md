@@ -153,7 +153,10 @@ createRoot(document.getElementById("root")!).render(
   Only what the pointer can use is reachable: `InputTransparent`, a locking `LockChildrenGestures` above, a disabled
   `SkiaButton` take a node out. A `SkiaEditor` is a Tab stop; Tab leaves it for the next node.
 - Keyboard: `KeyboardManager.Subscribe(down, char, up?)` (DOM `event.code` names). `SkiaEditor` focuses on tap; a
-  hidden textarea feeds IME / soft keyboard / clipboard into the same editing methods.
+  hidden textarea feeds IME / soft keyboard / clipboard into the same editing methods. Subscribers see every key,
+  also those typed into a page input or sent to a focused button: before acting on a key or calling preventDefault,
+  return when `KeyboardManager.IsOwnedByElement(e)` (or `IsInputMethodKey(e)` for text input), so the focused
+  element keeps its keys.
 - Accessibility: an invisible DOM overlay mirrors accessible controls over the `aria-hidden` canvas
   (`AccessibilityRole`, `AccessibilityLabel`, `AccessibilityHint`, `AccessibilityIsPressed`, `AccessibilityLive`,
   `Aria.RolePresentation` to hide). `AccessibilityTextSelectable` (opt-in) makes a label's text natively
