@@ -303,6 +303,15 @@ Updated whenever the port deliberately diverges or finds something worth back-po
 
 ## Rendering
 
+### RenderingMode defaults to Accelerated
+- **React**: a `<Canvas>` without `RenderingMode` draws on the GPU: the engine field starts as `"Accelerated"`
+  (`src/core/Canvas.ts`). `RenderingMode="Default"` draws on the CPU (software surface). The value is read once,
+  when the canvas is created. Accelerated falls back to software on its own when WebGL is unavailable.
+- **.NET**: `DrawnView.RenderingModeProperty` defaults to `RenderingModeType.Default` (software); apps set
+  `RenderingMode="Accelerated"` themselves.
+- **Opinion**: keep it (Nick, 2026-10-04): WebGL is almost always there on the web and the fallback covers the rest,
+  so nothing gets slower.
+
 ### Redraw synchronously inside the resize callback
 - **React**: the `ResizeObserver` callback recreates the surface and draws immediately (RO runs after layout,
   before paint), so a live window drag never presents a blank frame; the GL context/GrContext live for the Canvas
