@@ -10,6 +10,8 @@ import { SnappingLayout } from "./SnappingLayout";
  * so it must be aligned to its edge by the parent (VerticalOptions="End" for FromBottom, etc.).
  */
 export class SkiaDrawer extends SnappingLayout {
+  /** Takes mouse hover unless ReceivesHover is set false (C# ReceivesHoverByDefault). */
+  protected override ReceivesHoverByDefault(): boolean { return true; }
   Direction: DrawerDirection = "FromBottom";
   /** Points that stay visible when closed. */
   HeaderSize = 0;

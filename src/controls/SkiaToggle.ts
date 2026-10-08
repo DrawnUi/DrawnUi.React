@@ -11,6 +11,8 @@ import { SkiaLayout } from "./SkiaLayout";
  * take the style defaults (C# SetStyleDefault).
  */
 export abstract class SkiaToggle extends SkiaLayout {
+  /** Takes mouse hover unless ReceivesHover is set false (C# ReceivesHoverByDefault): switch, checkbox, radio button. */
+  protected override ReceivesHoverByDefault(): boolean { return true; }
   private controlStyle: PrebuiltControlStyle = "Unset";
   get ControlStyle(): PrebuiltControlStyle { return this.controlStyle; }
   set ControlStyle(v: PrebuiltControlStyle) {

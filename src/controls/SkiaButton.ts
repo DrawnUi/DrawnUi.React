@@ -13,6 +13,8 @@ import { type PrebuiltControlStyle, ResolveControlStyle, type ResolvedControlSty
  * PanThreshold. Press feedback = ApplyEffect (ripple), no darkening.
  */
 export class SkiaButton extends SkiaLayout {
+  /** Takes mouse hover unless ReceivesHover is set false (C# ReceivesHoverByDefault). */
+  protected override ReceivesHoverByDefault(): boolean { return true; }
   static PanThreshold = 5;
 
   Text = "";

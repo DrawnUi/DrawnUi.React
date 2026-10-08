@@ -16,6 +16,8 @@ interface ChildPosition { Offset: SKPoint; OnScreen: boolean; NextToScreen: bool
  * `DynamicSize` sizes an auto-sized carousel from the selected slide, `SwipeSpeed` / `LinearSpeedMs` tune the snap.
  */
 export class SkiaCarousel extends SnappingLayout {
+  /** Takes mouse hover unless ReceivesHover is set false (C# ReceivesHoverByDefault). */
+  protected override ReceivesHoverByDefault(): boolean { return true; }
   IsVertical = false;
   /** Side padding in points so the previous/next slides peek in. */
   SidesOffset = 0;

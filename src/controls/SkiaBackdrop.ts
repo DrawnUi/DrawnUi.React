@@ -11,6 +11,8 @@ import { SkiaLayout } from "./SkiaLayout";
  * on every frame it is drawn in; inside a cached parent it is re-recorded with that parent).
  */
 export class SkiaBackdrop extends SkiaLayout {
+  /** Samples what is drawn below: a composite above redraws it whole when something inside changes (drawnui-cross 6m). */
+  protected override get SamplesContent(): boolean { return true; }
   Blur = 5;
   Brightness = 1;
   /** Snapshot the surface currently drawn into (true) or the on-screen surface (false). */

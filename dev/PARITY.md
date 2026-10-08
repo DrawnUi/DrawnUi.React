@@ -265,6 +265,27 @@ Updated whenever the port deliberately diverges or finds something worth back-po
 - **.NET**: `SkiaAccessibilityManager.RowLength` counts the focused item's row; from the short last row of a wrap, Up
   skips items (12 tiles at 10 per row: Up from 12 goes to 10). This is a C# bug, reported to the C# side.
 
+### Hover is decided by its own hit pass (drawnui-cross 6m)
+- **React**: `HoverManager` walks the tree from one mouse position with the routing rules of ProcessGestures (visible,
+  not InputTransparent, inside, children not locked, nothing below a BlockGesturesBelow subtree); controls get no
+  `Pointer` gesture. Checked once per mouse move, plus the frame-end checks of 6m.
+- **.NET**: the canvas routes a `Pointer` gesture through ProcessGestures; controls that take hover report themselves
+  (`CheckHovered` -> `ReportHover`), the canvas commits after the pass. A custom ProcessGestures override can see and
+  stop Pointer gestures there.
+- **Opinion**: same hovered set for the same tree; routing Pointer gestures would reach every gesture override in the
+  React controls at mouse-move rate for no visible gain.
+
+### A deep change in an ImageComposite: by area, transforms mapped in (React and Rust)
+- **React / Rust**: the area of a change deeper than a direct child is mapped through the transforms on the way (the
+  control as drawn before and now, then every ancestor), so a card moved past its stack's edge is drawn there and erased
+  again when it moves back; only a visual effect or a backdrop on the way draws the child whole.
+- **.NET**: any transform from the origin up to the direct child draws the child whole, not clipped (draws the
+  overflow, never erases it when the card moves back).
+- React only: the area path needs `UpdateDraw` or `RepaintComposition`; a plain `Update()` (React's Update re-measures)
+  records the composite whole, so color changes should go through props or the color setters. A templated (ItemsSource)
+  composite always records whole (its cells are not composite children here). Not allocation-free: React's frame
+  allocates rects per child already.
+
 ### Focus scrolls the drawn content into view
 - **React-only**: when keyboard focus lands on an overlay node that is outside its `SkiaScroll` viewport,
   `SkiaScroll.EnsureVisible(control)` animates every scroll ancestor so the control is visible (browser

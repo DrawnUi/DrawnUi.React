@@ -32,9 +32,9 @@ export class SkiaProgress extends SkiaControl {
   set Max(v: number) { this.max = v; this.Update(); }
   /** Unset = per-style palette. */
   get TrackColor(): Color { return this.trackColor ?? SkiaProgress.Palette(this.UsingControlStyle).track; }
-  set TrackColor(v: Color) { this.trackColor = v; this.Update(); }
+  set TrackColor(v: Color) { this.trackColor = v; this.UpdateDraw(); }
   get ProgressColor(): Color { return this.progressColor ?? SkiaProgress.Palette(this.UsingControlStyle).progress; }
-  set ProgressColor(v: Color) { this.progressColor = v; this.Update(); }
+  set ProgressColor(v: Color) { this.progressColor = v; this.UpdateDraw(); }
 
   /** C# ResolvedTrackColor / ResolvedProgressColor / track heights per style. */
   static Palette(s: ResolvedControlStyle): { track: Color; progress: Color; height: number; radius: number } {

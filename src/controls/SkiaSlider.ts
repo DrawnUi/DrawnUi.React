@@ -13,6 +13,8 @@ type RangeZone = "Unknown" | "Start" | "End";
  * Track, selected trail and thumbs are painted directly; the C# thumb-position math (SliderHeight = thumb box) is kept.
  */
 export class SkiaSlider extends SkiaControl {
+  /** Takes mouse hover unless ReceivesHover is set false (C# ReceivesHoverByDefault). */
+  protected override ReceivesHoverByDefault(): boolean { return true; }
   static override DefaultAccessibilityRole?: string = "slider";
   ControlStyle: PrebuiltControlStyle = "Unset";
   Min = 0;
@@ -60,11 +62,11 @@ export class SkiaSlider extends SkiaControl {
   get SliderHeight(): number { return this.sliderHeight ?? this.Look().thumb + (this.EnableRange && this.UsingControlStyle !== "Unset" ? 8 : 0); }
   set SliderHeight(v: number) { this.sliderHeight = v; this.Update(); }
   get ThumbColor(): Color { return this.thumbColor ?? this.Look().thumbColor; }
-  set ThumbColor(v: Color) { this.thumbColor = v; this.Update(); }
+  set ThumbColor(v: Color) { this.thumbColor = v; this.UpdateDraw(); }
   get TrackColor(): Color { return this.trackColor ?? this.Look().track; }
-  set TrackColor(v: Color) { this.trackColor = v; this.Update(); }
+  set TrackColor(v: Color) { this.trackColor = v; this.UpdateDraw(); }
   get TrackSelectedColor(): Color { return this.trackSelectedColor ?? this.Look().selected; }
-  set TrackSelectedColor(v: Color) { this.trackSelectedColor = v; this.Update(); }
+  set TrackSelectedColor(v: Color) { this.trackSelectedColor = v; this.UpdateDraw(); }
 
   /** C# style builders: thumb diameter, track height, palette, thumb shadow. */
   private Look(): { thumb: number; trackH: number; track: Color; selected: Color; thumbColor: Color; shadow: SkiaShadow } {

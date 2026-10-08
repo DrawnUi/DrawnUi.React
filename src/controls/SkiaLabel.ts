@@ -63,6 +63,8 @@ export class SkiaLabel extends SkiaControl {
 
   // ---- invalidating accessors (DrawnUi bindable properties) ----
   private Set<K extends keyof this>(key: K, v: this[K]): void { if (this[key] !== v) { this[key] = v; this.Update(); } }
+  /** A property that changes only the look (a color): no layout change, see UpdateDraw. */
+  private SetLook<K extends keyof this>(key: K, v: this[K]): void { if (this[key] !== v) { this[key] = v; this.UpdateDraw(); } }
 
   get Text(): string { return this.text; }
   set Text(v: string) { this.Set("text" as keyof this, v as this[keyof this]); }
@@ -70,7 +72,7 @@ export class SkiaLabel extends SkiaControl {
   get FontSize(): number { return this.fontSize; }
   set FontSize(v: number) { this.Set("fontSize" as keyof this, v as this[keyof this]); }
   get TextColor(): Color { return this.textColor; }
-  set TextColor(v: Color) { this.Set("textColor" as keyof this, v as this[keyof this]); }
+  set TextColor(v: Color) { this.SetLook("textColor" as keyof this, v as this[keyof this]); }
 
   get FontFamily(): string { return this.fontFamily; }
   set FontFamily(v: string) { this.Set("fontFamily" as keyof this, v as this[keyof this]); }

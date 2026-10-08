@@ -145,6 +145,7 @@ export class SkiaControl {
     if (this.bindingContext === value) return;
     this.bindingContext = value;
     this.OnBindingContextChanged();
+    this.Superview?.Hover?.RequestCheck(); // a recycled cell under a still mouse now shows another item
   }
   /** Index of the bound item inside its ItemsSource, -1 when not templated. */
   ContextIndex = -1;
@@ -177,12 +178,37 @@ export class SkiaControl {
   private compositeFull = true;
   /** Canvas-pixel bounds this control covered when its parent last recorded it (composite erase region). */
   private lastCompositeBounds?: SKRect;
-  /** What the last composite record did (diagnostics): "full" or "partial", the number of children re-recorded and which ones. */
-  LastCompositeRecord: { Mode: "full" | "partial"; Children: number; Dirty: readonly SkiaControl[] } = { Mode: "full", Children: 0, Dirty: [] };
+  /**
+   * What the last composite record did (diagnostics): "full" or "partial", the number of children re-recorded and which
+   * ones; Areas: the pixels erased and drawn again for changes deeper than a child (C# Areas), Changed: the controls
+   * those areas belong to (C# Changed).
+   */
+  LastCompositeRecord: { Mode: "full" | "partial"; Children: number; Dirty: readonly SkiaControl[]; Areas: readonly SKRect[]; Changed: readonly SkiaControl[] } =
+    { Mode: "full", Children: 0, Dirty: [], Areas: [], Changed: [] };
+  /** C# MaxCompositionAreas: more areas than this in one composite record draw it whole instead. */
+  static MaxCompositionAreas = 16;
+  /** C# MaxCompositionShare: areas covering more than this share of a composite draw it whole instead. */
+  static MaxCompositionShare = 0.5;
+  /**
+   * Changes deeper than a direct child since the last composite record (drawnui-cross 6m): the control, the direct child
+   * it is in, where it was drawn before the change (its own drawn bounds, as drawn) and its rect then.
+   */
+  private compositeDeep?: { Origin: SkiaControl; Child: SkiaControl; Before: SKRect; Rect: SKRect }[];
+  /** Set while an UpdateDraw climbs: the ancestors re-measure but an ImageComposite among them keeps its partial record. */
+  private static drawOrigin: SkiaControl | null = null;
+  /** Nonzero while a composite redraws only some areas: layouts skip children entirely outside the clip. */
+  static CompositionCulling = 0;
   /** The children a composite record can re-record individually; layouts return their views. */
   protected GetCompositeChildren(): readonly SkiaControl[] { return []; }
   /** C# TrackChildAsDirty (DirtyChildrenTracker): the child changed without a remeasure of this control. */
   TrackChildAsDirty(child: SkiaControl): void { if (this.IsCacheComposite) this.DirtyChildrenInternal.add(child); }
+  private static readonly rejectRect = new Float32Array(4);
+  /** During a partial composite record: true when this control draws nothing inside the canvas clip (skipped whole). */
+  OutsideCompositionClip(canvas: SkCanvas): boolean {
+    const b = this.DrawnBoundsNow(this.RenderingScale), q = SkiaControl.rejectRect;
+    q[0] = b.Left; q[1] = b.Top; q[2] = b.Right; q[3] = b.Bottom;
+    return canvas.quickReject(q);
+  }
   /** Drawn bounds in canvas pixels including transforms and effects margins (C# GetTransformedDirtyBounds). */
   GetTransformedDirtyBounds(): SKRect {
     const r = this.ExpandedCacheRect(this.RenderingScale), m = this.RenderTransformMatrix;
@@ -201,6 +227,54 @@ export class SkiaControl {
   /** Consume every gesture that lands on this control so nothing below (z-order) receives it. */
   BlockGesturesBelow = false;
   LockChildrenGestures: LockTouch = "Disabled";
+
+  // ---- hover (drawnui-cross 6m, C# ReceivesHover / IsHovered / HoverChanged) ----
+  private receivesHover?: boolean;
+  /**
+   * Whether this control takes mouse hover: the canvas sets IsHovered while the mouse is over it. Opt-in: false by
+   * default, true by default only in the controls that always had hover (SkiaButton, SkiaSlider, the toggles,
+   * SkiaRadioButton, SkiaCarousel, SkiaDrawer), never because a control has a tap handler. A HoverChanged handler turns
+   * it on (C# fluent OnHovered) unless it is set.
+   */
+  get ReceivesHover(): boolean { return this.receivesHover ?? (this.HoverChanged ? true : this.ReceivesHoverByDefault()); }
+  set ReceivesHover(value: boolean) { this.receivesHover = value; }
+  /** The value of ReceivesHover until it is set. */
+  protected ReceivesHoverByDefault(): boolean { return false; }
+  private isHovered = false;
+  /**
+   * True while the mouse is over this control and it takes hover. Every such control under the pointer is hovered at
+   * once (a card and the button inside it, as CSS :hover); it stays as it is while content moves under the pointer and
+   * is checked again when that stops. Touch never hovers.
+   */
+  get IsHovered(): boolean { return this.isHovered; }
+  /** IsHovered changed: true when the mouse came over this control, false when it left (C# HoverChanged / OnHovered). */
+  HoverChanged?: (sender: SkiaControl, hovered: boolean) => void;
+  /** Set by the canvas's HoverManager. */
+  ApplyHover(on: boolean): void {
+    if (this.isHovered === on) return;
+    this.isHovered = on;
+    this.HoverChanged?.(this, on);
+  }
+  /** A scroll, carousel or drawer moving its content right now: hover waits until it stops (C# IsScrolling / InTransition). */
+  MovesContent(): boolean { return false; }
+
+  /**
+   * Hover hit path (HoverManager): this control is under the point (in its own space), its children under it follow,
+   * top-most first, by the routing rules of ProcessGestures. True when this subtree blocks gestures below it, so the
+   * controls under it get no hover (a popup over a list).
+   */
+  CollectHovered(point: SKPoint, into: SkiaControl[]): boolean {
+    into.push(this);
+    if (!this.CheckChildrenGesturesLocked("Pointer")) {
+      const listeners = this.GetGestureListeners();
+      for (let i = listeners.length - 1; i >= 0; i--) {
+        const child = listeners[i];
+        if (!child.IsVisible || child.InputTransparent || !this.IsGestureForChild(child, point)) continue;
+        if (child.CollectHovered(child.TransformPointToLocalSpace(point), into)) return true;
+      }
+    }
+    return this.BlockGesturesBelow;
+  }
 
   // ---- touch feedback (same names as DrawnUi) ----
   TouchEffectColor: Color = Colors.White;
@@ -772,14 +846,30 @@ export class SkiaControl {
     if (!surface) { this.PaintContent(ctx); return; }
     const canvas = surface.getCanvas();
     const children = this.GetCompositeChildren();
-    const partial = sameGeometry && !this.compositeFull && this.DirtyChildrenInternal.size > 0 && children.length > 0;
+    const deep = this.compositeDeep;
+    let partial = sameGeometry && !this.compositeFull && children.length > 0 && (this.DirtyChildrenInternal.size > 0 || !!deep?.length);
+    // changes deeper than a child: only their areas, the child they are in drawn clipped to them (drawnui-cross 6m)
+    const areas: SKRect[] = [], changed: SkiaControl[] = [], inside = new Set<SkiaControl>();
+    if (partial && deep?.length) {
+      let covered = 0;
+      for (const d of deep) {
+        if (!children.includes(d.Child) || this.DirtyChildrenInternal.has(d.Child)) continue;
+        const area = SkiaControl.DeepArea(d, this, ctx.Scale);
+        if (area === null) { partial = false; break; }
+        if (!area) { this.DirtyChildrenInternal.add(d.Child); continue; }
+        areas.push(area); changed.push(d.Origin); inside.add(d.Child);
+        covered += area.Width * area.Height;
+      }
+      if (areas.length > SkiaControl.MaxCompositionAreas || covered > r.Width * r.Height * SkiaControl.MaxCompositionShare) partial = false;
+    }
+    if (deep) deep.length = 0;
     const offset = prev && sameGeometry ? { X: r.Left - prev.Bounds.Left, Y: r.Top - prev.Bounds.Top } : { X: 0, Y: 0 };
     const saved = canvas.save();
     canvas.translate(-r.Left, -r.Top);
     if (partial) {
       // dirty = reported children + siblings intersecting their old or new bounds (C# makes intersecting children dirty too)
       const dirty = new Set<SkiaControl>();
-      const rects: SKRect[] = [];
+      const rects: SKRect[] = [...areas];
       const boundsOf = (c: SkiaControl): SKRect[] => {
         const out = [c.GetTransformedDirtyBounds()];
         if (c.lastCompositeBounds) out.push(new SKRect(c.lastCompositeBounds.Left + offset.X, c.lastCompositeBounds.Top + offset.Y, c.lastCompositeBounds.Right + offset.X, c.lastCompositeBounds.Bottom + offset.Y));
@@ -790,7 +880,7 @@ export class SkiaControl {
       while (grew) {
         grew = false;
         for (const c of children) {
-          if (dirty.has(c) || !c.IsVisible) continue;
+          if (dirty.has(c) || inside.has(c) || !c.IsVisible) continue;
           const own = boundsOf(c);
           if (rects.some((d) => own.some((o) => o.Left < d.Right && d.Left < o.Right && o.Top < d.Bottom && d.Top < o.Bottom))) { dirty.add(c); rects.push(...own); grew = true; }
         }
@@ -805,13 +895,17 @@ export class SkiaControl {
       this.IsRenderingWithComposition = true;
       this.DirtyChildrenInternal.clear();
       for (const c of dirty) this.DirtyChildrenInternal.add(c);
-      this.PaintContent({ ...ctx, Context: { Canvas: canvas, Surface: surface, Origin: { X: r.Left, Y: r.Top } } });
+      for (const c of inside) this.DirtyChildrenInternal.add(c);
+      SkiaControl.CompositionCulling++;
+      try { this.PaintContent({ ...ctx, Context: { Canvas: canvas, Surface: surface, Origin: { X: r.Left, Y: r.Top } } }); }
+      finally { SkiaControl.CompositionCulling--; }
       this.IsRenderingWithComposition = false;
-      this.LastCompositeRecord = { Mode: "partial", Children: dirty.size, Dirty: [...dirty] };
+      const redrawn = children.filter((c) => this.DirtyChildrenInternal.has(c));
+      this.LastCompositeRecord = { Mode: "partial", Children: redrawn.length, Dirty: redrawn, Areas: areas, Changed: changed };
     } else {
       canvas.clear(CK.TRANSPARENT);
       this.PaintContent({ ...ctx, Context: { Canvas: canvas, Surface: surface, Origin: { X: r.Left, Y: r.Top } } });
-      this.LastCompositeRecord = { Mode: "full", Children: children.length, Dirty: children };
+      this.LastCompositeRecord = { Mode: "full", Children: children.length, Dirty: children, Areas: [], Changed: [] };
     }
     canvas.restoreToCount(saved);
     for (const c of children) c.lastCompositeBounds = c.IsVisible ? c.GetTransformedDirtyBounds() : undefined;
@@ -1033,9 +1127,75 @@ export class SkiaControl {
    * cache holds its composited output, so those are staled before redrawing (DrawnUi RedrawCanvas + parent invalidation).
    */
   RepaintComposition(): void {
-    let child: SkiaControl = this, p = this.Parent;
-    while (p) { p.cacheDirty = true; p.TrackChildAsDirty(child); child = p; p = p.Parent; }
+    this.ReportToComposites();
+    for (let p = this.Parent; p; p = p.Parent) p.cacheDirty = true;
     this.Repaint();
+  }
+
+  /**
+   * Update() for a change of how this control looks, not of its size (a color set through props, C# NeedDraw): the same
+   * re-measure and cache invalidation, but an ImageComposite above redraws only this control's area instead of
+   * recording whole (drawnui-cross 6m). The record still goes whole when the control's rect changed after all.
+   */
+  UpdateDraw(): void {
+    this.ReportToComposites();
+    const outer = SkiaControl.drawOrigin;
+    SkiaControl.drawOrigin = this;
+    try { this.InvalidateMeasure(); } finally { SkiaControl.drawOrigin = outer; }
+  }
+
+  /**
+   * A change of this control that keeps its layout, to every ImageComposite above: a direct child is drawn again whole
+   * (C# TrackChildAsDirty), a deeper control by its area, read now as it was drawn (its last matrix and effects margin).
+   */
+  private ReportToComposites(): void {
+    let before: SKRect | undefined;
+    let child: SkiaControl = this;
+    for (let p = this.Parent; p; child = p, p = p.Parent) {
+      if (!p.IsCacheComposite) continue;
+      if (child === this) { p.TrackChildAsDirty(child); continue; }
+      const deep = p.compositeDeep ??= [];
+      if (deep.some((d) => d.Origin === this)) continue;
+      before ??= this.GetTransformedDirtyBounds();
+      const r = this.DrawingRect;
+      deep.push({ Origin: this, Child: child, Before: before, Rect: new SKRect(r.Left, r.Top, r.Right, r.Bottom) });
+    }
+  }
+
+  /** The matrix this control will be drawn with (Render), from its current properties; undefined when none. */
+  private CurrentMatrix(scale: number): number[] | undefined {
+    return this.HasTransform ? this.CreateRenderTransformMatrix(this.DrawingRect, scale) : undefined;
+  }
+
+  /** Where this control will be drawn: its rect grown by its effects margin, through its current matrix. */
+  private DrawnBoundsNow(scale: number): SKRect { return SkiaControl.MapRect(this.CurrentMatrix(scale), this.ExpandedCacheRect(scale)); }
+
+  private static MapRect(m: number[] | undefined, r: SKRect): SKRect {
+    if (!m) return r;
+    const pts = Super.CK.Matrix.mapPoints(m, [r.Left, r.Top, r.Right, r.Top, r.Right, r.Bottom, r.Left, r.Bottom]);
+    return new SKRect(Math.min(pts[0], pts[2], pts[4], pts[6]), Math.min(pts[1], pts[3], pts[5], pts[7]), Math.max(pts[0], pts[2], pts[4], pts[6]), Math.max(pts[1], pts[3], pts[5], pts[7]));
+  }
+
+  /** Its output depends on all of its content (a visual effect; a backdrop samples below): a change inside redraws it whole. */
+  protected get SamplesContent(): boolean { return !this.DisableEffects && this.visualEffects.length > 0; }
+
+  /**
+   * Where a deep change shows inside the composite (drawnui-cross 6m rule b): the control as drawn before and as drawn
+   * now, then through the transform of every ancestor up to the composite. undefined: draw the child whole (an effect
+   * or a backdrop on the way, the control gone from the child); null: the layout changed, record whole.
+   */
+  private static DeepArea(d: { Origin: SkiaControl; Child: SkiaControl; Before: SKRect; Rect: SKRect }, composite: SkiaControl, scale: number): SKRect | null | undefined {
+    const o = d.Origin, r = o.DrawingRect;
+    if (r.Left !== d.Rect.Left || r.Top !== d.Rect.Top || r.Right !== d.Rect.Right || r.Bottom !== d.Rect.Bottom) return null;
+    if (!o.IsVisible) return undefined;
+    const now = o.DrawnBoundsNow(scale);
+    let area = new SKRect(Math.min(now.Left, d.Before.Left), Math.min(now.Top, d.Before.Top), Math.max(now.Right, d.Before.Right), Math.max(now.Bottom, d.Before.Bottom));
+    let p = o.Parent, child: SkiaControl = o;
+    for (; p && p !== composite; child = p, p = p.Parent) {
+      if (p.SamplesContent || !p.IsVisible) return undefined;
+      area = SkiaControl.MapRect(p.CurrentMatrix(scale), area);
+    }
+    return p === composite && child === d.Child ? area : undefined;
   }
 
   /**
@@ -1049,7 +1209,8 @@ export class SkiaControl {
   InvalidateMeasure(): void {
     this.NeedMeasure = true;
     this.cacheDirty = true;
-    this.compositeFull = true; // structure may change: a composite cannot patch it
+    // structure may change: a composite cannot patch it; a draw-only change (UpdateDraw) reported its area instead
+    if (SkiaControl.drawOrigin === null || SkiaControl.drawOrigin === this) this.compositeFull = true;
     this.effectsMarginCache = undefined;
     if (this.Parent && this.IsParentIndependent) this.RepaintComposition();
     else if (this.Parent) this.Parent.InvalidateMeasure();

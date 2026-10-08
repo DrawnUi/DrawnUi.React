@@ -79,9 +79,12 @@ export abstract class SnappingLayout extends SkiaLayout {
 
   /** C# SnappingLayout.Render: the transition state follows the position every frame. */
   override Render(ctx: DrawingContext): void {
+    this.Superview?.Hover?.RegisterMover(this);
     super.Render(ctx);
     this.InTransition = !this.CheckTransitionEnded();
   }
+  /** Hover waits while the content slides (C# InTransition) or follows a pan. */
+  override MovesContent(): boolean { return this.InTransition || this.IsUserPanning; }
 
   // ---- clamping ----
   ClampOffset(x: number, y: number, rubber: boolean): SKPoint {

@@ -103,6 +103,10 @@ createRoot(document.getElementById("root")!).render(
 - Caching is the same plan as C#: `UseCache="Image"` on stable subtrees, `"Operations"` for vector content (the
   default on shapes and labels), `"ImageComposite"` for a layer whose children change independently (only the
   dirty children are re-recorded; `LastCompositeRecord` reports what happened), `None` for per-frame painters.
+  Inside an ImageComposite a change at any depth (a card in an inner stack of a list) redraws only that card's area
+  when it changes only the look: color props (`BackgroundColor`, `TextColor`, any `...Color`, gradients) and
+  transforms / Opacity. Any other prop, or an imperative `Update()`, records the whole composite: drive hover and
+  selection looks with color props.
   Shader effects need an Image-type cache on their control. That cache is only the shader's INPUT: a
   post-render effect runs on every frame its control is drawn (measured: one shader pass per drag frame on
   a moving sibling). For a static result under something that moves, wrap the control in a parent with
@@ -165,6 +169,12 @@ createRoot(document.getElementById("root")!).render(
   button keeps its name and the title is left out; a group card loses its name and its heading says it). A control
   role (button, link, checkbox, switch, slider, textbox, tab, option, menu item...) that cannot take input is
   `aria-disabled` and gets no tab stop.
+- Hover: `IsHovered` is true on every control under the mouse that takes hover, a card and the button inside it
+  alike. Opt-in: `ReceivesHover={true}` or a `HoverChanged={(me, on) => ...}` handler (it turns hover on); buttons,
+  sliders, toggles, radio buttons, carousels and drawers hover by default (`ReceivesHover={false}` turns it off). A
+  tap handler never makes a control hover. While a scroll, carousel or drawer moves its content nothing changes,
+  hover is checked once when it stops; leaving the canvas clears it; touch never hovers. Put the hover look in state
+  and pass it as a color prop, so a list in an `ImageComposite` redraws only that card.
 - Pointer (hand) cursor over tappable things: a `Tapped` handler alone does NOT show it. The control must also be in
   the accessibility overlay, so give it a role: `AccessibilityRole={Aria.RoleButton}` on a tappable card, row or
   shape, with `AccessibilityRole={Aria.RolePresentation}` on the labels inside so the card stays one target.

@@ -317,9 +317,13 @@ export class SkiaScroll extends SkiaControl {
   private offsetX = 0;
   private offsetY = 0;
   get ViewportOffsetX(): number { return this.offsetX; }
-  set ViewportOffsetX(value: number) { if (this.offsetX !== value) { this.offsetX = value; this.OnScrolled(); } }
+  set ViewportOffsetX(value: number) { if (this.offsetX !== value) { this.offsetX = value; this.OnScrolled(); this.OffsetJumped(); } }
   get ViewportOffsetY(): number { return this.offsetY; }
-  set ViewportOffsetY(value: number) { if (this.offsetY !== value) { this.offsetY = value; this.OnScrolled(); } }
+  set ViewportOffsetY(value: number) { if (this.offsetY !== value) { this.offsetY = value; this.OnScrolled(); this.OffsetJumped(); } }
+  /** An offset set without a glide or a pan (a jump, a touchpad step): the controls under a still mouse changed. */
+  private OffsetJumped(): void { if (!this.MovesContent()) this.Superview?.Hover?.RequestCheck(); }
+  /** Hover waits while the content glides, flings, bounces or follows a pan (C# IsScrolling). */
+  override MovesContent(): boolean { return this.IsScrolling || this.IsUserPanning || !!this.draggedScrollBar; }
 
   private readonly animatorFlingX = new ScrollFlingAnimator(this);
   private readonly animatorFlingY = new ScrollFlingAnimator(this);
@@ -394,6 +398,7 @@ export class SkiaScroll extends SkiaControl {
   }
   override InsertSubView(_index: number, control: SkiaControl): void { this.AddSubView(control); }
   override RemoveSubView(control: SkiaControl): void {
+    this.Superview?.Hover?.RequestCheck();
     if (this.content === control) this.Content = undefined;
     else if (this.header === control) this.Header = undefined;
     else if (this.footer === control) this.Footer = undefined;
@@ -502,6 +507,7 @@ export class SkiaScroll extends SkiaControl {
   }
 
   protected override Paint(ctx: DrawingContext): void {
+    this.Superview?.Hover?.RegisterMover(this);
     const c = this.content;
     if (!c) return;
     this.ArrangeContent();

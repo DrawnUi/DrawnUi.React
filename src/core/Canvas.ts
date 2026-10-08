@@ -3,6 +3,7 @@ import type { CachedObject, DrawingContext, SkiaControl } from "./SkiaControl";
 import type { AnimatorBase } from "./Animators";
 import { Super } from "./Super";
 import { SkiaAccessibilityManager } from "./Accessibility";
+import { HoverManager } from "./Hover";
 import { type Color, Colors, type RenderingModeType, SKRect } from "./Types";
 import {
   ContextMenuEventArgs, type ContextMenuSource,
@@ -44,6 +45,8 @@ export class Canvas {
   WasDrawn?: (sender: Canvas) => void;
   /** Registry + rate-limited snapshot of accessible controls, rendered by the DOM overlay (DrawnUi AccessibilityManager). */
   readonly AccessibilityManager = new SkiaAccessibilityManager();
+  /** Mouse hover of the controls (drawnui-cross 6m): ReceivesHover / IsHovered / HoverChanged. */
+  readonly Hover = new HoverManager();
 
   private content?: SkiaControl;
   get Content(): SkiaControl | undefined { return this.content; }
@@ -51,6 +54,7 @@ export class Canvas {
     if (this.content) this.content._superview = undefined;
     this.content = value;
     if (value) { value.Parent = undefined; value._superview = this; }
+    this.Hover.RequestCheck();
     this.Update();
   }
 
@@ -193,6 +197,7 @@ export class Canvas {
       root.Render({ Context: { Canvas: canvas, Surface: this.surface }, Destination: new SKRect(0, 0, w, h), Scale: scale });
     }
     this.AccessibilityManager.OnFrameEnd(this.RenderingScale, this.Element.width, this.Element.height, () => this.Update());
+    this.Hover.AfterFrame(this.content, this.activeTouchIds.size > 0);
     const now = performance.now();
     this.FrameTime = now - started;
     this.FrameIndex++;
@@ -328,7 +333,12 @@ export class Canvas {
       e.type === "pointerup" ? "Released" :
       e.type === "pointercancel" ? "Cancelled" : undefined;
     if (!type) return;
-    if (type === "Moved" && !this.activeTouchIds.has(e.pointerId)) { if (e.pointerType === "mouse") this.UpdateCursor(e.offsetX, e.offsetY); return; } // hover not ported (TouchActionResult.Pointer)
+    if (type === "Moved" && !this.activeTouchIds.has(e.pointerId)) {
+      if (e.pointerType === "touch") return; // touch never hovers
+      if (e.pointerType === "mouse") this.UpdateCursor(e.offsetX, e.offsetY);
+      if (this.activeTouchIds.size === 0) this.Hover.Move(this.content, e.offsetX * this.RenderingScale, e.offsetY * this.RenderingScale);
+      return;
+    }
     if ((type === "Released" || type === "Cancelled") && !this.activeTouchIds.has(e.pointerId)) return; // Up of a pointer that never pressed here
     // Capture so Up outside the element still arrives; throws for synthetic events (tests) — harmless.
     if (type === "Pressed") { try { this.Element.setPointerCapture(e.pointerId); } catch { /* synthetic pointer */ } }
@@ -350,6 +360,8 @@ export class Canvas {
     this.OnTouchAction(args);
     if (type === "Released" || type === "Cancelled") { this.claimedTouches.delete(e.pointerId); this.UpdateTouchAction(); }
   };
+  /** The mouse left the canvas: hover ends at once, also while content moves. */
+  private readonly onPointerLeave = (e: PointerEvent) => { if (e.pointerType !== "touch") this.Hover.Leave(); };
   private readonly preventTouch = (e: TouchEvent) => e.preventDefault();
   /** Gestures="Enabled": touch / pen pointers whose Down a control used (see OnTouchAction). */
   private readonly claimedTouches = new Set<number>();
@@ -481,6 +493,7 @@ export class Canvas {
     this.pageObserver.observe(document.body);
     el.style.userSelect = "none";
     for (const t of ["pointerdown", "pointermove", "pointerup", "pointercancel"]) el.addEventListener(t, this.onPointer as EventListener);
+    el.addEventListener("pointerleave", this.onPointerLeave);
     el.addEventListener("contextmenu", this.onContextMenu);
     el.addEventListener("wheel", this.onWheel, { passive: false });
     if (this.gestures === "Lock") el.addEventListener("touchmove", this.preventTouch, { passive: false });
@@ -495,6 +508,7 @@ export class Canvas {
     this.pageObserver = undefined;
     el.style.userSelect = "";
     for (const t of ["pointerdown", "pointermove", "pointerup", "pointercancel"]) el.removeEventListener(t, this.onPointer as EventListener);
+    el.removeEventListener("pointerleave", this.onPointerLeave);
     el.removeEventListener("contextmenu", this.onContextMenu);
     el.removeEventListener("wheel", this.onWheel);
     el.removeEventListener("touchmove", this.preventTouch);
