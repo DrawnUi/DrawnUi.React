@@ -51,7 +51,7 @@ interface GridSpan { Key: string; Start: number; Length: number; IsColumn: boole
 
 /** What the structure reads from a child: a control, or the slot of a recycled templated item (measured on a pooled view). */
 export type GridChild = Pick<SkiaControl, "IsVisible" | "Row" | "Column" | "RowSpan" | "ColumnSpan" | "HorizontalOptions" | "VerticalOptions"
-  | "MinimumWidthRequest" | "MinimumHeightRequest" | "Margin" | "MeasuredSize" | "Measure">;
+  | "MinimumWidthRequest" | "MinimumHeightRequest" | "HeightRequest" | "Margin" | "MeasuredSize" | "Measure">;
 
 /**
  * Port of DrawnUi SkiaGridStructure (itself adapted from the MAUI Grid manager). Works in POINTS: constraints come in
@@ -239,7 +239,22 @@ export class SkiaGridStructure {
     this.ResolveStars(this.Rows, heightConstraint - this.GridHeight(), (c) => c.IsRowSpanStar, (v) => v.MeasuredSize.Units.Height);
   }
 
+  /**
+   * C# SizesAutoRow: the child decides the height of its single Auto row, so it is measured with the height that row
+   * could still grow to, not with the row's current size (drawnui-cross 6p).
+   */
+  private SizesAutoRow(cell: Cell): boolean { return cell.RowSpan === 1 && this.Rows[cell.Row].IsAuto; }
+  private static NeedFillY(child: GridChild): boolean { return child.VerticalOptions === "Fill" && child.HeightRequest < 0; }
+
+  /**
+   * C# HeightOnAutoRow: the height the single Auto row could still grow to, unbounded for a vertical Fill child (which
+   * would take the whole constraint). The row's size so far came from a first pass at the grid's whole width, so a
+   * label wrapping in a star column was measured against its one-line height.
+   */
+  private HeightOnAutoRow(cell: Cell, child: GridChild): number { return SkiaGridStructure.NeedFillY(child) ? Infinity : this.AvailableHeight(cell); }
+
   private MeasureKnownCells(): void {
+    let autoRowGrew = false;
     for (const cell of this.cells) {
       if (!cell.NeedsKnownMeasurePass) continue;
       let width = 0, height = 0;
@@ -248,9 +263,20 @@ export class SkiaGridStructure {
       if (width === 0 || height === 0) continue;
       const child = this.children[cell.ViewIndex];
       const rect = this.GetCellBoundsFor(child);
-      this.MeasurePx(child, rect.Width, rect.Height);
+      if (child.IsVisible && this.SizesAutoRow(cell)) {
+        // the row grows to the child at its real width, within the room the grid has left
+        let grown = this.MeasurePx(child, rect.Width, this.HeightOnAutoRow(cell, child)).Height;
+        const available = this.AvailableHeight(cell);
+        if (isFinite(available) && grown > available) grown = available;
+        if (grown > this.Rows[cell.Row].Size) { this.Rows[cell.Row].Update(grown); autoRowGrew = true; }
+      } else this.MeasurePx(child, rect.Width, rect.Height);
       if (cell.IsColumnSpanStar && cell.ColumnSpan > 1) this.TrackSpan({ Key: `c${cell.Column}:${cell.ColumnSpan}`, Start: cell.Column, Length: cell.ColumnSpan, IsColumn: true, Requested: rect.Width });
       if (cell.IsRowSpanStar && cell.RowSpan > 1) this.TrackSpan({ Key: `r${cell.Row}:${cell.RowSpan}`, Start: cell.Row, Length: cell.RowSpan, IsColumn: false, Requested: rect.Height });
+    }
+    if (autoRowGrew) {
+      // star rows were resolved against the smaller Auto rows: they get what is left now, nothing when Auto took it all
+      SkiaGridStructure.ZeroOutStars(this.Rows);
+      if (this.heightConstraint - this.GridHeight() > 0) this.ResolveStarRows(this.heightConstraint);
     }
   }
 
@@ -307,9 +333,13 @@ export class SkiaGridStructure {
   RemeasureChildrenAtFinalCells(): void {
     for (const cell of this.cells) {
       const child = this.children[cell.ViewIndex];
+      if (!child.IsVisible) continue;
       const rect = this.GetCellBoundsFor(child);
       if (rect.Width <= 0 || rect.Height <= 0) continue;
-      const m = this.MeasurePx(child, rect.Width, rect.Height);
+      // on an Auto row a child that is not Fill vertically keeps the height the row can grow to, as in
+      // MeasureKnownCells: the same request returns at once, and wrapped text is not cut to the row
+      const height = this.SizesAutoRow(cell) && !SkiaGridStructure.NeedFillY(child) ? Math.max(rect.Height, this.AvailableHeight(cell)) : rect.Height;
+      const m = this.MeasurePx(child, rect.Width, height);
       if (cell.ColumnSpan === 1 && this.Columns[cell.Column].IsAuto && m.Width > this.Columns[cell.Column].Size) this.Columns[cell.Column].Update(m.Width);
       if (cell.RowSpan === 1 && this.Rows[cell.Row].IsAuto && m.Height > this.Rows[cell.Row].Size) this.Rows[cell.Row].Update(m.Height);
     }

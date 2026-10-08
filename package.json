@@ -59,6 +59,7 @@
     "check:children": "node dev/check.mjs dev/check-children.tsx",
     "check:composite": "node dev/check.mjs dev/check-composite.tsx",
     "check:hover": "node dev/check.mjs dev/check-hover.ts",
+    "check:grid-label": "node dev/check.mjs dev/check-grid-label.ts",
     "site:extras": "node dev/site-extras.mjs dist/demo",
     "build:lib": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
     "prepublishOnly": "npm run build:lib",
