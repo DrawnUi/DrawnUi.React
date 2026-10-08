@@ -204,7 +204,7 @@ type State = { count?: number; colors?: Record<number, string>; tx?: Record<numb
     ["InvalidateEffectsMargin + InvalidateCache + RepaintComposition", (g) => { g.InvalidateEffectsMargin(); g.InvalidateCache(); g.RepaintComposition(); }],
   ];
   for (const cache of ["ImageComposite", "Image"] as SkiaCacheType[]) {
-    for (const [from, to] of [["left", "right"], ["none", "left"]] as [Glow["Side"], Glow["Side"]][]) {
+    for (const [from, to] of [["left", "right"], ["none", "left"], ["left", "none"]] as [Glow["Side"], Glow["Side"]][]) {
       for (const [how, invalidate] of invalidations) {
         const s = glowScene(cache, from);
         for (let i = 0; i < 3; i++) s.frame();
