@@ -8,8 +8,8 @@ import { readFileSync } from "node:fs";
 import { SkiaLabel, SkiaShape, SkiaStack } from "../src/react/index.tsx";
 import { createDrawnRoot } from "../src/react/reconciler.ts";
 import {
-  Super, SKRect, Thickness, SkiaAccessibilityManager, HoverManager, SkiaEffect,
-  type SkiaControl, type SkiaShape as SkiaShapeCtrl, type SkiaStack as SkiaStackCtrl, type AnimatorBase, type Canvas,
+  Super, SKRect, Thickness, SkiaAccessibilityManager, HoverManager, SkiaEffect, SkiaControl, SkiaLayer as SkiaLayerCtrl, SkiaStack as SkiaStackCtrl, type SkiaCacheType,
+  type DrawingContext, type SkiaShape as SkiaShapeCtrl, type AnimatorBase, type Canvas,
 } from "../src/index.ts";
 
 declare const CanvasKitInit: (o: { locateFile: () => string }) => Promise<any>;
@@ -160,6 +160,65 @@ type State = { count?: number; colors?: Record<number, string>; tx?: Record<numb
   await main.render({ count: many, colors: Object.fromEntries(Array.from({ length: many }, (_, i) => [i, "#FF0000"])) });
   check("many changes: one full record", rec().Mode === "full", rec().Mode);
   await pixelsCheck("many changes", { count: many, colors: Object.fromEntries(Array.from({ length: many }, (_, i) => [i, "#FF0000"])) });
+
+  // a cache follows an effects margin that moves sides or grows (C# 97683f19, Rust paint_caches.rs): a 20 x 20 red
+  // control with a 10 px yellow glow outside its rect on one side, its margin on that side, above a sibling square in a
+  // cached stack as wide as they are, so the glow sticks out of the cache on that side
+  class Glow extends SkiaControl {
+    Side: "none" | "left" | "right" = "left";
+    constructor() { super(); this.WidthRequest = 20; this.HeightRequest = 20; this.HorizontalOptions = "Start"; this.VerticalOptions = "Start"; }
+    override ComputeEffectsMargin(scale: number): Thickness { return new Thickness(this.Side === "left" ? 10 * scale : 0, 0, this.Side === "right" ? 10 * scale : 0, 0); }
+    protected override Paint(ctx: DrawingContext): void {
+      const c = ctx.Context.Canvas, r = this.DrawingRect, p = new CK.Paint();
+      p.setColor(CK.RED); c.drawRect(CK.LTRBRect(r.Left, r.Top, r.Right, r.Bottom), p);
+      p.setColor(CK.YELLOW);
+      if (this.Side === "left") c.drawRect(CK.LTRBRect(r.Left - 10, r.Top, r.Left, r.Bottom), p);
+      if (this.Side === "right") c.drawRect(CK.LTRBRect(r.Right, r.Top, r.Right + 10, r.Bottom), p);
+      p.delete();
+    }
+  }
+  const glowScene = (cache: SkiaCacheType, side: Glow["Side"]) => {
+    const fake = new FakeCanvas();
+    const parent = new SkiaStackCtrl(); parent.UseCache = cache; parent.Spacing = 4; parent.Margin = new Thickness(40, 10, 0, 0);
+    parent.HorizontalOptions = "Start"; parent.VerticalOptions = "Start";
+    const glow = new Glow(); glow.Side = side;
+    const square = new SkiaLayerCtrl(); square.BackgroundColor = "#00FF00"; square.WidthRequest = 20; square.HeightRequest = 20;
+    square.HorizontalOptions = "Start"; square.VerticalOptions = "Start";
+    parent.AddSubView(glow); parent.AddSubView(square);
+    const root = new SkiaLayerCtrl(); root.AddSubView(parent);
+    root._superview = fake as unknown as Canvas;
+    const surface = CK.MakeSurface(160, 80);
+    const frame = () => {
+      const canvas = surface.getCanvas();
+      canvas.clear(CK.BLACK);
+      root.Measure(160, 80, 1); root.Arrange(new SKRect(0, 0, 160, 80), -1, -1, 1);
+      root.Render({ Context: { Canvas: canvas, Surface: surface }, Destination: new SKRect(0, 0, 160, 80), Scale: 1 });
+      for (const o of fake.disposeQueue.splice(0)) o.Dispose();
+    };
+    const pixels = () => surface.getCanvas().readPixels(0, 0, { width: 160, height: 80, colorType: CK.ColorType.RGBA_8888, alphaType: CK.AlphaType.Unpremul, colorSpace: CK.ColorSpace.SRGB }) as Uint8Array;
+    return { glow, frame, pixels };
+  };
+  const invalidations: [string, (g: Glow) => void][] = [
+    ["Update", (g) => g.Update()],
+    ["UpdateDraw", (g) => g.UpdateDraw()],
+    ["InvalidateEffectsMargin + InvalidateCache + RepaintComposition", (g) => { g.InvalidateEffectsMargin(); g.InvalidateCache(); g.RepaintComposition(); }],
+  ];
+  for (const cache of ["ImageComposite", "Image"] as SkiaCacheType[]) {
+    for (const [from, to] of [["left", "right"], ["none", "left"]] as [Glow["Side"], Glow["Side"]][]) {
+      for (const [how, invalidate] of invalidations) {
+        const s = glowScene(cache, from);
+        for (let i = 0; i < 3; i++) s.frame();
+        s.glow.Side = to; invalidate(s.glow);
+        for (let i = 0; i < 3; i++) s.frame();
+        const ref = glowScene("None", to);
+        for (let i = 0; i < 3; i++) ref.frame();
+        const a = s.pixels(), b = ref.pixels();
+        let different = 0;
+        for (let i = 0; i < a.length; i += 4) if (Math.abs(a[i] - b[i]) > 2 || Math.abs(a[i + 1] - b[i + 1]) > 2 || Math.abs(a[i + 2] - b[i + 2]) > 2) different++;
+        check(`${cache}: glow ${from} -> ${to} after ${how} equals a fresh render`, different === 0, `${different} px differ`);
+      }
+    }
+  }
 
   console.log(failures ? `FAIL: ${failures} checks` : "OK: composite redraws deep changes by area");
   process.exit(failures ? 1 : 0);

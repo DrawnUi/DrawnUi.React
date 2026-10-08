@@ -176,6 +176,9 @@ export class SkiaControl {
   private compositeSurface?: Surface;
   /** Own content or structure changed: the next composite record is a full one. */
   private compositeFull = true;
+  /** Where the kept composite surface starts relative to DrawingRect (the effects margin it was laid out with). */
+  private compositeInsetX = 0;
+  private compositeInsetY = 0;
   /** Canvas-pixel bounds this control covered when its parent last recorded it (composite erase region). */
   private lastCompositeBounds?: SKRect;
   /**
@@ -847,7 +850,11 @@ export class SkiaControl {
     const canvas = surface.getCanvas();
     const children = this.GetCompositeChildren();
     const deep = this.compositeDeep;
-    let partial = sameGeometry && !this.compositeFull && children.length > 0 && (this.DirtyChildrenInternal.size > 0 || !!deep?.length);
+    // the same size with another effects margin moves the content inside the surface: record whole (C# 97683f19)
+    const insetX = r.Left - this.DrawingRect.Left, insetY = r.Top - this.DrawingRect.Top;
+    const sameInset = insetX === this.compositeInsetX && insetY === this.compositeInsetY;
+    this.compositeInsetX = insetX; this.compositeInsetY = insetY;
+    let partial = sameGeometry && sameInset && !this.compositeFull && children.length > 0 && (this.DirtyChildrenInternal.size > 0 || !!deep?.length);
     // changes deeper than a child: only their areas, the child they are in drawn clipped to them (drawnui-cross 6m)
     const areas: SKRect[] = [], changed: SkiaControl[] = [], inside = new Set<SkiaControl>();
     if (partial && deep?.length) {
@@ -939,7 +946,10 @@ export class SkiaControl {
   /** Marks the cache stale; re-recorded on the next frame (a composite records fully: its own content changed). */
   InvalidateCache(): void { this.cacheDirty = true; this.compositeFull = true; }
   /** Effects margin recomputed on the next use (C# InvalidateEffectsMargin). */
-  InvalidateEffectsMargin(): void { this.effectsMarginCache = undefined; }
+  InvalidateEffectsMargin(): void {
+    // a layout's margin aggregates what its children paint outside it: every ancestor recomputes too (C# 97683f19)
+    for (let c: SkiaControl | undefined = this; c; c = c.Parent) c.effectsMarginCache = undefined;
+  }
 
   /** Draws PostAnimators above content; an effect returning true asks for another frame. */
   ExecutePostAnimators(ctx: DrawingContext): void {
