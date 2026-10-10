@@ -240,6 +240,7 @@ export class Canvas {
     let executed = 0;
     for (const a of [...this.AnimatingControls.values()]) {
       if (!a.Parent) { this.AnimatingControls.delete(a.Uid); continue; }
+      if (a.IsPaused) continue; // a paused animator neither ticks nor keeps frames coming (C# DrawnView)
       a.TickFrame(frameTimeNanos);
       executed++;
     }

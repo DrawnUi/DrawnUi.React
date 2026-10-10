@@ -26,8 +26,13 @@ export class AnimatorBase {
   StartFrameTimeNanos = 0;
   OnStart?: () => void;
   OnStop?: () => void;
+  /** Paused: the canvas does not tick it and it wakes no frames; Resume goes on from where it was (C# Pause / Resume). */
+  IsPaused = false;
 
   private delayHandle = 0;
+  private delayEnd = 0;
+  private delayLeft = 0;
+  private pausedAt = 0;
 
   constructor(parent: SkiaControl) { this.Parent = parent; }
 
@@ -65,6 +70,8 @@ export class AnimatorBase {
   Start(delayMs = 0): void {
     if (this.delayHandle) { clearTimeout(this.delayHandle); this.delayHandle = 0; }
     if (delayMs > 0) {
+      // the delay waits without frames
+      this.delayEnd = performance.now() + delayMs;
       this.delayHandle = window.setTimeout(() => { this.delayHandle = 0; this.Start(); }, delayMs);
       return;
     }
@@ -78,7 +85,26 @@ export class AnimatorBase {
     }
   }
 
+  /** Freezes the run (and what is left of a start delay); Resume goes on from there. */
+  Pause(): void {
+    if (this.IsPaused) return;
+    this.IsPaused = true;
+    this.pausedAt = performance.now();
+    if (this.delayHandle) { clearTimeout(this.delayHandle); this.delayHandle = 0; this.delayLeft = Math.max(0, this.delayEnd - this.pausedAt); }
+  }
+
+  /** Goes on from where Pause froze it: the paused time is not counted. */
+  Resume(): void {
+    if (!this.IsPaused) return;
+    this.IsPaused = false;
+    const paused = (performance.now() - this.pausedAt) * 1_000_000;
+    if (this.StartFrameTimeNanos !== 0) { this.StartFrameTimeNanos += paused; this.LastFrameTimeNanos += paused; }
+    if (this.delayLeft > 0) { const left = this.delayLeft; this.delayLeft = 0; this.Start(left); return; }
+    this.Parent?.Repaint(); // frames again
+  }
+
   Stop(): void {
+    this.IsPaused = false; this.delayLeft = 0;
     if (this.delayHandle) { clearTimeout(this.delayHandle); this.delayHandle = 0; }
     this.Unregister();
     this.LastFrameTimeNanos = 0;
@@ -162,17 +188,18 @@ export class SkiaValueAnimator extends AnimatorBase {
   /** Passed over mValue; subclasses derive their own reported value here. */
   protected TransformReportedValue(_deltaT: number): number { return this.mValue; }
 
-  /** Updates mValue from elapsed time; true when the target was reached. */
+  /**
+   * Updates mValue from elapsed time; true when the run is over. The eased value is not clamped to the range: a spring
+   * easing goes past its ends, and a run whose mMinValue is above mMaxValue (a ping-pong's way back) goes down.
+   */
   protected UpdateValue(_deltaT: number, deltaFromStart: number): boolean {
     const elapsedMs = deltaFromStart / 1_000_000;
     const progress = this.Speed > 0 ? elapsedMs / this.Speed : 1;
     const deltaValue = this.mMaxValue - this.mMinValue;
     const eased = this.Easing.Ease(Math.min(progress, 1));
     this.Progress = eased;
-    const value = deltaValue * eased + this.mMinValue;
-    if (value < this.mMinValue) { this.mValue = this.mMinValue; return false; }
-    if (value >= this.mMaxValue || progress >= 1) { this.mValue = this.mMaxValue; return true; }
-    this.mValue = value;
+    if (progress >= 1) { this.mValue = this.mMaxValue; return true; }
+    this.mValue = deltaValue * eased + this.mMinValue;
     return false;
   }
 
@@ -187,6 +214,25 @@ export class SkiaValueAnimator extends AnimatorBase {
     this.Stop();
     this.Finished?.();
     return true;
+  }
+}
+
+/** DrawnUi PingPongAnimator: every repeat runs the other way (Repeat -1 = forever by default). */
+export class PingPongAnimator extends SkiaValueAnimator {
+  /** One way done, the next starts (C# CycleFInished). */
+  CycleFinished?: () => void;
+  constructor(parent: SkiaControl) { super(parent); this.Repeat = -1; }
+  protected override FinishedRunning(): boolean {
+    if (this.Repeat !== 0) {
+      this.CycleFinished?.();
+      if (this.Repeat > 0) this.Repeat--;
+      [this.mMinValue, this.mMaxValue] = [this.mMaxValue, this.mMinValue];
+      this.mValue = this.mMinValue;
+      this.LastFrameTimeNanos = 0;
+      this.StartFrameTimeNanos = 0;
+      return false;
+    }
+    return super.FinishedRunning();
   }
 }
 
