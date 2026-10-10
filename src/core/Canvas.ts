@@ -20,6 +20,11 @@ import {
 export class Canvas {
   /** Points a pointer may travel between Down and Up and still count as a tap (AppoMobi TouchEffect default). */
   static TappedCancelMoveThresholdPoints = 16;
+  /**
+   * A press held this long without moving past TappedCancelMoveThresholdPoints is a LongPressing, at the press point
+   * (AppoMobi TouchEffect, DrawnUi.Rust LONG_PRESS_MS); its release sends no Tapped. A timer, no frames while waiting.
+   */
+  static LongPressTimeMs = 1500;
 
   BackgroundColor: Color = Colors.Transparent;
   /** Accelerated = WebGL surface, Default = software. Read once at first frame. */
@@ -530,6 +535,8 @@ export class Canvas {
       this.pageOverscroll = undefined;
     }
     this.claimedTouches.clear();
+    for (const id of [...this.longPressTimers.keys()]) this.DisarmLongPress(id);
+    this.longPressed.clear();
     this.activeTouchIds.clear(); this.pointerDownArgs.clear(); this.previousTouchArgs.clear();
   }
 
@@ -539,6 +546,7 @@ export class Canvas {
     const id = args.Id;
 
     if (args.Type === "Pressed") {
+      this.ArmLongPress(id, args);
       this.activeTouchIds.add(id);
       args.NumberOfTouches = this.activeTouchIds.size;
       args.StartingLocation = args.Location;
@@ -564,6 +572,8 @@ export class Canvas {
     args.StartingLocation = downArgs ? downArgs.StartingLocation : args.Location;
 
     if (args.Type === "Moved") {
+      const threshold = Canvas.TappedCancelMoveThresholdPoints * Math.max(0.1, this.RenderingScale);
+      if (Math.abs(args.Distance.Total.X) >= threshold || Math.abs(args.Distance.Total.Y) >= threshold) this.DisarmLongPress(id);
       if (args.Distance.Delta.X !== 0 || args.Distance.Delta.Y !== 0) this.OnGestureEvent(args, "Panning");
       this.previousTouchArgs.set(id, args);
       return;
@@ -571,7 +581,9 @@ export class Canvas {
 
     if (args.Type === "Released" || args.Type === "Cancelled") {
       args.IsInContact = args.NumberOfTouches > 1;
-      if (!args.IsInContact && downArgs && args.Type === "Released") {
+      const longPressed = this.longPressed.delete(id);
+      this.DisarmLongPress(id);
+      if (!args.IsInContact && downArgs && args.Type === "Released" && !longPressed) {
         const threshold = Canvas.TappedCancelMoveThresholdPoints * Math.max(0.1, this.RenderingScale);
         if (Math.abs(args.Distance.Total.X) < threshold && Math.abs(args.Distance.Total.Y) < threshold) this.OnGestureEvent(args, "Tapped");
       }
@@ -580,6 +592,29 @@ export class Canvas {
       this.pointerDownArgs.delete(id);
       this.activeTouchIds.delete(id);
     }
+  }
+
+  private readonly longPressTimers = new Map<number, number>();
+  private readonly longPressed = new Set<number>();
+
+  /** The long press of a new press: due LongPressTimeMs later unless the pointer moves away or lets go. */
+  private ArmLongPress(id: number, down: TouchActionEventArgs): void {
+    this.DisarmLongPress(id);
+    this.longPressed.delete(id);
+    this.longPressTimers.set(id, window.setTimeout(() => {
+      this.longPressTimers.delete(id);
+      if (!this.activeTouchIds.has(id)) return;
+      this.longPressed.add(id);
+      const args = new TouchActionEventArgs();
+      Object.assign(args, down);
+      args.Location = down.StartingLocation ?? down.Location;
+      this.OnGestureEvent(args, "LongPressing");
+    }, Canvas.LongPressTimeMs));
+  }
+
+  private DisarmLongPress(id: number): void {
+    const t = this.longPressTimers.get(id);
+    if (t) { clearTimeout(t); this.longPressTimers.delete(id); }
   }
 
   private OnGestureEvent(args: TouchActionEventArgs, result: TouchActionResult): void {

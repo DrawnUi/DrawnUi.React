@@ -12,7 +12,7 @@ export class SKPoint {
 /** Raw platform action (subset of TouchActionType). */
 export type TouchActionType = "Pressed" | "Moved" | "Released" | "Cancelled" | "Wheel" | "Pointer";
 
-/** Recognized gesture (TouchActionResult). LongPressing/Pointer/Touch declared for parity, not produced yet. */
+/** Recognized gesture (TouchActionResult). LongPressing after Canvas.LongPressTimeMs held still; Pointer / Touch declared for parity, not produced. */
 export type TouchActionResult = "Touch" | "Down" | "Up" | "Tapped" | "LongPressing" | "Panning" | "Wheel" | "Pointer";
 
 export type GesturesMode = "Disabled" | "Enabled" | "Lock";
