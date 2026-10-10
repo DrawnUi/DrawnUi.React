@@ -13,7 +13,9 @@ interface SpanFonts { Key: string; Main: Font; Fallbacks: Font[]; Ascent: number
 /** A run of text drawn with one font (main, or a fallback for glyphs the main font lacks) and one span style. */
 interface TextRun { Text: string; Font: Font; Width: number; Span?: TextSpan; Fonts: SpanFonts }
 /** One laid-out line: runs, total advance, max ascent above / descent below the baseline (pixels). */
-interface TextLine { Runs: TextRun[]; Width: number; Ascent: number; Descent: number }
+interface TextLine { Runs: TextRun[]; Width: number; Ascent: number; Descent: number; /** Starts a paragraph after the first one (ParagraphSpacing above it). */ Para?: boolean }
+/** A paragraph of wrap tokens; `LineBreak`: it follows a U+2028 line separator, not a new paragraph. */
+type Paragraph = Token[] & { LineBreak?: boolean };
 
 /** One code point of the laid-out text: its UTF-16 index/length in Text and its box in pixels relative to DrawingRect. */
 export interface GlyphBox { Index: number; Length: number; Line: number; Left: number; Top: number; Width: number; Height: number }
@@ -43,6 +45,7 @@ export class SkiaLabel extends SkiaControl {
   private verticalTextAlignment: TextAlignment = "Start";
   private lineSpacing = 1;
   private lineHeight = 1;
+  private paragraphSpacing = 0;
   private textTransform: TextTransform = "None";
   private padding: Thickness = Thickness.Zero;
 
@@ -102,6 +105,12 @@ export class SkiaLabel extends SkiaControl {
   /** Multiplier applied to the natural line height (ascent + descent). */
   get LineHeight(): number { return this.lineHeight; }
   set LineHeight(v: number) { this.Set("lineHeight" as keyof this, v as this[keyof this]); }
+  /**
+   * Space above every paragraph after the first, in lines (C# ParagraphSpacing; 0 here as DrawnUi.Rust, C# 0.25). A
+   * paragraph starts after "\n"; U+2028 breaks the line inside a paragraph.
+   */
+  get ParagraphSpacing(): number { return this.paragraphSpacing; }
+  set ParagraphSpacing(v: number) { this.Set("paragraphSpacing" as keyof this, v as this[keyof this]); }
   get TextTransform(): TextTransform { return this.textTransform; }
   set TextTransform(v: TextTransform) { this.Set("textTransform" as keyof this, v as this[keyof this]); }
   get Padding(): Thickness { return this.padding; }
@@ -226,12 +235,14 @@ export class SkiaLabel extends SkiaControl {
    * Paragraphs (split on "\n") of wrap tokens, built from Spans when present, else from Text.
    * A fragment that does not start with a space glues to the previous word (no break opportunity is added).
    */
-  private Tokenize(scale: number): Token[][] {
-    const paragraphs: Token[][] = [[]];
+  private Tokenize(scale: number): Paragraph[] {
+    const paragraphs: Paragraph[] = [[]];
     const add = (text: string, fonts: SpanFonts, span?: TextSpan) => {
-      const parts = this.Transform(text).split("\n");
+      // "\n" starts a paragraph, U+2028 breaks the line inside one
+      const pieces = this.Transform(text).split(/(\n|\u2028)/);
+      const parts = pieces.filter((_, i) => i % 2 === 0), seps = pieces.filter((_, i) => i % 2 === 1);
       for (let p = 0; p < parts.length; p++) {
-        if (p > 0) paragraphs.push([]);
+        if (p > 0) { const next: Paragraph = []; if (seps[p - 1] === "\u2028") next.LineBreak = true; paragraphs.push(next); }
         const para = paragraphs[paragraphs.length - 1];
         const words = parts[p].split(" ");
         for (let w = 0; w < words.length; w++) {
@@ -268,14 +279,19 @@ export class SkiaLabel extends SkiaControl {
     }
   }
 
-  /** Word-wraps tokens into lines that fit maxWidth (Infinity = no wrap), applies MaxLines with a tail ellipsis. */
-  private LayoutLines(maxWidth: number, scale: number): TextLine[] {
+  /**
+   * Word-wraps tokens into lines that fit maxWidth (Infinity = no wrap); keeps the lines that fit maxHeight (at least one)
+   * and MaxLines, the last kept one ending with a tail ellipsis (C# / DrawnUi.Rust: a label in a box too short for its
+   * text cuts it, not only MaxLines).
+   */
+  private LayoutLines(maxWidth: number, scale: number, maxHeight = Infinity): TextLine[] {
     const wrap = this.lineBreakMode !== "NoWrap" && isFinite(maxWidth);
     const out: TextLine[] = [];
     const empty = (fonts: SpanFonts): TextLine => { const l = this.NewLine(); l.Ascent = fonts.Ascent; l.Descent = fonts.Descent; return l; };
 
     for (const para of this.Tokenize(scale)) {
       let line = this.NewLine();
+      if (out.length > 0 && !para.LineBreak) line.Para = true;
       let lastFonts = this.mainFonts!;
       for (let i = 0; i < para.length; i++) {
         const tok = para[i];
@@ -304,11 +320,24 @@ export class SkiaLabel extends SkiaControl {
       out.push(line.Runs.length > 0 ? line : empty(lastFonts));
     }
 
-    if (this.maxLines > 0 && out.length > this.maxLines) {
-      out.length = this.maxLines;
+    let kept = this.maxLines > 0 ? Math.min(out.length, this.maxLines) : out.length;
+    if (isFinite(maxHeight)) {
+      let used = 0, fit = 0;
+      for (let i = 0; i < out.length; i++) {
+        const lh = this.LineHeightPx(out[i]);
+        // the block height of the first i + 1 lines: spacing after every line but the last, paragraph space above
+        const total = used + lh + (i > 0 ? this.ParagraphSpace(out[i]) : 0);
+        if (total > maxHeight && fit > 0) break;
+        fit++;
+        used = total - lh + lh * this.lineSpacing;
+      }
+      kept = Math.min(kept, fit);
+    }
+    if (kept < out.length) {
+      out.length = kept;
       const truncates = this.lineBreakMode === "TailTruncation" || this.lineBreakMode === "HeadTruncation" || this.lineBreakMode === "MiddleTruncation";
       if (truncates) {
-        const last = out[this.maxLines - 1];
+        const last = out[kept - 1];
         const tailRun = last.Runs[last.Runs.length - 1];
         const fonts = tailRun ? tailRun.Fonts : this.mainFonts!;
         const ell = this.Segment("…", fonts, tailRun?.Span);
@@ -331,19 +360,23 @@ export class SkiaLabel extends SkiaControl {
 
   private LineHeightPx(line: TextLine): number { return (line.Ascent + line.Descent) * this.lineHeight; }
 
+  /** ParagraphSpacing above a line that starts a paragraph (after the first): that many of its lines, with their spacing. */
+  private ParagraphSpace(line: TextLine): number { return line.Para && this.paragraphSpacing ? this.LineHeightPx(line) * this.lineSpacing * this.paragraphSpacing : 0; }
+
   private BlockHeight(): number {
     let h = 0;
     for (let i = 0; i < this.lines.length; i++) {
       const lh = this.LineHeightPx(this.lines[i]);
-      h += i < this.lines.length - 1 ? lh * this.lineSpacing : lh;
+      h += (i < this.lines.length - 1 ? lh * this.lineSpacing : lh) + this.ParagraphSpace(this.lines[i]);
     }
     return h;
   }
 
-  protected override MeasureAbsolute(widthConstraint: number, _heightConstraint: number, scale: number): ScaledSize {
+  protected override MeasureAbsolute(widthConstraint: number, heightConstraint: number, scale: number): ScaledSize {
     this.mainFonts = this.ResolveMainFonts(scale);
     const px = this.padding.HorizontalThickness * scale, py = this.padding.VerticalThickness * scale;
-    this.lines = this.text || this.Spans.length > 0 ? this.LayoutLines(widthConstraint - px, scale) : [];
+    const extraH = this.EffectsExtra(scale).H;
+    this.lines = this.text || this.Spans.length > 0 ? this.LayoutLines(widthConstraint - px, scale, heightConstraint - py - extraH) : [];
     let width = 0;
     for (const l of this.lines) width = Math.max(width, l.Width);
     const extra = this.EffectsExtra(scale);
@@ -373,6 +406,7 @@ export class SkiaLabel extends SkiaControl {
     y += extra.Stroke / 2;
     const out: { x: number; y: number; w: number; h: number; text: string }[] = [];
     for (const line of this.lines) {
+      y += this.ParagraphSpace(line);
       const lh = this.LineHeightPx(line);
       const lineW = line.Width + extra.W;
       let x = left;
@@ -493,6 +527,7 @@ export class SkiaLabel extends SkiaControl {
     const gradient = this.FillGradient;
     const textRect = new SKRect(left, top, right, bottom);
     for (const line of this.lines) {
+      y += this.ParagraphSpace(line);
       const lh = this.LineHeightPx(line);
       const lineW = line.Width + extra.W;
       let x = left;
