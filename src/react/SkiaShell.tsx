@@ -477,7 +477,13 @@ export const SkiaShell = forwardRef<ShellNavigation, SkiaShellProps>(function Sk
     if (initial.length) { setStacks((all) => { const next = all.slice(); next[live.current.selectedTab] = initial; return next; }); history.current = initial.map(() => "page" as HistoryKind); window.history.replaceState({ [HISTORY_KEY]: history.current.length }, "", hashFor(initial)); }
     const onPop = () => {
       const depth = (window.history.state as Record<string, number> | null)?.[HISTORY_KEY] ?? 0;
-      if (depth < history.current.length) {
+      const target = parseHash();
+      // a Back lands on one of OUR entries: its hash is the stack it was pushed with (the first N pages, N = the page
+      // entries below it). A typed hash or a plain <a href="#/route"> makes a new entry with no state (depth 0):
+      // that is a navigation to the hash, not a Back to the root
+      const pagesBelow = history.current.slice(0, depth).filter((k) => k === "page").length;
+      const back = depth < history.current.length && target.join("/") === live.current.stack.slice(0, pagesBelow).join("/");
+      if (back) {
         // back: unwind our entries down to depth
         void (async () => {
           while (history.current.length > depth) {
@@ -495,9 +501,8 @@ export const SkiaShell = forwardRef<ShellNavigation, SkiaShellProps>(function Sk
           }
         })();
       } else {
-        // forward (depth grew), or the same depth with another hash = a plain <a href="#/route"> link or a typed hash:
+        // forward (depth grew), or another hash = a plain <a href="#/route"> link or a typed hash:
         // the hash names the pages, rebuild the stack without animation (overlays cannot be restored)
-        const target = parseHash();
         if (depth === history.current.length && target.join("/") === live.current.stack.join("/")) return;
         history.current = target.map(() => "page" as HistoryKind);
         window.history.replaceState({ [HISTORY_KEY]: history.current.length }, "", hashFor(target));

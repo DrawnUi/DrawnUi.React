@@ -15,7 +15,10 @@ export class HoverManager {
   /** The hovered controls, root first. */
   readonly Hovered: SkiaControl[] = [];
   private readonly next: SkiaControl[] = [];
-  private readonly path: SkiaControl[] = [];
+  /** The controls under the pointer at the last hit test, root first, and the pointer in each one's own space. */
+  readonly Path: SkiaControl[] = [];
+  readonly PathX: number[] = [];
+  readonly PathY: number[] = [];
   private readonly movers: SkiaControl[] = [];
   private hasPointer = false;
   private x = 0;
@@ -23,22 +26,36 @@ export class HoverManager {
   private paused = false;
   private check = false;
 
-  /** The mouse (or a pen in range) moved to (x, y), canvas pixels, nothing pressed. */
+  /**
+   * The mouse (or a pen in range) moved to (x, y), canvas pixels, nothing pressed. The hit path is taken also while
+   * hover waits (the cursor follows it), hover changes only when nothing moves.
+   */
   Move(root: SkiaControl | undefined, x: number, y: number): void {
     this.hasPointer = true;
     this.x = x;
     this.y = y;
+    this.HitTest(root);
     if (this.paused) return; // content moves under the pointer: what was hovered stays, one check when it stops
     this.check = false;
-    this.Update(root);
+    this.Apply(true);
+  }
+
+  /** Fills Path with the controls under the pointer by the routing rules of ProcessGestures. */
+  private HitTest(root: SkiaControl | undefined): void {
+    const path = this.Path;
+    path.length = 0; this.PathX.length = 0; this.PathY.length = 0;
+    if (root && root.IsVisible && !root.InputTransparent) {
+      const point = root.TransformPointToLocalSpace(new SKPoint(this.x, this.y));
+      if (root.HitIsInside(point.X, point.Y)) root.CollectHovered(point, path, this.PathX, this.PathY);
+    }
   }
 
   /** The pointer left the canvas: nothing is hovered, also while content moves. */
   Leave(): void {
     this.hasPointer = false;
     this.check = false;
-    this.next.length = 0;
-    this.Apply();
+    this.Path.length = 0; this.PathX.length = 0; this.PathY.length = 0;
+    this.Apply(false);
   }
 
   /** The controls under a still pointer may have changed: checked once at the end of the frame. */
@@ -62,7 +79,8 @@ export class HoverManager {
     if (!this.check) return;
     this.check = false;
     if (!this.hasPointer || pressed) return;
-    this.Update(root);
+    this.HitTest(root);
+    this.Apply(true);
   }
 
   private static Shown(control: SkiaControl): boolean {
@@ -71,21 +89,14 @@ export class HoverManager {
     return true;
   }
 
-  private Update(root: SkiaControl | undefined): void {
-    const path = this.path, next = this.next;
-    path.length = 0;
-    next.length = 0;
-    if (root && root.IsVisible && !root.InputTransparent) {
-      const point = root.TransformPointToLocalSpace(new SKPoint(this.x, this.y));
-      if (root.HitIsInside(point.X, point.Y)) root.CollectHovered(point, path);
-    }
-    for (const c of path) if (c.ReceivesHover) next.push(c);
-    this.Apply();
-  }
-
-  /** `next` becomes the hovered set: the ones that left get HoverChanged(false), then the new ones (true). */
-  private Apply(): void {
+  /**
+   * The hovered set becomes the controls of the hit path that take hover (`fromPath`), or none: the ones that left get
+   * HoverChanged(false), then the new ones (true).
+   */
+  private Apply(fromPath: boolean): void {
     const now = this.Hovered, next = this.next;
+    next.length = 0;
+    if (fromPath) for (const c of this.Path) if (c.ReceivesHover) next.push(c);
     if (now.length === next.length) {
       let same = true;
       for (let i = 0; i < now.length && same; i++) same = now[i] === next[i];

@@ -335,8 +335,8 @@ export class Canvas {
     if (!type) return;
     if (type === "Moved" && !this.activeTouchIds.has(e.pointerId)) {
       if (e.pointerType === "touch") return; // touch never hovers
-      if (e.pointerType === "mouse") this.UpdateCursor(e.offsetX, e.offsetY);
       if (this.activeTouchIds.size === 0) this.Hover.Move(this.content, e.offsetX * this.RenderingScale, e.offsetY * this.RenderingScale);
+      if (e.pointerType === "mouse") this.UpdateCursor();
       return;
     }
     if ((type === "Released" || type === "Cancelled") && !this.activeTouchIds.has(e.pointerId)) return; // Up of a pointer that never pressed here
@@ -387,19 +387,18 @@ export class Canvas {
   private cursorPointer = false;
   /**
    * DrawnUi.Blazor shows `cursor: pointer` over interactive controls through its overlay elements; here the overlay
-   * is pointer-events:none, so the mouse position is tested against the accessibility snapshot (the accessible
-   * controls' rects in points, already sorted and rate-limited), each hit control answering WantsPointerCursor
-   * (itself tappable, or a tappable span of a label), and the canvas element's cursor is switched only when the
-   * answer changes. Mouse moves only, no work without a mouse and none in the frame loop.
+   * is pointer-events:none, so the canvas decides from the hover hit path (Hover.Path: the controls under the mouse by
+   * the routing rules of ProcessGestures, so nothing below a popup that blocks gestures below): a control in the
+   * accessibility tree (it has a role) that answers WantsPointerCursor (itself tappable, or a tappable span of a label)
+   * shows the hand. A popup's close-on-background-tap wrapper has no role, so its backdrop shows none. The canvas
+   * element's cursor is switched only when the answer changes. Mouse moves only, none in the frame loop.
    */
-  private UpdateCursor(x: number, y: number): void {
+  private UpdateCursor(): void {
     let hit = false;
-    const scale = this.RenderingScale;
-    for (const n of this.AccessibilityManager.Snapshot) {
-      if (x < n.Rect.Left || x >= n.Rect.Right || y < n.Rect.Top || y >= n.Rect.Bottom) continue;
-      // the control decides (whole control, or a tappable span of a label); point in pixels relative to the control's
-      // origin, taken from the snapshot rect (already carries the scroll / cache offset; a rotated control gets its bbox)
-      if (n.Source.WantsPointerCursor((x - n.Rect.Left) * scale, (y - n.Rect.Top) * scale)) { hit = true; break; }
+    const path = this.Hover.Path, xs = this.Hover.PathX, ys = this.Hover.PathY;
+    for (let i = path.length - 1; i >= 0 && !hit; i--) {
+      const c = path[i];
+      if (c.IsAccessibilityElement && c.WantsPointerCursor(xs[i] - c.DrawingRect.Left, ys[i] - c.DrawingRect.Top)) hit = true;
     }
     if (hit !== this.cursorPointer) { this.cursorPointer = hit; this.Element.style.cursor = hit ? "pointer" : ""; }
   }

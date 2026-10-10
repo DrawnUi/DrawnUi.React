@@ -266,14 +266,15 @@ export class SkiaControl {
    * top-most first, by the routing rules of ProcessGestures. True when this subtree blocks gestures below it, so the
    * controls under it get no hover (a popup over a list).
    */
-  CollectHovered(point: SKPoint, into: SkiaControl[]): boolean {
+  CollectHovered(point: SKPoint, into: SkiaControl[], xs?: number[], ys?: number[]): boolean {
     into.push(this);
+    xs?.push(point.X); ys?.push(point.Y);
     if (!this.CheckChildrenGesturesLocked("Pointer")) {
       const listeners = this.GetGestureListeners();
       for (let i = listeners.length - 1; i >= 0; i--) {
         const child = listeners[i];
         if (!child.IsVisible || child.InputTransparent || !this.IsGestureForChild(child, point)) continue;
-        if (child.CollectHovered(child.TransformPointToLocalSpace(point), into)) return true;
+        if (child.CollectHovered(child.TransformPointToLocalSpace(point), into, xs, ys)) return true;
       }
     }
     return this.BlockGesturesBelow;
