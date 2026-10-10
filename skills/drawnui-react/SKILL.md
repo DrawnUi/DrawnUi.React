@@ -115,6 +115,21 @@ createRoot(document.getElementById("root")!).render(
 - Invalidation vocabulary when writing custom controls: `Update()` = remeasure + redraw; `InvalidateCache()` = own
   content changed; `RepaintComposition()` = my transform / paint changed, ancestor caches go stale; `Repaint()` =
   just ask for a frame. A control that changes its own drawing calls `InvalidateCache(); RepaintComposition();`.
+- A control drawn entirely outside the canvas clip (scrolled away, off a page) is skipped with its subtree; its cache
+  is still recorded when it is stale. A custom control that paints outside its rect must say how far
+  (`ComputeEffectsMargin`), and nothing that has to happen every frame belongs in `Paint`: use an animator.
+  Changes under a hidden parent ask for no frame, its animators pause and go on when it shows again.
+- Web cache defaults: `SkiaLottie` uses `Operations`, `SkiaGif` no cache (the .NET `ImageDoubleBuffered` needs a
+  background thread the browser does not have); set `UseCache` to override.
+- Animators: `Pause()` / `Resume()` (goes on from where it was), `PingPongAnimator`, the MAUI easings (`SinInOut`,
+  `BounceIn` / `BounceOut`, `SpringIn` / `SpringOut` overshoot). A held press raises `LongPressing` after
+  `Canvas.LongPressTimeMs` (1500); the release after it is no tap.
+- Text: `CharacterSpacing` (1 = the font's own; each glyph gets (value - 1) points more), measured, wrapped and cut at
+  the width it draws. Chinese and Japanese wrap between characters, never before closing punctuation or small kana
+  (`SkiaLabel.CanBreakInsideWord`); Korean and Latin wrap at spaces, a Latin word wider than the line by characters.
+- `SkiaScroll.ScrollToIndex(index, animate, "Start" | "Center" | "End")` keeps aiming until the row's place is
+  measured (a `MeasureVisible` list estimates rows it has not measured yet), so it lands on the row; a press, the
+  wheel or another scroll cancels it, and `LoadMoreCommand` waits until it lands.
 - Effects: `VisualEffects={[effect]}` with `SkiaShaderEffect` (`ShaderSource` url or `ShaderCode`, Shadertoy
   uniforms `iResolution` / `iImageResolution` / `iTime` / `iOffset` / `iMouse` + `iImage1`, `SetUniform`,
   `UseBackground` Always / Once / Never), `ShaderDoubleTexturesEffect`, `ShaderTransitionEffect`,
