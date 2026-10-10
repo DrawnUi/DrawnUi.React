@@ -1,6 +1,7 @@
 // Label rules as C# / DrawnUi.Rust (label_rules.rs), checked in Node (`npm run check:label`): the height limits the
 // lines (a box too short cuts the text with "…", at least one line kept); ParagraphSpacing above every paragraph after
-// the first; U+2028 breaks a line inside a paragraph; a run of spaces is one.
+// the first; U+2028 breaks a line inside a paragraph; a run of spaces is one; default-ignorable code points no font
+// has (U+FE0F, joiners, tags) draw nothing and take no room.
 import { readFileSync } from "node:fs";
 import { Super, SKRect, SkiaAccessibilityManager, HoverManager, SkiaLabel, type AnimatorBase, type Canvas } from "../src/index.ts";
 
@@ -59,6 +60,13 @@ const WORDS = "The quick brown fox jumps over the lazy dog again and again";
   check("U+2028 breaks the line, no paragraph space", lines(sep).join() === "a,b" && sep.MeasuredSize.Pixels.Height === Math.ceil(line * 2), `${lines(sep).join()} ${sep.MeasuredSize.Pixels.Height}`);
   check("an empty paragraph is a line", lines(measure((l) => { l.Text = "a\n\nb"; })).join("|") === "a||b");
   check("a run of spaces is one", lines(measure((l) => { l.Text = "a   b"; })).join() === "a b");
+
+  // default-ignorable code points no font has draw nothing and take no room (Rust label_ignorables)
+  const width = (t: string, fallback = "") => measure((l) => { l.Text = t; l.FontSize = 40; if (fallback) l.FontFamilyFallback = fallback; }).MeasuredSize.Pixels.Width;
+  const ab = width("AB");
+  for (const t of ["A\u200DB", "A\uFE0FB", "A\u{E0067}B", "A\u2060B", "A\u200BB"]) check(`${JSON.stringify(t)} is as wide as AB`, width(t) === ab, `${width(t)} vs ${ab}`);
+  Super.Fonts.set("FontEmoji", new Map([[400, CK.Typeface.MakeFreeTypeFaceFromData(readFileSync(`${ROOT}/samples/public/fonts/NotoColorEmoji-Subset.ttf`).buffer)]]));
+  check("U+FE0F after an emoji the fallback has: no box after it", width("\u2699\uFE0F 4m", "FontEmoji") === width("\u2699 4m", "FontEmoji"), `${width("\u2699\uFE0F 4m", "FontEmoji")} vs ${width("\u2699 4m", "FontEmoji")}`);
 
   console.log(failures ? `FAIL: ${failures} checks` : "OK: label rules");
   process.exit(failures ? 1 : 0);

@@ -180,6 +180,18 @@ export class SkiaLabel extends SkiaControl {
     return w;
   }
 
+  private static readonly Ignorable = /[\u200B-\u200F\u2060-\u2064\uFE00-\uFE0F\u{E0000}-\u{E0FFF}]/u;
+  /**
+   * Default-ignorable code points (zero width space, joiners, direction marks, word joiners, variation selectors such
+   * as U+FE0F after an emoji, tags) that none of the fonts has draw nothing and take no room, never the missing-glyph
+   * box (DrawnUi.Rust label_ignorables; text is not shaped here, C# hides them by shaping).
+   */
+  private static DropIgnorables(text: string, main: Font, fallbacks: readonly Font[]): string {
+    if (!SkiaLabel.Ignorable.test(text)) return text;
+    const has = (cp: string) => main.getGlyphIDs(cp)[0] !== 0 || fallbacks.some((f) => f.getGlyphIDs(cp)[0] !== 0);
+    return Array.from(text).filter((cp) => !SkiaLabel.Ignorable.test(cp) || has(cp)).join("");
+  }
+
   /**
    * Splits text into runs by glyph availability: the main font, or the first fallback that has a glyph where the
    * main font has glyph 0. Spaces always stay on the main font (fallback faces often carry very wide spaces).
@@ -192,6 +204,8 @@ export class SkiaLabel extends SkiaControl {
       const main = fonts.Main;
       const fbs = fonts.Fallbacks;
       cached = [];
+      text = SkiaLabel.DropIgnorables(text, main, fbs);
+      if (text.length === 0) { this.runCache.set(cacheKey, cached); return cached; }
       if (fbs.length === 0) {
         cached.push({ Text: text, Font: main, Width: SkiaLabel.Advance(main, text), Fonts: fonts });
       } else {
