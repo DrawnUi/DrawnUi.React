@@ -1,7 +1,6 @@
 import type { DrawingContext, SkiaControl } from "../core/SkiaControl";
 import { type GestureEventProcessingInfo, SKPoint, type SkiaGesturesParameters } from "../core/Gestures";
 import { Super } from "../core/Super";
-import { SkiaValueAnimator } from "../core/Animators";
 import { type PrebuiltControlStyle, ResolveControlStyle } from "../core/ControlStyle";
 import { type InputKey, KeyboardManager } from "../core/KeyboardManager";
 import { TextInputProxy } from "../core/TextInputProxy";
@@ -70,7 +69,8 @@ export class SkiaEditor extends SkiaShape {
   private readonly placeholder = new SkiaLabel();
   private scrollX = 0;
   private scrollY = 0;
-  private blink = new SkiaValueAnimator(this);
+  /** The caret blinks on a timer, asleep between blinks: no frame runs while it waits (DrawnUi.Rust editor_rules). */
+  private blinkTimer = 0;
   private caretVisible = true;
   private subscribed = false;
   private stubSelectionStop = -1;
@@ -100,8 +100,6 @@ export class SkiaEditor extends SkiaShape {
     this.placeholder.IsVisible = false;
     this.AddSubView(this.placeholder);
     this.AddSubView(this.Label);
-    this.blink.mMinValue = 0; this.blink.mMaxValue = 1; this.blink.Speed = 1000; this.blink.Repeat = -1;
-    this.blink.OnUpdated = (v) => { const visible = v < 0.5; if (visible !== this.caretVisible) { this.caretVisible = visible; this.InvalidateCache(); this.RepaintComposition(); } };
     this.ApplyControlStyleVisuals();
     this.UpdateLabel();
   }
@@ -159,9 +157,17 @@ export class SkiaEditor extends SkiaShape {
     this.selectionLength = l;
     this.OnCursorMoved();
   }
+  /** Shows the caret for a full half second, then blinks every 500 ms. */
+  private StartBlink(): void {
+    this.StopBlink();
+    this.caretVisible = true;
+    this.blinkTimer = window.setInterval(() => { this.caretVisible = !this.caretVisible; this.InvalidateCache(); this.RepaintComposition(); }, 500);
+  }
+  private StopBlink(): void { if (this.blinkTimer) { clearInterval(this.blinkTimer); this.blinkTimer = 0; } }
+
   private OnCursorMoved(): void {
     this.ScrollToCaret();
-    this.caretVisible = true;
+    if (this.isFocused) this.StartBlink(); else this.caretVisible = true;
     TextInputProxy.Sync(this);
     this.CursorMoved?.(this);
     this.InvalidateCache(); this.RepaintComposition();
@@ -175,14 +181,13 @@ export class SkiaEditor extends SkiaShape {
       if (SkiaEditor.Focused && SkiaEditor.Focused !== this) SkiaEditor.Focused.IsFocused = false;
       SkiaEditor.Focused = this;
       this.SetFocusNative(true);
-      this.caretVisible = true;
-      this.blink.Start();
+      this.StartBlink();
     } else {
       if (SkiaEditor.Focused === this) SkiaEditor.Focused = undefined;
       this.selectionLength = 0;
       this.dragSelecting = false;
       this.stubSelectionStop = -1; this.selectionMovingEdge = -1;
-      this.blink.Stop();
+      this.StopBlink();
       this.SetFocusNative(false);
     }
     this.FocusChanged?.(this, v);
@@ -600,8 +605,7 @@ export class SkiaEditor extends SkiaShape {
   }
 
   protected override OnDisposing(): void {
-    this.blink.Stop();
-    this.blink.Dispose();
+    this.StopBlink();
     if (SkiaEditor.Focused === this) SkiaEditor.Focused = undefined;
     this.SetFocusNative(false);
   }
