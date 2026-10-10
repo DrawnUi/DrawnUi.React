@@ -707,11 +707,9 @@ export class SkiaLayout extends SkiaControl {
     if (this.IsTemplatedList) { this.PaintTemplated(ctx); return; }
     if (this.IsRecycledLayout) { this.PaintSlots(ctx); return; }
     const composing = this.IsRenderingWithComposition;
-    // inside a composite that redraws only some areas, a child entirely outside them is not even traversed
-    const culling = !composing && SkiaControl.CompositionCulling > 0;
     for (const v of this.GetOrderedSubviews()) {
-      if (composing ? !this.DirtyChildrenInternal.has(v) : culling && v.IsVisible && v.OutsideCompositionClip(ctx.Context.Canvas)) continue;
-      v.Render(ctx);
+      if (composing && !this.DirtyChildrenInternal.has(v)) continue;
+      v.Render(ctx); // a child entirely outside the clip skips itself
     }
   }
   protected override GetCompositeChildren(): readonly SkiaControl[] { return this.IsTemplatedList || this.IsRecycledLayout ? [] : this.GetOrderedSubviews(); }

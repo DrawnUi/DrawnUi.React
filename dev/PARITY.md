@@ -483,6 +483,12 @@ Updated whenever the port deliberately diverges or finds something worth back-po
 - **React**: `Image` / `ImageComposite` / `ImageDoubleBuffered` caches record the expanded rect snapped outward to integer device pixels; the blit is 1:1 and a shader effect sampling `fragCoord - iOffset` hits texel centers (a fractional `DrawingRect.Left` made `blit.sksl` bilinear-blur the image by a sub-pixel amount). Picture caches keep the exact rect.
 - **.NET**: `CachedObject.Bounds` / recording areas are already integer pixels.
 
+### Controls outside the clip
+- **React**: every control whose rect, grown by its effects margin, through the matrix it is drawn with, lies outside the canvas clip (`quickReject`) is skipped with its subtree; its matrix is still updated for hit tests. A control whose own cache must be recorded (none yet, dirty, resized) still records it there, as before.
+- **.NET**: stacks skip cells outside the viewport (`Virtualisation`, default on; the cell's drawn rect with margins).
+- **DrawnUi.Rust**: as React, but a cache is not recorded until its control comes in.
+- **Opinion**: recording offscreen caches as before keeps that cost out of scroll frames: deferring it (the Rust way) put a 10 ms frame into the first scroll of the Looks page (Image-cached cards; 2.4-4 ms before). Node, 2000 uncached cards in a scroll: 26-27 ms per frame before, 3.1-3.2 ms after. A child drawn outside a parent that is itself outside the clip (overflow without an effects margin) is skipped too.
+
 ### Lottie and GIF default caches
 - **React**: `SkiaLottie` defaults to `Operations`, `SkiaGif` to `None` (drawnui-cross rule 3 for web engines).
 - **.NET**: both default to `ImageDoubleBuffered` (`SkiaLottie.cs:22`, `SkiaGif.cs:30`): a bake thread makes the bitmap while the last one shows. The web has no such thread: the cache is one offscreen pass in the frame per change, every frame while playing.

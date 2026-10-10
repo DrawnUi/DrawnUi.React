@@ -107,8 +107,9 @@ type State = { count?: number; colors?: Record<number, string>; tx?: Record<numb
   check("first record is full", rec().Mode === "full");
   let renders = 0;
   const card0 = main.refs.cards[0];
-  const render0 = card0.Render.bind(card0);
-  card0.Render = (ctx) => { renders++; render0(ctx); };
+  // drawn = its paint or its cache's blit ran (a control outside the clip returns before that)
+  const drawable = card0 as unknown as { RenderContent(...a: unknown[]): void }, render0 = drawable.RenderContent.bind(card0);
+  drawable.RenderContent = (...a: unknown[]) => { renders++; render0(...a); };
   await main.render({ colors: { 2: "#FF0000" } });
   let r = rec();
   const card2 = main.refs.cards[2], m = card2.DrawingRect;

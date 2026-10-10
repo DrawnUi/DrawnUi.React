@@ -72,6 +72,7 @@
     "check:wheel-routing": "node dev/check.mjs dev/check-wheel-routing.ts",
     "check:velocity": "node dev/check.mjs dev/check-velocity.ts",
     "check:scroll-index": "node dev/check.mjs dev/check-scroll-index.ts",
+    "check:culling": "node dev/check.mjs dev/check-culling.ts",
     "site:extras": "node dev/site-extras.mjs dist/demo",
     "build:lib": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
     "prepublishOnly": "npm run build:lib",

@@ -199,16 +199,23 @@ export class SkiaControl {
   private compositeDeep?: { Origin: SkiaControl; Child: SkiaControl; Before: SKRect; Rect: SKRect }[];
   /** Set while an UpdateDraw climbs: the ancestors re-measure but an ImageComposite among them keeps its partial record. */
   private static drawOrigin: SkiaControl | null = null;
-  /** Nonzero while a composite redraws only some areas: layouts skip children entirely outside the clip. */
-  static CompositionCulling = 0;
   /** The children a composite record can re-record individually; layouts return their views. */
   protected GetCompositeChildren(): readonly SkiaControl[] { return []; }
   /** C# TrackChildAsDirty (DirtyChildrenTracker): the child changed without a remeasure of this control. */
   TrackChildAsDirty(child: SkiaControl): void { if (this.IsCacheComposite) this.DirtyChildrenInternal.add(child); }
   private static readonly rejectRect = new Float32Array(4);
-  /** During a partial composite record: true when this control draws nothing inside the canvas clip (skipped whole). */
-  OutsideCompositionClip(canvas: SkCanvas): boolean {
-    const b = this.DrawnBoundsNow(this.RenderingScale), q = SkiaControl.rejectRect;
+  /** Its cache must be recorded before it can be drawn (none, dirty, another type, scale, size or GPU context). */
+  private CacheStale(scale: number): boolean {
+    const cacheType = this.UsingCacheType;
+    if (cacheType === "None") return false;
+    const o = this.RenderObject, r = cacheType === "Operations" ? this.ExpandedCacheRect(scale) : this.AlignedCacheRect(scale);
+    return this.cacheDirty || !o || o.Type !== cacheType || o.Epoch !== (this.Superview?.GpuEpoch ?? 0) || o.Scale !== scale
+      || Math.round(o.Bounds.Width) !== Math.round(r.Width) || Math.round(o.Bounds.Height) !== Math.round(r.Height);
+  }
+
+  /** Its rect grown by its effects margin, through the matrix it is drawn with, lies outside the canvas clip. */
+  private OutsideClip(canvas: SkCanvas, scale: number): boolean {
+    const b = SkiaControl.MapRect(this.RenderTransformMatrix, this.ExpandedCacheRect(scale)), q = SkiaControl.rejectRect;
     q[0] = b.Left; q[1] = b.Top; q[2] = b.Right; q[3] = b.Bottom;
     return canvas.quickReject(q);
   }
@@ -681,6 +688,19 @@ export class SkiaControl {
     const offsetOnly = (this.Left !== 0 || this.Top !== 0) && this.UsingCacheType !== "None" && this.TranslationX === 0 && this.TranslationY === 0
       && this.Rotation === 0 && this.ScaleX === 1 && this.ScaleY === 1 && this.SkewX === 0 && this.SkewY === 0;
     const needTransform = this.HasTransform && !offsetOnly;
+    let dx = 0, dy = 0;
+    if (needTransform) {
+      this.RenderTransformMatrix = this.CreateRenderTransformMatrix(this.DrawingRect, ctx.Scale);
+    } else if (offsetOnly) {
+      dx = this.Left * ctx.Scale; dy = this.Top * ctx.Scale;
+      this.RenderTransformMatrix = Super.CK.Matrix.translated(dx, dy); // gestures / accessibility still map through it
+    } else {
+      this.RenderTransformMatrix = undefined;
+    }
+    // drawn entirely outside the clip: skipped with its subtree (C# layout Virtualisation, DrawnUi.Rust); the matrix
+    // above stays current for hit tests. A cache that must be recorded is still recorded here, as before, so its cost
+    // does not move into the frame where the control scrolls in (DrawnUi.Rust records it then)
+    if (this.OutsideClip(canvas, ctx.Scale) && !this.CacheStale(ctx.Scale)) return;
     let saved = false;
     // same as DrawnUi: opacity = a layer with alpha, transforms = canvas matrix around the whole subtree (cache included)
     if (applyOpacity) {
@@ -693,16 +713,7 @@ export class SkiaControl {
       canvas.save();
       saved = true;
     }
-    let dx = 0, dy = 0;
-    if (needTransform) {
-      this.RenderTransformMatrix = this.CreateRenderTransformMatrix(this.DrawingRect, ctx.Scale);
-      canvas.concat(this.RenderTransformMatrix);
-    } else if (offsetOnly) {
-      dx = this.Left * ctx.Scale; dy = this.Top * ctx.Scale;
-      this.RenderTransformMatrix = Super.CK.Matrix.translated(dx, dy); // gestures / accessibility still map through it
-    } else {
-      this.RenderTransformMatrix = undefined;
-    }
+    if (needTransform) canvas.concat(this.RenderTransformMatrix!);
     if (this.IsClippedToBounds) {
       if (!saved) { canvas.save(); saved = true; }
       const c = this.ClipEffects ? this.DrawingRect : this.ExpandedCacheRect(ctx.Scale);
@@ -761,10 +772,7 @@ export class SkiaControl {
       const r = cacheType === "Operations" ? this.ExpandedCacheRect(ctx.Scale) : this.AlignedCacheRect(ctx.Scale);
       const epoch = this.Superview?.GpuEpoch ?? 0;
       if (this.RenderObjectPrevious && this.RenderObjectPrevious.Epoch !== epoch) this.DisposePrevious(); // made on a lost GPU context
-      const stale = this.cacheDirty || !this.RenderObject || this.RenderObject.Type !== cacheType || this.RenderObject.Epoch !== epoch
-        || this.RenderObject.Scale !== ctx.Scale
-        || Math.round(this.RenderObject.Bounds.Width) !== Math.round(r.Width) || Math.round(this.RenderObject.Bounds.Height) !== Math.round(r.Height);
-      if (stale) this.CreateRenderingObject({ ...ctx, Destination: this.DrawingRect }, cacheType);
+      if (this.CacheStale(ctx.Scale)) this.CreateRenderingObject({ ...ctx, Destination: this.DrawingRect }, cacheType);
       if (this.RenderObject) {
         // C# DrawRenderObject: with post renderers an Image cache is not blitted, the effects sample it (CachedImage)
         // and paint the result; a picture cache has no texture, so it is replayed first and snapshotted by the effect
@@ -907,9 +915,8 @@ export class SkiaControl {
       this.DirtyChildrenInternal.clear();
       for (const c of dirty) this.DirtyChildrenInternal.add(c);
       for (const c of inside) this.DirtyChildrenInternal.add(c);
-      SkiaControl.CompositionCulling++;
-      try { this.PaintContent({ ...ctx, Context: { Canvas: canvas, Surface: surface, Origin: { X: r.Left, Y: r.Top } } }); }
-      finally { SkiaControl.CompositionCulling--; }
+      // children entirely outside the redrawn areas are skipped by their own clip check (Render)
+      this.PaintContent({ ...ctx, Context: { Canvas: canvas, Surface: surface, Origin: { X: r.Left, Y: r.Top } } });
       this.IsRenderingWithComposition = false;
       const redrawn = children.filter((c) => this.DirtyChildrenInternal.has(c));
       this.LastCompositeRecord = { Mode: "partial", Children: redrawn.length, Dirty: redrawn, Areas: areas, Changed: changed };
