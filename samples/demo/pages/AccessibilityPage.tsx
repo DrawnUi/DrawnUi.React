@@ -13,6 +13,19 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
   );
 }
 
+/** An item of a keyboard group: a SkiaShape button that reports itself as activated (hello-app a11y screen, HelloWpf). */
+function GroupItem({ text, width, activated }: { text: string; width?: number; activated: (name: string) => void }) {
+  return (
+    <SkiaShape Type="Rectangle" CornerRadius={6} BackgroundColor="#373B3E" WidthRequest={width ?? -1} HeightRequest={36} HorizontalOptions={width ? "Start" : "Fill"}
+      AnimationTapped="Ripple" AccessibilityRole={Aria.RoleButton} AccessibilityCanInteract AccessibilityLabel={text} Tapped={() => activated(text)}>
+      <SkiaLabel Text={text} FontSize={14} TextColor={Colors.White} HorizontalOptions="Center" VerticalOptions="Center" AccessibilityRole={Aria.RolePresentation} />
+    </SkiaShape>
+  );
+}
+
+const FRUITS = ["Apple", "Banana", "Cherry", "Date"];
+const NUMBERS = Array.from({ length: 12 }, (_, i) => `${i + 1}`);
+
 /**
  * Accessibility snippet: the canvas is aria-hidden, an invisible ARIA overlay mirrors the drawn controls.
  * Everything here is reachable with Tab / Enter / Space and a screen reader; hover and pointer gestures still hit the canvas.
@@ -60,8 +73,9 @@ export function AccessibilityPage() {
           </SkiaWrap>
         </Card>
 
-        <Card title="Toggles — AccessibilityIsPressed → aria-pressed">
-          <SkiaRow Spacing={8}>
+        <Card title="Toggles — AccessibilityIsPressed, in a toolbar">
+          {/* a toolbar: one Tab stop, Left / Right move between the toggles */}
+          <SkiaRow Spacing={8} AccessibilityRole={Aria.RoleToolbar}>
             <SkiaButton Text={sound ? "Sound: on" : "Sound: off"} BackgroundColor={sound ? "#20C997" : "#495057"} AccessibilityLabel="Sound" AccessibilityIsPressed={sound} Tapped={() => { setSound((v) => !v); setLastActivated("sound"); }} />
             <SkiaButton Text={dark ? "Dark: on" : "Dark: off"} BackgroundColor={dark ? "#20C997" : "#495057"} AccessibilityLabel="Dark mode" AccessibilityIsPressed={dark} Tapped={() => { setDark((v) => !v); setLastActivated("dark"); }} />
           </SkiaRow>
@@ -81,6 +95,18 @@ export function AccessibilityPage() {
             <SkiaShape Type="Circle" BackgroundColor="#FFC107" WidthRequest={48} LockRatio={1} VerticalOptions="Center" AccessibilityRole={Aria.RolePresentation} />
           </SkiaWrap>
           <SkiaLabel Text="The yellow circle is decorative: AccessibilityRole=Aria.RolePresentation keeps it out of the tree." FontSize={12} TextColor="#ADB5BD" HorizontalOptions="Fill" />
+        </Card>
+
+        <Card title="Keyboard groups — one Tab stop, the arrow keys inside">
+          <SkiaLabel Text="A container with a composite role (Aria.RoleList, RoleToolbar, RoleGrid...) is one Tab stop: the arrow keys move between its items, Home and End go to the first and the last, Enter or Space activates. Tab comes back to the item it left." FontSize={12} TextColor="#ADB5BD" HorizontalOptions="Fill" />
+          <SkiaLabel Text="Fruits — a list: Up and Down" FontSize={13} TextColor="#DEE2E6" HorizontalOptions="Fill" />
+          <SkiaStack Spacing={6} AccessibilityRole={Aria.RoleList} AccessibilityLabel="Fruits">
+            {FRUITS.map((name) => <GroupItem key={name} text={name} activated={setLastActivated} />)}
+          </SkiaStack>
+          <SkiaLabel Text="Numbers — a grid: all four arrows" FontSize={13} TextColor="#DEE2E6" HorizontalOptions="Fill" />
+          <SkiaWrap Spacing={6} AccessibilityRole={Aria.RoleGrid} AccessibilityLabel="Numbers">
+            {NUMBERS.map((name) => <GroupItem key={name} text={name} width={56} activated={setLastActivated} />)}
+          </SkiaWrap>
         </Card>
 
         <Card title="Labels — read by default, opted out per control">
