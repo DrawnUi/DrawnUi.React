@@ -128,8 +128,17 @@ export abstract class SnappingLayout extends SkiaLayout {
     return origin;
   }
 
+  /**
+   * Release speed, points per second along an axis, under which the snap ignores the velocity and goes to the nearest
+   * anchor by distance (C# SnapVelocityThreshold, drawnui-cross 6o): a finger held still before lifting is not a flick.
+   */
+  SnapVelocityThreshold = 100;
+
   ScrollToNearestAnchor(location: SKPoint, velocity: SKPoint): void {
     if (this.SnapPoints.length === 0) return;
+    if (Math.abs(velocity.X) < this.SnapVelocityThreshold || Math.abs(velocity.Y) < this.SnapVelocityThreshold) {
+      velocity = new SKPoint(Math.abs(velocity.X) < this.SnapVelocityThreshold ? 0 : velocity.X, Math.abs(velocity.Y) < this.SnapVelocityThreshold ? 0 : velocity.Y);
+    }
     const origin = this.FindNearestAnchorInternal(location, velocity);
     const target = this.SelectNextAnchor(origin, velocity);
     if (SnappingLayout.Dist(location, target) >= 0.5) this.ScrollToOffset(target, velocity, this.CanAnimate);

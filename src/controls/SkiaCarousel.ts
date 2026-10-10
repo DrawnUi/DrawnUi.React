@@ -216,9 +216,10 @@ export class SkiaCarousel extends SnappingLayout {
     return super.FindNearestAnchorInternal(current, velocity);
   }
 
-  /** C# SkiaCarousel.ScrollToNearestAnchor: velocity below 100 counts as none; looped snaps around virtual anchors. */
+  /** C# SkiaCarousel.ScrollToNearestAnchor: velocity below SnapVelocityThreshold counts as none; looped snaps around virtual anchors. */
   override ScrollToNearestAnchor(location: SKPoint, velocity: SKPoint): void {
-    velocity = new SKPoint(Math.abs(velocity.X) < 100 ? 0 : velocity.X, Math.abs(velocity.Y) < 100 ? 0 : velocity.Y);
+    const t = this.SnapVelocityThreshold;
+    velocity = new SKPoint(Math.abs(velocity.X) < t ? 0 : velocity.X, Math.abs(velocity.Y) < t ? 0 : velocity.Y);
     if (this.ApplyLoopedLogic) {
       const origin = this.FindNearestAnchorInternal(location, velocity);
       const target = this.SelectNextAnchor(origin, velocity);
