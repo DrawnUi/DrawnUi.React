@@ -495,9 +495,19 @@ export class Canvas {
     el.addEventListener("pointerleave", this.onPointerLeave);
     el.addEventListener("contextmenu", this.onContextMenu);
     el.addEventListener("wheel", this.onWheel, { passive: false });
-    if (this.gestures === "Lock") el.addEventListener("touchmove", this.preventTouch, { passive: false });
-    else if (this.gestures === "Enabled") el.addEventListener("touchmove", this.preventClaimedTouch, { passive: false });
+    if (this.gestures === "Lock") {
+      el.addEventListener("touchmove", this.preventTouch, { passive: false });
+      // the canvas owns every touch (DrawnUi.Web applyGestureStyle, DrawnUi.Rust host): no iOS callout or text
+      // selection on a long press, and no rubber band / pull-down of the page starting on it
+      const st = el.style as CSSStyleDeclaration & { webkitUserSelect: string; webkitTouchCallout: string };
+      st.webkitUserSelect = "none"; st.webkitTouchCallout = "none";
+      this.pageOverscroll = [document.documentElement.style.overscrollBehavior, document.body.style.overscrollBehavior];
+      document.documentElement.style.overscrollBehavior = "none";
+      document.body.style.overscrollBehavior = "none";
+    } else if (this.gestures === "Enabled") el.addEventListener("touchmove", this.preventClaimedTouch, { passive: false });
   }
+  /** The page's own overscroll-behavior before Lock set it to none (html, body), put back on detach. */
+  private pageOverscroll?: [string, string];
 
   private DetachInput(): void {
     const el = this.Element;
@@ -512,6 +522,12 @@ export class Canvas {
     el.removeEventListener("wheel", this.onWheel);
     el.removeEventListener("touchmove", this.preventTouch);
     el.removeEventListener("touchmove", this.preventClaimedTouch);
+    if (this.pageOverscroll) {
+      const st = el.style as CSSStyleDeclaration & { webkitUserSelect: string; webkitTouchCallout: string };
+      st.webkitUserSelect = ""; st.webkitTouchCallout = "";
+      [document.documentElement.style.overscrollBehavior, document.body.style.overscrollBehavior] = this.pageOverscroll;
+      this.pageOverscroll = undefined;
+    }
     this.claimedTouches.clear();
     this.activeTouchIds.clear(); this.pointerDownArgs.clear(); this.previousTouchArgs.clear();
   }

@@ -465,6 +465,8 @@ export const SkiaShell = forwardRef<ShellNavigation, SkiaShellProps>(function Sk
         prev ? prev.TranslateToAsync(-dir * w, 0, TabsAnimationSpeed, TabsEasing) : Promise.resolve(),
       ]), TabsAnimationSpeed + 500);
     }
+    // the tab left stays mounted (its state kept): hidden first, then back in place for its next turn
+    if (prev) { prev.IsVisible = false; prev.TranslationX = 0; prev.TranslationY = 0; }
     setTabTransition(null);
   }, [hasTabs, Tabs, AnimateTabs, TabsAnimationSpeed]);
 
@@ -526,24 +528,26 @@ export const SkiaShell = forwardRef<ShellNavigation, SkiaShellProps>(function Sk
   const transitioning = transitions > 0 || leaving !== null;
   const rootBottom = hasTabs ? TabBarHeight + insets.Bottom : 0;
   const navTop = NavBarHeight + insets.Top;
-  const rootNode = hasTabs ? RenderRoute(Tabs![selectedTab]?.route ?? "") : children;
+  // every tab keeps its root and its pages mounted (state, scroll positions), only the selected one shows (C# tab
+  // views, DrawnUi.Rust "tabs keep their stacks")
+  const tabIndexes = hasTabs ? Tabs!.map((_, i) => i) : [0];
   const entering = tabTransition ? { TranslationX: tabTransition.dir * 0.75 * (typeof window !== "undefined" ? window.innerWidth : 0), Opacity: 0.001, ZIndex: 1 } : {};
 
   return (
     <ShellContext.Provider value={nav}>
       <SkiaLayer VerticalOptions="Fill">
-        {tabTransition && (
-          <SkiaLayer key={`tab-leaving-${tabTransition.from}`} VerticalOptions="Fill" Margin={new Thickness(0, 0, 0, rootBottom)} ZIndex={0} BackgroundColor={PageBackgroundColor}
-            ref={(c: SkiaControl | null) => { if (c) tabRoots.current.set(tabTransition.from, c); }}>
-            {RenderRoute(Tabs![tabTransition.from]?.route ?? "")}
-          </SkiaLayer>
-        )}
-        <SkiaLayer key={hasTabs ? `tab-${selectedTab}` : "root"} VerticalOptions="Fill" Margin={new Thickness(0, 0, 0, rootBottom)} IsVisible={visiblePages.length === 0 || transitioning} BackgroundColor={hasTabs ? PageBackgroundColor : undefined} {...entering}
-          ref={(c: SkiaControl | null) => { if (c) tabRoots.current.set(selectedTab, c); }}>
-          {rootNode}
-        </SkiaLayer>
-        {visiblePages.map((r, i) => (
-          <PageHost key={`${selectedTab}:${r}#${i}`} route={r} speed={PagesAnimationSpeed} visible={r === topRoute || transitioning} background={PageBackgroundColor} bottom={rootBottom}
+        {tabIndexes.map((t) => {
+          const selected = t === selectedTab;
+          return (
+            <SkiaLayer key={hasTabs ? `tab-${t}` : "root"} VerticalOptions="Fill" Margin={new Thickness(0, 0, 0, rootBottom)} BackgroundColor={hasTabs ? PageBackgroundColor : undefined}
+              IsVisible={selected ? visiblePages.length === 0 || transitioning : tabTransition?.from === t} ZIndex={0} {...(selected ? entering : {})}
+              ref={(c: SkiaControl | null) => { if (c) tabRoots.current.set(t, c); }}>
+              {hasTabs ? RenderRoute(Tabs![t]?.route ?? "") : children}
+            </SkiaLayer>
+          );
+        })}
+        {tabIndexes.flatMap((t) => (t === selectedTab ? visiblePages : stacks[t] ?? []).map((r, i) => (
+          <PageHost key={`${t}:${r}#${i}`} route={r} speed={PagesAnimationSpeed} active={t === selectedTab} visible={t === selectedTab && (r === topRoute || transitioning)} background={PageBackgroundColor} bottom={rootBottom}
             register={(c) => { if (c) pageCtrls.current.set(r, c); else pageCtrls.current.delete(r); }}>
             <SkiaLayer VerticalOptions="Fill" Margin={new Thickness(0, navTop, 0, 0)}>{RenderRoute(r)}</SkiaLayer>
             <SkiaLayer HeightRequest={navTop} BackgroundColor={NavBarColor} Padding={new Thickness(0, insets.Top, 0, 0)}>
@@ -553,7 +557,7 @@ export const SkiaShell = forwardRef<ShellNavigation, SkiaShellProps>(function Sk
               <SkiaLayer HeightRequest={1} VerticalOptions="End" BackgroundColor="#343A40" />
             </SkiaLayer>
           </PageHost>
-        ))}
+        )))}
         {hasTabs && (
           <SkiaLayer HeightRequest={TabBarHeight + insets.Bottom} VerticalOptions="End" BackgroundColor={TabBarColor} ZIndex={ShellDefaults.ZIndexModals - 1} BlockGesturesBelow Padding={new Thickness(0, 0, 0, insets.Bottom)}>
             <SkiaLayer HeightRequest={1} BackgroundColor="#343A40" />
@@ -576,15 +580,19 @@ export const SkiaShell = forwardRef<ShellNavigation, SkiaShellProps>(function Sk
 });
 
 /** A pushed page: slides in from the right on mount (C# SkiaViewSwitcher PushView), covers what is below. */
-function PageHost({ route, speed, visible, background, bottom, register, children }: { route: string; speed: number; visible: boolean; background: string; bottom: number; register: (c: SkiaControl | null) => void; children: ReactNode }) {
+function PageHost({ route, speed, active, visible, background, bottom, register, children }: { route: string; speed: number; active: boolean; visible: boolean; background: string; bottom: number; register: (c: SkiaControl | null) => void; children: ReactNode }) {
   const ctrl = useRef<SkiaControl | null>(null);
+  // slides in once, when pushed; a page of another tab stays mounted and is registered only while its tab is selected
   useEffect(() => {
     const c = ctrl.current;
-    if (!c) return;
-    register(c);
-    if (speed > 0) { c.TranslationX = CanvasWidthPts(c); void c.TranslateToAsync(0, 0, speed); }
-    return () => register(null);
+    if (c && speed > 0) { c.TranslationX = CanvasWidthPts(c); void c.TranslateToAsync(0, 0, speed); }
   }, [route]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const c = ctrl.current;
+    if (!c || !active) return;
+    register(c);
+    return () => register(null);
+  }, [route, active]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <SkiaLayer ref={(c: SkiaControl | null) => { ctrl.current = c; }} VerticalOptions="Fill" HorizontalOptions="Fill" Margin={new Thickness(0, 0, 0, bottom)} BackgroundColor={background} IsVisible={visible} BlockGesturesBelow>
       {children}
