@@ -39,7 +39,9 @@ export class SkiaLottie extends AnimatedFramesRenderer {
 
   constructor() {
     super();
-    this.UseCache = "ImageDoubleBuffered";
+    // C# ImageDoubleBuffered pays off where a thread bakes the bitmap; on the web it is one offscreen pass per frame
+    // while playing, so the web engines default to Operations (drawnui-cross rule 3)
+    this.UseCache = "Operations";
   }
 
   get Source(): string { return this.source; }

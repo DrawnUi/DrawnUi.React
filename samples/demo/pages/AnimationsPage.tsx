@@ -43,7 +43,7 @@ export function AnimationsPage() {
                 <SkiaLabel Text="SpeedRatio" FontSize={13} TextColor="#ADB5BD" VerticalOptions="Center" />
                 {[0.5, 1, 2].map((v) => <SkiaButton key={v} Text={`${v}x`} BackgroundColor={speed === v ? "#533483" : "#495057"} FontSize={13} Tapped={() => setSpeed(v)} />)}
               </SkiaRow>
-              <SkiaLabel Text="Skottie renders the vector animation every frame into an ImageDoubleBuffered cache; the animator is the C# RangeAnimator over InPoint..OutPoint." FontSize={12} TextColor="#ADB5BD" HorizontalOptions="Fill" />
+              <SkiaLabel Text="Skottie renders the vector animation every frame into an Operations cache (a picture); the animator is the C# RangeAnimator over InPoint..OutPoint." FontSize={12} TextColor="#ADB5BD" HorizontalOptions="Fill" />
             </SkiaStack>
           </SkiaRow>
         </Card>

@@ -483,6 +483,11 @@ Updated whenever the port deliberately diverges or finds something worth back-po
 - **React**: `Image` / `ImageComposite` / `ImageDoubleBuffered` caches record the expanded rect snapped outward to integer device pixels; the blit is 1:1 and a shader effect sampling `fragCoord - iOffset` hits texel centers (a fractional `DrawingRect.Left` made `blit.sksl` bilinear-blur the image by a sub-pixel amount). Picture caches keep the exact rect.
 - **.NET**: `CachedObject.Bounds` / recording areas are already integer pixels.
 
+### Lottie and GIF default caches
+- **React**: `SkiaLottie` defaults to `Operations`, `SkiaGif` to `None` (drawnui-cross rule 3 for web engines).
+- **.NET**: both default to `ImageDoubleBuffered` (`SkiaLottie.cs:22`, `SkiaGif.cs:30`): a bake thread makes the bitmap while the last one shows. The web has no such thread: the cache is one offscreen pass in the frame per change, every frame while playing.
+- **Opinion**: rule 3. Chrome A/B on the Lottie & GIF page (5 Lotties + 2 GIFs, no input, 3 runs of A/B/A/B, 5 s each): frame CPU time p50 1.3-1.9 ms with the web defaults vs 1.8-2.2 ms with ImageDoubleBuffered, p99 equal or lower in 5 of 6 pairs; the offscreen GPU pass per change is saved on top. An app that sets `UseCache` keeps its value.
+
 ## Accessibility
 
 ### Wheel events under half a notch move at once

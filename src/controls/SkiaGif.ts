@@ -91,7 +91,9 @@ export class SkiaGif extends AnimatedFramesRenderer {
 
   constructor() {
     super();
-    this.UseCache = "ImageDoubleBuffered";
+    // C# ImageDoubleBuffered pays off where a thread bakes the bitmap; on the web it is one offscreen pass per frame
+    // change, so the web engines draw a GIF frame with no cache (drawnui-cross rule 3)
+    this.UseCache = "None";
   }
 
   get Source(): string { return this.source; }
