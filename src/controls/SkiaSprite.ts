@@ -202,6 +202,10 @@ export class SkiaSprite extends AnimatedFramesRenderer {
 
   // ---- animator ----
   protected override OnAnimatorUpdated(value: number): void { this.Seek(value); }
+  protected override NextChangeMs(value: number): number | undefined {
+    const fd = this.FrameDurationMs;
+    return fd > 0 ? (Math.floor(value / fd) + 1) * fd : undefined;
+  }
   protected override OnAnimatorSeeking(time: number): void {
     if (!this.SpriteSheet) return;
     const frame = this.GetFrameNumberFromTime(time);

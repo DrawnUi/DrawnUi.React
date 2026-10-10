@@ -23,6 +23,12 @@ export class GifAnimation {
     if (frame >= 0 && frame <= this.TotalFrames - 1) this.Frame = this.Frames[frame];
   }
 
+  /** Start (ms) of the frame after the one at `msTime`; DurationMs after the last one. */
+  NextFrameStartMs(msTime: number): number {
+    for (let i = 0; i < this.positionsMs.length; i++) if (msTime < this.positionsMs[i]) return this.positionsMs[i];
+    return this.DurationMs;
+  }
+
   GetFrameNumber(msTime: number): number {
     if (this.positionsMs.length === 0 || this.DurationMs <= 0) return 0;
     if (msTime < 0) msTime = this.DurationMs + msTime;
@@ -94,6 +100,7 @@ export class SkiaGif extends AnimatedFramesRenderer {
   override Start(delayMs = 0): void { if ((this.Animation?.TotalFrames ?? 0) > 0) super.Start(delayMs); }
 
   protected override OnAnimatorUpdated(value: number): void { this.Seek(value); }
+  protected override NextChangeMs(value: number): number | undefined { return this.Animation && this.Animation.DurationMs > 0 ? this.Animation.NextFrameStartMs(value) : undefined; }
 
   /** Seeks by time in ms (the animator range is 0..DurationMs). */
   protected override OnAnimatorSeeking(time: number): void {

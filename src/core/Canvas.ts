@@ -242,17 +242,31 @@ export class Canvas {
 
   /** Ticks every registered animator once; returns how many ran. */
   protected ExecuteAnimators(frameTimeNanos: number): number {
-    let executed = 0;
+    let executed = 0, wake = Infinity;
     for (const a of [...this.AnimatingControls.values()]) {
       if (!a.Parent) { this.AnimatingControls.delete(a.Uid); continue; }
       // the control or a parent is hidden: its animator pauses, no frames, and goes on from where it was when shown
       if (a.Parent.HiddenInTree()) { if (!a.IsPaused) { a.Pause(); a.PausedWhileHidden = true; } continue; }
       if (a.PausedWhileHidden) { a.PausedWhileHidden = false; a.Resume(); }
       if (a.IsPaused) continue; // a paused animator neither ticks nor keeps frames coming (C# DrawnView)
+      if (a.SleepUntilNanos > frameTimeNanos) { wake = Math.min(wake, a.SleepUntilNanos); continue; } // nothing changes yet
       a.TickFrame(frameTimeNanos);
       executed++;
+      if (a.SleepUntilNanos > frameTimeNanos) wake = Math.min(wake, a.SleepUntilNanos);
     }
+    this.WakeAt(wake, frameTimeNanos);
     return executed;
+  }
+
+  private wakeTimer = 0;
+  private wakeAtNanos = Infinity;
+  /** One timer for the earliest sleeping animator: the frame loop wakes then, no frames run in between. */
+  private WakeAt(nanos: number, nowNanos: number): void {
+    if (!isFinite(nanos)) return;
+    if (this.wakeTimer && this.wakeAtNanos <= nanos) return;
+    if (this.wakeTimer) clearTimeout(this.wakeTimer);
+    this.wakeAtNanos = nanos;
+    this.wakeTimer = window.setTimeout(() => { this.wakeTimer = 0; this.wakeAtNanos = Infinity; this.Update(); }, Math.max(0, (nanos - nowNanos) / 1_000_000));
   }
 
   /** Frames drawn so far (SkiaBackdrop uses it to refresh once after a cached record). */
@@ -307,6 +321,7 @@ export class Canvas {
 
   Dispose(): void {
     this.disposed = true;
+    if (this.wakeTimer) { clearTimeout(this.wakeTimer); this.wakeTimer = 0; }
     this.Element.removeEventListener("webglcontextlost", this.onContextLost);
     this.Element.removeEventListener("webglcontextrestored", this.onContextRestored);
     this.Gestures = "Disabled";

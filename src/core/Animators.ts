@@ -30,6 +30,12 @@ export class AnimatorBase {
   IsPaused = false;
   /** Paused by the canvas because its control is hidden; resumed when it shows again. */
   PausedWhileHidden = false;
+  /**
+   * Frame time (ns) before which nothing it shows changes: the canvas does not tick it and it keeps no frames coming
+   * until then, a timer wakes the frame loop at that time (a GIF or a sprite between two frames; DrawnUi.Rust frame
+   * animators sleep between changes). 0 = tick every frame.
+   */
+  SleepUntilNanos = 0;
 
   private delayHandle = 0;
   private delayEnd = 0;
@@ -101,12 +107,13 @@ export class AnimatorBase {
     this.IsPaused = false;
     const paused = (performance.now() - this.pausedAt) * 1_000_000;
     if (this.StartFrameTimeNanos !== 0) { this.StartFrameTimeNanos += paused; this.LastFrameTimeNanos += paused; }
+    if (this.SleepUntilNanos !== 0) this.SleepUntilNanos += paused;
     if (this.delayLeft > 0) { const left = this.delayLeft; this.delayLeft = 0; this.Start(left); return; }
     this.Parent?.Repaint(); // frames again
   }
 
   Stop(): void {
-    this.IsPaused = false; this.PausedWhileHidden = false; this.delayLeft = 0;
+    this.IsPaused = false; this.PausedWhileHidden = false; this.SleepUntilNanos = 0; this.delayLeft = 0;
     if (this.delayHandle) { clearTimeout(this.delayHandle); this.delayHandle = 0; }
     this.Unregister();
     this.LastFrameTimeNanos = 0;

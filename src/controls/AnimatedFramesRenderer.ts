@@ -59,7 +59,7 @@ export class AnimatedFramesRenderer extends SkiaControl {
   InitializeAnimator(): void {
     if (!this.Animator) {
       const a = new SkiaValueAnimator(this);
-      a.OnUpdated = (v) => this.OnAnimatorUpdated(v);
+      a.OnUpdated = (v) => { this.OnAnimatorUpdated(v); this.SleepUntilNextChange(a, v); };
       a.OnStart = () => { this.WasStarted = true; this.OnStarted(); };
       a.OnStop = () => { if (this.WasStarted) this.OnFinished(); this.WasStarted = false; };
       this.Animator = a;
@@ -67,6 +67,20 @@ export class AnimatedFramesRenderer extends SkiaControl {
     this.Animator.Repeat = this.repeat;
     this.OnAnimatorInitializing();
     if (this.delayedPlay || (this.autoPlay && this.CheckCanStartAnimator())) { this.delayedPlay = false; this.Start(); }
+  }
+
+  /**
+   * Animation time (ms, the animator's range) of the next change of what is shown after `value`, or undefined when it
+   * may change every frame (Lottie). A GIF or a sprite returns its next frame's start.
+   */
+  protected NextChangeMs(_value: number): number | undefined { return undefined; }
+
+  /** The animator sleeps until the next change: no ticks and no frames in between (DrawnUi.Rust sleeping frame animators). */
+  private SleepUntilNextChange(a: SkiaValueAnimator, value: number): void {
+    const next = this.NextChangeMs(value), range = a.mMaxValue - a.mMinValue;
+    if (next === undefined || !(range > 0) || !(a.Speed > 0) || next <= value) { a.SleepUntilNanos = 0; return; }
+    const wallMs = (Math.min(next, a.mMaxValue) - value) * (a.Speed / range);
+    a.SleepUntilNanos = a.LastFrameTimeNanos + wallMs * 1_000_000;
   }
 
   /** Configure the animator range/speed once the frames source is known. */
