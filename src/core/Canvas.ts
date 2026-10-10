@@ -595,21 +595,27 @@ export class Canvas {
   protected ProcessGestures(root: SkiaControl, args: SkiaGesturesParameters): SkiaControl | null {
     const info = () => new GestureEventProcessingInfo(args.Event.Location, SKPoint.Empty, SKPoint.Empty, null);
 
+    // the wheel goes to the press owner only while a press is held; between presses it goes by position, and it
+    // never makes an owner: a wheel over a second scroll moves that one, not the last one the wheel moved
+    // (DrawnUi.Rust input_router "the wheel goes to the owner of the press first"; C# keeps the last wheel consumer)
+    const wheel = args.Type === "Wheel";
     if (args.Type === "Down") this.gestureOwner = null;
-    else if (this.gestureOwner && Canvas.IsSavedGesture(args.Type)) {
+    else if (this.gestureOwner && Canvas.IsSavedGesture(args.Type) && (!wheel || this.activeTouchIds.size > 0)) {
       const owner = this.gestureOwner;
       const alive = !!owner.Superview && owner.IsVisible && !owner.InputTransparent;
       const consumed = alive ? owner.OnSkiaGestureEvent(args, info()) : null;
       if (consumed) {
         // it still wants the gesture: nobody else sees this one (C# skips the tree pass for a saved gesture)
-        this.gestureOwner = args.Type === "Up" ? null : consumed;
+        if (!wheel) this.gestureOwner = args.Type === "Up" ? null : consumed;
         return consumed;
       }
-      this.gestureOwner = null; // it let go (a button whose press turned into a pan): route normally again
+      // it let go (a button whose press turned into a pan): route normally again; a wheel it does not use goes by
+      // position and leaves it the press
+      if (!wheel) this.gestureOwner = null;
     }
 
     const consumed = root.ProcessGestures(args, info());
-    this.gestureOwner = consumed && args.Type !== "Up" ? consumed : null;
+    if (!wheel) this.gestureOwner = consumed && args.Type !== "Up" ? consumed : null;
     return consumed;
   }
 }

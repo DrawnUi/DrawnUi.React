@@ -265,6 +265,14 @@ Updated whenever the port deliberately diverges or finds something worth back-po
 - **.NET**: `SkiaAccessibilityManager.RowLength` counts the focused item's row; from the short last row of a wrap, Up
   skips items (12 tiles at 10 per row: Up from 12 goes to 10). This is a C# bug, reported to the C# side.
 
+### The wheel never makes an owner (React and Rust)
+- **React / Rust**: a wheel goes to the press owner only while a press is held; between presses it goes to what is
+  under the pointer, and taking it does not make the control the owner of later wheels. An owner that does not use a
+  wheel during its press keeps the press.
+- **.NET**: the last wheel consumer is replayed every wheel until the next Down, so a wheel over a second scroll
+  moves the first.
+- **Opinion**: back-port to .NET (the canvas's saved-gesture replay).
+
 ### Hover is decided by its own hit pass (drawnui-cross 6m)
 - **React**: `HoverManager` walks the tree from one mouse position with the routing rules of ProcessGestures (visible,
   not InputTransparent, inside, children not locked, nothing below a BlockGesturesBelow subtree); controls get no
