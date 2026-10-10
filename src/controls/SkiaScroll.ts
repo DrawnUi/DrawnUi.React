@@ -264,6 +264,7 @@ export class SkiaScroll extends SkiaControl {
 
   /** C# CheckNeedToLoadMore: fires once per content extent near an edge; re-arms when the content grows or the user moves away (>offset+100pt, >2 s). */
   private CheckLoadMore(): void {
+    if (this.indexOrder) return; // an open ScrollToIndex has the viewport on its way: the edges are looked at after it
     const vertical = this.Orientation !== "Horizontal";
     const offset = vertical ? this.offsetY : this.offsetX;
     const min = vertical ? this.ContentOffsetBounds.Top : this.ContentOffsetBounds.Left; // most negative offset
@@ -508,6 +509,7 @@ export class SkiaScroll extends SkiaControl {
 
   protected override Paint(ctx: DrawingContext): void {
     this.Superview?.Hover?.RegisterMover(this);
+    this.PursueIndexOrder();
     const c = this.content;
     if (!c) return;
     this.ArrangeContent();
@@ -595,6 +597,7 @@ export class SkiaScroll extends SkiaControl {
   }
 
   ScrollTo(x: number, y: number, maxSpeedSecs: number, clamp = true): void {
+    if (!this.pursuing) this.indexOrder = undefined; // another scroll drops an open ScrollToIndex
     this.StopAnimators(); // also forgets any pending edge bounce: a programmatic scroll never bounces
     let tx = x, ty = y;
     if (clamp) { const c = this.ClampOffset(x, y, this.ContentOffsetBounds, true); tx = c.X; ty = c.Y; }
@@ -617,16 +620,70 @@ export class SkiaScroll extends SkiaControl {
     else this.ScrollTo(this.offsetX, this.ContentOffsetBounds.Top, maxTimeSecs);
   }
 
-  StopScrolling(): void { this.StopAnimators(); this.IsUserPanning = false; }
+  StopScrolling(): void { this.indexOrder = undefined; this.StopAnimators(); this.IsUserPanning = false; }
 
   /**
    * Scrolls so that item `index` is at the viewport start (or end). Like DrawnUi, Content must BE the
    * templated layout (the recycled list is the scroll's only child; a header goes above the scroll or in Header).
    */
   ScrollToIndex(index: number, animate: boolean, option: RelativePositionType = "Start"): void {
+    this.indexOrder = { Index: index, Option: option, Secs: animate ? this.ScrollingSpeedMs / 1000 : 0, Stalled: 0 };
+    this.PursueIndexOrder();
+    this.Repaint();
+  }
+
+  /**
+   * An open ScrollToIndex (C# OrderedScrollToIndex, DrawnUi.Rust scroll_to_index): a row not measured yet is gone to by
+   * the sizes as they are estimated, and the order is aimed again every frame until the row has its real place and the
+   * viewport stands on it; an animated move goes on to a moved target in the time it has left, later corrections jump.
+   * A press, the wheel or another scroll drops it; while it is open LoadMore waits.
+   */
+  private indexOrder?: { Index: number; Option: RelativePositionType; Secs: number; Stalled: number };
+  private pursuing = false;
+
+  /** One step of the open order (C# ExecuteScrollToIndexOrder, Rust `pursue`), at the start of every paint. */
+  private PursueIndexOrder(): void {
+    const order = this.indexOrder;
+    if (!order) return;
+    const horizontal = this.Orientation === "Horizontal";
+    const before = horizontal ? this.offsetX : this.offsetY;
+    const running = horizontal ? this.animatorFlingX : this.animatorFlingY;
+    const aim = this.AimIndex(order.Index, order.Option);
+    let done = false;
+    if (aim) {
+      const c = this.ClampOffset(horizontal ? aim.Offset : this.offsetX, horizontal ? this.offsetY : aim.Offset, this.ContentOffsetBounds, true);
+      const target = horizontal ? c.X : c.Y;
+      const runningTo = horizontal ? this.scrollToTargetX : this.scrollToTargetY;
+      const move = (to: number, secs: number) => {
+        this.pursuing = true;
+        try { this.ScrollTo(horizontal ? to : this.offsetX, horizontal ? this.offsetY : to, secs, true); } finally { this.pursuing = false; }
+      };
+      if (running.IsRunning && runningTo !== null) {
+        if (Math.abs(runningTo - target) > 0.5) {
+          // on the way: the move goes on to the new target in the time it has left
+          const now = this.Superview?.FrameTimeNanos || performance.now() * 1_000_000;
+          move(target, running.StartFrameTimeNanos ? Math.max(0.016, running.Speed - (now - running.StartFrameTimeNanos) / 1e9) : running.Speed);
+          running.StartFrameTimeNanos = running.LastFrameTimeNanos = now;
+        }
+      } else if (Math.abs(before - target) <= 0.5) {
+        if (horizontal) this.ViewportOffsetX = target; else this.ViewportOffsetY = target;
+        done = aim.Exact;
+      } else {
+        move(target, order.Secs);
+        order.Secs = 0;
+      }
+    }
+    // no list yet, or a row that never gets its real place: not forever
+    order.Stalled = (horizontal ? this.offsetX : this.offsetY) === before && !running.IsRunning ? order.Stalled + 1 : 0;
+    if (done || order.Stalled >= 10) { this.indexOrder = undefined; this.CheckLoadMore(); return; }
+    this.Repaint(); // the next frame aims again
+  }
+
+  /** The offset (points) that puts item `index` where `option` says, by the sizes the list knows now; Exact = its place is measured. */
+  private AimIndex(index: number, option: RelativePositionType): { Offset: number; Exact: boolean } | undefined {
     const layout = this.content instanceof SkiaLayout && this.content.IsTemplated ? this.content : undefined;
     const items = layout?.ItemsSource;
-    if (!layout || !items || items.length === 0 || !this.content) return;
+    if (!layout || !items || items.length === 0 || !this.content) return undefined;
     const i = Math.max(0, Math.min(items.length - 1, index));
     const scale = this.RenderingScale;
     const horizontal = this.Orientation === "Horizontal";
@@ -641,7 +698,7 @@ export class SkiaScroll extends SkiaControl {
       // A templated Row / Wrap / Grid realizes every item (C# non-list layouts are not virtualized): read the cell's
       // arranged rect, like C# reads the structure cell's Destination.
       const cell = layout.ChildrenFactory.GetViewForIndex(i);
-      if (!cell) return;
+      if (!cell) return undefined;
       const r = cell.DrawingRect, c = this.content.DrawingRect;
       itemStart = (horizontal ? r.Left - c.Left : r.Top - c.Top) / scale;
       itemSize = (horizontal ? r.Width : r.Height) / scale;
@@ -649,9 +706,7 @@ export class SkiaScroll extends SkiaControl {
     let target = itemStart;
     if (option === "End") target -= viewport - itemSize;
     else if (option === "Center") target -= (viewport - itemSize) / 2;
-    const time = animate ? this.ScrollingSpeedMs / 1000 : 0;
-    if (horizontal) this.ScrollTo(-target, this.offsetY, time, true);
-    else this.ScrollTo(this.offsetX, -target, time, true);
+    return { Offset: -target, Exact: layout.IsItemMeasured(i) };
   }
 
   private StopAnimators(): void {
@@ -731,6 +786,7 @@ export class SkiaScroll extends SkiaControl {
     if (this.ProcessScrollBarGestures(args, apply)) return this;
 
     if (args.Type === "Down") {
+      this.indexOrder = undefined; // a press drops an open ScrollToIndex
       this.hadDown = true;
       this.snapped = false;
       if (this.RespondsToGestures) { this.StopAnimators(); this.ResetPan(); }

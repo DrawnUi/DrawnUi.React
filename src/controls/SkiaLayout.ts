@@ -625,6 +625,12 @@ export class SkiaLayout extends SkiaControl {
     return h;
   }
 
+  /**
+   * The item's offset and height are real, not estimated (C# LastMeasuredIndexLocal >= index): MeasureVisible knows
+   * them once the measured prefix passed the item; the other strategies always do.
+   */
+  IsItemMeasured(index: number): boolean { return this.MeasureItemsStrategy !== "MeasureVisible" || index < this.mvMeasured; }
+
   /** Pixel offset of item index from the top of the layout content (inside padding). */
   GetItemOffsetPixels(index: number): number {
     const scale = this.RenderingScale;
