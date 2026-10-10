@@ -13,7 +13,7 @@ Save under `~/.claude/skills/<name>/SKILL.md` (or your agent's skill folder) to 
 ## Install
 
 ```
-npm i drawnui-react@preview react react-dom
+npm i drawnui-react react react-dom
 ```
 
 `drawnui-react` = React tags + engine types, `drawnui-react/core` = engine only. Vite recommended (CanvasKit `.wasm` is a `?url` import).

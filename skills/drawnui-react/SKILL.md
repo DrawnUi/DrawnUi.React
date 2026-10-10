@@ -14,7 +14,7 @@ when C# has one.
 ## Install
 
 ```
-npm i drawnui-react@preview react react-dom
+npm i drawnui-react react react-dom
 ```
 
 - New app: start from the starter template instead of writing the Vite / startup / canvas setup by hand:

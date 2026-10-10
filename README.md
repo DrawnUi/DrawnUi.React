@@ -27,7 +27,7 @@ await Super.UseDrawnUi()
 ## Install
 
 ```
-npm i drawnui-react@preview react react-dom
+npm i drawnui-react react react-dom
 ```
 
 `drawnui-react` = React tags + every engine type, `drawnui-react/core` = the engine only. Ships ES modules + `.d.ts`;
