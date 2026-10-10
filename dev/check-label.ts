@@ -2,8 +2,10 @@
 // lines (a box too short cuts the text with "…", at least one line kept); ParagraphSpacing above every paragraph after
 // the first; U+2028 breaks a line inside a paragraph; a run of spaces is one; default-ignorable code points no font
 // has (U+FE0F, joiners, tags) draw nothing and take no room; CharacterSpacing widens the line, and spaced text measures,
-// wraps and is cut at the width it draws (C# 7cf1007c, Rust label_spacing_grid).
-import { readFileSync } from "node:fs";
+// wraps and is cut at the width it draws (C# 7cf1007c, Rust label_spacing_grid); Japanese and Chinese break between
+// characters with kinsoku and a Latin word wider than the line breaks by characters (C# LabelCjkWrapTests, Rust
+// label_cjk_wrap; the Japanese part needs a Japanese font: JP_FONT, else Windows' Noto Sans JP).
+import { readFileSync, existsSync } from "node:fs";
 import { Super, SKRect, SkiaAccessibilityManager, HoverManager, SkiaLabel, TextSpan, Thickness, type AnimatorBase, type Canvas } from "../src/index.ts";
 
 declare const CanvasKitInit: (o: { locateFile: () => string }) => Promise<any>;
@@ -105,6 +107,30 @@ const WORDS = "The quick brown fox jumps over the lazy dog again and again";
   for (const [name, title] of [...titles, ["cut in the second span", (l: SkiaLabel) => { l.AddSubView(span("ESTI ")); l.AddSubView(span("LIZARUMAFOTOLONGA", true)); }] as [string, (l: SkiaLabel) => void]]) {
     const { label, right } = inkRight((l) => { title(l); l.FontSize = 20; l.CharacterSpacing = 3; l.MaxLines = 1; l.WidthRequest = 150; }, 400, 100);
     check(`${name}: spaced text is cut at the width it draws`, right > 0 && right <= 151, `ink ends at ${right} in a 150 px label: ${lines(label).join(" | ")}`);
+  }
+
+  // Chinese / Japanese line breaks (C# LabelCjkWrapTests, Rust label_cjk_wrap)
+  const wrapped = (text: string, mode: "WordWrap" | "TailTruncation", maxLines: number, width: number, family = "") => {
+    const l = measure((x) => { x.Text = text; x.WidthRequest = width; x.LineBreakMode = mode; x.MaxLines = maxLines; if (family) x.FontFamily = family; });
+    return (l as unknown as { lines: { Runs: { Text: string }[]; Width: number }[] }).lines.map((x) => ({ text: x.Runs.map((r) => r.Text).join(""), width: x.Width }));
+  };
+  const fit = (ls: { width: number }[], limit: number) => ls.every((x) => x.width <= limit);
+  const URL = "https://drawnui.net/articles/a/very/long/path/without/any/space/that/cannot/fit/on/one/line";
+  const url = wrapped(`See ${URL}`, "WordWrap", -1, 200);
+  check("a long Latin word breaks by characters", url[0].text.trim() === "See" && url.length > 2 && fit(url, 201) && url.slice(1).map((x) => x.text).join("") === URL, url.map((x) => x.text).join(" | "));
+  const breaks: [string, number, boolean][] = [["背景", 1, true], ["部屋。", 2, false], ["「今", 1, false], ["ャッ", 1, false], ["ab", 1, false], ["aの", 1, true], ["한국", 1, false], ["a\u{20000}", 1, true], ["\u{20000}b", 1, false]];
+  for (const [text, index, expected] of breaks) check(`break inside ${JSON.stringify(text)} at ${index}: ${expected}`, SkiaLabel.CanBreakInsideWord(text, index) === expected);
+  const jpFont = [process.env.JP_FONT, "C:/Windows/Fonts/NotoSansJP-VF.ttf", "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"].find((f) => f && existsSync(f));
+  if (!jpFont) console.log("skip Japanese wrap: no Japanese font (set JP_FONT)");
+  else {
+    Super.Fonts.set("FontJapaneseTest", new Map([[400, CK.Typeface.MakeFreeTypeFaceFromData(readFileSync(jpFont).buffer)]]));
+    const JAPANESE = "背景の部屋をどう見せるかを選びます。今のプリセットは下のスイッチでオフにできます。";
+    const jp = wrapped(JAPANESE, "WordWrap", -1, 300, "FontJapaneseTest");
+    check("Japanese wraps between characters with kinsoku", jp.length >= 2 && jp.length <= 4 && fit(jp, 301) && jp.slice(1).every((x) => !"、。ー」』）っゃゅょッャュョ".includes(Array.from(x.text)[0])) && jp.map((x) => x.text).join("") === JAPANESE, jp.map((x) => `${x.text} (${x.width.toFixed(0)})`).join(" | "));
+    const after = wrapped(`DrawnCamera ${JAPANESE}`, "WordWrap", -1, 300, "FontJapaneseTest");
+    check("Japanese after a Latin word fills the line", after[0].text.startsWith("DrawnCamera 背景") && fit(after, 301), after.map((x) => x.text).join(" | "));
+    const cut = wrapped(JAPANESE + JAPANESE, "TailTruncation", 2, 300, "FontJapaneseTest");
+    check("Japanese tail truncation keeps MaxLines", cut.length === 2 && fit(cut, 301), cut.map((x) => `${x.text} (${x.width.toFixed(0)})`).join(" | "));
   }
 
   console.log(failures ? `FAIL: ${failures} checks` : "OK: label rules");

@@ -245,6 +245,71 @@ export class SkiaLabel extends SkiaControl {
 
   private Width(runs: TextRun[]): number { let w = 0; for (const r of runs) w += r.Width; return w; }
 
+  /** A line never starts with these (closing punctuation, small kana, the long vowel mark): JIS X 4051 kinsoku (C#). */
+  private static readonly NoBreakBefore = "、。，．・：；？！゛゜ヽヾゝゞ々〻ー」』）〕］｝〉》】〗〙〟｠»’”‐゠–〜～ぁぃぅぇぉっゃゅょゎゕゖァィゥェォッャュョヮヵヶㇰㇱㇲㇳㇴㇵㇶㇷㇸㇹㇺㇻㇼㇽㇾㇿ｡｣､･ｰｧｨｩｪｫｬｭｮｯ)]},.!?:;%";
+  /** A line never ends with these (opening brackets and quotes). */
+  private static readonly NoBreakAfter = "「『（〔［｛〈《【〖〘〝｟«‘“｢([{";
+  /** Chinese / Japanese: ideographs, kana, CJK punctuation, full-width forms (C# IsCjkAt). Korean breaks at spaces only. */
+  private static readonly Cjk = /[\u3000-\u312F\u3190-\u33FF\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF\u{20000}-\u{3FFFF}]/u;
+
+  private static CanBreakBetween(before: string, after: string): boolean {
+    return (SkiaLabel.Cjk.test(before) || SkiaLabel.Cjk.test(after)) && !SkiaLabel.NoBreakBefore.includes(after) && !SkiaLabel.NoBreakAfter.includes(before);
+  }
+
+  /**
+   * C# CanBreakInsideWord: whether a line may break between text[index - 1] and text[index] (UTF-16 indexes) inside a
+   * space-free run: next to a Chinese or Japanese character, never before closing punctuation or small kana, never
+   * after an opening bracket, never inside a surrogate pair.
+   */
+  static CanBreakInsideWord(text: string, index: number): boolean {
+    if (index <= 0 || index >= text.length) return false;
+    const hi = (k: number) => { const c = text.charCodeAt(k); return c >= 0xD800 && c <= 0xDBFF; };
+    if (hi(index - 1)) return false; // inside a surrogate pair
+    const before = String.fromCodePoint(text.codePointAt(hi(index - 2) && index >= 2 ? index - 2 : index - 1)!);
+    const after = String.fromCodePoint(text.codePointAt(index)!);
+    return SkiaLabel.CanBreakBetween(before, after);
+  }
+
+  /**
+   * C# FitAtBreak: the last place inside the word where a Chinese / Japanese line may break and `prefix` plus the word
+   * up to there still fits; code points from the word's start, 0 = none.
+   */
+  private FitCjk(word: TextRun[], prefix: number, maxWidth: number): number {
+    if (!word.some((r) => SkiaLabel.Cjk.test(r.Text))) return 0;
+    const sp = this.glyphSpacing;
+    let x = prefix, best = 0, before = "", k = 0;
+    for (const r of word) {
+      const cps = Array.from(r.Text), widths = r.Font.getGlyphWidths(r.Font.getGlyphIDs(r.Text, cps.length));
+      for (let i = 0; i < cps.length; i++) {
+        if (k > 0 && SkiaLabel.CanBreakBetween(before, cps[i])) {
+          if (x - sp > maxWidth) return best;
+          best = k;
+        }
+        x += widths[i] + sp; before = cps[i]; k++;
+      }
+    }
+    return best;
+  }
+
+  /** The word cut after `count` code points: the head goes on a line, the rest follows. */
+  private SplitWord(word: TextRun[], count: number): [TextRun[], TextRun[]] {
+    const head: TextRun[] = [], rest: TextRun[] = [];
+    let left = count;
+    for (const r of word) {
+      const cps = Array.from(r.Text);
+      if (left >= cps.length) { head.push(r); left -= cps.length; continue; }
+      if (left > 0) {
+        const a = cps.slice(0, left).join(""), b = cps.slice(left).join("");
+        head.push({ ...r, Text: a, Width: this.Advance(r.Font, a) });
+        rest.push({ ...r, Text: b, Width: this.Advance(r.Font, b) });
+        left = 0;
+        continue;
+      }
+      rest.push(r);
+    }
+    return [head, rest];
+  }
+
   private Transform(text: string): string {
     switch (this.textTransform) {
       case "Uppercase": return text.toUpperCase();
@@ -324,22 +389,32 @@ export class SkiaLabel extends SkiaControl {
         // glued fragments (no space between spans) wrap as one word
         let word = this.Segment(tok.Text, tok.Fonts, tok.Span);
         while (i + 1 < para.length && !para[i + 1].SpaceBefore) { i++; word = word.concat(this.Segment(para[i].Text, para[i].Fonts, para[i].Span)); }
-        const space = tok.SpaceBefore && line.Runs.length > 0 ? this.Segment(" ", tok.Fonts, tok.Span) : [];
-        const spaceW = this.Width(space), wordW = this.Width(word);
-        if (!wrap || line.Width + spaceW + wordW - sp <= maxWidth || (line.Runs.length === 0 && wordW - sp <= maxWidth)) {
-          this.Append(line, space); this.Append(line, word);
-          continue;
-        }
-        if (line.Runs.length > 0) { out.push(line); line = this.NewLine(); }
-        if (wordW - sp <= maxWidth) { this.Append(line, word); continue; }
-        // word longer than the line: break by code points
-        for (const r of word) {
-          for (const ch of Array.from(r.Text)) {
-            const run = this.Segment(ch, r.Fonts, r.Span);
-            const chW = this.Width(run);
-            if (line.Runs.length > 0 && line.Width + chW - sp > maxWidth) { out.push(line); line = this.NewLine(); }
-            this.Append(line, run);
+        for (;;) {
+          const space = tok.SpaceBefore && line.Runs.length > 0 ? this.Segment(" ", tok.Fonts, tok.Span) : [];
+          const spaceW = this.Width(space), wordW = this.Width(word);
+          if (!wrap || line.Width + spaceW + wordW - sp <= maxWidth || (line.Runs.length === 0 && wordW - sp <= maxWidth)) {
+            this.Append(line, space); this.Append(line, word);
+            break;
           }
+          // Chinese / Japanese: the word fills the line up to its last break that fits (C# FitAtBreak)
+          const k = this.FitCjk(word, line.Width + spaceW, maxWidth);
+          if (k > 0) {
+            const [head, rest] = this.SplitWord(word, k);
+            this.Append(line, space); this.Append(line, head);
+            out.push(line); line = this.NewLine(); word = rest;
+            continue;
+          }
+          if (line.Runs.length > 0) { out.push(line); line = this.NewLine(); continue; }
+          // word longer than the line: break by code points
+          for (const r of word) {
+            for (const ch of Array.from(r.Text)) {
+              const run = this.Segment(ch, r.Fonts, r.Span);
+              const chW = this.Width(run);
+              if (line.Runs.length > 0 && line.Width + chW - sp > maxWidth) { out.push(line); line = this.NewLine(); }
+              this.Append(line, run);
+            }
+          }
+          break;
         }
       }
       out.push(line.Runs.length > 0 ? line : empty(lastFonts));
