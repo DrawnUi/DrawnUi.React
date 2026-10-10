@@ -22,6 +22,10 @@ export class SkiaShape extends SkiaLayout {
   StrokeCap: StrokeCap = "Round";
   /** Gradient painted along the stroke instead of StrokeColor (C# StrokeGradient). */
   StrokeGradient?: SkiaGradient;
+  /** Dashes in points: on, off, on, off... (C# StrokePath, each rounded to pixels). Empty = a solid line. */
+  StrokePath?: number[];
+  /** Blend mode of the stroke, an SKBlendMode name (C# StrokeBlendMode). */
+  StrokeBlendMode = "SrcOver";
   /** Raised (Bevel) or pressed-in (Emboss) edges, drawn with Bevel after the background (C# BevelType). */
   BevelType: BevelType = "None";
   private bevel?: SkiaBevel;
@@ -75,16 +79,29 @@ export class SkiaShape extends SkiaLayout {
     return this.StrokeWidth > 0 ? this.StrokeWidth * scale : -this.StrokeWidth;
   }
 
-  /** Rect the outline is drawn on: bounds deflated by half the stroke so the stroke stays inside. */
+  /**
+   * The outline the stroke runs on (C# CalculateShapeSizeForStroke): the bounds inset by half the stroke rounded up, at
+   * least a pixel, then on whole pixels inward, so a 1 px stroke on a plain rectangle sits on the line between two
+   * pixels as upstream draws it.
+   */
   private StrokeAwareRect(r: SKRect, scale: number): SKRect {
-    const half = this.StrokePixels(scale) / 2;
-    return new SKRect(r.Left + half, r.Top + half, r.Right - half, r.Bottom - half);
+    if (!this.UsesStroke()) return r;
+    const half = this.StrokePixels(scale) / 2, inset = half < 0.5 ? 1 : Math.ceil(half);
+    return new SKRect(Math.ceil(r.Left + inset), Math.ceil(r.Top + inset), Math.floor(r.Right - inset), Math.floor(r.Bottom - inset));
+  }
+
+  /** The fill (C# MeasuredStrokeAwareClipSize): a third of the stroke inside the outline, so it does not show under the stroke's edge. */
+  private BackgroundRect(r: SKRect, scale: number): SKRect {
+    if (!this.UsesStroke()) return r;
+    const o = this.StrokeAwareRect(r, scale), k = this.StrokePixels(scale) / 3;
+    return new SKRect(o.Left + k, o.Top + k, o.Right - k, o.Bottom - k);
   }
 
   private UsesStroke(): boolean { return this.StrokeWidth !== 0 && this.StrokeColor !== Colors.Transparent; }
 
   /** Builds the outline path for rect (canvas pixels). Caller deletes it. */
-  protected CreateShapePath(rect: SKRect, scale: number): Path {
+  /** `radiusReduce`: pixels taken off every corner radius (the fill inside a thick stroke, C# GetCorrectedBackgroundRadii). */
+  protected CreateShapePath(rect: SKRect, scale: number, radiusReduce = 0): Path {
     const CK = Super.CK;
     const b = new CK.PathBuilder();
     const type = this.Type;
@@ -118,7 +135,8 @@ export class SkiaShape extends SkiaLayout {
     } else {
       const c = this.cornerRadius;
       if (c.TopLeft || c.TopRight || c.BottomLeft || c.BottomRight) {
-        const tl = c.TopLeft * scale, tr = c.TopRight * scale, br = c.BottomRight * scale, bl = c.BottomLeft * scale;
+        const k = (v: number) => Math.max(0, v * scale - radiusReduce);
+        const tl = k(c.TopLeft), tr = k(c.TopRight), br = k(c.BottomRight), bl = k(c.BottomLeft);
         b.addRRect(Float32Array.of(rect.Left, rect.Top, rect.Right, rect.Bottom, tl, tl, tr, tr, br, br, bl, bl));
       } else {
         b.addRect(CK.LTRBRect(rect.Left, rect.Top, rect.Right, rect.Bottom));
@@ -159,8 +177,11 @@ export class SkiaShape extends SkiaLayout {
     if (type === "Arc" || type === "Line") return; // open shapes: stroke only
     const CK = Super.CK;
     const canvas = ctx.Context.Canvas;
-    const rect = this.StrokeAwareRect(ctx.Destination, ctx.Scale);
-    const path = this.CreateShapePath(rect, ctx.Scale);
+    const rect = this.BackgroundRect(ctx.Destination, ctx.Scale);
+    // inside a stroke wider than a point the corners of the fill are rounded less (C# GetCorrectedBackgroundRadii)
+    const outline = this.StrokeAwareRect(ctx.Destination, ctx.Scale);
+    const reduce = this.UsesStroke() && this.StrokeWidth > 1 ? Math.min((outline.Width - rect.Width) / 2, (outline.Height - rect.Height) / 2) : 0;
+    const path = this.CreateShapePath(rect, ctx.Scale, reduce);
     // C# PaintWithShadowsInternal: the fill is drawn once per shadow with a drop-shadow filter; a hollow shape
     // (ClipBackgroundColor) clips its own outline away so only the shadow outside remains
     for (const shadow of this.shadows) {
@@ -267,17 +288,33 @@ export class SkiaShape extends SkiaLayout {
       clip.delete();
     }
     if (this.UsesStroke()) {
-      const rect = this.StrokeAwareRect(ctx.Destination, ctx.Scale);
-      const path = this.CreateShapePath(rect, ctx.Scale);
+      const scale = ctx.Scale, px = this.StrokePixels(scale), type = this.Type;
+      let rect = this.StrokeAwareRect(ctx.Destination, scale);
+      const c = this.cornerRadius;
+      const rounded = type === "Rectangle" && !!(c.TopLeft || c.TopRight || c.BottomLeft || c.BottomRight);
+      // C# PaintStroke: on curves a stroke of a point or less is thinned (its antialiasing makes it look heavier than
+      // the straight parts), a thin rounded rectangle runs through pixel centers, a line is at least a pixel wide
+      const curved = rounded || type === "Circle" || type === "Ellipse" || type === "Arc" || type === "Path";
+      const width = type === "Line" ? Math.max(1, px) : curved && px <= scale ? px * 0.55 : px;
+      if (rounded && px <= 2 * scale) {
+        const even = (v: number) => { const r = Math.round(v); return Math.abs(v % 1) === 0.5 && r % 2 !== 0 ? r - 1 : r; }; // C# Math.Round: ties to even
+        rect = new SKRect(even(rect.Left) + 0.5, even(rect.Top) + 0.5, even(rect.Right) - 0.5, even(rect.Bottom) - 0.5);
+      }
+      const path = this.CreateShapePath(rect, scale);
       const paint = new CK.Paint();
       paint.setAntiAlias(true);
       paint.setStyle(CK.PaintStyle.Stroke);
-      paint.setStrokeWidth(Math.max(1, this.StrokePixels(ctx.Scale)));
+      paint.setStrokeWidth(width);
       paint.setColor(Super.ParseColor(this.StrokeColor));
       if (this.StrokeGradient) this.SetupGradient(paint, this.StrokeGradient, rect);
+      const blend = (CK.BlendMode as unknown as Record<string, import("canvaskit-wasm").BlendMode>)[this.StrokeBlendMode];
+      if (blend && this.StrokeBlendMode !== "SrcOver") paint.setBlendMode(blend);
       paint.setStrokeCap(this.StrokeCap === "Butt" ? CK.StrokeCap.Butt : this.StrokeCap === "Square" ? CK.StrokeCap.Square : CK.StrokeCap.Round);
       paint.setStrokeJoin(this.StrokeCap === "Round" ? CK.StrokeJoin.Round : CK.StrokeJoin.Miter);
+      const dash = this.StrokePath?.length ? CK.PathEffect.MakeDash(this.StrokePath.map((v) => Math.round(v * scale)), 0) : null;
+      if (dash) paint.setPathEffect(dash);
       canvas.drawPath(path, paint);
+      dash?.delete();
       paint.delete();
       path.delete();
     }

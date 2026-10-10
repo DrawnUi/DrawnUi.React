@@ -63,6 +63,7 @@
     "check:snap": "node dev/check.mjs dev/check-snap.ts",
     "check:game": "node dev/check.mjs dev/check-game.ts",
     "check:animation": "node dev/check.mjs dev/check-animation.ts",
+    "check:shape": "node dev/check.mjs dev/check-shape.ts",
     "check:shell": "node dev/check.mjs dev/check-shell.tsx",
     "check:wheel-routing": "node dev/check.mjs dev/check-wheel-routing.ts",
     "site:extras": "node dev/site-extras.mjs dist/demo",
