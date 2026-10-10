@@ -75,5 +75,8 @@ export class SkiaProgress extends SkiaControl {
     paint.delete();
   }
 
-  protected override DefaultAccessibilityLabel(): string | undefined { return `${Math.round(this.Ratio * 100)}%`; }
+  /** Value between Min and Max, read as "65%"; the name is the app's AccessibilityLabel only (drawnui-cross 6c). */
+  override get AccessibilityValue(): import("../core/Accessibility").AccessibilityValue {
+    return { Now: this.value, Min: this.min, Max: this.max, Step: 0, Text: `${Math.round(this.Ratio * 100)}%` };
+  }
 }

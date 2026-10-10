@@ -8,7 +8,7 @@
 import { readFileSync } from "node:fs";
 import {
   Super, SkiaScroll, SkiaStack, SkiaWrap, SkiaLayer, SkiaRow, SkiaButton, SkiaSlider, SkiaDynamicDrawnCell, SkiaLabel,
-  SkiaAccessibilityManager, Aria, SKRect, Thickness, SkiaEditor, KeyboardManager, type SkiaControl, type AnimatorBase,
+  SkiaAccessibilityManager, Aria, SKRect, Thickness, SkiaEditor, KeyboardManager, SkiaProgress, type SkiaControl, type AnimatorBase,
 } from "../src/index.ts";
 
 declare const CanvasKitInit: (o: { locateFile: () => string }) => Promise<any>;
@@ -210,6 +210,19 @@ class Cell extends SkiaDynamicDrawnCell {
   check("a soft keyboard's Unidentified key is not acted on", !down(key("Backspace", "BODY", { key: "Unidentified" })) && editor.Text === "abx", editor.Text);
   check("Backspace is Backspace, Delete is Delete", KeyboardManager.IsOwnedByElement(key("Backspace", "HTML")) === false
     && (editor.CursorPosition = 1, down(key("Delete", "BODY")) && editor.Text === "ax"), editor.Text);
+
+  // range values (drawnui-cross 6c): a value, not a name; read back on the next frame after a key
+  const sliderNode = () => mgr.Snapshot.find((n) => n.Source === slider);
+  check("slider: value in the snapshot, no name from the value", sliderNode()?.Value?.Now === slider.End && sliderNode()?.Value?.Min === 0 && sliderNode()?.Value?.Max === 50
+    && sliderNode()?.Value?.Step === 0.5 && sliderNode()?.Label === undefined, JSON.stringify({ v: sliderNode()?.Value, l: sliderNode()?.Label }));
+  mgr.MinUpdateIntervalMs = 100000;
+  await frames(1);
+  SkiaAccessibilityManager.Key(slider, "ArrowRight");
+  await frames(1);
+  check("slider: the new value is in the snapshot on the next frame", sliderNode()?.Value?.Now === slider.End, `${sliderNode()?.Value?.Now} vs ${slider.End}`);
+  mgr.MinUpdateIntervalMs = 0;
+  const progress = new SkiaProgress(); progress.Value = 65;
+  check("progress: value text 65%, no name from the value", progress.AccessibilityValue?.Text === "65%" && progress.AccessibilityLabel === undefined, `${progress.AccessibilityValue?.Text} / ${progress.AccessibilityLabel}`);
 
   console.log(failures ? `FAIL: ${failures} checks` : "OK: keyboard contract");
   process.exit(failures ? 1 : 0);

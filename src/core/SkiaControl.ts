@@ -522,6 +522,9 @@ export class SkiaControl {
    */
   WantsPointerCursor(_x: number, _y: number): boolean { return this.AccessibilityCanInteract; }
 
+  /** A range control's value for screen readers (slider, progress); undefined for everything else (drawnui-cross 6c). */
+  get AccessibilityValue(): import("./Accessibility").AccessibilityValue | undefined { return undefined; }
+
   /** aria-pressed for toggles; undefined = not a toggle. */
   get AccessibilityIsPressed(): boolean | undefined { return this.accessibilityIsPressed; }
   set AccessibilityIsPressed(v: boolean | undefined) { if (this.accessibilityIsPressed !== v) { this.accessibilityIsPressed = v; this.AccessibilityChanged(); } }

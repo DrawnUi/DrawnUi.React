@@ -10,20 +10,20 @@ function Card({ title, style, log }: { title: string; style: PrebuiltControlStyl
         <SkiaLabel Text={title} FontSize={16} FontAttributes="Bold" TextColor="#111827" />
 
         <SkiaRow Spacing={16} HorizontalOptions="Fill">
-          <SkiaSwitch ControlStyle={style} IsToggled VerticalOptions="Center" Toggled={(_, v) => log(`${title} switch: ${v}`)} />
-          <SkiaCheckbox ControlStyle={style} IsToggled VerticalOptions="Center" Toggled={(_, v) => log(`${title} checkbox: ${v}`)} />
+          <SkiaSwitch ControlStyle={style} IsToggled VerticalOptions="Center" AccessibilityLabel="Wi-Fi" Toggled={(_, v) => log(`${title} switch: ${v}`)} />
+          <SkiaCheckbox ControlStyle={style} IsToggled VerticalOptions="Center" AccessibilityLabel="Remember me" Toggled={(_, v) => log(`${title} checkbox: ${v}`)} />
           <SkiaRadioButton ControlStyle={style} Text="One" IsToggled GroupName={title} VerticalOptions="Center" Toggled={(_, v) => v && log(`${title} radio: One`)} />
           <SkiaRadioButton ControlStyle={style} Text="Two" GroupName={title} VerticalOptions="Center" Toggled={(_, v) => v && log(`${title} radio: Two`)} />
         </SkiaRow>
 
         <SkiaButton Text="Button" ControlStyle={style} HorizontalOptions="Start" Tapped={() => log(`${title} button tapped`)} />
 
-        <SkiaProgress ControlStyle={style} Value={65} HorizontalOptions="Fill" />
+        <SkiaProgress ControlStyle={style} Value={65} HorizontalOptions="Fill" AccessibilityLabel="Download" />
 
-        <SkiaSlider ControlStyle={style} End={65} HorizontalOptions="Fill" EndChanged={(_, v) => log(`${title} slider: ${v.toFixed(0)}`)} />
+        <SkiaSlider ControlStyle={style} End={65} HorizontalOptions="Fill" AccessibilityLabel="Volume" EndChanged={(_, v) => log(`${title} slider: ${v.toFixed(0)}`)} />
 
         {/* range mode: two thumbs */}
-        <SkiaSlider ControlStyle={style} EnableRange Start={20} End={80} HorizontalOptions="Fill" StartChanged={(_, v) => log(`${title} range start: ${v.toFixed(0)}`)} EndChanged={(_, v) => log(`${title} range end: ${v.toFixed(0)}`)} />
+        <SkiaSlider ControlStyle={style} EnableRange Start={20} End={80} HorizontalOptions="Fill" AccessibilityLabel="Price range" StartChanged={(_, v) => log(`${title} range start: ${v.toFixed(0)}`)} EndChanged={(_, v) => log(`${title} range end: ${v.toFixed(0)}`)} />
       </SkiaStack>
     </SkiaShape>
   );

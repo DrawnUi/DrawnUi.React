@@ -203,6 +203,13 @@ const NAVIGATION_KEYS = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDow
  * canvas. Keyboard and screen-reader input arrive as DOM events: Enter / Space activate (a Tapped), the navigation keys
  * go to the focused control and then to its arrow-key group; a group is one Tab stop (roving tabindex).
  */
+/** aria-valuenow / min / max / valuetext of a range control (drawnui-cross 6c); a slider reads as horizontal. */
+function valueAttributes(n: AccessibilityNode) {
+  const v = n.Value;
+  if (!v) return undefined;
+  return { "aria-valuenow": v.Now, "aria-valuemin": v.Min, "aria-valuemax": v.Max, "aria-valuetext": v.Text || undefined, "aria-orientation": n.Role === "slider" ? ("horizontal" as const) : undefined };
+}
+
 function AccessibilityOverlay({ view }: { view: CanvasView }) {
   const [nodes, setNodes] = useState<AccessibilityNode[]>(() => view.AccessibilityManager.Snapshot);
   // keyboard focus moved by the manager (arrow keys in a group): focus that node's element once it is rendered
@@ -223,6 +230,20 @@ function AccessibilityOverlay({ view }: { view: CanvasView }) {
     setFocusRequest(undefined);
     elementOf(focusRequest.id)?.focus({ preventScroll: true });
   }, [focusRequest]);
+  // the focused node went away (its page or popup closed): the focus goes to the first Tab stop on screen in reading
+  // order instead of falling back to the page (drawnui-cross 6c refocus); a focus the user moved away stays away
+  const focusedId = useRef(0);
+  useLayoutEffect(() => {
+    const id = focusedId.current;
+    if (!id || nodes.some((n) => n.Id === id)) return;
+    focusedId.current = 0;
+    const active = document.activeElement;
+    if (active && active !== document.body) return;
+    const box = overlayRef.current?.getBoundingClientRect();
+    const first = nodes.find((n) => n.CanInteract && view.AccessibilityManager.IsTabStop(n.Source)
+      && (!box || (n.Rect.Bottom > 0 && n.Rect.Top < box.height && n.Rect.Right > 0 && n.Rect.Left < box.width)));
+    if (first) elementOf(first.Id)?.focus({ preventScroll: true });
+  }, [nodes]);
   // Tab / Shift+Tab in a text field leave it for the next node, also after a click into it: DOM focus goes to the
   // field's own element (without taking the caret again) and the browser's Tab moves on from there
   const tabbingOut = useRef(0);
@@ -271,7 +292,7 @@ function AccessibilityOverlay({ view }: { view: CanvasView }) {
         const pos: CSSProperties = { left: n.Rect.Left, top: n.Rect.Top, width: n.Rect.Width, height: n.Rect.Height };
         const activate = () => SkiaAccessibilityManager.Activate(n.Source);
         return n.CanInteract ? (
-          <div key={n.Id} data-a11y-id={n.Id} role={n.Role} aria-label={n.Label} title={n.Hint}
+          <div key={n.Id} data-a11y-id={n.Id} role={n.Role} aria-label={n.Label} title={n.Hint} {...valueAttributes(n)}
             aria-pressed={n.Role === "button" ? n.IsPressed : undefined}
             aria-checked={n.Role === "switch" || n.Role === "checkbox" || n.Role === "radio" ? n.IsPressed : undefined}
             aria-live={n.Live as "polite" | "assertive" | undefined}
@@ -282,6 +303,7 @@ function AccessibilityOverlay({ view }: { view: CanvasView }) {
               else if (NAVIGATION_KEYS.has(e.key) && SkiaAccessibilityManager.Key(n.Source, e.key)) e.preventDefault();
             }}
             onFocus={(e) => {
+              focusedId.current = n.Id;
               pin({ currentTarget: e.currentTarget.parentElement as HTMLDivElement } as React.SyntheticEvent<HTMLDivElement>);
               SkiaScrollCtrl.EnsureVisible(n.Source); // inside every enclosing scroll
               if (tabbingOut.current === n.Id) tabbingOut.current = 0; // leaving a text field: it keeps no caret
@@ -290,6 +312,7 @@ function AccessibilityOverlay({ view }: { view: CanvasView }) {
               setFocusTick((t) => t + 1);
             }}
             onBlur={(e) => {
+              if (e.currentTarget.isConnected && focusedId.current === n.Id) focusedId.current = 0; // moved away on purpose
               if (TextInputProxy.IsProxyTarget(e.relatedTarget)) return; // a text field moved DOM focus to its own input
               n.Source.OnAccessibilityFocused(false);
               n.Source.NotifyAccessibilityFocused(false);
@@ -305,7 +328,7 @@ function AccessibilityOverlay({ view }: { view: CanvasView }) {
           </div>
         ) : (
           // static text is exposed as real (transparent) text content; aria-label only for roles that need a name
-          <div key={n.Id} role={n.Role} aria-label={n.Role === "text" ? undefined : n.Label} title={n.Hint} aria-disabled={n.Disabled || undefined} aria-live={n.Live as "polite" | "assertive" | undefined} className="drawnui-a11y-node" style={pos}>
+          <div key={n.Id} role={n.Role} aria-label={n.Role === "text" ? undefined : n.Label} title={n.Hint} {...valueAttributes(n)} aria-disabled={n.Disabled || undefined} aria-live={n.Live as "polite" | "assertive" | undefined} className="drawnui-a11y-node" style={pos}>
             {n.Label}
           </div>
         );

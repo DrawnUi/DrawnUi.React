@@ -50,6 +50,12 @@ const asScroll = (c: SkiaControl): GroupScroll | undefined => ("ScrollToIndex" i
 /** One laid-out text line exposed for native selection (AccessibilityTextSelectable): CSS px relative to the node. */
 export interface AccessibilityTextLine { Text: string; Left: number; Top: number; Width: number; Height: number; FontFamily: string; FontWeight: number; FontSize: number }
 
+/**
+ * The value of a range control (a slider, a progress bar): what a screen reader reads and adjusts (drawnui-cross 6c,
+ * C# AccessibilityValue): aria-valuenow / min / max, and aria-valuetext when Text is not empty ("65%", "20 – 80").
+ */
+export interface AccessibilityValue { Now: number; Min: number; Max: number; Step: number; Text: string }
+
 /** One entry of the accessibility snapshot (DrawnUi AccessibilityNode). Rect is CSS pixels relative to the canvas. */
 export interface AccessibilityNode {
   Id: number;
@@ -63,6 +69,8 @@ export interface AccessibilityNode {
   IsPressed?: boolean;
   Live?: string;
   Source: SkiaControl;
+  /** A range control's value (aria-valuenow / min / max / valuetext); its name stays the app's label. */
+  Value?: AccessibilityValue;
   /** Real text lines rendered into the overlay so the browser can select / copy them (opt-in per control). */
   TextLines?: AccessibilityTextLine[];
 }
@@ -111,6 +119,7 @@ export class SkiaAccessibilityManager {
   static Activate(node?: SkiaControl): boolean {
     if (!node || !node.AccessibilityCanInteract) return false;
     node.OnAccessibilityActivated();
+    node.Superview?.AccessibilityManager.ForceRebuildOnNextFrame(); // a screen reader reads the new state right back
     return true;
   }
 
@@ -121,7 +130,10 @@ export class SkiaAccessibilityManager {
    */
   static Key(node: SkiaControl | undefined, key: InputKey): boolean {
     if (!node) return false;
-    if (node.CanReceiveGesture("Panning") && node.OnAccessibilityKey(key)) return true;
+    if (node.CanReceiveGesture("Panning") && node.OnAccessibilityKey(key)) {
+      node.Superview?.AccessibilityManager.ForceRebuildOnNextFrame(); // the new value is read right back, not a second later
+      return true;
+    }
     return node.Superview?.AccessibilityManager.MoveInGroup(node, key) ?? false;
   }
 
@@ -244,7 +256,7 @@ export class SkiaAccessibilityManager {
     if (node.AccessibilityLive) for (const cb of this.liveUpdated) cb(node);
   }
 
-  ForceRebuildOnNextFrame(): void { this.lastRebuild = 0; this.dirty = true; }
+  ForceRebuildOnNextFrame(): void { this.lastRebuild = -Infinity; this.dirty = true; }
 
   Unregister(node: SkiaControl): void {
     if (this.nodes.delete(node)) { node.OnAccessibilityUnregistered(); this.dirty = true; }
@@ -290,7 +302,7 @@ export class SkiaAccessibilityManager {
       // only what is entirely outside a clipped canvas by more than a screen is dropped to keep the DOM small
       if (px.Right < -canvasWidthPx || px.Bottom < -canvasHeightPx || px.Left > 2 * canvasWidthPx || px.Top > 2 * canvasHeightPx) continue;
       list.push({
-        Id: n.AccessibilityId, Label: n.AccessibilityLabel, Hint: n.AccessibilityHint, Role: n.AccessibilityRole!,
+        Id: n.AccessibilityId, Label: n.AccessibilityLabel, Hint: n.AccessibilityHint, Role: n.AccessibilityRole!, Value: n.AccessibilityValue,
         Rect: new SKRect(px.Left / scale, px.Top / scale, px.Right / scale, px.Bottom / scale),
         CanInteract: n.AccessibilityCanInteract, IsPressed: n.AccessibilityIsPressed, Live: n.AccessibilityLive, Source: n,
         Disabled: !n.AccessibilityCanInteract && Aria.IsInteractiveRole(n.AccessibilityRole),
@@ -322,7 +334,7 @@ export class SkiaAccessibilityManager {
     for (let i = 0; i < a.length; i++) {
       const x = a[i], y = b[i];
       if (x.Source !== y.Source || x.Label !== y.Label || x.Hint !== y.Hint || x.Role !== y.Role || x.CanInteract !== y.CanInteract || x.Disabled !== y.Disabled
-        || x.IsPressed !== y.IsPressed || x.Live !== y.Live
+        || x.IsPressed !== y.IsPressed || x.Live !== y.Live || !SameValue(x.Value, y.Value)
         || Math.abs(x.Rect.Left - y.Rect.Left) > 0.5 || Math.abs(x.Rect.Top - y.Rect.Top) > 0.5
         || Math.abs(x.Rect.Right - y.Rect.Right) > 0.5 || Math.abs(x.Rect.Bottom - y.Rect.Bottom) > 0.5) return false;
       const tx = x.TextLines, ty = y.TextLines;
@@ -354,6 +366,10 @@ function SayNamesOnce(list: AccessibilityNode[]): AccessibilityNode[] {
     else owner.Label = undefined;
   }
   return said.size ? list.filter((x) => !said.has(x)) : list;
+}
+
+function SameValue(a?: AccessibilityValue, b?: AccessibilityValue): boolean {
+  return a === b || (!!a && !!b && a.Now === b.Now && a.Min === b.Min && a.Max === b.Max && a.Step === b.Step && a.Text === b.Text);
 }
 
 // ---- group helpers (duck-typed layouts and scrolls) ----

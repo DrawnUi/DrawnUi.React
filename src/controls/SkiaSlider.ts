@@ -235,5 +235,11 @@ export class SkiaSlider extends SkiaControl {
     this.End = Math.min(this.Max, Math.max(low, value));
     return true;
   }
-  protected override DefaultAccessibilityLabel(): string | undefined { return this.EnableRange ? `${this.start} – ${this.end}` : `${this.end}`; }
+  /**
+   * End between Min and Max, read as the number, or "20 – 80" in range mode; the step is the arrow key's. The name is
+   * the app's AccessibilityLabel only (C# used to make the value the name, drawnui-cross 6c).
+   */
+  override get AccessibilityValue(): import("../core/Accessibility").AccessibilityValue {
+    return { Now: this.end, Min: this.Min, Max: this.Max, Step: this.Step > 0 ? this.Step : (this.Max - this.Min) / 100, Text: this.EnableRange ? `${this.start} – ${this.end}` : "" };
+  }
 }
