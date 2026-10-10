@@ -245,6 +245,9 @@ export class Canvas {
     let executed = 0;
     for (const a of [...this.AnimatingControls.values()]) {
       if (!a.Parent) { this.AnimatingControls.delete(a.Uid); continue; }
+      // the control or a parent is hidden: its animator pauses, no frames, and goes on from where it was when shown
+      if (a.Parent.HiddenInTree()) { if (!a.IsPaused) { a.Pause(); a.PausedWhileHidden = true; } continue; }
+      if (a.PausedWhileHidden) { a.PausedWhileHidden = false; a.Resume(); }
       if (a.IsPaused) continue; // a paused animator neither ticks nor keeps frames coming (C# DrawnView)
       a.TickFrame(frameTimeNanos);
       executed++;

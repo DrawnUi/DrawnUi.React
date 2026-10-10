@@ -1133,8 +1133,24 @@ export class SkiaControl {
 
   /** Redraw without remeasure and WITHOUT dropping caches (position/overlay changes). */
   Repaint(): void {
-    this.Superview?.Update();
+    if (!this.UnderHiddenParent()) this.Superview?.Update();
   }
+
+  /**
+   * A parent (not the control itself) is hidden: a change here asks for no frame and the latest state shows when the
+   * parent is shown again (C# 329f6c44 HiddenUpdateTests, DrawnUi.Rust hidden_updates). The control's own visibility
+   * change still draws: it is the one that hides or shows it.
+   */
+  UnderHiddenParent(): boolean {
+    for (let p = this.Parent; p; p = p.Parent) if (!p.IsVisible) return true;
+    return false;
+  }
+
+  /** The control or a parent is hidden: its animators pause until it shows again. */
+  HiddenInTree(): boolean { return !this.IsVisible || this.UnderHiddenParent(); }
+
+  /** The control an invalidation started at while it climbs (InvalidateMeasure): a hidden parent of it wakes no frame. */
+  private static invalidateOrigin: SkiaControl | null = null;
 
   /**
    * Transform / Opacity changed: this control's own cache is still valid (content unchanged) but every ancestor
@@ -1226,9 +1242,13 @@ export class SkiaControl {
     // structure may change: a composite cannot patch it; a draw-only change (UpdateDraw) reported its area instead
     if (SkiaControl.drawOrigin === null || SkiaControl.drawOrigin === this) this.compositeFull = true;
     this.effectsMarginCache = undefined;
-    if (this.Parent && this.IsParentIndependent) this.RepaintComposition();
-    else if (this.Parent) this.Parent.InvalidateMeasure();
-    else this.Superview?.Update();
+    const outer = SkiaControl.invalidateOrigin;
+    SkiaControl.invalidateOrigin ??= this;
+    try {
+      if (this.Parent && this.IsParentIndependent) this.RepaintComposition();
+      else if (this.Parent) this.Parent.InvalidateMeasure();
+      else if (!SkiaControl.invalidateOrigin.UnderHiddenParent()) this.Superview?.Update();
+    } finally { SkiaControl.invalidateOrigin = outer; }
   }
 
   // ---- gestures (same names as DrawnUi) ----

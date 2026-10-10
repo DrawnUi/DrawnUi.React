@@ -28,6 +28,8 @@ export class AnimatorBase {
   OnStop?: () => void;
   /** Paused: the canvas does not tick it and it wakes no frames; Resume goes on from where it was (C# Pause / Resume). */
   IsPaused = false;
+  /** Paused by the canvas because its control is hidden; resumed when it shows again. */
+  PausedWhileHidden = false;
 
   private delayHandle = 0;
   private delayEnd = 0;
@@ -104,7 +106,7 @@ export class AnimatorBase {
   }
 
   Stop(): void {
-    this.IsPaused = false; this.delayLeft = 0;
+    this.IsPaused = false; this.PausedWhileHidden = false; this.delayLeft = 0;
     if (this.delayHandle) { clearTimeout(this.delayHandle); this.delayHandle = 0; }
     this.Unregister();
     this.LastFrameTimeNanos = 0;
