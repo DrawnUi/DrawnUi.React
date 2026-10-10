@@ -42,12 +42,16 @@ export class DrawnGame extends SkiaLayout {
   /** Starts the game loop. */
   StartLoop(delayMs = 0): void {
     this.appLoop ??= new ActionOnTickAnimator(this, (t) => this.GameTick(t));
+    this.LastFrameTimeNanos = 0; // the first frame of a (re)started loop has no previous one: its delta is 0
     this.appLoop.Start(delayMs);
   }
 
-  /** Internal, override `GameLoop` for your game. Frame time is in nanoseconds. */
+  /**
+   * Internal, override `GameLoop` for your game. Frame time is in nanoseconds. The first frame after StartLoop or
+   * Resume gets a delta of 0, not the time since the clock's origin or since the stop (DrawnUi.Rust game_loop).
+   */
   protected GameTick(frameTimeNanos: number): void {
-    const deltaSeconds = (frameTimeNanos - this.LastFrameTimeNanos) / 1_000_000_000;
+    const deltaSeconds = this.LastFrameTimeNanos === 0 ? 0 : (frameTimeNanos - this.LastFrameTimeNanos) / 1_000_000_000;
     this.LastFrameTimeNanos = frameTimeNanos;
     this.GameLoop(deltaSeconds);
   }
@@ -61,7 +65,7 @@ export class DrawnGame extends SkiaLayout {
   }
 
   Resume(): void {
-    this.LastFrameTimeNanos = Math.round(performance.now() * 1_000_000);
+    this.LastFrameTimeNanos = 0; // the frame clock restarts: the next delta is 0
     this.IsPaused = false;
     this.OnResumed();
   }
