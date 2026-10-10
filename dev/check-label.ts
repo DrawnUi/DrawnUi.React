@@ -1,9 +1,10 @@
 // Label rules as C# / DrawnUi.Rust (label_rules.rs), checked in Node (`npm run check:label`): the height limits the
 // lines (a box too short cuts the text with "…", at least one line kept); ParagraphSpacing above every paragraph after
 // the first; U+2028 breaks a line inside a paragraph; a run of spaces is one; default-ignorable code points no font
-// has (U+FE0F, joiners, tags) draw nothing and take no room.
+// has (U+FE0F, joiners, tags) draw nothing and take no room; CharacterSpacing widens the line, and spaced text measures,
+// wraps and is cut at the width it draws (C# 7cf1007c, Rust label_spacing_grid).
 import { readFileSync } from "node:fs";
-import { Super, SKRect, SkiaAccessibilityManager, HoverManager, SkiaLabel, type AnimatorBase, type Canvas } from "../src/index.ts";
+import { Super, SKRect, SkiaAccessibilityManager, HoverManager, SkiaLabel, TextSpan, Thickness, type AnimatorBase, type Canvas } from "../src/index.ts";
 
 declare const CanvasKitInit: (o: { locateFile: () => string }) => Promise<any>;
 const ROOT = process.cwd();
@@ -67,6 +68,44 @@ const WORDS = "The quick brown fox jumps over the lazy dog again and again";
   for (const t of ["A\u200DB", "A\uFE0FB", "A\u{E0067}B", "A\u2060B", "A\u200BB"]) check(`${JSON.stringify(t)} is as wide as AB`, width(t) === ab, `${width(t)} vs ${ab}`);
   Super.Fonts.set("FontEmoji", new Map([[400, CK.Typeface.MakeFreeTypeFaceFromData(readFileSync(`${ROOT}/samples/public/fonts/NotoColorEmoji-Subset.ttf`).buffer)]]));
   check("U+FE0F after an emoji the fallback has: no box after it", width("\u2699\uFE0F 4m", "FontEmoji") === width("\u2699 4m", "FontEmoji"), `${width("\u2699\uFE0F 4m", "FontEmoji")} vs ${width("\u2699 4m", "FontEmoji")}`);
+
+  // CharacterSpacing (Rust character_spacing_widens_the_line, label_spacing_grid)
+  const lineWidth = (l: SkiaLabel) => (l as unknown as { lines: { Width: number }[] }).lines[0].Width;
+  const grown = lineWidth(measure((l) => { l.Text = "abcd"; l.CharacterSpacing = 3; })) - lineWidth(measure((l) => { l.Text = "abcd"; }));
+  check("CharacterSpacing 3: 2 px more between each of 4 glyphs", Math.abs(grown - 6) < 0.01, `${grown}`);
+  /** A white label on black at `scale`, in a box `w` x `h` points: one past the rightmost column with ink. */
+  const inkRight = (setup: (l: SkiaLabel) => void, w: number, h: number, scale = 1) => {
+    const l = new SkiaLabel(); l.TextColor = "#FFFFFF"; setup(l);
+    l._superview = fake as unknown as Canvas;
+    const pw = Math.round(w * scale), ph = Math.round(h * scale);
+    l.Measure(pw, ph, scale); l.Arrange(new SKRect(0, 0, pw, ph), l.WidthRequest, l.HeightRequest, scale);
+    const surface = CK.MakeSurface(pw, ph), c = surface.getCanvas();
+    c.clear(CK.BLACK);
+    l.Render({ Context: { Canvas: c, Surface: surface }, Destination: new SKRect(0, 0, pw, ph), Scale: scale });
+    const px = c.readPixels(0, 0, { width: pw, height: ph, colorType: CK.ColorType.RGBA_8888, alphaType: CK.AlphaType.Unpremul, colorSpace: CK.ColorSpace.SRGB }) as Uint8Array;
+    surface.delete();
+    let right = 0;
+    for (let y = 0; y < ph; y++) for (let x = pw - 1; x >= right; x--) if (px[(y * pw + x) * 4] > 80) { right = x + 1; break; }
+    return { label: l, right };
+  };
+  const span = (text: string, bold = false) => { const t = new TextSpan(); t.Text = text; t.IsBold = bold; return t; };
+  const titles: [string, (l: SkiaLabel) => void][] = [
+    ["label", (l) => { l.Text = "ESTILIZAR UMA FOTO"; }],
+    ["spans", (l) => { l.AddSubView(span("ESTILIZAR ")); l.AddSubView(span("UMA FOTO", true)); }],
+  ];
+  for (const [name, title] of titles) {
+    const { label, right } = inkRight((l) => { title(l); l.FontSize = 32; l.CharacterSpacing = 3; }, 700, 200);
+    const measured = label.MeasuredSize.Pixels.Width;
+    check(`${name}: spaced text measures the width it draws`, right > 0 && right <= measured + 1 && measured - right < 12, `measured ${measured}, ink ends at ${right}`);
+    // a spaced title wraps inside its column (Rust a_spaced_title_wraps_inside_its_star_column: 151 pt at 1.25)
+    const wrapped = inkRight((l) => { title(l); l.FontSize = 12; l.CharacterSpacing = 3; l.MaxLines = 2; l.Padding = new Thickness(0, 8, 12, 8); }, 151, 200, 1.25);
+    const textRight = Math.round((151 - 12) * 1.25);
+    check(`${name}: a spaced title wraps inside its column`, wrapped.label.LinesCount === 2 && lines(wrapped.label).every((x) => !x.endsWith("…")) && wrapped.right > 0 && wrapped.right <= textRight + 1, `${lines(wrapped.label).join(" | ")}, ink ends at ${wrapped.right} of ${textRight}`);
+  }
+  for (const [name, title] of [...titles, ["cut in the second span", (l: SkiaLabel) => { l.AddSubView(span("ESTI ")); l.AddSubView(span("LIZARUMAFOTOLONGA", true)); }] as [string, (l: SkiaLabel) => void]]) {
+    const { label, right } = inkRight((l) => { title(l); l.FontSize = 20; l.CharacterSpacing = 3; l.MaxLines = 1; l.WidthRequest = 150; }, 400, 100);
+    check(`${name}: spaced text is cut at the width it draws`, right > 0 && right <= 151, `ink ends at ${right} in a 150 px label: ${lines(label).join(" | ")}`);
+  }
 
   console.log(failures ? `FAIL: ${failures} checks` : "OK: label rules");
   process.exit(failures ? 1 : 0);

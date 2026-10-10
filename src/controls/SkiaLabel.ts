@@ -46,6 +46,7 @@ export class SkiaLabel extends SkiaControl {
   private lineSpacing = 1;
   private lineHeight = 1;
   private paragraphSpacing = 0;
+  private characterSpacing = 1;
   private textTransform: TextTransform = "None";
   private padding: Thickness = Thickness.Zero;
 
@@ -111,6 +112,12 @@ export class SkiaLabel extends SkiaControl {
    */
   get ParagraphSpacing(): number { return this.paragraphSpacing; }
   set ParagraphSpacing(v: number) { this.Set("paragraphSpacing" as keyof this, v as this[keyof this]); }
+  /**
+   * C# CharacterSpacing: 1 = the font's own spacing; every glyph is followed by (CharacterSpacing - 1) points more
+   * (less below 1), the line measures and wraps at the width it draws (C# 7cf1007c, DrawnUi.Rust label).
+   */
+  get CharacterSpacing(): number { return this.characterSpacing; }
+  set CharacterSpacing(v: number) { this.Set("characterSpacing" as keyof this, v as this[keyof this]); }
   get TextTransform(): TextTransform { return this.textTransform; }
   set TextTransform(v: TextTransform) { this.Set("textTransform" as keyof this, v as this[keyof this]); }
   get Padding(): Thickness { return this.padding; }
@@ -142,6 +149,8 @@ export class SkiaLabel extends SkiaControl {
   private mainFonts?: SpanFonts;
   private readonly fontsCache = new Map<string, SpanFonts>();
   private readonly runCache = new Map<string, TextRun[]>();
+  /** CharacterSpacing in pixels at the measured scale: added after every glyph of a run (its Width includes them). */
+  private glyphSpacing = 0;
 
   private ResolveFonts(family: string, weight: number, italic: boolean, sizePx: number): SpanFonts {
     const key = `${family}|${this.fontFamilyFallback}|${weight}|${italic}|${sizePx}`;
@@ -174,9 +183,9 @@ export class SkiaLabel extends SkiaControl {
     return this.ResolveFonts(span.FontFamily ?? this.fontFamily, weight, italic, (span.FontSize ?? this.fontSize) * scale);
   }
 
-  private static Advance(font: Font, text: string): number {
+  private Advance(font: Font, text: string): number {
     let w = 0;
-    for (const adv of font.getGlyphWidths(font.getGlyphIDs(text))) w += adv;
+    for (const adv of font.getGlyphWidths(font.getGlyphIDs(text))) w += adv + this.glyphSpacing;
     return w;
   }
 
@@ -207,7 +216,7 @@ export class SkiaLabel extends SkiaControl {
       text = SkiaLabel.DropIgnorables(text, main, fbs);
       if (text.length === 0) { this.runCache.set(cacheKey, cached); return cached; }
       if (fbs.length === 0) {
-        cached.push({ Text: text, Font: main, Width: SkiaLabel.Advance(main, text), Fonts: fonts });
+        cached.push({ Text: text, Font: main, Width: this.Advance(main, text), Fonts: fonts });
       } else {
         const cps = Array.from(text);
         const mainIds = main.getGlyphIDs(text, cps.length);
@@ -222,12 +231,12 @@ export class SkiaLabel extends SkiaControl {
           const f = fontFor(i);
           if (f !== current) {
             const t = cps.slice(start, i).join("");
-            cached.push({ Text: t, Font: current, Width: SkiaLabel.Advance(current, t), Fonts: fonts });
+            cached.push({ Text: t, Font: current, Width: this.Advance(current, t), Fonts: fonts });
             start = i; current = f;
           }
         }
         const t = cps.slice(start).join("");
-        cached.push({ Text: t, Font: current, Width: SkiaLabel.Advance(current, t), Fonts: fonts });
+        cached.push({ Text: t, Font: current, Width: this.Advance(current, t), Fonts: fonts });
       }
       this.runCache.set(cacheKey, cached);
     }
@@ -300,6 +309,8 @@ export class SkiaLabel extends SkiaControl {
    */
   private LayoutLines(maxWidth: number, scale: number, maxHeight = Infinity): TextLine[] {
     const wrap = this.lineBreakMode !== "NoWrap" && isFinite(maxWidth);
+    // run widths carry the gap after every glyph; the one after a line's last glyph is not drawn
+    const sp = this.glyphSpacing;
     const out: TextLine[] = [];
     const empty = (fonts: SpanFonts): TextLine => { const l = this.NewLine(); l.Ascent = fonts.Ascent; l.Descent = fonts.Descent; return l; };
 
@@ -315,18 +326,18 @@ export class SkiaLabel extends SkiaControl {
         while (i + 1 < para.length && !para[i + 1].SpaceBefore) { i++; word = word.concat(this.Segment(para[i].Text, para[i].Fonts, para[i].Span)); }
         const space = tok.SpaceBefore && line.Runs.length > 0 ? this.Segment(" ", tok.Fonts, tok.Span) : [];
         const spaceW = this.Width(space), wordW = this.Width(word);
-        if (!wrap || line.Width + spaceW + wordW <= maxWidth || (line.Runs.length === 0 && wordW <= maxWidth)) {
+        if (!wrap || line.Width + spaceW + wordW - sp <= maxWidth || (line.Runs.length === 0 && wordW - sp <= maxWidth)) {
           this.Append(line, space); this.Append(line, word);
           continue;
         }
         if (line.Runs.length > 0) { out.push(line); line = this.NewLine(); }
-        if (wordW <= maxWidth) { this.Append(line, word); continue; }
+        if (wordW - sp <= maxWidth) { this.Append(line, word); continue; }
         // word longer than the line: break by code points
         for (const r of word) {
           for (const ch of Array.from(r.Text)) {
             const run = this.Segment(ch, r.Fonts, r.Span);
             const chW = this.Width(run);
-            if (line.Runs.length > 0 && line.Width + chW > maxWidth) { out.push(line); line = this.NewLine(); }
+            if (line.Runs.length > 0 && line.Width + chW - sp > maxWidth) { out.push(line); line = this.NewLine(); }
             this.Append(line, run);
           }
         }
@@ -356,19 +367,20 @@ export class SkiaLabel extends SkiaControl {
         const fonts = tailRun ? tailRun.Fonts : this.mainFonts!;
         const ell = this.Segment("…", fonts, tailRun?.Span);
         const ellW = this.Width(ell);
-        while (last.Runs.length > 0 && last.Width + ellW > maxWidth) {
+        while (last.Runs.length > 0 && last.Width + ellW - sp > maxWidth) {
           const r = last.Runs[last.Runs.length - 1];
           const cps = Array.from(r.Text);
           cps.pop();
           while (cps.length > 0 && cps[cps.length - 1] === " ") cps.pop();
           last.Width -= r.Width;
           if (cps.length === 0) { last.Runs.pop(); continue; }
-          r.Text = cps.join(""); r.Width = SkiaLabel.Advance(r.Font, r.Text);
+          r.Text = cps.join(""); r.Width = this.Advance(r.Font, r.Text);
           last.Width += r.Width;
         }
         this.Append(last, ell);
       }
     }
+    if (sp !== 0) for (const l of out) if (l.Runs.length > 0) l.Width -= sp;
     return out;
   }
 
@@ -388,6 +400,8 @@ export class SkiaLabel extends SkiaControl {
 
   protected override MeasureAbsolute(widthConstraint: number, heightConstraint: number, scale: number): ScaledSize {
     this.mainFonts = this.ResolveMainFonts(scale);
+    const glyphSpacing = scale * (this.characterSpacing - 1);
+    if (glyphSpacing !== this.glyphSpacing) { this.glyphSpacing = glyphSpacing; this.runCache.clear(); }
     const px = this.padding.HorizontalThickness * scale, py = this.padding.VerticalThickness * scale;
     const extraH = this.EffectsExtra(scale).H;
     this.lines = this.text || this.Spans.length > 0 ? this.LayoutLines(widthConstraint - px, scale, heightConstraint - py - extraH) : [];
@@ -472,7 +486,7 @@ export class SkiaLabel extends SkiaControl {
         cps.forEach((cp, k) => {
           const w = widths[k] ?? 0;
           out.push({ Index: index, Length: cp.length, Line: li, Left: x, Top: g.y, Width: w, Height: g.h });
-          x += w; index += cp.length;
+          x += w + this.glyphSpacing; index += cp.length;
         });
       }
       cursor = start + g.text.length;
@@ -538,6 +552,15 @@ export class SkiaLabel extends SkiaControl {
       return paint;
     };
     const canvas = ctx.Context.Canvas;
+    const sp = this.glyphSpacing;
+    // spaced text: every glyph placed with the gap after it (C# MeasureLineGlyphs positions)
+    const drawRun = (run: TextRun, rx: number, ry: number, paint: InstanceType<typeof CK.Paint>) => {
+      if (sp === 0) { canvas.drawText(run.Text, rx, ry, paint, run.Font); return; }
+      const ids = run.Font.getGlyphIDs(run.Text), widths = run.Font.getGlyphWidths(ids);
+      const positions = new Float32Array(ids.length * 2);
+      for (let k = 0, gx = 0; k < ids.length; k++) { positions[k * 2] = gx; gx += widths[k] + sp; }
+      canvas.drawGlyphs(ids, positions, rx, ry, run.Font, paint);
+    };
     const gradient = this.FillGradient;
     const textRect = new SKRect(left, top, right, bottom);
     for (const line of this.lines) {
@@ -554,18 +577,19 @@ export class SkiaLabel extends SkiaControl {
       if (strokePaint && this.StrokeGradient) this.SetupGradient(strokePaint, this.StrokeGradient, gradientRect ?? new SKRect(x, y, x + line.Width, y + lh));
       for (const run of line.Runs) {
         const span = run.Span;
+        const drawnW = run.Width - sp; // the gap after the run's last glyph is not part of it
         if (span) {
-          span.Rects.push(new SKRect(x - d.Left, y - d.Top, x + run.Width - d.Left, y + lh - d.Top));
-          if (span.BackgroundColor) canvas.drawRect(CK.LTRBRect(x, y, x + run.Width, y + lh), paintFor(span.BackgroundColor));
+          span.Rects.push(new SKRect(x - d.Left, y - d.Top, x + drawnW - d.Left, y + lh - d.Top));
+          if (span.BackgroundColor) canvas.drawRect(CK.LTRBRect(x, y, x + drawnW, y + lh), paintFor(span.BackgroundColor));
         }
         const color = span?.TextColor ?? this.textColor;
         if (run.Text) {
           // C# DrawText order: drop shadow, stroke, fill
-          if (shadowPaint) canvas.drawText(run.Text, x + shadowDx, baseline + shadowDy, shadowPaint, run.Font);
-          if (strokePaint) canvas.drawText(run.Text, x, baseline, strokePaint, run.Font);
+          if (shadowPaint) drawRun(run, x + shadowDx, baseline + shadowDy, shadowPaint);
+          if (strokePaint) drawRun(run, x, baseline, strokePaint);
           const paint = paintFor(color);
           if (gradient && gradientRect) this.SetupGradient(paint, gradient, gradientRect);
-          canvas.drawText(run.Text, x, baseline, paint, run.Font);
+          drawRun(run, x, baseline, paint);
         }
         if (span?.HasDecorations) {
           // same geometry as C# DrawSpanDecorations; CanvasKit exposes no underline/strikeout/x-height metrics,
@@ -573,11 +597,11 @@ export class SkiaLabel extends SkiaControl {
           if (span.Underline && span.UnderlineWidth !== 0) {
             const w = span.UnderlineWidth > 0 ? span.UnderlineWidth * scale : -span.UnderlineWidth;
             const yl = Math.round(baseline + scale);
-            canvas.drawLine(x, yl, x + run.Width, yl, paintFor(color, w));
+            canvas.drawLine(x, yl, x + drawnW, yl, paintFor(color, w));
           }
           if (span.Strikeout) {
             const yl = Math.round(baseline - (run.Fonts.SizePx * 0.52) / 2);
-            canvas.drawLine(x, yl, x + run.Width, yl, paintFor(span.StrikeoutColor, span.StrikeoutWidth * scale));
+            canvas.drawLine(x, yl, x + drawnW, yl, paintFor(span.StrikeoutColor, span.StrikeoutWidth * scale));
           }
         }
         x += run.Width;
