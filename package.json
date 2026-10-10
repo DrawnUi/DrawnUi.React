@@ -65,6 +65,7 @@
     "check:animation": "node dev/check.mjs dev/check-animation.ts",
     "check:shape": "node dev/check.mjs dev/check-shape.ts",
     "check:label": "node dev/check.mjs dev/check-label.ts",
+    "check:image": "node dev/check.mjs dev/check-image.ts",
     "check:shell": "node dev/check.mjs dev/check-shell.tsx",
     "check:wheel-routing": "node dev/check.mjs dev/check-wheel-routing.ts",
     "site:extras": "node dev/site-extras.mjs dist/demo",

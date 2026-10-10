@@ -155,14 +155,17 @@ export class SkiaImage extends SkiaControl {
   protected override MeasureAbsolute(widthConstraint: number, heightConstraint: number, scale: number): ScaledSize {
     const img = this.LoadedSource;
     let w = widthConstraint, h = heightConstraint;
-    if (img) {
-      const aspect = img.width() / img.height();
-      if (!isFinite(w) && isFinite(h)) w = h * aspect;
-      else if (!isFinite(h) && isFinite(w)) h = w / aspect;
-    }
-    if (!isFinite(w) || !isFinite(h)) { this.AspectScale = { X: 0, Y: 0 }; return ScaledSize.FromPixels(0, 0, scale); }
-    if (img) this.AspectScale = SkiaImage.RescaleAspect(img.width(), img.height(), SKRect.Create(0, 0, w, h), this.Aspect);
-    return ScaledSize.FromPixels(w, h, scale);
+    // nothing loaded: the box it is offered (C# OnMeasuring), an unbounded side 0
+    if (!img) { this.AspectScale = { X: 0, Y: 0 }; return ScaledSize.FromPixels(isFinite(w) ? w : 0, isFinite(h) ? h : 0, scale); }
+    const iw = img.width(), ih = img.height();
+    if (!isFinite(w) && isFinite(h)) w = h * iw / ih;
+    else if (!isFinite(h) && isFinite(w)) h = w * ih / iw;
+    if (!isFinite(w) || !isFinite(h) || iw <= 0 || ih <= 0) { this.AspectScale = { X: 0, Y: 0 }; return ScaledSize.FromPixels(0, 0, scale); }
+    // C# OnMeasuring / DrawnUi.Rust: an auto-sized side is the bitmap's pixels scaled by the aspect for this box, never
+    // more than the box (a Fill or requested side still takes its box in Measure)
+    const s = SkiaImage.RescaleAspect(iw, ih, SKRect.Create(0, 0, w, h), this.Aspect);
+    this.AspectScale = s;
+    return ScaledSize.FromPixels(Math.min(iw * s.X, w), Math.min(ih * s.Y, h), scale);
   }
 
   protected override Paint(ctx: DrawingContext): void {
