@@ -4,6 +4,7 @@
 import { SkiaValueAnimator } from "./Animators";
 import type { SkiaControl } from "./SkiaControl";
 import { SKRect } from "./Types";
+import { VelocityTrail } from "./Gestures";
 
 /** UIKit-style exponential deceleration: value(t) = v0 * (rate^(1000 t) - 1) / k, k = 1000 ln(rate). */
 export class DecelerationTimingParameters {
@@ -194,6 +195,10 @@ export class VelocityAccumulator {
 
   CaptureVelocity(x: number, y: number, arrivedTimeNanos = 0): void {
     const time = arrivedTimeNanos > 0 ? arrivedTimeNanos / 1e6 : performance.now();
+    // a move in the same burst as the last one replaces it: the first move of a burst carries only part of the burst's
+    // distance (DrawnUi.Rust VelocityAccumulator, 6d525f7)
+    const last = this.samples[this.samples.length - 1];
+    if (last && time - last.time < VelocityTrail.BurstMs) { last.X = x; last.Y = y; return; }
     if (this.samples.length === VelocityAccumulator.MaxSampleSize) this.samples.shift();
     this.samples.push({ X: x, Y: y, time });
   }

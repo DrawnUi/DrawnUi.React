@@ -28,6 +28,58 @@ export class DistanceInfo {
   Velocity = SKPoint.Empty;
 }
 
+/**
+ * The last positions of a press with their times (DrawnUi.Rust gestures `Trail`, 6d525f7). Measured only against the
+ * previous move, irregular delivery made the velocity worthless: moves handled in one burst (queued pointer events
+ * handed over back to back by a busy main thread, WSLg pairs 0.01 ms apart) gave millions of px/s and every fling at
+ * the limit. Moves under BurstMs apart are one position; a move's velocity is its displacement over the last WindowMs,
+ * the earlier position interpolated; when the previous move is already that old, its own velocity exactly (evenly
+ * spaced input at 60 Hz measures as before).
+ */
+export class VelocityTrail {
+  /** A move's velocity is its displacement over this much time. */
+  static readonly WindowMs = 16;
+  /** Below this since the press no velocity is measured yet: the first moves of a burst. */
+  static readonly MinMs = 4;
+  /** Moves closer than this came in one burst: one position, at the burst's first time. */
+  static readonly BurstMs = 1;
+  private static readonly Capacity = 16;
+  private readonly points: { X: number; Y: number; T: number }[] = [];
+
+  Push(x: number, y: number, t: number): void {
+    const last = this.points[this.points.length - 1];
+    if (last && t - last.T < VelocityTrail.BurstMs) { last.X = x; last.Y = y; return; }
+    if (this.points.length === VelocityTrail.Capacity) this.points.shift();
+    this.points.push({ X: x, Y: y, T: t });
+  }
+
+  /** The velocity at (x, y) at time t (ms), pixels per second; `fallback` right after the press. */
+  Velocity(x: number, y: number, t: number, fallback: SKPoint): SKPoint {
+    let n = this.points.length;
+    // a move in the burst of the last position measures from the positions before it
+    if (n > 0 && t - this.points[n - 1].T < VelocityTrail.BurstMs) n--;
+    if (n === 0) return fallback;
+    const since = t - this.points[0].T;
+    if (since < VelocityTrail.MinMs) return fallback;
+    const window = Math.min(VelocityTrail.WindowMs, since), at = t - window;
+    const last = this.points[n - 1];
+    if (last.T <= at) { const secs = (t - last.T) / 1000; return new SKPoint((x - last.X) / secs, (y - last.Y) / secs); }
+    // the position at `at`: between the two positions around it (the current one included)
+    let fromX = this.points[0].X, fromY = this.points[0].Y, prev = this.points[0];
+    for (let i = 1; i <= n; i++) {
+      const p = i < n ? this.points[i] : { X: x, Y: y, T: t };
+      if (p.T >= at) {
+        const share = p.T - prev.T < 1e-6 ? 1 : (at - prev.T) / (p.T - prev.T);
+        fromX = prev.X + (p.X - prev.X) * share; fromY = prev.Y + (p.Y - prev.Y) * share;
+        break;
+      }
+      prev = p;
+    }
+    const secs = window / 1000;
+    return new SKPoint((x - fromX) / secs, (y - fromY) / secs);
+  }
+}
+
 /** AppoMobi.Gestures MouseButton: which button pressed / released (DOM button 0..4). */
 export type MouseButton = "Left" | "Middle" | "Right" | "XButton1" | "XButton2" | "Extended";
 export type PointerDeviceType = "Mouse" | "Touch" | "Pen";
@@ -58,6 +110,8 @@ export class TouchActionEventArgs {
   Timestamp = performance.now();
   /** ms since the previous event of the same pointer. */
   DeltaTimeMs = 0;
+  /** The press's recent positions the velocity is measured over, carried from event to event of one pointer. */
+  Trail?: VelocityTrail;
   /**
    * Mouse wheel: Delta > 0 = wheel down / right (browser sign). IsHorizontal: the event is along the X axis (a tilting
    * wheel, the sideways part of a two-finger touchpad swipe), as C# WheelEventArgs.IsHorizontal.
@@ -81,8 +135,14 @@ export class TouchActionEventArgs {
     d.End = released ? previous.Location : current.Location;
     d.Delta = released ? SKPoint.Empty : current.Location.Subtract(previous.Location);
     d.Total = previous.Distance.Total.Add(d.Delta);
-    const secs = current.DeltaTimeMs / 1000;
-    d.Velocity = secs > 0 && !released ? new SKPoint(d.Delta.X / secs, d.Delta.Y / secs) : previous.Distance.Velocity;
+    if (released) d.Velocity = previous.Distance.Velocity;
+    else {
+      let trail = previous.Trail;
+      if (!trail) { trail = new VelocityTrail(); trail.Push(previous.Location.X, previous.Location.Y, previous.Timestamp); }
+      d.Velocity = trail.Velocity(current.Location.X, current.Location.Y, current.Timestamp, previous.Distance.Velocity);
+      trail.Push(current.Location.X, current.Location.Y, current.Timestamp);
+      current.Trail = trail;
+    }
     current.Distance = d;
   }
 }
