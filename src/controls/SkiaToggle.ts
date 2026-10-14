@@ -24,7 +24,11 @@ export abstract class SkiaToggle extends SkiaLayout {
   Toggled?: (sender: SkiaToggle, value: boolean) => void;
   DefaultValue = false;
   IsAnimated = true;
-  RespondsToGestures = true;
+  private respondsToGestures = true;
+  /** False: a tap or the keyboard does not toggle it (code still can), a tap on it stops there, and it is reported disabled (drawnui-cross 6w). */
+  get RespondsToGestures(): boolean { return this.respondsToGestures; }
+  set RespondsToGestures(v: boolean) { if (this.respondsToGestures !== v) { this.respondsToGestures = v; this.NotifyAccessibility(); } }
+  protected override AcceptsInput(): boolean { return this.respondsToGestures; }
 
   private isToggled = false;
   private colorThumbOn?: Color;
@@ -115,7 +119,8 @@ export abstract class SkiaToggle extends SkiaLayout {
   override set AccessibilityIsPressed(_v: boolean | undefined) { /* derived from IsToggled */ }
 
   override ProcessGestures(args: SkiaGesturesParameters, apply: GestureEventProcessingInfo): SkiaControl | null {
-    if (args.Type === "Tapped" && this.RespondsToGestures) { this.IsToggled = !this.IsToggled; return this; }
+    if (!this.respondsToGestures) return this.BlockedGestureResult(args); // a tap does not toggle it, nor reach controls under it
+    if (args.Type === "Tapped") { this.IsToggled = !this.IsToggled; return this; }
     return super.ProcessGestures(args, apply);
   }
 }

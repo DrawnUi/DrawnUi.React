@@ -69,7 +69,7 @@ export function AccessibilityPage() {
           <SkiaWrap Spacing={8}>
             <SkiaButton Text={`Tapped ${count}×`} BackgroundColor="#0D6EFD" AccessibilityHint="Increments the counter" Tapped={() => { setCount((c) => c + 1); setLastActivated("counter"); }} />
             <SkiaButton Text="★" FontSize={18} FontFamilyFallback="FontSymbols,FontSymbols2" BackgroundColor="#6610F2" WidthRequest={48} AccessibilityLabel="Favorite" AccessibilityHint="Icon-only button: AccessibilityLabel replaces the glyph" Tapped={() => setLastActivated("favorite")} />
-            <SkiaButton Text="Disabled" BackgroundColor="#495057" IsDisabled AccessibilityHint="IsDisabled: no tab stop, not activatable" />
+            <SkiaButton Text="Disabled" BackgroundColor="#495057" RespondsToGestures={false} AccessibilityHint="RespondsToGestures false: no tab stop, not activatable" />
           </SkiaWrap>
         </Card>
 

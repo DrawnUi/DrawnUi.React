@@ -618,8 +618,20 @@ export class SkiaControl {
     return true;
   }
 
-  /** False while the control ignores gestures itself, e.g. a disabled button. Default true. */
+  /**
+   * False while the control ignores input itself: RespondsToGestures = false on a button, toggle, slider, scroll...
+   * Taps, keyboard and the accessibility state (reported disabled) all follow it (drawnui-cross 6w). Default true.
+   */
   protected AcceptsInput(): boolean { return true; }
+
+  /**
+   * What a control that takes no input returns for a gesture that reached it (C# BlockedGestureResult): it keeps a
+   * press, tap or long press, so nothing under it reacts to them, and lets moves and wheel go on to the controls around
+   * it (a scroll behind it still scrolls).
+   */
+  protected BlockedGestureResult(args: SkiaGesturesParameters): SkiaControl | null {
+    return args.Type === "Down" || args.Type === "Tapped" || args.Type === "LongPressing" ? this : null;
+  }
 
   NotifyAccessibilityFocused(focused: boolean): void { this.Superview?.AccessibilityManager.NotifyFocused(focused ? this : undefined); }
 

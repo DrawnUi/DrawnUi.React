@@ -24,7 +24,11 @@ export class SkiaSlider extends SkiaControl {
   /** Minimum distance between the two thumbs, in value units. */
   RangeMin = 0;
   ClickOnTrailEnabled = true;
-  RespondsToGestures = true;
+  private respondsToGestures = true;
+  /** False: neither a drag nor the arrow keys move it (code still can), and it is reported disabled (drawnui-cross 6w). */
+  get RespondsToGestures(): boolean { return this.respondsToGestures; }
+  set RespondsToGestures(v: boolean) { if (this.respondsToGestures !== v) { this.respondsToGestures = v; this.NotifyAccessibility(); } }
+  protected override AcceptsInput(): boolean { return this.respondsToGestures; }
   IsPressed = false;
   IsUserPanning = false;
   /** Extra points around a thumb that still count as grabbing it (C# moreHotspotSize). */

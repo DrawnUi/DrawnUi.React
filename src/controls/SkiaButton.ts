@@ -30,7 +30,17 @@ export class SkiaButton extends SkiaLayout {
   StrokeColor: Color = Colors.Transparent;
   StrokeWidth = 0;
   IsPressed = false;
-  IsDisabled = false;
+  private respondsToGestures = true;
+  /**
+   * False switches the button off for the user: taps, presses and keyboard activation do nothing (no Tapped, Down, Up),
+   * a tap on it does not reach controls under it, and screen readers report it disabled. Code can still change it.
+   * Same property as on toggles, sliders, scrolls and drawers (drawnui-cross 6w). Default true.
+   */
+  get RespondsToGestures(): boolean { return this.respondsToGestures; }
+  set RespondsToGestures(v: boolean) { if (this.respondsToGestures !== v) { this.respondsToGestures = v; this.NotifyAccessibility(); } }
+  /** @deprecated The opposite of RespondsToGestures, which every control uses: set `RespondsToGestures = false`. */
+  get IsDisabled(): boolean { return !this.respondsToGestures; }
+  set IsDisabled(v: boolean) { this.RespondsToGestures = !v; }
   LockPanning = false;
   /** Touch feedback played on Down (DrawnUi SkiaButton.ApplyEffect). */
   ApplyEffect: SkiaTouchAnimation = "Ripple"; // C# default
@@ -67,9 +77,9 @@ export class SkiaButton extends SkiaLayout {
   /** Set to `Aria.RoleButton` to expose every button (React extension). */
   static override DefaultAccessibilityRole?: string;
   protected override DefaultAccessibilityLabel(): string | undefined { return this.Text || undefined; }
-  protected override DefaultAccessibilityCanInteract(): boolean { return !this.IsDisabled; }
-  /** A disabled button ignores taps, so keyboard navigation skips it too. */
-  protected override AcceptsInput(): boolean { return !this.IsDisabled; }
+  protected override DefaultAccessibilityCanInteract(): boolean { return this.respondsToGestures; }
+  /** With RespondsToGestures = false the button ignores taps, keyboard navigation skips it and it is reported disabled. */
+  protected override AcceptsInput(): boolean { return this.respondsToGestures; }
 
   /** The button's own BackgroundColor/CornerRadius/Stroke are the frame's; the button itself paints nothing. */
   protected override PaintBackground(): void {}
@@ -143,7 +153,7 @@ export class SkiaButton extends SkiaLayout {
   }
 
   override ProcessGestures(args: SkiaGesturesParameters, apply: GestureEventProcessingInfo): SkiaControl | null {
-    if (this.IsDisabled) return null;
+    if (!this.respondsToGestures) return this.BlockedGestureResult(args); // no press, no Down / Up / Tapped; a tap on it stops here
     const point = args.Event.Location;
 
     if (args.Type === "Down") {

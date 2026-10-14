@@ -63,7 +63,7 @@ class Cell extends SkiaDynamicDrawnCell {
   for (const b of [tall, short1, mid]) row.AddSubView(b);
   const toolbar = new SkiaWrap(); toolbar.AccessibilityRole = Aria.RoleToolbar; toolbar.Spacing = 6; toolbar.Margin = new Thickness(0, 70, 0, 0);
   const tools = ["HOME", "BACK", "OFF", "NEXT", "END"].map((t) => button(t, 30));
-  tools[2].IsDisabled = true;
+  tools[2].RespondsToGestures = false;
   for (const b of tools) toolbar.AddSubView(b);
   const slider = new SkiaSlider(); slider.Margin = new Thickness(0, 120, 0, 0); slider.WidthRequest = 300; slider.Min = 0; slider.Max = 50; slider.Step = 0; slider.End = 10;
   const locked = new SkiaLayer(); locked.Margin = new Thickness(0, 170, 0, 0); locked.HeightRequest = 30; locked.LockChildrenGestures = "PassNone";

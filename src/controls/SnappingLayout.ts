@@ -13,7 +13,11 @@ import { SkiaLayout } from "./SkiaLayout";
  */
 export abstract class SnappingLayout extends SkiaLayout {
   Animated = true;
-  RespondsToGestures = true;
+  private respondsToGestures = true;
+  /** False: neither a swipe nor the keyboard moves it (code still can), and it is reported disabled; its content keeps its own taps (drawnui-cross 6w). */
+  get RespondsToGestures(): boolean { return this.respondsToGestures; }
+  set RespondsToGestures(v: boolean) { if (this.respondsToGestures !== v) { this.respondsToGestures = v; this.NotifyAccessibility(); } }
+  protected override AcceptsInput(): boolean { return this.respondsToGestures; }
   IgnoreWrongDirection = false;
   Bounces = false;
   RubberDamping = 0.7;

@@ -531,6 +531,15 @@ Updated whenever the port deliberately diverges or finds something worth back-po
 - **.NET**: MAUI Windows / WPF draw the ring on the canvas and track `KeyboardFocusNode`; Escape leaves the drawn nodes.
 - **Opinion**: same contract; the canvas ring and Escape are not needed where the browser owns focus.
 
+### Input off: hover and context menus
+- **React**: a button, toggle or radio with `RespondsToGestures = false` keeps a press, tap or long press (nothing
+  under it reacts) and shows no hand cursor, but it is still hovered (`IsHovered` / `HoverChanged`: hover is taken
+  from the hit path, not from ProcessGestures; no React control draws a hover look), and a context menu on it goes on
+  to the handlers around it (`ProcessContextMenu` is its own route).
+- **.NET**: `BlockedGestureResult` returns before `CheckHovered`, so the control is not hovered, and keeps the
+  ContextMenu gesture too (C# 31e5e564). Slider and drawer that are off are still hovered there.
+- **Opinion**: only app `HoverChanged` handlers can see the difference; align when a React control draws hover.
+
 ### Selectable text is opt-in
 - **React**: `AccessibilityTextSelectable` (default false) puts a label's lines into the overlay as real text with pointer events; the text then owns the pointer (selection), so it is never enabled implicitly — custom controls would lose taps and pans under their labels. ARIA roles / labels stay unaffected.
 - **.NET**: no selectable labels (only `SkiaEditor` selects).

@@ -169,8 +169,14 @@ createRoot(document.getElementById("root")!).render(
   buttons a group role (`Aria.RoleList`, `RoleGrid`, `RoleToolbar`, `RoleRadioGroup`, `RoleTabList`, `RoleMenu`,
   `RoleMenuBar`, `RoleListBox`): it becomes one Tab stop and the arrows walk its items by index, recycled cells
   included (scrolled in, then focused). Cells need a role and a label (set `AccessibilityLabel` in `SetContent`).
-  Only what the pointer can use is reachable: `InputTransparent`, a locking `LockChildrenGestures` above, a disabled
-  `SkiaButton` take a node out. A `SkiaEditor` is a Tab stop; Tab leaves it for the next node.
+  Only what the pointer can use is reachable: `InputTransparent`, a locking `LockChildrenGestures` above, a control
+  switched off with `RespondsToGestures={false}` take a node out. A `SkiaEditor` is a Tab stop; Tab leaves it for the next node.
+- Input off: `RespondsToGestures={false}` is the one switch on `SkiaButton`, switch, checkbox, radio, slider, scroll,
+  carousel and drawer (`IsDisabled` on a button is its obsolete opposite). A button, toggle or radio that is off
+  ignores taps and presses (no `Tapped` / `Down` / `Up`, no toggle), and a tap on it stops there instead of reaching
+  what is under it; moves and the wheel pass on. Every such control is skipped by the keyboard and reported disabled,
+  also when the value changes later. A scroll or drawer that is off still lets its content take taps. Code can still
+  change any of them.
 - Keyboard: `KeyboardManager.Subscribe(down, char, up?)` (DOM `event.code` names). `SkiaEditor` focuses on tap; a
   hidden textarea feeds IME / soft keyboard / clipboard into the same editing methods. Subscribers see every key,
   also those typed into a page input or sent to a focused button: before acting on a key or calling preventDefault,

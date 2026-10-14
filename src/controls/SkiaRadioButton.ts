@@ -105,8 +105,9 @@ export class SkiaRadioButton extends SkiaToggle {
   }
 
   override ProcessGestures(args: SkiaGesturesParameters, apply: GestureEventProcessingInfo): SkiaControl | null {
+    if (!this.RespondsToGestures) return this.BlockedGestureResult(args); // a tap does not select it, nor reach controls under it
     if (args.Type === "Tapped") {
-      if (!this.IsToggled && this.RespondsToGestures) { this.IsToggled = true; return this; }
+      if (!this.IsToggled) { this.IsToggled = true; return this; }
       return null;
     }
     return super.ProcessGestures(args, apply);

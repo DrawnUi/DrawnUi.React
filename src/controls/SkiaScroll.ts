@@ -36,7 +36,11 @@ export class SkiaScroll extends SkiaControl {
   AutoScrollingSpeedMs = 600;
   ScrollingSpeedMs = 400;
   IgnoreWrongDirection = false;
-  RespondsToGestures = true;
+  private respondsToGestures = true;
+  /** False: neither a drag, the wheel nor the keyboard scrolls it (code still can), and it is reported disabled; its content keeps its own taps (drawnui-cross 6w). */
+  get RespondsToGestures(): boolean { return this.respondsToGestures; }
+  set RespondsToGestures(v: boolean) { if (this.respondsToGestures !== v) { this.respondsToGestures = v; this.NotifyAccessibility(); } }
+  protected override AcceptsInput(): boolean { return this.respondsToGestures; }
 
   // ---- header / footer (C# SkiaScroll.Header / Footer) ----
   private header?: SkiaControl;
