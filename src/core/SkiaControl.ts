@@ -1,4 +1,4 @@
-import type { Canvas as SkCanvas, Image, Path, SkPicture, Surface } from "canvaskit-wasm";
+import type { Canvas as SkCanvas, Image, Paint, Path, SkPicture, Surface } from "canvaskit-wasm";
 import { Super } from "./Super";
 import { SkiaStyles } from "./Styles";
 import { type Color, Colors, type LayoutOptions, SKRect, ScaledSize, type SkiaCacheType, type SkiaGradient, type SkiaTouchAnimation, Thickness } from "./Types";
@@ -46,13 +46,22 @@ export class CachedObject {
   /** A picture holding image blits, whose sampling was fixed when it was recorded (C# CachedObject.HasImageBlits). */
   HasImageBlits = false;
 
+  /** C# PaintRenderObject: the blit paint is antialiased (else a turned bitmap keeps stair steps along its own border), dithered when distorted. */
+  private static blitPaint?: Paint;
+  private static blitPaintDithered?: Paint;
+  private static BlitPaint(dither: boolean): Paint {
+    const CK = Super.CK;
+    const make = () => { const p = new CK.Paint(); p.setAntiAlias(true); p.setDither(dither); return p; };
+    return dither ? (CachedObject.blitPaintDithered ??= make()) : (CachedObject.blitPaint ??= make());
+  }
+
   /** Replays the cache with its top-left moved to (left, top); `smooth` = an image drawn distorted (linear + mipmaps). */
   Draw(canvas: SkCanvas, left: number, top: number, smooth = false): void {
     const CK = Super.CK;
     if (this.Image) {
       // nearest keeps a bitmap blitted 1:1 sharp; once scaled, turned or projected it needs smooth sampling (C# 1e4610f6)
-      if (smooth) canvas.drawImageOptions(this.Image, left, top, CK.FilterMode.Linear, CK.MipmapMode.Linear, null);
-      else canvas.drawImageOptions(this.Image, left, top, CK.FilterMode.Nearest, CK.MipmapMode.None, null);
+      if (smooth) canvas.drawImageOptions(this.Image, left, top, CK.FilterMode.Linear, CK.MipmapMode.Linear, CachedObject.BlitPaint(true));
+      else canvas.drawImageOptions(this.Image, left, top, CK.FilterMode.Nearest, CK.MipmapMode.None, CachedObject.BlitPaint(false));
     } else if (this.Picture) {
       const saved = canvas.save();
       canvas.translate(left - this.Bounds.Left, top - this.Bounds.Top);

@@ -147,6 +147,16 @@ function strip(rowCache: SkiaCacheType, tapped: (i: number) => void) {
     check("tilted strip: a tap on the drawn tile 2 reaches tile 2", last === 2, `tapped ${last} at ${x.toFixed(1)},${y.toFixed(1)}`);
   }
 
+  for (const [name, turn] of [["Rotation 20", (s: SkiaShape) => { s.Rotation = 20; }], ["RotationY 40, Rotation -6", (s: SkiaShape) => { s.RotationY = 40; s.Rotation = -6; }]] as const) {
+    // an opaque Image-cached card: its bitmap's own border is an edge on screen (C# PaintRenderObject antialiases the blit)
+    const make = (cache: SkiaCacheType) => { const s = new SkiaShape(); s.WidthRequest = 200; s.HeightRequest = 120; s.UseCache = cache; s.BackgroundColor = "#0D6EFD"; turn(s); return s; };
+    const pa = new Scene(make("Image"), CK).frame(), pb = new Scene(make("None"), CK).frame();
+    let differ = 0;
+    for (let i = 0; i < pa.length; i += 4) if (Math.max(Math.abs(pa[i] - pb[i]), Math.abs(pa[i + 1] - pb[i + 1]), Math.abs(pa[i + 2] - pb[i + 2])) > 48) differ++;
+    // before (no paint on the blit): 337 and 301 pixels, a stair-stepped border
+    check(`${name}: an Image-cached card's border draws smooth, like the card uncached`, differ <= 5, `${differ} pixels off by more than 48 levels`);
+  }
+
   {
     const cached = strip("Image", () => {}), live = strip("None", () => {});
     const a = new Scene(cached.card, CK), b = new Scene(live.card, CK);
