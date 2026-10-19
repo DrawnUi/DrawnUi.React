@@ -17,7 +17,13 @@ export interface DrawingContext {
    * in canvas pixels (caches are translated to their own origin), Recording = the canvas records a picture
    * (Operations cache) that is replayed on Surface later.
    */
-  Context: { Canvas: SkCanvas; Surface?: Surface; Origin?: { X: number; Y: number }; Recording?: boolean };
+  Context: {
+    Canvas: SkCanvas; Surface?: Surface; Origin?: { X: number; Y: number }; Recording?: boolean;
+    /** The picture being recorded is drawn scaled, turned, skewed or projected: images blitted into it sample smoothly (C#). */
+    PlaybackDistorted?: boolean;
+    /** An image cache (or a picture holding one) was blitted here (C#): the picture is recorded again when its playback distortion changes. */
+    HasImageBlits?: boolean;
+  };
   Destination: SKRect;
   Scale: number;
 }
@@ -35,13 +41,18 @@ export class CachedObject {
 
   /** Canvas.GpuEpoch it was made in: after a WebGL context restore it is remade (a picture may replay old GPU images). */
   Epoch = 0;
+  /** A picture recorded to be drawn distorted: the images in it sample smoothly (C# CachedObject.PlaybackDistorted). */
+  PlaybackDistorted = false;
+  /** A picture holding image blits, whose sampling was fixed when it was recorded (C# CachedObject.HasImageBlits). */
+  HasImageBlits = false;
 
-  /** Replays the cache with its top-left moved to (left, top). */
-  Draw(canvas: SkCanvas, left: number, top: number): void {
+  /** Replays the cache with its top-left moved to (left, top); `smooth` = an image drawn distorted (linear + mipmaps). */
+  Draw(canvas: SkCanvas, left: number, top: number, smooth = false): void {
     const CK = Super.CK;
     if (this.Image) {
-      // Nearest sampling: a cached bitmap is blitted 1:1, never resampled.
-      canvas.drawImageOptions(this.Image, left, top, CK.FilterMode.Nearest, CK.MipmapMode.None, null);
+      // nearest keeps a bitmap blitted 1:1 sharp; once scaled, turned or projected it needs smooth sampling (C# 1e4610f6)
+      if (smooth) canvas.drawImageOptions(this.Image, left, top, CK.FilterMode.Linear, CK.MipmapMode.Linear, null);
+      else canvas.drawImageOptions(this.Image, left, top, CK.FilterMode.Nearest, CK.MipmapMode.None, null);
     } else if (this.Picture) {
       const saved = canvas.save();
       canvas.translate(left - this.Bounds.Left, top - this.Bounds.Top);
@@ -103,6 +114,14 @@ export class SkiaControl {
   /** Degrees. */
   SkewX = 0;
   SkewY = 0;
+  /** Degrees, a 3D turn around the horizontal axis through the pivot, seen with perspective (C# RotationX). */
+  RotationX = 0;
+  /** Degrees, a 3D turn around the vertical axis through the pivot (C# RotationY). */
+  RotationY = 0;
+  /** Degrees, a 3D turn around the axis facing the viewer, after RotationX and RotationY (C# RotationZ). */
+  RotationZ = 0;
+  /** Depth: toward the viewer (+, bigger) or away (−, smaller), turned or flat; draws at 576 / (576 − TranslationZ) (C# TranslationZ). */
+  TranslationZ = 0;
   /** Pivot for Rotation/Scale/Skew as a fraction of the box (MAUI default 0.5). */
   AnchorX = 0.5;
   AnchorY = 0.5;
@@ -127,8 +146,9 @@ export class SkiaControl {
   get Scale(): number { return this.ScaleX; }
   set Scale(v: number) { this.ScaleX = v; this.ScaleY = v; }
   get HasTransform(): boolean {
-    return this.TranslationX !== 0 || this.TranslationY !== 0 || this.Left !== 0 || this.Top !== 0 || this.Rotation !== 0 || this.ScaleX !== 1 || this.ScaleY !== 1 || this.SkewX !== 0 || this.SkewY !== 0;
+    return this.TranslationX !== 0 || this.TranslationY !== 0 || this.Left !== 0 || this.Top !== 0 || this.Rotation !== 0 || this.ScaleX !== 1 || this.ScaleY !== 1 || this.SkewX !== 0 || this.SkewY !== 0 || this.Has3d;
   }
+  private get Has3d(): boolean { return this.RotationX !== 0 || this.RotationY !== 0 || this.RotationZ !== 0 || this.TranslationZ !== 0; }
   /** Matrix applied at the last render (canvas space), undefined when none; gestures map through its inverse. */
   RenderTransformMatrix?: number[];
   /** Generic numeric parameters (DrawnUi Value1/Value2): SkiaShape Arc uses start angle / sweep angle in degrees. */
@@ -471,11 +491,25 @@ export class SkiaControl {
     const fullW = destination.Width - m.HorizontalThickness * scale, fullH = destination.Height - m.VerticalThickness * scale;
     const x = availL + SkiaControl.Align(this.HorizontalOptions, fullW, w);
     const y = availT + SkiaControl.Align(this.VerticalOptions, fullH, h);
+    const old = this.DrawingRect;
     this.DrawingRect = SKRect.Create(x, y, w, h);
+    this.FollowMatrix(old);
     this.OnLayoutChanged();
     if (this.PendingUnattachedAnimators) this.StartPendingAnimators();
     // DrawnUi OnLayoutReady: an accessible control registers itself on its first layout
     if (!this.registeredWithAccessibility && this.IsAccessibilityElement) this.NotifyAccessibility();
+  }
+
+  /**
+   * A cached ancestor replays its picture where a re-arrange moved it (a scroll) without rendering this control again,
+   * so the matrix made at its last Render moves with its rect: taps, hover and the accessibility rect stay on what is
+   * drawn (C# offsets the cached render tree instead). A control that renders again gets a fresh matrix there.
+   */
+  private FollowMatrix(old: SKRect): void {
+    const m = this.RenderTransformMatrix, r = this.DrawingRect;
+    if (!m || (old.Left === r.Left && old.Top === r.Top)) return;
+    const M = Super.CK.Matrix, dx = r.Left - old.Left, dy = r.Top - old.Top;
+    this.RenderTransformMatrix = M.multiply(M.translated(dx, dy), m, M.translated(-dx, -dy));
   }
 
   /** C# SuperViewChanged: starts the animators queued before this control was attached. */
@@ -698,7 +732,7 @@ export class SkiaControl {
     const applyOpacity = this.Opacity < 1;
     // C# Left/Top: a cached control is blitted at an offset, no matrix and no save/restore around the subtree
     const offsetOnly = (this.Left !== 0 || this.Top !== 0) && this.UsingCacheType !== "None" && this.TranslationX === 0 && this.TranslationY === 0
-      && this.Rotation === 0 && this.ScaleX === 1 && this.ScaleY === 1 && this.SkewX === 0 && this.SkewY === 0;
+      && this.Rotation === 0 && this.ScaleX === 1 && this.ScaleY === 1 && this.SkewX === 0 && this.SkewY === 0 && !this.Has3d;
     const needTransform = this.HasTransform && !offsetOnly;
     let dx = 0, dy = 0;
     if (needTransform) {
@@ -735,11 +769,12 @@ export class SkiaControl {
     if (saved) canvas.restore();
   }
 
-  /** Port of DrawnUi ApplyTransforms: T(-pivot) · rotation · scale/skew · T(pivot) · translation, in canvas pixels. */
+  /** Port of DrawnUi ApplyTransforms: T(-pivot) · rotation · scale/skew · 3D · T(pivot) · translation, in canvas pixels. */
   protected CreateRenderTransformMatrix(destination: SKRect, scale: number): number[] {
     const M = Super.CK.Matrix;
     const moveX = (this.TranslationX + this.Left) * scale, moveY = (this.TranslationY + this.Top) * scale;
-    if (this.Rotation === 0 && this.ScaleX === 1 && this.ScaleY === 1 && this.SkewX === 0 && this.SkewY === 0) return M.translated(moveX, moveY);
+    const has3d = this.Has3d;
+    if (this.Rotation === 0 && this.ScaleX === 1 && this.ScaleY === 1 && this.SkewX === 0 && this.SkewY === 0 && !has3d) return M.translated(moveX, moveY);
     const px = destination.Left + destination.Width * this.AnchorX;
     const py = destination.Top + destination.Height * this.AnchorY;
     const kx = this.SkewX !== 0 ? Math.tan((Math.PI * this.SkewX) / 180) : 0;
@@ -747,7 +782,39 @@ export class SkiaControl {
     const scaleSkew = [this.ScaleX, kx, 0, ky, this.ScaleY, 0, 0, 0, 1];
     const rotation = this.Rotation !== 0 ? M.rotated((Math.PI * this.Rotation) / 180) : M.identity();
     // multiply(a, b, c) = a·b·c, the right-most applies first
-    return M.multiply(M.translated(px + moveX, py + moveY), scaleSkew, rotation, M.translated(-px, -py));
+    if (!has3d) return M.multiply(M.translated(px + moveX, py + moveY), scaleSkew, rotation, M.translated(-px, -py));
+    return M.multiply(M.translated(px + moveX, py + moveY), SkiaControl.Create3dMatrix(this.RotationX, this.RotationY, this.RotationZ, this.TranslationZ), scaleSkew, rotation, M.translated(-px, -py));
+  }
+
+  /** C# camera distance of the 3D transforms (Sk3dView.CameraDistance): 8 inches at 72 dpi, in canvas pixels. */
+  static readonly CameraDistance = 576;
+
+  /**
+   * C# Create3dMatrix (Sk3dView): RotationX, then RotationY, then RotationZ (negated) around the pivot, projected from
+   * the camera; TranslationZ is depth, a flat control at depth z draws at camera / (camera − z).
+   */
+  static Create3dMatrix(rotationX: number, rotationY: number, rotationZ: number, translationZ: number): number[] {
+    const d = Math.PI / 180, camera = SkiaControl.CameraDistance;
+    const sx = Math.sin(rotationX * d), cx = Math.cos(rotationX * d), sy = Math.sin(rotationY * d), cy = Math.cos(rotationY * d);
+    const sz = Math.sin(-rotationZ * d), cz = Math.cos(-rotationZ * d);
+    return [
+      cy * cz, cy * sz, 0,
+      sx * sy * cz - cx * sz, sx * sy * sz + cx * cz, 0,
+      (cx * sy * cz + sx * sz) / camera, (cx * sy * sz - sx * cz) / camera, Math.max(camera - translationZ, 1) / camera,
+    ];
+  }
+
+  /** C# SkiaSamplingOptions.IsMoveOnly: the matrix only moves (or mirrors), so a bitmap keeps its pixels 1:1. */
+  static IsMoveOnly(m: ArrayLike<number>): boolean {
+    return m[1] === 0 && m[3] === 0 && m[6] === 0 && m[7] === 0 && m[8] === 1 && Math.abs(m[0]) === 1 && Math.abs(m[4]) === 1;
+  }
+
+  /**
+   * C# WillDrawDistorted: what this control draws here ends up scaled, turned, skewed or projected, by its own transforms
+   * or a live ancestor's (both in the canvas matrix) or by the picture it is recorded into. Images then sample smoothly.
+   */
+  protected WillDrawDistorted(ctx: DrawingContext): boolean {
+    return !!ctx.Context.PlaybackDistorted || !SkiaControl.IsMoveOnly(ctx.Context.Canvas.getTotalMatrix());
   }
 
   /** Maps a point given in the parent's space into this control's untransformed space (DrawnUi TransformPointToLocalSpace). */
@@ -784,17 +851,26 @@ export class SkiaControl {
       const r = cacheType === "Operations" ? this.ExpandedCacheRect(ctx.Scale) : this.AlignedCacheRect(ctx.Scale);
       const epoch = this.Superview?.GpuEpoch ?? 0;
       if (this.RenderObjectPrevious && this.RenderObjectPrevious.Epoch !== epoch) this.DisposePrevious(); // made on a lost GPU context
-      if (this.CacheStale(ctx.Scale)) this.CreateRenderingObject({ ...ctx, Destination: this.DrawingRect }, cacheType);
+      // a picture replays its image blits with the sampling chosen when it was recorded: recorded again once its
+      // playback turns distorted or straight (C# SamplingMismatch), else a cached child of a turning card stays jagged
+      const o = this.RenderObject;
+      if (this.CacheStale(ctx.Scale) || (o?.Picture && o.HasImageBlits && o.PlaybackDistorted !== this.WillDrawDistorted(ctx))) this.CreateRenderingObject({ ...ctx, Destination: this.DrawingRect }, cacheType);
       if (this.RenderObject) {
         // C# DrawRenderObject: with post renderers an Image cache is not blitted, the effects sample it (CachedImage)
         // and paint the result; a picture cache has no texture, so it is replayed first and snapshotted by the effect
-        if (post.length === 0 || !this.RenderObject.Image) this.RenderObject.Draw(ctx.Context.Canvas, r.Left + dx, r.Top + dy);
+        if (post.length === 0 || !this.RenderObject.Image) this.DrawCache(this.RenderObject, ctx, r.Left + dx, r.Top + dy);
         for (const e of post) e.Render(own);
       }
-      else if (this.RenderObjectPrevious) this.RenderObjectPrevious.Draw(ctx.Context.Canvas, r.Left + dx, r.Top + dy); // double buffer: last good frame
+      else if (this.RenderObjectPrevious) this.DrawCache(this.RenderObjectPrevious, ctx, r.Left + dx, r.Top + dy); // double buffer: last good frame
       else this.DrawPlaceholder(own);
     }
     this.ExecutePostAnimators(own);
+  }
+
+  /** Blits a cache: an image samples smoothly when drawn distorted; a picture being recorded learns it holds image blits. */
+  private DrawCache(cache: CachedObject, ctx: DrawingContext, left: number, top: number): void {
+    if (cache.Image || cache.HasImageBlits) ctx.Context.HasImageBlits = true;
+    cache.Draw(ctx.Context.Canvas, left, top, !!cache.Image && this.WillDrawDistorted(ctx));
   }
 
   /** Background + Paint(): the part of the control that a cache captures. */
@@ -828,12 +904,16 @@ export class SkiaControl {
     }
     if (cacheType === "Operations") {
       const recorder = new CK.PictureRecorder();
+      const playbackDistorted = this.WillDrawDistorted(ctx);
       const canvas = recorder.beginRecording(CK.LTRBRect(r.Left, r.Top, r.Right, r.Bottom));
-      this.PaintContent({ ...ctx, Context: { ...ctx.Context, Canvas: canvas, Recording: true } });
+      const recording = { ...ctx.Context, Canvas: canvas, Recording: true, PlaybackDistorted: playbackDistorted, HasImageBlits: false };
+      this.PaintContent({ ...ctx, Context: recording });
       const picture = recorder.finishRecordingAsPicture();
       recorder.delete();
       this.RenderObject = new CachedObject("Operations", r, ctx.Scale, picture);
       this.RenderObject.Epoch = this.Superview?.GpuEpoch ?? 0;
+      this.RenderObject.PlaybackDistorted = playbackDistorted;
+      this.RenderObject.HasImageBlits = recording.HasImageBlits;
     } else if (cacheType === "ImageComposite") {
       this.CreateCompositeRenderingObject(ctx, r, w, h);
     } else {

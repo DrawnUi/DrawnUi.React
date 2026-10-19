@@ -121,6 +121,24 @@ createRoot(document.getElementById("root")!).render(
   Changes under a hidden parent ask for no frame, its animators pause and go on when it shows again.
 - Web cache defaults: `SkiaLottie` uses `Operations`, `SkiaGif` no cache (the .NET `ImageDoubleBuffered` needs a
   background thread the browser does not have); set `UseCache` to override.
+- Transforms, 2D and 3D: applied at render around the arranged box, so layout never changes and the control's own
+  cache stays valid while it moves or turns. MAUI names: `TranslationX` / `TranslationY` (points), `Rotation`
+  (degrees, clockwise), `ScaleX` / `ScaleY` (`-1` mirrors), `SkewX` / `SkewY`, `Opacity`; `AnchorX` / `AnchorY` =
+  the pivot as a fraction of the box (0.5, 0.5 = center; it is also the hinge of a 3D turn). Taps land on the drawn
+  control, not its layout box, also inside a cached parent that a scroll moved. Animate with `RotateToAsync`,
+  `ScaleToAsync`, `TranslateToAsync`, `FadeToAsync`, or any property with
+  `AnimateRangeAsync((v) => { card.RotationY = v; }, from, to, ms, easing)`; set a transform from code, outside an
+  animation, then call `RepaintComposition()`.
+- 3D, perspective built in (no shader, no matrix of your own): `RotationY` turns around the vertical axis (a flip; a
+  200 x 200 card at 50 draws 131 wide, the left edge nearer: 231 vs 177 tall), `RotationX` around the horizontal one
+  (at 40: 155 tall, the bottom edge nearer: 225 vs 180 wide), `RotationZ` around the axis facing you; all combine
+  with `Rotation` (RotationX 16, RotationY 20, Rotation -6 = a card lying on a table). Past 90 a control shows its
+  content mirrored, as its back: for a real back side show a second face while `cos(RotationX) * cos(RotationY) < 0`
+  and mirror it (`ScaleX = -1` for a Y turn, `ScaleY = -1` for an X turn). `TranslationZ` is depth: positive comes
+  toward you and draws bigger, negative goes away and draws smaller, turned or flat: scale = 576 / (576 -
+  TranslationZ), so -300 = 0.66x, +150 = 1.35x, +300 = 2.09x. Image caches inside a turned or scaled control are
+  drawn smooth. A horizontal `SkiaScroll` in a tilted card scrolls by a sideways swipe and a tap picks the item
+  under the finger, while an up or down swipe on it still scrolls the page.
 - Animators: `Pause()` / `Resume()` (goes on from where it was), `PingPongAnimator`, the MAUI easings (`SinInOut`,
   `BounceIn` / `BounceOut`, `SpringIn` / `SpringOut` overshoot). A held press raises `LongPressing` after
   `Canvas.LongPressTimeMs` (1500); the release after it is no tap.

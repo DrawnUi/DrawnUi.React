@@ -45,7 +45,7 @@ export const Registry: Record<string, new () => HostInstance> = {
 type Props = Record<string, unknown>;
 const SKIP = new Set(["children", "key", "ref"]);
 /** Props that change how the subtree is composited, not what it contains: repaint, keep caches (DrawnUi RedrawCanvas). */
-const REPAINT_ONLY = new Set(["TranslationX", "TranslationY", "Rotation", "ScaleX", "ScaleY", "Scale", "SkewX", "SkewY", "AnchorX", "AnchorY", "Opacity"]);
+const REPAINT_ONLY = new Set(["TranslationX", "TranslationY", "TranslationZ", "Rotation", "RotationX", "RotationY", "RotationZ", "ScaleX", "ScaleY", "Scale", "SkewX", "SkewY", "AnchorX", "AnchorY", "Opacity"]);
 /** Props that change only how a control looks, never its size (C# NeedDraw): an ImageComposite above redraws only its area. */
 const isDrawOnly = (k: string) => k.endsWith("Color") || k === "FillGradient" || k === "StrokeGradient";
 

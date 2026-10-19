@@ -531,6 +531,14 @@ Updated whenever the port deliberately diverges or finds something worth back-po
 - **.NET**: MAUI Windows / WPF draw the ring on the canvas and track `KeyboardFocusNode`; Escape leaves the drawn nodes.
 - **Opinion**: same contract; the canvas ring and Escape are not needed where the browser owns focus.
 
+### Transformed controls under a moved cache
+
+- **React:** a cached parent replays its picture where a re-arrange (a scroll) moved it without rendering its
+  children, so `Arrange` moves each child's `RenderTransformMatrix` with its rect (T(d) · M · T(-d)); taps, hover and
+  the accessibility rect follow what is drawn.
+- **.NET:** hit tests through a cached parent go through its cached render tree, offset by where the cache is drawn.
+- **Opinion:** same result; React keeps one matrix per control instead of a render tree.
+
 ### Input off: hover and context menus
 - **React**: a button, toggle or radio with `RespondsToGestures = false` keeps a press, tap or long press (nothing
   under it reacts) and shows no hand cursor, but it is still hovered (`IsHovered` / `HoverChanged`: hover is taken
