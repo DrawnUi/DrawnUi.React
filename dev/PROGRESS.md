@@ -142,6 +142,7 @@ Detailed per-feature omissions: [SKIPPED.md](SKIPPED.md). Live sample: https://h
 | 2026-10-19 | Release | Publish 73 + npm `0.1.0-preview.19` (Nick: "i want hello app to show new stuff, your skill to have knowledge about using transforms and a new package published"): 3D transforms (drawnui-cross 6ab), the Transforms page 3D card and tilted strip, the public skill transforms rules |
 | 2026-10-19 | 3D: antialiased cache blit | Image caches are blitted with an antialiased paint, dithered when distorted (C# `PaintRenderObject`, drawnui-cross 6ab, found by DrawnUi.Rust): a turned Image-cached card had stair steps along its own bitmap border (337 / 301 pixels off by more than 48 levels against the card uncached, now 0). `npm run check:3d` 12 checks; all 22 checks OK; 21 routes, 0 console errors |
 | 2026-10-19 | Release | Publish 74 + npm `0.1.0-preview.20`: the antialiased cache blit, a follow-up of Publish 73 / preview.19 (same order) |
+| 2026-10-24 | Gesture owner check | DrawnUi.Net 1.10.7.12 stable briefing (drawnui-smart): C# a32a6aac (the control that consumed the last event is offered the next one first, wherever the finger is) ported as tests only, React already routes Panning / Wheel / Up to `gestureOwner`. `npm run check:gesture-owner` = `PanningStrip_KeepsTheGestureOutsideItsBounds_SiblingBelowGetsNothing` + `PanningStrip_InsideAVerticalScroll_ThenDown_PageStays` through the Canvas touch state machine: pass (red with the owner replay switched off). C# a64c9683 (bake size change): n/a, no background bakes |
 
 ## In progress
 
