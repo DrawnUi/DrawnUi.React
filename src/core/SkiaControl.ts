@@ -210,11 +210,16 @@ export class SkiaControl {
   /** What to cache for this subtree; see SkiaCacheType. Layouts default to None, SkiaLabel/SkiaSvg to Operations. */
   UseCache: SkiaCacheType = "None";
   /** The cache type actually applied (None while caching is disabled globally). */
+  /**
+   * C# HostsBackdrop: a SkiaBackdrop inside asked this picture-cached control to draw live (a picture would replay
+   * the backdrop's screen copy frozen). Stays set after the backdrop is removed: the control just keeps drawing live.
+   */
+  HostsBackdrop = false;
   get UsingCacheType(): SkiaCacheType {
     if (!Super.CacheEnabled) return "None";
     switch (this.UseCache) {
       case "None": return "None";
-      case "Operations": case "OperationsFull": return "Operations";
+      case "Operations": case "OperationsFull": return this.HostsBackdrop ? "None" : "Operations";
       case "ImageDoubleBuffered": return "ImageDoubleBuffered";
       case "ImageComposite": case "ImageCompositeGPU": return "ImageComposite";
       default: return "Image"; // Image, GPU -> single offscreen image

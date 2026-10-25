@@ -9,7 +9,7 @@ import { SkiaLayout } from "./SkiaLayout";
  * and `Brightness` (gamma, 1 = unchanged), tinted by `BackgroundColor`; children draw first and are blurred too.
  * The snapshot comes from the surface being drawn (`UseContext`, the area it covers there through every ancestor
  * transform) or the on-screen surface. Not cached (re-blurs on every frame it is drawn in); picture-cached ancestors
- * draw live once it is inside them (their UseCache set to None once); inside an Image-cached ancestor it copies that cache's surface
+ * draw live once it is inside them (HostsBackdrop); inside an Image-cached ancestor it copies that cache's surface
  * (right when what shows through the glass is inside that cache, wrong when it should show content outside it).
  */
 export class SkiaBackdrop extends SkiaLayout {
@@ -46,7 +46,7 @@ export class SkiaBackdrop extends SkiaLayout {
     if (this.BackgroundColor) { const paint = this.CreateBackgroundPaint(d); canvas.drawRect(CK.LTRBRect(d.Left, d.Top, d.Right, d.Bottom), paint); paint.delete(); }
     if (!this.HasEffects) return;
     // C# StopPictureCachesAbove: a screen copy recorded into an ancestor's picture would be replayed frozen; this frame
-    // draws no copy, the picture-cached ancestors draw live from the next frame on (their UseCache set to None once, C# fa5956ae)
+    // draws no copy, the picture-cached ancestors draw live from the next frame on (HostsBackdrop)
     if (ctx.Context.Recording) { this.StopPictureCachesAbove(); return; }
     // C# UseContext: snapshot the surface the pixels end up on — the on-screen surface or the nearest Image cache
     // surface. Copied where the backdrop really is on that surface: its rect through the canvas matrix (ancestor
@@ -96,7 +96,7 @@ export class SkiaBackdrop extends SkiaLayout {
   /** C# StopPictureCachesAbove: the picture-cached ancestors draw live from the next frame, which this asks for. */
   protected StopPictureCachesAbove(): void {
     for (let p = this.Parent; p; p = p.Parent) {
-      if (p.UsingCacheType === "Operations") { p.UseCache = "None"; p.InvalidateCache(); }
+      if (p.UsingCacheType === "Operations") { p.HostsBackdrop = true; p.InvalidateCache(); }
     }
     queueMicrotask(() => this.Update());
   }
