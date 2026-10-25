@@ -7,8 +7,9 @@ import { SkiaLayout } from "./SkiaLayout";
 /**
  * Mirrors DrawnUi SkiaBackdrop: draws what is already painted beneath its box through `Blur` (points, default 5)
  * and `Brightness` (gamma, 1 = unchanged), tinted by `BackgroundColor`; children draw first and are blurred too.
- * The snapshot comes from the surface being drawn (`UseContext`) or the on-screen surface. Not cached (re-blurs
- * on every frame it is drawn in; inside a cached parent it is re-recorded with that parent).
+ * The snapshot comes from the surface being drawn (`UseContext`, the area it covers there through every ancestor
+ * transform) or the on-screen surface. Not cached (re-blurs on every frame it is drawn in); picture-cached ancestors
+ * draw live once it is inside them (HostsBackdrop), an Image-cached ancestor gives it only that cache to copy.
  */
 export class SkiaBackdrop extends SkiaLayout {
   /** Samples what is drawn below: a composite above redraws it whole when something inside changes (drawnui-cross 6m). */
@@ -19,6 +20,7 @@ export class SkiaBackdrop extends SkiaLayout {
   UseContext = true;
 
   private snapshot?: Image;
+  private warnedImageCache = false;
 
   constructor() {
     super();
@@ -43,15 +45,33 @@ export class SkiaBackdrop extends SkiaLayout {
     super.Paint(ctx); // children
     if (this.BackgroundColor) { const paint = this.CreateBackgroundPaint(d); canvas.drawRect(CK.LTRBRect(d.Left, d.Top, d.Right, d.Bottom), paint); paint.delete(); }
     if (!this.HasEffects) return;
+    // C# StopPictureCachesAbove: a screen copy recorded into an ancestor's picture would be replayed frozen; this frame
+    // draws no copy, the picture-cached ancestors draw live from the next frame on (HostsBackdrop)
+    if (ctx.Context.Recording) { this.StopPictureCachesAbove(); return; }
     // C# UseContext: snapshot the surface the pixels end up on — the on-screen surface or the nearest Image cache
-    // surface (Origin = its top-left in canvas pixels). Content beneath is already there because caches are recorded
-    // inline while the parent paints, so this also works while an Operations picture is being recorded.
+    // surface. Copied where the backdrop really is on that surface: its rect through the canvas matrix (ancestor
+    // scale, move, rotation, 3D, the cache origin), rounded out, clamped to the surface, and drawn back 1:1 with the
+    // matrix undone, clipped to the backdrop's own (maybe turned) rect: the blur stays the same on screen while an
+    // ancestor scales (C# 6fd3bae3). The global surface (UseContext false) is copied at the layout rect.
     const surface = this.UseContext ? ctx.Context.Surface : this.Superview?.Surface;
     if (!surface) return;
+    if (this.UseContext && ctx.Context.Origin && !this.warnedImageCache) {
+      // drawn into an ancestor's Image cache surface: it holds only the cached subtree, not the screen behind (C# 9d6ae911)
+      this.warnedImageCache = true;
+      console.warn(`[SkiaBackdrop]${this.Tag ? ` ${this.Tag}` : ""} is drawn into an ancestor's Image cache: it copies that cache, not the screen behind. Remove the cache from its ancestors.`);
+    }
     surface.flush();
-    const origin = this.UseContext ? ctx.Context.Origin : undefined;
-    const ox = origin?.X ?? 0, oy = origin?.Y ?? 0;
-    const l = Math.floor(d.Left - ox), t = Math.floor(d.Top - oy), r = Math.ceil(d.Right - ox), b = Math.ceil(d.Bottom - oy);
+    let l = Math.floor(d.Left), t = Math.floor(d.Top), r = Math.ceil(d.Right), b = Math.ceil(d.Bottom);
+    let device: number[] | null = null;
+    if (this.UseContext) {
+      const m = canvas.getTotalMatrix();
+      const p = CK.Matrix.mapPoints(m, [d.Left, d.Top, d.Right, d.Top, d.Right, d.Bottom, d.Left, d.Bottom]);
+      l = Math.max(0, Math.floor(Math.min(p[0], p[2], p[4], p[6]))); t = Math.max(0, Math.floor(Math.min(p[1], p[3], p[5], p[7])));
+      r = Math.min(surface.width(), Math.ceil(Math.max(p[0], p[2], p[4], p[6]))); b = Math.min(surface.height(), Math.ceil(Math.max(p[1], p[3], p[5], p[7])));
+      if (r <= l || b <= t) return;
+      device = CK.Matrix.invert(m);
+      if (!device) return;
+    }
     // whole-surface snapshot, sub-rect on draw: a bounded snapshot of a GPU surface is not origin-safe in CanvasKit
     const image = surface.makeImageSnapshot();
     if (!image) return;
@@ -62,7 +82,12 @@ export class SkiaBackdrop extends SkiaLayout {
     if (gamma) paint.setColorFilter(gamma);
     const saved = canvas.save();
     canvas.clipRect(CK.LTRBRect(d.Left, d.Top, d.Right, d.Bottom), CK.ClipOp.Intersect, true);
-    canvas.drawImageRectOptions(image, CK.LTRBRect(l, t, r, b), CK.LTRBRect(d.Left, d.Top, d.Right, d.Bottom), CK.FilterMode.Linear, CK.MipmapMode.None, paint);
+    if (device) {
+      canvas.concat(device);
+      canvas.drawImageRectOptions(image, CK.LTRBRect(l, t, r, b), CK.LTRBRect(l, t, r, b), CK.FilterMode.Nearest, CK.MipmapMode.None, paint);
+    } else {
+      canvas.drawImageRectOptions(image, CK.LTRBRect(l, t, r, b), CK.LTRBRect(d.Left, d.Top, d.Right, d.Bottom), CK.FilterMode.Linear, CK.MipmapMode.None, paint);
+    }
     canvas.restoreToCount(saved);
     blur?.delete(); gamma?.delete(); paint.delete();
     const kill = this.snapshot;
@@ -71,6 +96,14 @@ export class SkiaBackdrop extends SkiaLayout {
     // What is beneath may change without invalidating this branch (an image that loads later, a sibling animating):
     // stale the ancestors' caches for the NEXT frame, after the current record has finished, without asking for one.
     queueMicrotask(() => { let p = this.Parent; while (p) { p.InvalidateCache(); p = p.Parent; } });
+  }
+
+  /** C# StopPictureCachesAbove: the picture-cached ancestors draw live from the next frame, which this asks for. */
+  protected StopPictureCachesAbove(): void {
+    for (let p = this.Parent; p; p = p.Parent) {
+      if (p.UsingCacheType === "Operations") { p.HostsBackdrop = true; p.InvalidateCache(); }
+    }
+    queueMicrotask(() => this.Update());
   }
 
   protected override OnDisposing(): void { this.snapshot?.delete(); this.snapshot = undefined; }

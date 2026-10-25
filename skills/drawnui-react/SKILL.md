@@ -151,7 +151,10 @@ createRoot(document.getElementById("root")!).render(
 - Effects: `VisualEffects={[effect]}` with `SkiaShaderEffect` (`ShaderSource` url or `ShaderCode`, Shadertoy
   uniforms `iResolution` / `iImageResolution` / `iTime` / `iOffset` / `iMouse` + `iImage1`, `SetUniform`,
   `UseBackground` Always / Once / Never), `ShaderDoubleTexturesEffect`, `ShaderTransitionEffect`,
-  `AnimatedShaderEffect`; `SkiaShaderCarousel` slides must be `UseCache="Image"`. `SetUniform` and animation ticks
+  `AnimatedShaderEffect`; `SkiaShaderCarousel` slides must be `UseCache="Image"`. `SkiaBackdrop` copies what is on screen
+  under the area it covers, also inside a scaled, moved or turned parent; a picture-cached parent (a SkiaShape) draws
+  live once a backdrop is inside it; under an Image-cached parent it copies only that cache, not the screen behind (a
+  console warning says so once). `SetUniform` and animation ticks
   redraw the effect over the parent's cache, which is kept; set `ShouldInvalidateParentCache = true` when the parent's
   content refreshes only through the effect's redraws (a custom paint reading live data without `Update()`), then
   every such change rebuilds the parent's cache. After changing a value only the shader reads, call

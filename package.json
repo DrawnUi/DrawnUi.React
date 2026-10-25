@@ -78,6 +78,7 @@
     "check:gesture-owner": "node dev/check.mjs dev/check-gesture-owner.ts",
     "check:shader-cache": "node dev/check.mjs dev/check-shader-cache.ts",
     "check:shader-content": "node dev/check.mjs dev/check-shader-content.ts",
+    "check:backdrop": "node dev/check.mjs dev/check-backdrop.ts",
     "site:extras": "node dev/site-extras.mjs dist/demo",
     "build:lib": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
     "prepublishOnly": "npm run build:lib",
