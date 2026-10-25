@@ -8,8 +8,9 @@ import { SkiaLayout } from "./SkiaLayout";
  * Mirrors DrawnUi SkiaBackdrop: draws what is already painted beneath its box through `Blur` (points, default 5)
  * and `Brightness` (gamma, 1 = unchanged), tinted by `BackgroundColor`; children draw first and are blurred too.
  * The snapshot comes from the surface being drawn (`UseContext`, the area it covers there through every ancestor
- * transform) or the on-screen surface. Not cached (re-blurs on every frame it is drawn in); picture-cached ancestors
- * draw live once it is inside them (HostsBackdrop); inside an Image-cached ancestor it copies that cache's surface
+ * transform) or the on-screen surface. Not cached (re-blurs on every frame it is drawn in). Its picture-cached parents
+ * should use `UseCache = None` (the app sets it, the library never changes a parent's cache; a one-time console warning
+ * names the case); inside an Image-cached ancestor it copies that cache's surface
  * (right when what shows through the glass is inside that cache, wrong when it should show content outside it).
  */
 export class SkiaBackdrop extends SkiaLayout {
@@ -21,6 +22,7 @@ export class SkiaBackdrop extends SkiaLayout {
   UseContext = true;
 
   private snapshot?: Image;
+  private warnedPicture = false;
 
   constructor() {
     super();
@@ -45,9 +47,12 @@ export class SkiaBackdrop extends SkiaLayout {
     super.Paint(ctx); // children
     if (this.BackgroundColor) { const paint = this.CreateBackgroundPaint(d); canvas.drawRect(CK.LTRBRect(d.Left, d.Top, d.Right, d.Bottom), paint); paint.delete(); }
     if (!this.HasEffects) return;
-    // C# StopPictureCachesAbove: a screen copy recorded into an ancestor's picture would be replayed frozen; this frame
-    // draws no copy, the picture-cached ancestors draw live from the next frame on (HostsBackdrop)
-    if (ctx.Context.Recording) { this.StopPictureCachesAbove(); return; }
+    // recorded into a parent's picture cache: its copy of what is behind goes into the picture. The library never
+    // changes a parent's cache (Nick, C# cf18cf29): it says so once, the app sets UseCache = None on those parents
+    if (ctx.Context.Recording && !this.warnedPicture) {
+      this.warnedPicture = true;
+      console.warn(`[SkiaBackdrop]${this.Tag ? ` ${this.Tag}` : ""} is recorded into a parent's picture cache (Operations / OperationsFull, the default of SkiaShape): its copy of what is behind goes into the picture. Set UseCache = None on its picture-cached parents.`);
+    }
     // C# UseContext: snapshot the surface the pixels end up on — the on-screen surface or the nearest Image cache
     // surface. Copied where the backdrop really is on that surface: its rect through the canvas matrix (ancestor
     // scale, move, rotation, 3D, the cache origin), rounded out, clamped to the surface, and drawn back 1:1 with the
@@ -91,14 +96,6 @@ export class SkiaBackdrop extends SkiaLayout {
     // What is beneath may change without invalidating this branch (an image that loads later, a sibling animating):
     // stale the ancestors' caches for the NEXT frame, after the current record has finished, without asking for one.
     queueMicrotask(() => { let p = this.Parent; while (p) { p.InvalidateCache(); p = p.Parent; } });
-  }
-
-  /** C# StopPictureCachesAbove: the picture-cached ancestors draw live from the next frame, which this asks for. */
-  protected StopPictureCachesAbove(): void {
-    for (let p = this.Parent; p; p = p.Parent) {
-      if (p.UsingCacheType === "Operations") { p.HostsBackdrop = true; p.InvalidateCache(); }
-    }
-    queueMicrotask(() => this.Update());
   }
 
   protected override OnDisposing(): void { this.snapshot?.delete(); this.snapshot = undefined; }
