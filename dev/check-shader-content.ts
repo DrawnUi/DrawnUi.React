@@ -87,16 +87,16 @@ const name = (p: { R: number; G: number; B: number }) =>
   }
 
   {
-    // KeepParentCache on a picture-cached shape (SkiaShape's default Operations): picture kept, new value drawn
+    // the default (the parent's cache kept) on a picture-cached shape (SkiaShape's default Operations): picture kept, new value drawn
     const shape = new SkiaShape();
-    const e = new SkiaShaderEffect(); e.ShaderCode = Tint; e.KeepParentCache = true; e.SetUniform("uAmount", 0);
+    const e = new SkiaShaderEffect(); e.ShaderCode = Tint; e.SetUniform("uAmount", 0);
     shape.VisualEffects = [e];
     const frame = scene(shape);
     for (let i = 0; i < 8; i++) frame();
     const cache = shape.RenderObject, before = name(frame());
     e.SetUniform("uAmount", 1);
     let after = frame(); after = frame(); after = frame();
-    check("KeepParentCache on an Operations shape: picture kept, the new value drawn",
+    check("SetUniform on an Operations shape: picture kept, the new value drawn",
       shape.UsingCacheType === "Operations" && !!cache?.Picture && before === "content" && after.B > 200 && after.R < 50 && shape.RenderObject === cache,
       `before ${before}, after rgb(${after.R},${after.G},${after.B}), same picture ${shape.RenderObject === cache}`);
   }

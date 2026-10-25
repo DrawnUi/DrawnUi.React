@@ -1,7 +1,7 @@
-// SkiaShaderEffect.KeepParentCache (drawnui-cross 6ae, C# d0b1f2b6 ShaderKeepParentCacheTests), checked in Node
-// (`npm run check:shader-cache`): a shader effect paints over its parent's cached content. With KeepParentCache a
-// uniform change or an animation tick redraws the effect with the new value and the parent keeps its cache; without
-// it (the default) every such change rebuilds the parent's cache.
+// SkiaShaderEffect.ShouldInvalidateParentCache (drawnui-cross 6ae, C# 0c6d9ef1 ShaderParentCacheTests), checked in
+// Node (`npm run check:shader-cache`): a shader effect paints over its parent's cached content. By default a uniform
+// change or an animation tick redraws the effect with the new value and the parent keeps its cache; with
+// ShouldInvalidateParentCache every such change rebuilds the parent's cache.
 import {
   Super, SKRect, SkiaAccessibilityManager, HoverManager, SkiaLayout, SkiaShape, SkiaShaderEffect, AnimatedShaderEffect,
   type Canvas, type AnimatorBase,
@@ -71,26 +71,27 @@ class FakeCanvas {
     return { fake, card, frames };
   };
 
-  for (const keep of [true, false]) {
-    const effect = new SkiaShaderEffect(); effect.ShaderCode = TintShader; effect.KeepParentCache = keep; effect.SetUniform("uAmount", 0);
+  for (const invalidate of [true, false]) {
+    const keep = !invalidate;
+    const effect = new SkiaShaderEffect(); effect.ShaderCode = TintShader; effect.ShouldInvalidateParentCache = invalidate; effect.SetUniform("uAmount", 0);
     const { fake, card, frames } = scene(effect);
     const cache = card.RenderObject, before = frames(1);
     const asked = fake.frames;
     effect.SetUniform("uAmount", 1);
     const after = frames(3);
-    check(`KeepParentCache ${keep}: SetUniform draws the new value, the parent's cache ${keep ? "kept" : "rebuilt"}`,
+    check(`ShouldInvalidateParentCache ${invalidate}: SetUniform draws the new value, the parent's cache ${keep ? "kept" : "rebuilt"}`,
       !!cache && before.R > 200 && before.B < 50 && fake.frames > asked && after.B > 200 && after.R < 50 && (keep ? card.RenderObject === cache : card.RenderObject !== cache),
       `before R${before.R} B${before.B}, after R${after.R} B${after.B}, same cache ${card.RenderObject === cache}`);
   }
 
   {
-    const effect = new AnimatedShaderEffect(); effect.ShaderCode = ProgressShader; effect.KeepParentCache = true; effect.DurationMs = 200;
+    const effect = new AnimatedShaderEffect(); effect.ShaderCode = ProgressShader; effect.DurationMs = 200;
     const { card, frames } = scene(effect);
     effect.Play();
     frames(2);
     const cache = card.RenderObject;
     const after = frames(20);
-    check("AnimatedShaderEffect with KeepParentCache: the ticks animate over the same cache",
+    check("AnimatedShaderEffect, default: the ticks animate over the same cache",
       !!cache && effect.Progress > 0.99 && after.B > 200 && after.R < 50 && card.RenderObject === cache,
       `progress ${effect.Progress.toFixed(2)}, R${after.R} B${after.B}, same cache ${card.RenderObject === cache}`);
   }

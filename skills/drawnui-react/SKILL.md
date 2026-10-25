@@ -151,10 +151,11 @@ createRoot(document.getElementById("root")!).render(
 - Effects: `VisualEffects={[effect]}` with `SkiaShaderEffect` (`ShaderSource` url or `ShaderCode`, Shadertoy
   uniforms `iResolution` / `iImageResolution` / `iTime` / `iOffset` / `iMouse` + `iImage1`, `SetUniform`,
   `UseBackground` Always / Once / Never), `ShaderDoubleTexturesEffect`, `ShaderTransitionEffect`,
-  `AnimatedShaderEffect`; `SkiaShaderCarousel` slides must be `UseCache="Image"`. Every `SetUniform` and animation
-  tick rebuilds the parent's cache by default; `KeepParentCache = true` keeps it (the effect is redrawn over the same
-  cache: use it for a big cached layer under an animated effect, not for content that refreshes only through the
-  effect); after changing a value only the shader reads, call `UpdateUniforms()`. On a cached control (any cache type)
+  `AnimatedShaderEffect`; `SkiaShaderCarousel` slides must be `UseCache="Image"`. `SetUniform` and animation ticks
+  redraw the effect over the parent's cache, which is kept; set `ShouldInvalidateParentCache = true` when the parent's
+  content refreshes only through the effect's redraws (a custom paint reading live data without `Update()`), then
+  every such change rebuilds the parent's cache. After changing a value only the shader reads, call
+  `UpdateUniforms()`; the effect's `Update()` always rebuilds the parent's cache. On a cached control (any cache type)
   the shader replaces the control and `iImage1` is the control's own content, so a transparent result shows what is
   behind it; on an uncached control (`UseCache="None"`) the control paints first and the shader draws over it, reading
   the canvas there (the control and what is behind it: glass, ripples). An effect implementing

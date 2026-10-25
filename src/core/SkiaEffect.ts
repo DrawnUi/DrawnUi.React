@@ -148,17 +148,17 @@ export class SkiaShaderEffect extends SkiaEffect implements IPostRendererEffect 
   }
 
   /**
-   * C# KeepParentCache (default false): animation ticks, `SetUniform` and `UpdateUniforms()` only redraw this effect and
-   * the parent keeps its cache (ancestors still redraw); false = every such change rebuilds the parent's cache, as
-   * `Update()`. The effect paints over the parent's cached content, so a uniform change needs no new cache: use it
-   * for a large cached parent whose content asks for its own updates. Leave it false for a parent whose content
-   * refreshes only through the effect's redraws.
+   * C# ShouldInvalidateParentCache (default false): animation ticks, `SetUniform` and `UpdateUniforms()` only redraw
+   * this effect over the parent's cache (ancestor caches still redraw), because the effect paints over the parent's
+   * cached content and a uniform change needs no new cache. True: they also invalidate the parent's cache, so the parent
+   * re-renders its content on every change; set it when that content refreshes only through the effect's redraws (a
+   * custom Paint reading changing data without calling Update()). `Update()` always invalidates the cache.
    */
-  KeepParentCache = false;
+  ShouldInvalidateParentCache = false;
 
-  /** Call after changing a value only the shader reads (a uniform, an animation progress): redraws the effect, keeping the parent's cache when KeepParentCache is true, else `Update()`. */
+  /** Call after changing a value only the shader reads (a uniform, an animation progress): redraws the effect over the parent's cache, or `Update()` when ShouldInvalidateParentCache is true. */
   UpdateUniforms(): void {
-    if (!this.KeepParentCache) { this.Update(); return; }
+    if (this.ShouldInvalidateParentCache) { this.Update(); return; }
     this.Parent?.RepaintComposition();
   }
 
