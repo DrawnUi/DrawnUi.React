@@ -119,7 +119,7 @@ export function ShellPage() {
                 </SkiaShape>
               </SkiaLayer>
               {/* BACKDROP */}
-              <SkiaShape Type="Rectangle" Margin={new Thickness(16)} BackgroundColor="#66FFFFFF" ClipBackgroundColor CornerRadius={19} HorizontalOptions="Fill" VerticalOptions="Fill"
+              <SkiaShape Type="Rectangle" UseCache="None" Margin={new Thickness(16)} BackgroundColor="#66FFFFFF" ClipBackgroundColor CornerRadius={19} HorizontalOptions="Fill" VerticalOptions="Fill"
                 Shadows={[{ X: 4, Y: 4, Blur: 3, Opacity: 1, Color: "#44000000" }]}>
                 <SkiaLayer>
                   <SkiaBackdrop Blur={3} UseContext HorizontalOptions="Fill" VerticalOptions="Fill" ZIndex={-1} />
