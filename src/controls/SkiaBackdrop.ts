@@ -9,7 +9,8 @@ import { SkiaLayout } from "./SkiaLayout";
  * and `Brightness` (gamma, 1 = unchanged), tinted by `BackgroundColor`; children draw first and are blurred too.
  * The snapshot comes from the surface being drawn (`UseContext`, the area it covers there through every ancestor
  * transform) or the on-screen surface. Not cached (re-blurs on every frame it is drawn in); picture-cached ancestors
- * draw live once it is inside them (HostsBackdrop), an Image-cached ancestor gives it only that cache to copy.
+ * draw live once it is inside them (HostsBackdrop); inside an Image-cached ancestor it copies that cache's surface
+ * (right when what shows through the glass is inside that cache, wrong when it should show content outside it).
  */
 export class SkiaBackdrop extends SkiaLayout {
   /** Samples what is drawn below: a composite above redraws it whole when something inside changes (drawnui-cross 6m). */
@@ -20,7 +21,6 @@ export class SkiaBackdrop extends SkiaLayout {
   UseContext = true;
 
   private snapshot?: Image;
-  private warnedImageCache = false;
 
   constructor() {
     super();
@@ -55,11 +55,6 @@ export class SkiaBackdrop extends SkiaLayout {
     // ancestor scales (C# 6fd3bae3). The global surface (UseContext false) is copied at the layout rect.
     const surface = this.UseContext ? ctx.Context.Surface : this.Superview?.Surface;
     if (!surface) return;
-    if (this.UseContext && ctx.Context.Origin && !this.warnedImageCache) {
-      // drawn into an ancestor's Image cache surface: it holds only the cached subtree, not the screen behind (C# 9d6ae911)
-      this.warnedImageCache = true;
-      console.warn(`[SkiaBackdrop]${this.Tag ? ` ${this.Tag}` : ""} is drawn into an ancestor's Image cache: it copies that cache, not the screen behind. Remove the cache from its ancestors.`);
-    }
     surface.flush();
     let l = Math.floor(d.Left), t = Math.floor(d.Top), r = Math.ceil(d.Right), b = Math.ceil(d.Bottom);
     let device: number[] | null = null;
