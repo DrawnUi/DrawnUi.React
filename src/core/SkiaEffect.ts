@@ -147,9 +147,25 @@ export class SkiaShaderEffect extends SkiaEffect implements IPostRendererEffect 
     return this.compiled !== undefined;
   }
 
+  /**
+   * C# KeepParentCache (default false): animation ticks, `SetUniform` and `UpdateUniforms()` only redraw this effect and
+   * the parent keeps its cache (ancestors still redraw); false = every such change rebuilds the parent's cache, as
+   * `Update()`. The effect paints over the parent's cached content, so a uniform change needs no new cache: use it
+   * for a large Image / GPU cached parent whose content asks for its own updates. Leave it false for a picture-cached
+   * parent (Operations, the default of SkiaShape and SkiaLabel) or one whose content refreshes only through the
+   * effect's redraws.
+   */
+  KeepParentCache = false;
+
+  /** Call after changing a value only the shader reads (a uniform, an animation progress): redraws the effect, keeping the parent's cache when KeepParentCache is true, else `Update()`. */
+  UpdateUniforms(): void {
+    if (!this.KeepParentCache) { this.Update(); return; }
+    this.Parent?.RepaintComposition();
+  }
+
   // ---- uniforms API (C# SetUniform overloads) ----
   SetUniform(name: string, ...values: number[]): this {
-    if (name && values.length > 0) { this.Uniforms.set(name, values); this.Update(); }
+    if (name && values.length > 0) { this.Uniforms.set(name, values); this.UpdateUniforms(); }
     return this;
   }
 
@@ -536,7 +552,7 @@ export class AnimatedShaderEffect extends SkiaShaderEffect {
     if (!parent) return;
     if (!this.Animator) {
       const a = new SkiaValueAnimator(parent);
-      a.OnUpdated = (v) => { this.Progress = v; this.Update(); };
+      a.OnUpdated = (v) => { this.Progress = v; this.UpdateUniforms(); };
       a.Finished = () => this.Completed?.(this);
       this.Animator = a;
     }

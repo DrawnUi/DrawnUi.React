@@ -151,7 +151,10 @@ createRoot(document.getElementById("root")!).render(
 - Effects: `VisualEffects={[effect]}` with `SkiaShaderEffect` (`ShaderSource` url or `ShaderCode`, Shadertoy
   uniforms `iResolution` / `iImageResolution` / `iTime` / `iOffset` / `iMouse` + `iImage1`, `SetUniform`,
   `UseBackground` Always / Once / Never), `ShaderDoubleTexturesEffect`, `ShaderTransitionEffect`,
-  `AnimatedShaderEffect`; `SkiaShaderCarousel` slides must be `UseCache="Image"`. An effect implementing
+  `AnimatedShaderEffect`; `SkiaShaderCarousel` slides must be `UseCache="Image"`. Every `SetUniform` and animation
+  tick rebuilds the parent's cache by default; `KeepParentCache = true` keeps it (the effect is redrawn over the same
+  cache: use it for a big Image-cached layer under an animated effect, not for an Operations-cached parent or content
+  that refreshes only through the effect); after changing a value only the shader reads, call `UpdateUniforms()`. An effect implementing
   `ProcessGestures` receives the parent's gestures first.
 - `<Canvas Gestures>`: `"Enabled"` shares input with the host page like MAUI's `Enabled` inside a native scroll view,
   so a canvas embedded in a longer page never traps page scrolling. Touch: a finger pan along an axis the page can
