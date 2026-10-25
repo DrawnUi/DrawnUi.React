@@ -93,9 +93,8 @@ export class SkiaBackdrop extends SkiaLayout {
     const kill = this.snapshot;
     this.snapshot = image;
     kill?.delete();
-    // What is beneath may change without invalidating this branch (an image that loads later, a sibling animating):
-    // stale the ancestors' caches for the NEXT frame, after the current record has finished, without asking for one.
-    queueMicrotask(() => { let p = this.Parent; while (p) { p.InvalidateCache(); p = p.Parent; } });
+    // the library never changes how a parent's cache behaves (Nick, 2026-10-25): a cached parent replays the copy it
+    // recorded, as in C#; the app sets UseCache = None on the parents of a backdrop that must follow what is behind
   }
 
   protected override OnDisposing(): void { this.snapshot?.delete(); this.snapshot = undefined; }

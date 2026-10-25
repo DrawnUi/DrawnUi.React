@@ -1,8 +1,9 @@
 // SkiaBackdrop under transformed and picture-cached parents (drawnui-cross 6af, C# 6fd3bae3 / bcce0739
 // BackdropTransformedParentTests), checked in Node (`npm run check:backdrop`). The backdrop copies the screen area it
 // really covers (its rect through the canvas matrix: scale, move, rotation), drawn back 1:1, so with no blur every
-// pixel it covers equals what is behind it; inside a picture-cached shape it follows what is behind it, never a copy
-// frozen into the picture. Brightness 1.0001 makes React draw the copy (with no effect at all it draws nothing).
+// pixel it covers equals what is behind it. In an uncached shape it follows what is behind it; a picture-cached shape
+// replays the copy it recorded (the documented freeze: the library never changes a parent's cache, the app sets
+// UseCache = None). Brightness 1.0001 makes React draw the copy (with no effect at all it draws nothing).
 import {
   Super, SKRect, SkiaAccessibilityManager, HoverManager, SkiaLayer, SkiaRow, SkiaShape, SkiaBackdrop,
   type Canvas, type AnimatorBase, type SkiaCacheType, type SkiaControl,
@@ -70,7 +71,7 @@ const stripes = (width: number, repeat: number) => {
     check(`scale ${scale}, TranslationX ${tx}, Rotation ${rot}: the backdrop copies the screen it covers`, wrong === 0, `${wrong}/${total} pixels differ from the background`);
   }
 
-  for (const cache of ["Operations", "None"] as SkiaCacheType[]) {
+  for (const cache of ["None"] as SkiaCacheType[]) {
     // the BlockChampion popup: the backdrop in a shape inside a frame that zooms 0.75 to 1
     const frame = new SkiaLayer(); frame.WidthRequest = 200; frame.HeightRequest = 100; frame.HorizontalOptions = "Center"; frame.VerticalOptions = "Center"; frame.Scale = 0.75;
     const shape = new SkiaShape(); shape.UseCache = cache; shape.HorizontalOptions = "Fill"; shape.VerticalOptions = "Fill"; shape.AddSubView(glass());
@@ -97,7 +98,9 @@ const stripes = (width: number, repeat: number) => {
     behind.BackgroundColor = "#0000FF"; behind.UpdateDraw();
     let px = await tick(); for (let i = 0; i < 5; i++) px = await tick();
     const c = px(200, 100);
-    check(`shape cache ${cache}: the glass follows what is behind it`, c[2] > 200 && c[0] < 50, `center rgb(${c.join(",")}), shape uses ${shape.UsingCacheType}`);
+    if (cache === "None") check(`shape cache ${cache}: the glass follows what is behind it`, c[2] > 200 && c[0] < 50, `center rgb(${c.join(",")})`);
+    else check(`shape cache ${cache}: the picture replays its recorded copy (documented freeze, the parent's cache untouched)`,
+      c[0] > 200 && c[2] < 50 && shape.UsingCacheType === "Operations", `center rgb(${c.join(",")}), shape uses ${shape.UsingCacheType}`);
   }
 
   console.log(failures ? `FAIL: ${failures} checks` : "OK: backdrops copy what they cover");
