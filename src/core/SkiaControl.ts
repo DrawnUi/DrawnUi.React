@@ -70,9 +70,34 @@ export class CachedObject {
     }
   }
 
+  /**
+   * C# GetPictureImage: the picture of a picture cache (Operations, OperationsFull) drawn into an image, made on the
+   * first call (on `main`'s GPU context when given) and kept as long as this cache lives. Shader effects read it as
+   * their input, so on such a control they work on its own content, as on an Image cache.
+   */
+  GetPictureImage(main?: Surface): Image | undefined {
+    if (this.pictureImage || !this.Picture) return this.pictureImage;
+    const w = Math.ceil(this.Bounds.Width), h = Math.ceil(this.Bounds.Height);
+    if (w <= 0 || h <= 0) return undefined;
+    const surface = main?.makeSurface({ ...main.imageInfo(), width: w, height: h }) ?? Super.CK.MakeSurface(w, h);
+    if (!surface) return undefined;
+    const canvas = surface.getCanvas();
+    canvas.clear(Super.CK.TRANSPARENT);
+    canvas.translate(-this.Bounds.Left, -this.Bounds.Top);
+    canvas.drawPicture(this.Picture);
+    this.pictureImage = surface.makeImageSnapshot();
+    surface.delete();
+    return this.pictureImage;
+  }
+  private pictureImage?: Image;
+  /** The picture drawn into an image, once GetPictureImage made it. */
+  get PictureImage(): Image | undefined { return this.pictureImage; }
+
   Dispose(): void {
     this.Picture?.delete();
     this.Image?.delete();
+    this.pictureImage?.delete();
+    this.pictureImage = undefined;
   }
 }
 
@@ -364,9 +389,17 @@ export class SkiaControl {
    */
   get CachedImage(): CachedTexture | undefined {
     const c = this.RenderObject;
-    if (!c?.Image) return undefined;
-    const r = this.AlignedCacheRect(c.Scale);
-    return { Image: c.Image, Bounds: SKRect.Create(r.Left, r.Top, c.Bounds.Width, c.Bounds.Height) };
+    if (!c) return undefined;
+    if (c.Image) {
+      const r = this.AlignedCacheRect(c.Scale);
+      return { Image: c.Image, Bounds: SKRect.Create(r.Left, r.Top, c.Bounds.Width, c.Bounds.Height) };
+    }
+    // a picture cache: its picture drawn into an image (made in RenderContent), so effects work on this control's
+    // content instead of a snapshot of what is behind it (C# caa1c8c1)
+    const image = c.PictureImage;
+    if (!image) return undefined;
+    const r = this.ExpandedCacheRect(c.Scale);
+    return { Image: image, Bounds: SKRect.Create(r.Left, r.Top, image.width(), image.height()) };
   }
   /** Clip overlay effects to the control's shape (CreateClip). */
   ClipEffects = true;
@@ -865,9 +898,12 @@ export class SkiaControl {
       const o = this.RenderObject;
       if (this.CacheStale(ctx.Scale) || (o?.Picture && o.HasImageBlits && o.PlaybackDistorted !== this.WillDrawDistorted(ctx))) this.CreateRenderingObject({ ...ctx, Destination: this.DrawingRect }, cacheType);
       if (this.RenderObject) {
-        // C# DrawRenderObject: with post renderers an Image cache is not blitted, the effects sample it (CachedImage)
-        // and paint the result; a picture cache has no texture, so it is replayed first and snapshotted by the effect
-        if (post.length === 0 || !this.RenderObject.Image) this.DrawCache(this.RenderObject, ctx, r.Left + dx, r.Top + dy);
+        // C# DrawRenderObject: with post renderers a cache is not blitted, the effects sample it (CachedImage) and paint
+        // the result, so the shader replaces the control; a picture cache hands them its picture drawn into an image
+        // (made once per cache, C# GetPictureImage); drawn as before only when that image could not be made
+        const cache = this.RenderObject;
+        if (post.length > 0 && cache.Picture) cache.GetPictureImage(ctx.Context.Surface);
+        if (post.length === 0 || !(cache.Image ?? cache.PictureImage)) this.DrawCache(cache, ctx, r.Left + dx, r.Top + dy);
         for (const e of post) e.Render(own);
       }
       else if (this.RenderObjectPrevious) this.DrawCache(this.RenderObjectPrevious, ctx, r.Left + dx, r.Top + dy); // double buffer: last good frame

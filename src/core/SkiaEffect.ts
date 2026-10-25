@@ -151,9 +151,8 @@ export class SkiaShaderEffect extends SkiaEffect implements IPostRendererEffect 
    * C# KeepParentCache (default false): animation ticks, `SetUniform` and `UpdateUniforms()` only redraw this effect and
    * the parent keeps its cache (ancestors still redraw); false = every such change rebuilds the parent's cache, as
    * `Update()`. The effect paints over the parent's cached content, so a uniform change needs no new cache: use it
-   * for a large Image / GPU cached parent whose content asks for its own updates. Leave it false for a picture-cached
-   * parent (Operations, the default of SkiaShape and SkiaLabel) or one whose content refreshes only through the
-   * effect's redraws.
+   * for a large cached parent whose content asks for its own updates. Leave it false for a parent whose content
+   * refreshes only through the effect's redraws.
    */
   KeepParentCache = false;
 

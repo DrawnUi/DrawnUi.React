@@ -153,8 +153,11 @@ createRoot(document.getElementById("root")!).render(
   `UseBackground` Always / Once / Never), `ShaderDoubleTexturesEffect`, `ShaderTransitionEffect`,
   `AnimatedShaderEffect`; `SkiaShaderCarousel` slides must be `UseCache="Image"`. Every `SetUniform` and animation
   tick rebuilds the parent's cache by default; `KeepParentCache = true` keeps it (the effect is redrawn over the same
-  cache: use it for a big Image-cached layer under an animated effect, not for an Operations-cached parent or content
-  that refreshes only through the effect); after changing a value only the shader reads, call `UpdateUniforms()`. An effect implementing
+  cache: use it for a big cached layer under an animated effect, not for content that refreshes only through the
+  effect); after changing a value only the shader reads, call `UpdateUniforms()`. On a cached control (any cache type)
+  the shader replaces the control and `iImage1` is the control's own content, so a transparent result shows what is
+  behind it; on an uncached control (`UseCache="None"`) the control paints first and the shader draws over it, reading
+  the canvas there (the control and what is behind it: glass, ripples). An effect implementing
   `ProcessGestures` receives the parent's gestures first.
 - `<Canvas Gestures>`: `"Enabled"` shares input with the host page like MAUI's `Enabled` inside a native scroll view,
   so a canvas embedded in a longer page never traps page scrolling. Touch: a finger pan along an axis the page can
