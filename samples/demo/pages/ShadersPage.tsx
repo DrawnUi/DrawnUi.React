@@ -44,7 +44,7 @@ class MultiRippleWithTouchEffect extends ShaderDoubleTexturesEffect implements I
     const box = parent.DrawingRect;
     const ripple: Ripple = { origin: { X: apply.MappedLocation.X + apply.ChildOffset.X - box.Left, Y: apply.MappedLocation.Y + apply.ChildOffset.Y - box.Top }, time: performance.now(), progress: 0 };
     this.ripples.add(ripple);
-    void parent.AnimateRangeAsync((v) => { ripple.progress = v; this.Update(); }, 0, 1, 4500).then(() => this.ripples.delete(ripple));
+    void parent.AnimateRangeAsync((v) => { ripple.progress = v; this.UpdateUniforms(); }, 0, 1, 4500).then(() => this.ripples.delete(ripple));
     return null;
   }
 }
@@ -121,7 +121,7 @@ export function ShadersPage() {
   useEffect(() => {
     const hosts = [waveHost.current, plasmaHost.current].filter((h) => !!h) as unknown as SkiaControl[];
     if (!running || hosts.length === 0) return;
-    const animators = hosts.map((h) => { const a = new SkiaValueAnimator(h); a.mMinValue = 0; a.mMaxValue = 1; a.Speed = 1000; a.Repeat = -1; a.OnUpdated = () => { wave.Update(); plasma.Update(); }; a.Start(); return a; });
+    const animators = hosts.map((h) => { const a = new SkiaValueAnimator(h); a.mMinValue = 0; a.mMaxValue = 1; a.Speed = 1000; a.Repeat = -1; a.OnUpdated = () => { wave.UpdateUniforms(); plasma.UpdateUniforms(); }; a.Start(); return a; });
     return () => animators.forEach((a) => a.Stop());
   }, [running, wave, plasma]);
 
