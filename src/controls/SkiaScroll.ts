@@ -701,8 +701,8 @@ export class SkiaScroll extends SkiaControl {
     } else {
       // A templated Row / Wrap / Grid realizes every item (C# non-list layouts are not virtualized): read the cell's
       // arranged rect, like C# reads the structure cell's Destination.
-      // a masonry's recycled slots know every item's place, shown or not
-      const r = layout.GetMasonryItemRect(i) ?? layout.ChildrenFactory.GetViewForIndex(i)?.DrawingRect;
+      // recycled slots know every item's place, shown or not
+      const r = layout.GetItemRect(i) ?? layout.ChildrenFactory.GetViewForIndex(i)?.DrawingRect;
       if (!r) return undefined;
       const c = this.content.DrawingRect;
       itemStart = (horizontal ? r.Left - c.Left : r.Top - c.Top) / scale;

@@ -158,7 +158,8 @@ createRoot(document.getElementById("root")!).render(
   (`SkiaLabel.CanBreakInsideWord`); Korean and Latin wrap at spaces, a Latin word wider than the line by characters.
 - `SkiaScroll.ScrollToIndex(index, animate, "Start" | "Center" | "End")` keeps aiming until the row's place is
   measured (a `MeasureVisible` list estimates rows it has not measured yet), so it lands on the row; a press, the
-  wheel or another scroll cancels it, and `LoadMoreCommand` waits until it lands.
+  wheel or another scroll cancels it, and `LoadMoreCommand` waits until it lands. It reaches any item of a templated
+  list, Row, Wrap, Grid, split Column or Masonry that is the scroll's `Content`, shown or not.
 - Effects: `VisualEffects={[effect]}` with `SkiaShaderEffect` (`ShaderSource` url or `ShaderCode`, Shadertoy
   uniforms `iResolution` / `iImageResolution` / `iTime` / `iOffset` / `iMouse` + `iImage1`, `SetUniform`,
   `UseBackground` Always / Once / Never), `ShaderDoubleTexturesEffect`, `ShaderTransitionEffect`,

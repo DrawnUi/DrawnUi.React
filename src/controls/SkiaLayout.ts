@@ -527,12 +527,17 @@ export class SkiaLayout extends SkiaControl {
     return { w: used > 0 ? used * columnWidth + (used - 1) * spacing : 0, h: Math.max(0, ...bottoms) };
   }
 
-  /** Masonry: where the slot of item `index` was arranged (pixels), also while no view shows it; undefined otherwise. */
-  GetMasonryItemRect(index: number): SKRect | undefined {
-    if (!this.IsMasonry || !this.IsRecycledLayout) return undefined;
+  /**
+   * Where item `index` of a recycled templated Row / Wrap / Grid / split Column / Masonry was arranged (pixels), from
+   * its slot, also while no view shows it (ScrollToIndex to an item off screen); undefined otherwise.
+   */
+  GetItemRect(index: number): SKRect | undefined {
+    if (!this.IsRecycledLayout) return undefined;
     const d = this.slots?.[index]?.Destination;
     return d && d.Width > 0 ? d : undefined;
   }
+  /** Masonry: where the slot of item `index` was arranged (pixels); see GetItemRect. */
+  GetMasonryItemRect(index: number): SKRect | undefined { return this.IsMasonry ? this.GetItemRect(index) : undefined; }
 
   /** Port of C# MeasureGrid: build the structure in points, stretch the last track when the grid fills, remeasure at final cells. */
   private MeasureGrid(widthPx: number, heightPx: number, scale: number): { w: number; h: number } {
@@ -672,7 +677,7 @@ export class SkiaLayout extends SkiaControl {
    * The item's offset and height are real, not estimated (C# LastMeasuredIndexLocal >= index): MeasureVisible knows
    * them once the measured prefix passed the item; the other strategies always do.
    */
-  IsItemMeasured(index: number): boolean { return this.IsMasonry || this.MeasureItemsStrategy !== "MeasureVisible" || index < this.mvMeasured; }
+  IsItemMeasured(index: number): boolean { return !this.IsTemplatedList || this.MeasureItemsStrategy !== "MeasureVisible" || index < this.mvMeasured; }
 
   /** Pixel offset of item index from the top of the layout content (inside padding). */
   GetItemOffsetPixels(index: number): number {
