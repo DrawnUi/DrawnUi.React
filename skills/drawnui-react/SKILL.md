@@ -209,7 +209,9 @@ createRoot(document.getElementById("root")!).render(
   `OnAccessibilityKey(key)` and return true when used; `SkiaSlider` steps), then to its group. Give a list or a row of
   buttons a group role (`Aria.RoleList`, `RoleGrid`, `RoleToolbar`, `RoleRadioGroup`, `RoleTabList`, `RoleMenu`,
   `RoleMenuBar`, `RoleListBox`): it becomes one Tab stop and the arrows walk its items by index, recycled cells
-  included (scrolled in, then focused). Cells need a role and a label (set `AccessibilityLabel` in `SetContent`).
+  included (scrolled in, then focused). In a Masonry group the arrows follow the tiles on screen: Up / Down the same
+  column, Left / Right the nearest tile of the neighbour column, PageUp / PageDown one viewport along the column.
+  Cells need a role and a label (set `AccessibilityLabel` in `SetContent`).
   Only what the pointer can use is reachable: `InputTransparent`, a locking `LockChildrenGestures` above, a control
   switched off with `RespondsToGestures={false}` take a node out. A `SkiaEditor` is a Tab stop; Tab leaves it for the next node.
 - Input off: `RespondsToGestures={false}` is the one switch on `SkiaButton`, switch, checkbox, radio, slider, scroll,

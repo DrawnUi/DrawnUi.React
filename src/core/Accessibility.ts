@@ -42,7 +42,10 @@ export const Aria = {
 } as const;
 
 /** What the group logic reads from a layout and a scroll, by shape: core modules never import the controls (load order). */
-interface GroupLayout { Type: string; Split: number; IsTemplated: boolean; ItemsSource?: readonly unknown[]; ChildrenFactory: { GetViewForIndex(index: number): SkiaControl | undefined } }
+interface GroupLayout {
+  Type: string; Split: number; IsTemplated: boolean; ItemsSource?: readonly unknown[]; ChildrenFactory: { GetViewForIndex(index: number): SkiaControl | undefined };
+  GetMasonryPlacement?(): { Index: number; Rect: { Left: number; Top: number; Bottom: number } }[];
+}
 interface GroupScroll { Content?: SkiaControl; ScrollToIndex(index: number, animate: boolean, option?: "Start" | "End"): void }
 const asLayout = (c: SkiaControl): GroupLayout | undefined => ("ChildrenFactory" in c && "Split" in c ? c as unknown as GroupLayout : undefined);
 const asScroll = (c: SkiaControl): GroupScroll | undefined => ("ScrollToIndex" in c && "ViewportOffsetY" in c ? c as unknown as GroupScroll : undefined);
@@ -202,7 +205,9 @@ export class SkiaAccessibilityManager {
     const vertical = axis !== "Horizontal";
     const page = () => PageSize(scroll!, item, vertical) * row;
     let target: number, step: number;
-    if ((key === "ArrowDown" && axis === "Vertical") || (key === "ArrowRight" && axis !== "Vertical")) { target = current + 1; step = 1; }
+    const layout = asLayout(group), masonry = layout?.Type === "Masonry" ? MasonryTarget(layout, current, key, scroll) : undefined;
+    if (masonry !== undefined) { target = masonry; step = key === "ArrowDown" || key === "ArrowRight" || key === "PageDown" ? 1 : -1; }
+    else if ((key === "ArrowDown" && axis === "Vertical") || (key === "ArrowRight" && axis !== "Vertical")) { target = current + 1; step = 1; }
     else if ((key === "ArrowUp" && axis === "Vertical") || (key === "ArrowLeft" && axis !== "Vertical")) { target = current - 1; step = -1; }
     else if (key === "ArrowDown" && axis === "Both") { target = Math.min(count - 1, current + row); step = 1; }
     else if (key === "ArrowUp" && axis === "Both") { target = Math.max(0, current - row); step = -1; }
@@ -445,6 +450,42 @@ function IsDrawn(control: SkiaControl): boolean {
 }
 
 /** Items per viewport of the scroll around the group. */
+/**
+ * C# MasonryTarget (2ad608d1): the target of an arrow or page key in a Masonry group, from the placed items. Up / Down go
+ * to the previous / next item of the same column, Left / Right to the item of the neighbour column nearest in height,
+ * PageUp / PageDown up to one viewport along the column (else the next / previous item of the column). `current` when
+ * there is no item that way; undefined for other keys or no placement (the generic rules apply).
+ */
+function MasonryTarget(layout: GroupLayout, current: number, key: InputKey, scroll: GroupScroll | undefined): number | undefined {
+  if (key !== "ArrowDown" && key !== "ArrowUp" && key !== "ArrowLeft" && key !== "ArrowRight" && key !== "PageDown" && key !== "PageUp") return undefined;
+  const cells = layout.GetMasonryPlacement?.() ?? [];
+  const focused = cells.find((c) => c.Index === current);
+  if (!focused) return undefined;
+  const lefts = [...new Set(cells.map((c) => Math.round(c.Rect.Left)))].sort((a, b) => a - b);
+  const columnOf = (c: { Rect: { Left: number } }) => lefts.indexOf(Math.round(c.Rect.Left));
+  const col = columnOf(focused), top = focused.Rect.Top, mid = (focused.Rect.Top + focused.Rect.Bottom) / 2;
+  const column = cells.filter((c) => columnOf(c) === col).sort((a, b) => a.Rect.Top - b.Rect.Top);
+  const below = column.filter((c) => c.Rect.Top > top), above = column.filter((c) => c.Rect.Top < top);
+  const viewport = scroll ? (scroll as unknown as SkiaControl).DrawingRect.Height : 0;
+  let found: { Index: number } | undefined;
+  if (key === "ArrowDown") found = below[0];
+  else if (key === "ArrowUp") found = above[above.length - 1];
+  else if (key === "ArrowRight" || key === "ArrowLeft") {
+    const next = col + (key === "ArrowRight" ? 1 : -1);
+    let best = Infinity;
+    for (const c of cells) {
+      if (columnOf(c) !== next) continue;
+      const d = Math.abs((c.Rect.Top + c.Rect.Bottom) / 2 - mid);
+      if (d < best) { best = d; found = c; }
+    }
+  } else {
+    if (!scroll) return undefined;
+    if (key === "PageDown") { const within = below.filter((c) => c.Rect.Top <= top + viewport); found = within[within.length - 1] ?? below[0]; }
+    else { const within = above.filter((c) => c.Rect.Top >= top - viewport); found = within[0] ?? above[above.length - 1]; }
+  }
+  return found?.Index ?? current;
+}
+
 function PageSize(scroll: GroupScroll, item: SkiaControl, vertical: boolean): number {
   const v = (scroll as unknown as SkiaControl).DrawingRect, size = item.MeasuredSize.Pixels;
   const viewport = vertical ? v.Height : v.Width, s = vertical ? size.Height : size.Width;

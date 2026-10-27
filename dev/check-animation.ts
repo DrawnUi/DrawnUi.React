@@ -69,14 +69,16 @@ class FakeCanvas {
   {
     const a = new SkiaValueAnimator(host); a.mMinValue = 0; a.mMaxValue = 100; a.Speed = 400;
     let x = 0; a.OnUpdated = (v) => { x = v; };
-    a.Start(); fake.Tick(); await sleep(100); fake.Tick();
+    // the expected value comes from the real time it ran (a busy machine oversleeps), not from the sleep lengths
+    const t0 = performance.now(); a.Start(); fake.Tick(); await sleep(100); fake.Tick();
     const before = x;
-    a.Pause();
+    const t1 = performance.now(); a.Pause();
     const ticked = fake.Tick();
     await sleep(300); fake.Tick();
     check("paused: no tick, the value frozen", ticked === 0 && x === before, `ticked ${ticked}, ${x.toFixed(1)} vs ${before.toFixed(1)}`);
-    a.Resume(); await sleep(100); fake.Tick();
-    check("resumed: goes on from there (about 50 after 200 ms of running)", Math.abs(x - 50) < 8, `${x.toFixed(1)}`);
+    const t2 = performance.now(); a.Resume(); await sleep(100); fake.Tick(); const t3 = performance.now();
+    const ran = (t1 - t0) + (t3 - t2), want = Math.min(100, (ran / 400) * 100);
+    check("resumed: goes on from there (the value of the time it ran, not of the pause)", Math.abs(x - want) < 8, `${x.toFixed(1)} after ${ran.toFixed(0)} ms running, want ${want.toFixed(1)}`);
     a.Stop();
   }
 

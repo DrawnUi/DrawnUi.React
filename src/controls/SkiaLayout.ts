@@ -536,6 +536,18 @@ export class SkiaLayout extends SkiaControl {
     const d = this.slots?.[index]?.Destination;
     return d && d.Width > 0 ? d : undefined;
   }
+  /**
+   * Masonry: every placed item with its rect (pixels), in item order: what keyboard navigation follows, since the
+   * columns have uneven heights and the item `Split` places later is rarely under the focused one.
+   */
+  GetMasonryPlacement(): { Index: number; Rect: SKRect }[] {
+    if (!this.IsMasonry) return [];
+    const r = this.DrawingRect, p = this.Padding, s = this.RenderingScale, left = r.Left + p.Left * s, top = r.Top + p.Top * s;
+    return this.wrapSlots.map((w) => ({
+      Index: w.view instanceof TemplatedSlot ? w.view.Index : this.IsTemplated ? (w.view as SkiaControl).ContextIndex : this.views.indexOf(w.view as SkiaControl),
+      Rect: SKRect.Create(left + w.x, top + w.y, w.w, w.h),
+    }));
+  }
   /** Masonry: where the slot of item `index` was arranged (pixels); see GetItemRect. */
   GetMasonryItemRect(index: number): SKRect | undefined { return this.IsMasonry ? this.GetItemRect(index) : undefined; }
 
