@@ -146,7 +146,7 @@ export class SkiaLayout extends SkiaControl {
     if (this.itemsSource === value) return;
     const old = this.itemsSource;
     this.itemsSource = value;
-    if (value && old && this.IsTemplated && !this.structureDirty && this.ApplyIncrementalChange(old, value)) { this.InvalidateMeasure(); return; }
+    if (value && old && this.IsTemplated && !this.IsMasonry && !this.structureDirty && this.ApplyIncrementalChange(old, value)) { this.InvalidateMeasure(); return; }
     if (value && this.IsTemplated) this.ChildrenFactory.UpdateItems(value);
     this.structureDirty = true;
     this.InvalidateMeasure();
@@ -280,7 +280,11 @@ export class SkiaLayout extends SkiaControl {
     if (!this.IsTemplated) return this.views;
     const n = this.itemsSource!.length;
     if (this.IsRecycledLayout) {
-      if (this.slots?.length !== n) this.slots = Array.from({ length: n }, (_, i) => new TemplatedSlot(i, this.ChildrenFactory));
+      if (this.slots?.length !== n) {
+        // a masonry keeps the slots it has: an appended page (LoadMore) measures only the new items
+        const keep = this.IsMasonry ? this.slots ?? [] : [];
+        this.slots = Array.from({ length: n }, (_, i) => keep[i] ?? new TemplatedSlot(i, this.ChildrenFactory));
+      }
       return this.slots;
     }
     const out: SkiaControl[] = [];
@@ -432,6 +436,7 @@ export class SkiaLayout extends SkiaControl {
     let cw = 0, ch = 0, n = 0;
 
     if (this.IsWrapFlow) { const s = this.MeasureWrap(w, scale); return ScaledSize.FromPixels(s.w + px, s.h + py, scale); }
+    if (this.IsMasonry) { const s = this.MeasureMasonry(w, scale); return ScaledSize.FromPixels(s.w + px, s.h + py, scale); }
     if (this.Type === "Grid") { const s = this.MeasureGrid(w, h, scale); return ScaledSize.FromPixels(s.w + px, s.h + py, scale); }
 
     for (const v of this.LayoutViews()) {
@@ -489,6 +494,41 @@ export class SkiaLayout extends SkiaControl {
     }
     finishRow(true);
     return { w: maxW, h: this.wrapSlots.length ? y + rowH : 0 };
+  }
+
+  private get IsMasonry(): boolean { return this.Type === "Masonry"; }
+
+  /**
+   * C# MeasureMasonry / BuildMasonryLayout: Split columns of equal width, every item measured unbounded at the column
+   * width and put at the bottom of the shortest column (the first on a tie), so items of different heights leave no
+   * gaps; Spacing between columns and between items. Every item is laid out (no items window). A templated slot keeps
+   * the size of its item, so an appended page or an item that asked to be measured again (an image arrived) is the only
+   * one measured, and every item is placed again from the sizes known.
+   */
+  private MeasureMasonry(width: number, scale: number): { w: number; h: number } {
+    const columns = Math.max(1, this.Split);
+    const spacing = Math.round(this.Spacing * scale);
+    const columnWidth = columns > 1 ? Math.round((width - (columns - 1) * this.Spacing * scale) / columns) : width;
+    const bottoms = new Array<number>(columns).fill(0), rows = new Array<number>(columns).fill(0);
+    this.wrapSlots = [];
+    for (const v of this.LayoutViews()) {
+      if (!v.IsVisible) continue;
+      let column = 0;
+      for (let c = 1; c < columns; c++) if (bottoms[c] < bottoms[column]) column = c;
+      const h = v.Measure(columnWidth, Infinity, scale).Pixels.Height;
+      const x = column * (columnWidth + spacing), y = bottoms[column] + (rows[column]++ > 0 ? spacing : 0);
+      this.wrapSlots.push({ view: v, x, y, w: columnWidth, h });
+      bottoms[column] = y + h;
+    }
+    const used = Math.min(columns, this.wrapSlots.length);
+    return { w: used > 0 ? used * columnWidth + (used - 1) * spacing : 0, h: Math.max(0, ...bottoms) };
+  }
+
+  /** Masonry: where the slot of item `index` was arranged (pixels), also while no view shows it; undefined otherwise. */
+  GetMasonryItemRect(index: number): SKRect | undefined {
+    if (!this.IsMasonry || !this.IsRecycledLayout) return undefined;
+    const d = this.slots?.[index]?.Destination;
+    return d && d.Width > 0 ? d : undefined;
   }
 
   /** Port of C# MeasureGrid: build the structure in points, stretch the last track when the grid fills, remeasure at final cells. */
@@ -629,7 +669,7 @@ export class SkiaLayout extends SkiaControl {
    * The item's offset and height are real, not estimated (C# LastMeasuredIndexLocal >= index): MeasureVisible knows
    * them once the measured prefix passed the item; the other strategies always do.
    */
-  IsItemMeasured(index: number): boolean { return this.MeasureItemsStrategy !== "MeasureVisible" || index < this.mvMeasured; }
+  IsItemMeasured(index: number): boolean { return this.IsMasonry || this.MeasureItemsStrategy !== "MeasureVisible" || index < this.mvMeasured; }
 
   /** Pixel offset of item index from the top of the layout content (inside padding). */
   GetItemOffsetPixels(index: number): number {
@@ -672,7 +712,7 @@ export class SkiaLayout extends SkiaControl {
     const gap = this.Spacing * scale;
     let cursor = this.Type === "Row" ? inner.Left : inner.Top;
 
-    if (this.IsWrapFlow) {
+    if (this.IsWrapFlow || this.IsMasonry) {
       for (const s of this.wrapSlots) s.view.Arrange(SKRect.Create(inner.Left + s.x, inner.Top + s.y, s.w, s.h), s.view.WidthRequest, s.view.HeightRequest, scale);
       return;
     }
@@ -871,6 +911,11 @@ export class SkiaLayer extends SkiaLayout {
 /** SkiaLayout Type=Grid + HorizontalOptions=Fill (DrawnUi alias): MAUI Grid alternative. */
 export class SkiaGrid extends SkiaLayout {
   constructor() { super(); this.Type = "Grid"; this.HorizontalOptions = "Fill"; }
+}
+
+/** SkiaLayout Type=Masonry + Split 2 + HorizontalOptions=Fill (DrawnUi alias): columns, each item to the shortest one. */
+export class SkiaMasonry extends SkiaLayout {
+  constructor() { super(); this.Type = "Masonry"; this.Split = 2; this.HorizontalOptions = "Fill"; }
 }
 
 /** SkiaLayout Type=Wrap + HorizontalOptions=Fill (DrawnUi alias): responsive flow of fixed-size children. */

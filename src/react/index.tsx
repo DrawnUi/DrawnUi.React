@@ -60,6 +60,7 @@ export const SkiaStack = "SkiaStack" as unknown as FC<LayoutProps<SkiaLayoutCtrl
 export const SkiaRow = "SkiaRow" as unknown as FC<LayoutProps<SkiaLayoutCtrl>>;
 export const SkiaLayer = "SkiaLayer" as unknown as FC<LayoutProps<SkiaLayoutCtrl>>;
 export const SkiaWrap = "SkiaWrap" as unknown as FC<LayoutProps<SkiaLayoutCtrl>>;
+export const SkiaMasonry = "SkiaMasonry" as unknown as FC<LayoutProps<SkiaLayoutCtrl>>;
 export const SkiaGrid = "SkiaGrid" as unknown as FC<LayoutProps<SkiaLayoutCtrl>>;
 /** Grid drawing gradient separator lines in its spacing (C# SkiaDecoratedGrid). */
 export const SkiaDecoratedGrid = "SkiaDecoratedGrid" as unknown as FC<LayoutProps<SkiaDecoratedGridCtrl>>;

@@ -77,6 +77,14 @@ createRoot(document.getElementById("root")!).render(
   `DynamicColumns` / `Invert` for Wrap / Row / Grid. The single-column Column is the virtualized list; a templated Row /
   Wrap / Grid / split Column follows `RecyclingTemplate` too: `Enabled` binds pooled views only to the slots on screen
   (every slot when the layout sits under a cached parent), `Disabled` keeps one view per item. Appending to `ItemsSource` keeps measured rows, prepending keeps the visible rows in place, and reordering the same items (drag to reorder) keeps every measured height and the scroll offset; any other change rebuilds.
+- Masonry (`<SkiaMasonry>` = `Type="Masonry"`, `Split` 2, horizontal fill): `Split` columns of equal width, every
+  item goes to the bottom of the shortest column, so items of different heights leave no gaps (a `SkiaWrap` with
+  `Split` makes rows, each as tall as its tallest item). `Spacing` is the gap between columns and between items; the
+  first item is top left. Children or `ItemsSource` + `ItemTemplate` (recycled cells, `LoadMore`, `ScrollToIndex`
+  inside a vertical `SkiaScroll`). An appended page measures only the new items, an item that changes size is
+  measured alone, then the items are placed again. Every item is laid out, so the first layout and an insert in the
+  middle cost time in proportion to the item count. A cell that sets its size from its item marks itself for measure
+  (`NeedMeasure = true`, or `Update()` when the size changes later).
 - A stack packs its children along its axis: a child's `VerticalOptions="Center"` cannot centre it in a column's
   leftover space (nor `HorizontalOptions` in a row). Use `SkiaLayer` (absolute) when a child has to sit in the
   middle of a bigger box, which is also how a full-height drag handle keeps its icon centred.

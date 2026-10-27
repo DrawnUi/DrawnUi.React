@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Colors, SkiaButton, SkiaDecoratedGrid, SkiaGrid, SkiaLabel, SkiaLayer, SkiaRow, SkiaScroll, SkiaShape, SkiaStack, SkiaWrap, Thickness } from "drawnui-react";
+import { Colors, SkiaButton, SkiaDecoratedGrid, SkiaGrid, SkiaLabel, SkiaLayer, SkiaMasonry, SkiaRow, SkiaScroll, SkiaShape, SkiaStack, SkiaWrap, Thickness } from "drawnui-react";
 import { SkiaDynamicDrawnCell, type SkiaLayout as SkiaLayoutCtrl, SkiaLabel as SkiaLabelCtrl, SkiaShape as SkiaShapeCtrl, Thickness as ThicknessCtrl } from "drawnui-react/core";
 
 /** Recycled chip cell for the templated layouts below: visuals once, SetContent per bind. */
@@ -20,6 +20,16 @@ class ChipCell extends SkiaDynamicDrawnCell {
   }
 }
 const PALETTE = ["#0F3460", "#533483", "#1B4332", "#7B2D26", "#495057", "#0D6EFD", "#D63384", "#2D6A4F"];
+const MASONRY_HEIGHTS = [120, 60, 90, 50, 140, 70, 100, 60, 80, 130, 50, 90];
+
+/** 12 numbered tiles of different heights, the same set for the masonry and the wrap. */
+function masonryTiles() {
+  return MASONRY_HEIGHTS.map((h, i) => (
+    <SkiaShape key={i} Type="Rectangle" CornerRadius={8} HeightRequest={h} HorizontalOptions="Fill" BackgroundColor={PALETTE[i % PALETTE.length]}>
+      <SkiaLabel Text={`${i + 1}`} FontSize={16} TextColor={Colors.White} HorizontalOptions="Center" VerticalOptions="Center" />
+    </SkiaShape>
+  ));
+}
 
 /** Text cell for the decorated grid: a title and a value, padded, no background — the grid lines separate the cells. */
 class TextCell extends SkiaDynamicDrawnCell {
@@ -74,7 +84,7 @@ function Box({ text, color, w, h, ...rest }: { text: string; color: string; w?: 
   );
 }
 
-/** Every SkiaLayout type: Absolute (SkiaLayer), Column (SkiaStack), Row (SkiaRow), Wrap (SkiaWrap), Grid (SkiaGrid). */
+/** Every SkiaLayout type: Absolute (SkiaLayer), Column (SkiaStack), Row (SkiaRow), Wrap (SkiaWrap), Grid (SkiaGrid), Masonry (SkiaMasonry). */
 export function LayoutsPage() {
   const [count, setCount] = useState(10);
   const [split, setSplit] = useState(3);
@@ -237,6 +247,14 @@ export function LayoutsPage() {
               </SkiaShape>
             ))}
           </SkiaWrap>
+        </Card>
+
+        <SkiaLabel Text="Masonry · SkiaMasonry" FontSize={20} TextColor={Colors.White} HorizontalOptions="Center" Margin={new Thickness(0, 8, 0, 0)} />
+        <Card title="SkiaMasonry · Split=3 · Spacing 8 · every tile goes to the shortest column">
+          <SkiaMasonry Split={3} Spacing={8}>{masonryTiles()}</SkiaMasonry>
+        </Card>
+        <Card title="The same tiles in a SkiaWrap · Split=3: each row is as tall as its tallest tile">
+          <SkiaWrap Split={3} Spacing={8}>{masonryTiles()}</SkiaWrap>
         </Card>
 
         <SkiaLabel Text="Caching · UseCache=ImageComposite" FontSize={20} TextColor={Colors.White} HorizontalOptions="Center" Margin={new Thickness(0, 8, 0, 0)} />

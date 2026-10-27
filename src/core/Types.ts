@@ -82,7 +82,7 @@ export type TextTransform = "None" | "Lowercase" | "Uppercase" | "Titlecase";
 export type DrawerDirection = "FromBottom" | "FromTop" | "FromLeft" | "FromRight";
 
 /** DrawnUi LayoutType. */
-export type LayoutType = "Absolute" | "Column" | "Row" | "Wrap" | "Grid";
+export type LayoutType = "Absolute" | "Column" | "Row" | "Wrap" | "Grid" | "Masonry";
 /** MAUI ReturnType: what the keyboard's return key means (SkiaEditor: Send submits a multiline editor). */
 export type ReturnType = "Default" | "Done" | "Go" | "Next" | "Search" | "Send";
 /** DrawnUi SkiaEditor.SkiaEditorKeyboard. */
