@@ -120,7 +120,7 @@ export function LayoutsPage() {
     <SkiaScroll Orientation="Vertical">
       <SkiaStack Spacing={16} Padding={new Thickness(16)} HorizontalOptions="Center" MaximumWidthRequest={720}>
         <SkiaLabel Text="SkiaLayout types" FontSize={24} TextColor={Colors.White} HorizontalOptions="Center" />
-        <SkiaLabel Text="One class, five Type values; the aliases preset Type (+ HorizontalOptions=Fill for SkiaStack / SkiaLayer / SkiaWrap / SkiaGrid). Children position themselves with HorizontalOptions / VerticalOptions / Margin, the container adds Spacing and Padding." FontSize={13} TextColor={Colors.LightGray} HorizontalOptions="Fill" HorizontalTextAlignment="Center" />
+        <SkiaLabel Text="One class, six Type values; the aliases preset Type (+ HorizontalOptions=Fill for SkiaStack / SkiaLayer / SkiaWrap / SkiaGrid / SkiaMasonry). Children position themselves with HorizontalOptions / VerticalOptions / Margin, the container adds Spacing and Padding." FontSize={13} TextColor={Colors.LightGray} HorizontalOptions="Fill" HorizontalTextAlignment="Center" />
 
         <SkiaLabel Text="Absolute · SkiaLayer" FontSize={20} TextColor={Colors.White} HorizontalOptions="Center" Margin={new Thickness(0, 8, 0, 0)} />
         <Card title="Children overlap in one cell; alignment + Margin place them (WPF-style, no X/Y)">
