@@ -3,7 +3,7 @@
 // (recycled slots, ScrollToIndex, taps, LoadMore); a changed item is measured alone and every item is placed again;
 // an appended page measures only the new items; every item is laid out.
 import {
-  Super, SKRect, SKPoint, Canvas, SkiaAccessibilityManager, HoverManager, SkiaLayer, SkiaLayout, SkiaShape, SkiaScroll,
+  Super, SKRect, SKPoint, Canvas, SkiaAccessibilityManager, HoverManager, SkiaLayer, SkiaLayout, SkiaShape, SkiaScroll, Thickness,
   SkiaGesturesParameters, TouchActionEventArgs, type SkiaControl, type AnimatorBase, type TouchActionResult, type LayoutType,
 } from "../src/index.ts";
 
@@ -248,6 +248,49 @@ const expected = (heights: readonly number[]) => {
     const t = templated(big);
     const p = placedAsFresh(t.masonry, big);
     check("Templated: a big source lays out every item", p.ok, p.detail);
+  }
+
+  {
+    // C# Children_PaddingAndSpacing_PlaceItemsInsideThePadding / Templated_PaddingAndSpacing_SameAsChildren (edfb8e24):
+    // 200 wide, Split 2, Spacing 4, Padding 10,20,30,40; then Padding={10} as a plain number
+    const W = 200, H = 400;
+    const run = (templatedMode: boolean, padding: Thickness | number) => {
+      const m = new SkiaLayout(); m.Type = "Masonry"; m.Split = 2; m.Spacing = 4; m.Padding = padding; m.HorizontalOptions = "Fill";
+      if (templatedMode) { m.RecyclingTemplate = "Enabled"; m.ItemTemplate = () => new HeightCell(); m.ItemsSource = HEIGHTS; }
+      else for (const h of HEIGHTS) { const c = new HeightCell(); c.BindingContext = h; m.AddSubView(c); }
+      const root = new SkiaLayer(); root.WidthRequest = W; root.HeightRequest = H; root.AddSubView(m);
+      root._superview = new FakeCanvas() as unknown as Canvas;
+      let px: Uint8Array = new Uint8Array();
+      for (let f = 0; f < 4; f++) {
+        const surface = CK.MakeSurface(W, H); surface.getCanvas().clear(CK.BLACK);
+        root.Measure(W, H, 1); root.Arrange(new SKRect(0, 0, W, H), W, H, 1);
+        root.Render({ Context: { Canvas: surface.getCanvas(), Surface: surface }, Destination: new SKRect(0, 0, W, H), Scale: 1 });
+        px = surface.makeImageSnapshot().readPixels(0, 0, { width: W, height: H, colorType: CK.ColorType.RGBA_8888, alphaType: CK.AlphaType.Unpremul, colorSpace: CK.ColorSpace.SRGB }) as Uint8Array;
+        surface.delete();
+      }
+      const lit = (x: number, y: number) => { const i = (Math.round(y) * W + Math.round(x)) * 4; return px[i] + px[i + 1] + px[i + 2] > 30; };
+      const rects = HEIGHTS.map((_, i) => { const r = templatedMode ? m.GetMasonryItemRect(i) : m.Views[i].DrawingRect; return r ? new SKRect(r.Left - m.DrawingRect.Left, r.Top - m.DrawingRect.Top, r.Right - m.DrawingRect.Left, r.Bottom - m.DrawingRect.Top) : undefined; });
+      return { m, rects, lit };
+    };
+    const want = [[10, 20, 78, 100], [92, 20, 78, 20], [92, 44, 78, 20], [92, 68, 78, 100], [10, 124, 78, 100], [92, 172, 78, 20]];
+    for (const templatedMode of [false, true]) {
+      const r = run(templatedMode, new Thickness(10, 20, 30, 40));
+      const placed = want.every(([x, y, w, h], i) => { const q = r.rects[i]; return !!q && Math.abs(q.Left - x) < 0.5 && Math.abs(q.Top - y) < 0.5 && Math.abs(q.Width - w) < 0.5 && Math.abs(q.Height - h) < 0.5; });
+      const centers = r.rects.every((q) => !!q && r.lit(q.Left + q.Width / 2, q.Top + q.Height / 2));
+      const gaps = [[5, 60], [40, 10], [90, 60], [185, 60], [40, 122]].every(([x, y]) => !r.lit(x, y));
+      check(`${templatedMode ? "Templated" : "Children"}: Padding 10,20,30,40 and Spacing 4 place every item inside the padding`, placed && centers && gaps && Math.abs(r.m.MeasuredSize.Units.Height - 264) < 0.5,
+        `height ${r.m.MeasuredSize.Units.Height}, rects ${placed ? "ok" : r.rects.map((q) => q && `${q.Left},${q.Top} ${q.Width}x${q.Height}`).join(" ")}, centers ${centers}, gaps ${gaps}`);
+    }
+    {
+      // Padding={10}: the column width is round((180 - 4) / 2) = 88, columns at 10 and 102, content 204 + 20
+      const r = run(false, 10);
+      const bottoms = [0, 0], ok = HEIGHTS.every((h, i) => {
+        const col = bottoms[1] < bottoms[0] ? 1 : 0, x = 10 + col * 92, y = 10 + bottoms[col] + (bottoms[col] > 0 ? 4 : 0);
+        bottoms[col] = y - 10 + h;
+        const q = r.rects[i]; return !!q && Math.abs(q.Left - x) < 0.5 && Math.abs(q.Top - y) < 0.5 && Math.abs(q.Width - 88) < 0.5 && Math.abs(q.Height - h) < 0.5;
+      });
+      check("Padding={10} as a number: the same placement as Thickness(10)", ok && Math.abs(r.m.MeasuredSize.Units.Height - 224) < 0.5, `height ${r.m.MeasuredSize.Units.Height}`);
+    }
   }
 
   console.log(failures ? `FAIL: ${failures} checks` : "OK: masonry");
