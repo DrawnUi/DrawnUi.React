@@ -1,7 +1,7 @@
 import type { Canvas as SkCanvas, Image, Paint, Path, SkPicture, Surface } from "canvaskit-wasm";
 import { Super } from "./Super";
 import { SkiaStyles } from "./Styles";
-import { type Color, Colors, type LayoutOptions, SKRect, ScaledSize, type SkiaCacheType, type SkiaGradient, type SkiaTouchAnimation, Thickness } from "./Types";
+import { type Color, Colors, type LayoutOptions, SKRect, ScaledSize, type SkiaCacheType, type SkiaGradient, type SkiaTouchAnimation, Thickness, type ThicknessValue } from "./Types";
 import { type AnimatorBase, type IOverlayEffect, RippleAnimator, SkiaValueAnimator } from "./Animators";
 import { Easing } from "./Easing";
 import type { Canvas } from "./Canvas";
@@ -126,7 +126,10 @@ export class SkiaControl {
   Row = 0;
   ColumnSpan = 1;
   RowSpan = 1;
-  Margin: Thickness = Thickness.Zero;
+  private margin: Thickness = Thickness.Zero;
+  /** Space around the control (points); a number is the same on every side, as C# XAML (`Thickness.From`). */
+  get Margin(): Thickness { return this.margin; }
+  set Margin(v: ThicknessValue) { this.margin = Thickness.From(v); }
   /**
    * DrawnUi LockRatio: 0 = off; positive = square of the LARGER of the two sizes (requests or constraints),
    * negative = square of the SMALLER one. Infinite sides are ignored, so WidthRequest=150 + LockRatio=1 = 150x150.

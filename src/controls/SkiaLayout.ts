@@ -1,6 +1,6 @@
 import { type DrawingContext, SkiaControl } from "../core/SkiaControl";
 import { ViewsAdapter } from "../core/ViewsAdapter";
-import { type GridLength, type LayoutOptions, type LayoutType, type MeasuringStrategy, type RecyclingTemplate, SKRect, ScaledSize, type ShapeType, Thickness } from "../core/Types";
+import { type GridLength, type LayoutOptions, type LayoutType, type MeasuringStrategy, type RecyclingTemplate, SKRect, ScaledSize, type ShapeType, Thickness, type ThicknessValue } from "../core/Types";
 import { SkiaGridStructure } from "./GridStructure";
 
 /**
@@ -82,7 +82,10 @@ export class SkiaLayout extends SkiaControl {
   /** Layout type. SkiaShape redeclares it as ShapeType (any shape value lays out as Absolute), like the C# hidden Type. */
   Type: LayoutType | ShapeType = "Absolute";
   Spacing = 0;
-  Padding: Thickness = Thickness.Zero;
+  private padding: Thickness = Thickness.Zero;
+  /** Space inside the layout around its children (points); a number is the same on every side (`Thickness.From`). */
+  get Padding(): Thickness { return this.padding; }
+  set Padding(v: ThicknessValue) { this.padding = Thickness.From(v); }
 
   // ---- grid (same names as DrawnUi; definitions as "*, 2*, Auto, 100" or an array) ----
   ColumnDefinitions?: string | GridLength[];

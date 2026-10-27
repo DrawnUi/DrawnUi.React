@@ -4,6 +4,9 @@
 export type LayoutOptions = "Start" | "Center" | "End" | "Fill";
 
 /** MAUI Thickness with the same ctor overloads: (all) / (horizontal, vertical) / (l, t, r, b). */
+/** What a Thickness-typed property accepts: a Thickness, a number (every side) or the C# string form "12" / "12,6" / "l,t,r,b". */
+export type ThicknessValue = Thickness | number | string;
+
 export class Thickness {
   Left: number;
   Top: number;
@@ -15,6 +18,32 @@ export class Thickness {
     else { this.Left = a; this.Top = b; this.Right = c; this.Bottom = d ?? 0; }
   }
   static readonly Zero = new Thickness();
+  private static warned?: Set<string>;
+  /**
+   * What a Thickness-typed property (Margin, Padding) is given, as a Thickness: a number is the same on every side
+   * (C# XAML `Padding="12"`), the C# string forms "12", "12,6" (horizontal, vertical) and "1,2,3,4" (left, top, right,
+   * bottom) are read the same way. Anything else is Zero with a one-time console warning: never NaN, which would
+   * blank the control.
+   */
+  static From(value: unknown): Thickness {
+    if (value instanceof Thickness) return value;
+    if (typeof value === "number" && Number.isFinite(value)) return new Thickness(value);
+    if (typeof value === "string") {
+      const n = value.split(",").map((s) => Number(s.trim()));
+      if (n.every((x) => Number.isFinite(x))) {
+        if (n.length === 1) return new Thickness(n[0]);
+        if (n.length === 2) return new Thickness(n[0], n[1]);
+        if (n.length === 4) return new Thickness(n[0], n[1], n[2], n[3]);
+      }
+    }
+    if (value == null) return Thickness.Zero;
+    const key = String(value);
+    if (!(Thickness.warned ??= new Set()).has(key)) {
+      Thickness.warned.add(key);
+      console.warn(`[DrawnUi] ${key} is not a thickness (a Thickness, a number, or "h,v" / "l,t,r,b"): 0 is used.`);
+    }
+    return Thickness.Zero;
+  }
   get HorizontalThickness() { return this.Left + this.Right; }
   get VerticalThickness() { return this.Top + this.Bottom; }
 }

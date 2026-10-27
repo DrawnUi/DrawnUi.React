@@ -4,7 +4,7 @@ import { ControlTappedEventArgs, type GestureEventProcessingInfo, type SkiaGestu
 import { Super } from "../core/Super";
 import {
   type Color, Colors, type DrawTextAlignment, type FontAttributes, type LineBreakMode, ScaledSize, SKRect, type SkiaGradient, type TextAlignment,
-  type TextTransform, Thickness,
+  type TextTransform, Thickness, type ThicknessValue,
 } from "../core/Types";
 import { TextSpan } from "./TextSpan";
 
@@ -121,7 +121,7 @@ export class SkiaLabel extends SkiaControl {
   get TextTransform(): TextTransform { return this.textTransform; }
   set TextTransform(v: TextTransform) { this.Set("textTransform" as keyof this, v as this[keyof this]); }
   get Padding(): Thickness { return this.padding; }
-  set Padding(v: Thickness) { this.Set("padding" as keyof this, v as this[keyof this]); }
+  set Padding(v: ThicknessValue) { this.Set("padding" as keyof this, Thickness.From(v) as this[keyof this]); }
 
   /** Number of laid-out lines after the last measure. */
   get LinesCount(): number { return this.lines.length; }

@@ -67,6 +67,9 @@ createRoot(document.getElementById("root")!).render(
 - JSX tags are the engine classes: `<SkiaLabel Text=… />` is `new SkiaLabel()`; every prop is a plain property
   set on the control, C# events map to one callback prop each (`Tapped`, `TextChanged`, `SelectedIndexChanged`,
   `Scrolled`, …). `ref` gives the engine instance: call its methods (`GoNext()`, `ScrollTo(…)`, `IsFocused = true`).
+- `Margin` / `Padding` take a `Thickness`, a number (the same on every side: `Padding={12}`) or the C# string
+  forms `"12"`, `"12,6"` (horizontal, vertical), `"1,2,3,4"` (left, top, right, bottom). A number or a string is a
+  primitive prop, diffed by value, so it needs no hoisting.
 - **Stable object props.** `Margin={new Thickness(…)}`, `Padding`, `Shadows={[…]}`, `FillGradient={{…}}`,
   `VisualEffects={[fx]}`, `ItemTemplate={() => …}` created inline are a new object on every render: the control
   remeasures each render, a templated layout rebuilds its cell pool, an `ImageComposite` records fully. Hoist them
