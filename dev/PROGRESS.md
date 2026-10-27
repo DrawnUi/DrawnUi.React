@@ -158,6 +158,8 @@ Detailed per-feature omissions: [SKIPPED.md](SKIPPED.md). Live sample: https://h
 | 2026-10-27 | Release | Publish 79 + npm `0.1.0-preview.24` (Nick): Margin / Padding accept a number or the C# string forms |
 | 2026-10-27 | ScrollToIndex in recycled layouts | A templated recycled Row / Wrap / Grid / split Column read only realized cells, so an item off screen was never reached (offset stayed 0; found while porting Masonry). `SkiaLayout.GetItemRect(index)` reads the item's slot for every recycled layout, and `IsItemMeasured` is true for every non-list layout (they measure all items, MeasureVisible too). `npm run check:scroll-recycled` (10 checks: Wrap, split Column, Grid, Masonry, Row x MeasureAll / MeasureVisible; 8 red on the previous commit) |
 | 2026-10-27 | Release | Publish 80 + npm `0.1.0-preview.25`: ScrollToIndex reaches any item of a recycled templated layout |
+| 2026-10-27 | Masonry keyboard | C# 2ad608d1 (drawnui-smart for Nick): in a Masonry group the arrows moved by index +- Split (Down from #1 went to #3, another column). Now `MasonryTarget` in `src/core/Accessibility.ts` from `SkiaLayout.GetMasonryPlacement()`: Up / Down same column by top, Left / Right nearest middle in the neighbour column (stays without one), PageUp / PageDown within one viewport along the column. `npm run check:masonry-keys` (C# MasonryChildren / MasonryTemplated walks + PageDown; red on preview.25). Also `check:animation` pause / resume compares with the real time it ran (it assumed exact sleeps and failed on a busy PC; the animator was right) |
+| 2026-10-27 | Release | Publish 81 + npm `0.1.0-preview.26`: Masonry keyboard navigation |
 
 ## In progress
 
