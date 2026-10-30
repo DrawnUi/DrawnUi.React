@@ -64,7 +64,7 @@ export function TextPage() {
             <TextSpan Text=", " />
             <TextSpan Text="struck out" Strikeout />
             <TextSpan Text=", " />
-            <TextSpan Text={"\u00A0highlighted\u00A0"} BackgroundColor="#6610F2" TextColor={Colors.White} />
+            <TextSpan Text="highlighted" BackgroundColor="#6610F2" TextColor={Colors.White} />
             <TextSpan Text=" and a " />
             <TextSpan Text="tappable link →" TextColor="#6EA8FE" Underline Tapped={() => setTapped("link tapped at " + new Date().toLocaleTimeString())} />
             <TextSpan Text=" that wraps with the rest of the paragraph like any other word." />
@@ -81,7 +81,7 @@ export function TextPage() {
             <TextSpan Text="Use colored emojis " />
             <TextSpan Text="🌐🚒🙎🏽👻🤖" />
             <TextSpan Text=" Format text as " />
-            <TextSpan Text={"\u00A0BiG\u00A0"} FontSize={20} BackgroundColor="#FFEB3B" TextColor={Colors.Black} />
+            <TextSpan Text="BiG" FontSize={20} BackgroundColor="#FFEB3B" TextColor={Colors.Black} />
             <TextSpan Text=" and small! " FontSize={11} IsItalic />
             <TextSpan Text="Add another tappable link!" FontSize={14} TextColor="#9CCC65" Underline Tapped={() => setTapped("the link at " + new Date().toLocaleTimeString())} />
             <TextSpan Text=" " FontSize={14} />
