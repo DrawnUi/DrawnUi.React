@@ -7,11 +7,16 @@ import {
   type TextTransform, Thickness, type ThicknessValue,
 } from "../core/Types";
 import { TextSpan } from "./TextSpan";
+import { BidiLevels, HasCodePoint, IsRtl, JoinsPrevious, NeedsShaping, Shape, type Shaped } from "../core/Shaping";
 
 /** Resolved faces for one style (the label itself or one span): main font + FontFamilyFallback chain + metrics. */
 interface SpanFonts { Key: string; Main: Font; Fallbacks: Font[]; Ascent: number; Descent: number; SizePx: number }
-/** A run of text drawn with one font (main, or a fallback for glyphs the main font lacks) and one span style. */
-interface TextRun { Text: string; Font: Font; Width: number; Span?: TextSpan; Fonts: SpanFonts }
+/**
+ * A run of text drawn with one font (main, or a fallback for glyphs the main font lacks) and one span style. After the
+ * layout, a run that needs shaping carries its shaped glyphs, and on a line with right-to-left text its bidirectional
+ * level and its x from the line start (runs stay in logical order).
+ */
+interface TextRun { Text: string; Font: Font; Width: number; Span?: TextSpan; Fonts: SpanFonts; Shaped?: Shaped; Level?: number; X?: number }
 /** One laid-out line: runs, total advance, max ascent above / descent below the baseline (pixels). */
 interface TextLine { Runs: TextRun[]; Width: number; Ascent: number; Descent: number; /** Starts a paragraph after the first one (ParagraphSpacing above it). */ Para?: boolean }
 /** A paragraph of wrap tokens; `LineBreak`: it follows a U+2028 line separator, not a new paragraph. */
@@ -21,8 +26,11 @@ type Paragraph = Token[] & { LineBreak?: boolean };
 export interface GlyphBox { Index: number; Length: number; Line: number; Left: number; Top: number; Width: number; Height: number }
 /** A laid-out line: first text index, box in pixels relative to DrawingRect. */
 export interface LineBox { Line: number; Start: number; End: number; Left: number; Top: number; Width: number; Height: number }
-/** A wrap unit: a word (or glued span fragment) with its style. */
-interface Token { Text: string; Fonts: SpanFonts; Span?: TextSpan; SpaceBefore: boolean; TrailingSpace?: boolean }
+/**
+ * A wrap unit: a word (or glued span fragment) with its style. `Carried`: the space the fragment before it ends with,
+ * in that fragment's style (a space keeps the style of the span it was written in, as C#).
+ */
+interface Token { Text: string; Fonts: SpanFonts; Span?: TextSpan; SpaceBefore: boolean; TrailingSpace?: boolean; Carried?: { Fonts: SpanFonts; Span?: TextSpan } }
 
 /**
  * Mirrors DrawnUi SkiaLabel: multi-line text with word wrapping, MaxLines + tail ellipsis, horizontal /
@@ -183,7 +191,14 @@ export class SkiaLabel extends SkiaControl {
     return this.ResolveFonts(span.FontFamily ?? this.fontFamily, weight, italic, (span.FontSize ?? this.fontSize) * scale);
   }
 
+  private static NeedsShapingOrRtl(cp: number): boolean { return NeedsShaping(cp) || IsRtl(cp); }
+
+  /** Width of a text in one font: the shaped glyphs where the text needs shaping (Arabic joins, emoji sequences), else glyph by glyph. */
   private Advance(font: Font, text: string): number {
+    if (HasCodePoint(text, SkiaLabel.NeedsShapingOrRtl)) {
+      const shaped = Shape(font, text, HasCodePoint(text, IsRtl), this.glyphSpacing);
+      if (shaped) return shaped.Width;
+    }
     let w = 0;
     for (const adv of font.getGlyphWidths(font.getGlyphIDs(text))) w += adv + this.glyphSpacing;
     return w;
@@ -203,7 +218,8 @@ export class SkiaLabel extends SkiaControl {
 
   /**
    * Splits text into runs by glyph availability: the main font, or the first fallback that has a glyph where the
-   * main font has glyph 0. Spaces always stay on the main font (fallback faces often carry very wide spaces).
+   * main font has glyph 0. Spaces always stay on the main font (fallback faces often carry very wide spaces). A joiner,
+   * a variation selector, a skin tone or a tag keeps the font of the glyph before it: an emoji sequence is one run.
    */
   private Segment(text: string, fonts: SpanFonts, span?: TextSpan): TextRun[] {
     if (text.length === 0) return [];
@@ -228,7 +244,7 @@ export class SkiaLabel extends SkiaControl {
         };
         let start = 0, current = fontFor(0);
         for (let i = 1; i < cps.length; i++) {
-          const f = fontFor(i);
+          const f = JoinsPrevious(cps[i].codePointAt(0)!) ? current : fontFor(i);
           if (f !== current) {
             const t = cps.slice(start, i).join("");
             cached.push({ Text: t, Font: current, Width: this.Advance(current, t), Fonts: fonts });
@@ -345,10 +361,10 @@ export class SkiaLabel extends SkiaControl {
     } else if (this.text) {
       add(this.text, this.mainFonts!);
     }
-    // a fragment ending with a space puts the space before the NEXT token
+    // a fragment ending with a space puts that space, in its own style, before the NEXT token
     for (const para of paragraphs) {
       for (let i = 0; i < para.length; i++) {
-        if (para[i].TrailingSpace && i + 1 < para.length) para[i + 1].SpaceBefore = true;
+        if (para[i].TrailingSpace && i + 1 < para.length) para[i + 1].Carried = { Fonts: para[i].Fonts, Span: para[i].Span };
       }
     }
     return paragraphs;
@@ -388,9 +404,13 @@ export class SkiaLabel extends SkiaControl {
         lastFonts = tok.Fonts;
         // glued fragments (no space between spans) wrap as one word
         let word = this.Segment(tok.Text, tok.Fonts, tok.Span);
-        while (i + 1 < para.length && !para[i + 1].SpaceBefore) { i++; word = word.concat(this.Segment(para[i].Text, para[i].Fonts, para[i].Span)); }
+        while (i + 1 < para.length && !para[i + 1].SpaceBefore && !para[i + 1].Carried) { i++; word = word.concat(this.Segment(para[i].Text, para[i].Fonts, para[i].Span)); }
         for (;;) {
-          const space = tok.SpaceBefore && line.Runs.length > 0 ? this.Segment(" ", tok.Fonts, tok.Span) : [];
+          // the space the fragment before ends with, then the word's own one, each in its style
+          const space = line.Runs.length === 0 ? [] : [
+            ...(tok.Carried ? this.Segment(" ", tok.Carried.Fonts, tok.Carried.Span) : []),
+            ...(tok.SpaceBefore ? this.Segment(" ", tok.Fonts, tok.Span) : []),
+          ];
           const spaceW = this.Width(space), wordW = this.Width(word);
           if (!wrap || line.Width + spaceW + wordW - sp <= maxWidth || (line.Runs.length === 0 && wordW - sp <= maxWidth)) {
             this.Append(line, space); this.Append(line, word);
@@ -459,6 +479,98 @@ export class SkiaLabel extends SkiaControl {
     return out;
   }
 
+  /** A paragraph is right to left when its first strong letter is (DrawnUi.Rust split_bidi). */
+  private static FirstStrongIsRtl(text: string): boolean {
+    for (const ch of text) {
+      const cp = ch.codePointAt(0)!;
+      if (IsRtl(cp)) return true;
+      if (/\p{L}/u.test(ch)) return false;
+    }
+    return false;
+  }
+
+  /** The runs of a line cut where the bidirectional level changes; `levels` per UTF-16 index of the line text. */
+  private SplitByLevel(runs: TextRun[], levels: Uint8Array): TextRun[] {
+    const out: TextRun[] = [];
+    let at = 0;
+    for (const r of runs) {
+      const piece = (from: number, to: number, level: number) => {
+        const text = r.Text.slice(from, to);
+        out.push({ ...r, Text: text, Width: from === 0 && to === r.Text.length ? r.Width : this.Advance(r.Font, text), Level: level, Shaped: undefined, X: undefined });
+      };
+      let from = 0, level = levels[at] ?? 0;
+      for (let i = 0; i < r.Text.length;) {
+        const next = levels[at + i] ?? level;
+        if (i > 0 && next !== level) { piece(from, i, level); from = i; level = next; }
+        i += r.Text.codePointAt(i)! > 0xFFFF ? 2 : 1;
+      }
+      if (r.Text.length > 0) piece(from, r.Text.length, level);
+      at += r.Text.length;
+    }
+    return out;
+  }
+
+  /**
+   * After the layout, lines whose text needs shaping or runs right to left (DrawnUi.Rust build_blobs): with
+   * right-to-left text every run is cut where the bidirectional level changes (Unicode bidirectional algorithm, the
+   * paragraph direction from its first strong letter); runs that are right to left or need shaping get shaped glyphs;
+   * runs are placed in visual order (rule L2). Lines without such text are left as they are (plain path).
+   */
+  private ShapeLines(lines: TextLine[]): void {
+    const sp = this.glyphSpacing;
+    const lineText = (l: TextLine) => l.Runs.map((r) => r.Text).join("");
+    const anyRtl = lines.some((l) => l.Runs.some((r) => HasCodePoint(r.Text, IsRtl)));
+    let rtlParagraph = false;
+    for (let li = 0; li < lines.length; li++) {
+      const line = lines[li];
+      let bidi = false;
+      if (anyRtl) {
+        if (li === 0 || line.Para) {
+          let end = li + 1;
+          while (end < lines.length && !lines[end].Para) end++;
+          rtlParagraph = SkiaLabel.FirstStrongIsRtl(lines.slice(li, end).map(lineText).join(""));
+        }
+        const levels = BidiLevels(lineText(line), rtlParagraph);
+        if (levels) { line.Runs = this.SplitByLevel(line.Runs, levels); bidi = line.Runs.some((r) => (r.Level ?? 0) > 0); }
+      }
+      let shaped = false;
+      for (const run of line.Runs) {
+        const rtl = (run.Level ?? 0) % 2 === 1;
+        if (!rtl && !HasCodePoint(run.Text, NeedsShaping)) continue;
+        const s = Shape(run.Font, run.Text, rtl, sp);
+        if (s) { run.Shaped = s; run.Width = s.Width; shaped = true; }
+      }
+      if (!shaped && !bidi) continue;
+      let width = 0;
+      for (const run of line.Runs) width += run.Width;
+      line.Width = line.Runs.length > 0 ? width - sp : 0;
+      if (bidi) SkiaLabel.PlaceRuns(line.Runs);
+    }
+  }
+
+  /**
+   * Where each run of a line with right-to-left text goes, in visual order (Unicode rule L2: from the highest level down
+   * to the lowest odd one, every sequence of runs at that level or higher is reversed).
+   */
+  private static PlaceRuns(runs: TextRun[]): void {
+    const order = runs.map((_, i) => i);
+    const levelOf = (i: number) => runs[i].Level ?? 0;
+    const highest = Math.max(0, ...runs.map((r) => r.Level ?? 0));
+    const odd = runs.map((r) => r.Level ?? 0).filter((l) => l % 2 === 1);
+    const lowestOdd = odd.length ? Math.min(...odd) : highest + 1;
+    for (let level = highest; level >= lowestOdd && level > 0; level--) {
+      for (let i = 0; i < order.length;) {
+        if (levelOf(order[i]) < level) { i++; continue; }
+        const start = i;
+        while (i < order.length && levelOf(order[i]) >= level) i++;
+        const reversed = order.slice(start, i).reverse();
+        order.splice(start, reversed.length, ...reversed);
+      }
+    }
+    let x = 0;
+    for (const k of order) { runs[k].X = x; x += runs[k].Width; }
+  }
+
   private LineHeightPx(line: TextLine): number { return (line.Ascent + line.Descent) * this.lineHeight; }
 
   /** ParagraphSpacing above a line that starts a paragraph (after the first): that many of its lines, with their spacing. */
@@ -480,6 +592,7 @@ export class SkiaLabel extends SkiaControl {
     const px = this.padding.HorizontalThickness * scale, py = this.padding.VerticalThickness * scale;
     const extraH = this.EffectsExtra(scale).H;
     this.lines = this.text || this.Spans.length > 0 ? this.LayoutLines(widthConstraint - px, scale, heightConstraint - py - extraH) : [];
+    this.ShapeLines(this.lines);
     let width = 0;
     for (const l of this.lines) width = Math.max(width, l.Width);
     const extra = this.EffectsExtra(scale);
@@ -554,10 +667,12 @@ export class SkiaLabel extends SkiaControl {
       const g = geo[li];
       let start = g.text.length ? this.text.indexOf(g.text, cursor) : cursor;
       if (start < 0) start = cursor;
+      // right-to-left runs are boxed left to right in logical order (the caret is not placed visually there)
       let x = g.x, index = start;
       for (const run of line.Runs) {
+        if (run.X !== undefined) x = g.x + run.X;
         const cps = Array.from(run.Text);
-        const widths = run.Font.getGlyphWidths(run.Font.getGlyphIDs(run.Text, cps.length));
+        const widths = run.Shaped ? run.Shaped.Advances.map((a) => a - this.glyphSpacing) : run.Font.getGlyphWidths(run.Font.getGlyphIDs(run.Text, cps.length));
         cps.forEach((cp, k) => {
           const w = widths[k] ?? 0;
           out.push({ Index: index, Length: cp.length, Line: li, Left: x, Top: g.y, Width: w, Height: g.h });
@@ -630,6 +745,7 @@ export class SkiaLabel extends SkiaControl {
     const sp = this.glyphSpacing;
     // spaced text: every glyph placed with the gap after it (C# MeasureLineGlyphs positions)
     const drawRun = (run: TextRun, rx: number, ry: number, paint: InstanceType<typeof CK.Paint>) => {
+      if (run.Shaped) { canvas.drawGlyphs(run.Shaped.Glyphs, run.Shaped.Positions, rx, ry, run.Font, paint); return; }
       if (sp === 0) { canvas.drawText(run.Text, rx, ry, paint, run.Font); return; }
       const ids = run.Font.getGlyphIDs(run.Text), widths = run.Font.getGlyphWidths(ids);
       const positions = new Float32Array(ids.length * 2);
@@ -650,7 +766,10 @@ export class SkiaLabel extends SkiaControl {
       // C# paintDefault gets the gradient over rectDraw, or over line.Bounds per line (GradientByLines)
       const gradientRect = gradient ? (this.GradientByLines ? new SKRect(x, y, x + line.Width, y + lh) : textRect) : undefined;
       if (strokePaint && this.StrokeGradient) this.SetupGradient(strokePaint, this.StrokeGradient, gradientRect ?? new SKRect(x, y, x + line.Width, y + lh));
+      const lineX = x;
       for (const run of line.Runs) {
+        // a line with right-to-left text places its runs in visual order
+        if (run.X !== undefined) x = lineX + run.X;
         const span = run.Span;
         const drawnW = run.Width - sp; // the gap after the run's last glyph is not part of it
         if (span) {

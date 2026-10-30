@@ -53,6 +53,16 @@ createRoot(document.getElementById("root")!).render(
 
 - No glyph = silently dropped, never tofu-substituted: set `FontFamilyFallback="FontSymbols,FontSymbols2,FontEmoji"`
   on labels / editors that show symbols or emoji. No CJK font is shipped; register your own.
+- Text that needs shaping is shaped by `SkiaLabel` (no extra setup, no extra wasm): Arabic and Hebrew join and run
+  right to left, Indic conjuncts and vowel signs, emoji sequences (skin tones, ZWJ families, flags, keycaps) as one
+  glyph when the font has them; other text keeps the fast glyph-by-glyph path. A line with right-to-left text is drawn
+  in bidirectional order, the paragraph direction taken from its first strong letter; use
+  `HorizontalTextAlignment="End"` for right-aligned Arabic paragraphs. Register a font for the script as a fallback,
+  e.g. `.AddFont("fonts/NotoSansArabic-Subset.ttf", "FontArabic")` + `FontFamilyFallback="FontArabic"`. A joiner, skin
+  tone or variation selector keeps the font of the emoji before it. Fonts must come through `ConfigureFonts` (or
+  `Super.LoadFace`) to be shaped. The editor caret in right-to-left text is not placed visually yet.
+- A space keeps the style of the span it is written in: in `"as "` + `" BiG "` both spaces show, the highlight of
+  `" BiG "` covers its own two spaces only. Inside one span a run of spaces counts as one; a line never starts with one.
 - A control with no `FontFamily` draws in CanvasKit's built-in face, not your font (same as DrawnUi.Net). Register the
   app default with `ConfigureStyles` as above. A `SkiaLabel` style does NOT reach button captions, because `SkiaButton`
   pushes its own (empty) `FontFamily` onto its label — the .NET behaviour too — so add a second style for
@@ -164,8 +174,10 @@ createRoot(document.getElementById("root")!).render(
   uniforms `iResolution` / `iImageResolution` / `iTime` / `iOffset` / `iMouse` + `iImage1`, `SetUniform`,
   `UseBackground` Always / Once / Never), `ShaderDoubleTexturesEffect`, `ShaderTransitionEffect`,
   `AnimatedShaderEffect`; `SkiaShaderCarousel` slides must be `UseCache="Image"`. `SkiaBackdrop` copies what is on screen
-  under the area it covers, also inside a scaled, moved or turned parent. Set `UseCache="None"` on its picture-cached
-  parents (`Operations` / `OperationsFull`, the default of `SkiaShape`): the library never changes a parent's cache,
+  under the area it covers, also inside a scaled, moved or turned parent. A picture-cached parent (`Operations` /
+  `OperationsFull`, the default of `SkiaShape`) replays its first copy: set `UseCache="None"` on it when what shows
+  through changes after the cache is recorded (animated content behind, moving panel, picture still loading); keep the
+  cache over a still, loaded background (no per-frame cost). The library never changes a parent's cache,
   a console warning names the case once. Inside an Image-cached parent it copies that cache's surface: right when what shows
   through the glass is inside that cache, wrong when it should show content outside it. `SetUniform` and animation ticks
   redraw the effect over the parent's cache, which is kept; set `ShouldInvalidateParentCache = true` when the parent's

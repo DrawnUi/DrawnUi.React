@@ -551,3 +551,19 @@ Updated whenever the port deliberately diverges or finds something worth back-po
 ### Selectable text is opt-in
 - **React**: `AccessibilityTextSelectable` (default false) puts a label's lines into the overlay as real text with pointer events; the text then owns the pointer (selection), so it is never enabled implicitly — custom controls would lose taps and pans under their labels. ARIA roles / labels stay unaffected.
 - **.NET**: no selectable labels (only `SkiaEditor` selects).
+
+## Text shaping
+
+### Shaping engine and bidirectional levels
+- **React**: runs that need shaping are laid out as one-font CanvasKit paragraphs (HarfBuzz) and their glyphs read back
+  (`getShapedLines`); the run's left edge and width come from the paragraph (glyph positions include mark offsets).
+  Bidirectional levels come from a paragraph of the line (`getGlyphInfoAt` direction: levels 0 / 1 / 2 only).
+- **.NET**: HarfBuzzSharp per span, one direction per shaped span (no bidirectional reordering of runs).
+  **Rust**: harfrust per run and `unicode-bidi` levels, rule L2.
+- **Opinion**: same pictures for the demo text; React and Rust both reorder mixed lines, .NET does not. Explicit
+  embeddings (U+202A..202E, U+2066..2069) nest deeper than level 2 only in Rust.
+
+### Editor caret in right-to-left text
+- **React** and **Rust**: glyph boxes stay in logical order, so the caret and selection in right-to-left text are not
+  placed visually. **.NET**: the same limitation for shaped spans.
+- **Opinion**: fix in all engines together when an RTL editor is needed.

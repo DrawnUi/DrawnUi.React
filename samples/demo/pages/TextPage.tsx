@@ -17,6 +17,12 @@ const label = new SkiaRichLabel();
 label.Text = "# Hello";
 \`\`\``;
 
+/** The DrawnUI .NET demo's markdown (SkiaMarkdownLabel there), with its emoji run. */
+const DEMO_MARKDOWN = "~~Just put~~ a simple markdown string and this control will ***auto-split*** it into spans. It will recognize links _[a link](https://firstlink.app)_ rendered with ___SkiaMarkdownLabel___ Here it auto-created a span for \u{1F680}\u{1F434}\u{1F916}\u{1F47B} and switched back. _[More info..](https://moreinfo.app)_. Subclass this control or consume LinkTappedCommand property or LinkTapped event handler to react to taps.";
+
+/** The DrawnUI .NET demo's right-to-left paragraph: five Arabic lines. */
+const DEMO_RTL = "مرحبًا بكم في عصر العناصر البصرية المصممة\nحيث الدقة تلتقي بالإبداع في كل تفصيل\nنقدم لكم تجربة مستخدم فريدة ومتطورة\nاستمتع بالسلاسة والأداء العالي في التصميمات\nنحن نبتكر لنجعل تجربتكم أكثر تميزًا وسهولة";
+
 const LOREM = "DrawnUI draws every pixel itself: text is shaped and rasterized by Skia, so a label wraps by words, respects MaxLines with an ellipsis, aligns horizontally and vertically, and never leaves the canvas for a native view. This paragraph is long on purpose so it wraps across several lines at whatever width the layout gives it.";
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
@@ -64,6 +70,34 @@ export function TextPage() {
             <TextSpan Text=" that wraps with the rest of the paragraph like any other word." />
           </SkiaLabel>
           <SkiaLabel Text={"Last span tap: " + tapped} FontSize={13} TextColor="#ADB5BD" />
+        </Card>
+
+        <Card title="Spans with colored emoji — the DrawnUI .NET demo; emoji sequences are shaped into one glyph">
+          <SkiaLabel FontSize={15} TextColor="#DEE2E6" HorizontalOptions="Fill" LineSpacing={1.5} FontFamilyFallback="FontEmoji">
+            <TextSpan Text="ANY " FontSize={17} IsBold IsItalic TextColor="#FF5252" />
+            <TextSpan Text="span can be made " />
+            <TextSpan Text="tappable " IsItalic TextColor="#C77DFF" Tapped={() => setTapped("\"tappable\" at " + new Date().toLocaleTimeString())} />
+            <TextSpan Text="! " FontSize={12} IsItalic />
+            <TextSpan Text="Use colored emojis " />
+            <TextSpan Text="🌐🚒🙎🏽👻🤖" />
+            <TextSpan Text=" Format text as " />
+            <TextSpan Text=" BiG " FontSize={20} BackgroundColor="#FFEB3B" TextColor={Colors.Black} />
+            <TextSpan Text=" and small! " FontSize={11} IsItalic />
+            <TextSpan Text="Add another tappable link!" FontSize={14} TextColor="#9CCC65" Underline Tapped={() => setTapped("the link at " + new Date().toLocaleTimeString())} />
+            <TextSpan Text=" " FontSize={14} />
+            <TextSpan Text="Still in development but.." FontSize={14} Strikeout />
+            <TextSpan Text=" " FontSize={14} />
+            <TextSpan Text="You can already use the nuget!" FontSize={14} BackgroundColor="#33FF0000" />
+          </SkiaLabel>
+        </Card>
+
+        <Card title="SkiaRichLabel with an emoji run — the DrawnUI .NET demo">
+          <SkiaRichLabel FontSize={14} TextColor="#DEE2E6" HorizontalOptions="Fill" LineSpacing={1.5} FontFamilyFallback="FontEmoji" LinkTapped={(_, url) => setLink(url)}
+            Text={DEMO_MARKDOWN} />
+        </Card>
+
+        <Card title="Right to left — Arabic, shaped and in bidirectional order · HorizontalTextAlignment=End">
+          <SkiaLabel Text={DEMO_RTL} FontSize={15} TextColor="#DEE2E6" HorizontalOptions="Fill" LineSpacing={1.3} HorizontalTextAlignment="End" FontFamilyFallback="FontArabic" />
         </Card>
 
         <Card title="SkiaRichLabel — markdown in Text, rendered as spans">

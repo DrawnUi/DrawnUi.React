@@ -189,7 +189,7 @@ export class SkiaRichLabel extends SkiaLabel {
     this.hadParagraph = true;
   }
 
-  /** Inline markdown: `code`, **bold**, __bold__, *italic*, _italic_, ~~strike~~, [text](url), backslash escapes. */
+  /** Inline markdown: `code`, ***bold italic***, ___bold italic___, **bold**, __bold__, *italic*, _italic_, ~~strike~~, [text](url), backslash escapes. */
   private RenderInlines(text: string, state: InlineState): void {
     let literal = "";
     const flush = () => { if (literal) { this.AddTextSpan(literal, state); literal = ""; } };
@@ -213,6 +213,15 @@ export class SkiaRichLabel extends SkiaLabel {
           flush();
           this.AddTextSpan(m[1] || m[2], state, (s) => { s.Tag = m[2]; s.TextColor = this.linkColor; s.Underline = this.underlineLink; s.UnderlineWidth = this.underlineWidth; s.ForceCaptureInput = true; });
           i += m[0].length; continue;
+        }
+      }
+      const three = text.slice(i, i + 3);
+      if (three === "***" || three === "___") {
+        const end = closes(three, i + 3);
+        if (end > i + 3) {
+          flush();
+          this.RenderInlines(text.slice(i + 3, end), { ...state, bold: true, italic: true });
+          i = end + 3; continue;
         }
       }
       const two = text.slice(i, i + 2);

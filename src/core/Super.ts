@@ -2,7 +2,7 @@ import { Thickness } from "./Types";
 import { StylesCollection } from "./Styles";
 // the "full" build: same API plus Skottie (SkiaLottie) and the paragraph module; +0.9 MB raw over the default build
 import CanvasKitInit from "canvaskit-wasm/bin/full/canvaskit.js";
-import type { CanvasKit, Font, Typeface } from "canvaskit-wasm";
+import type { CanvasKit, Font, Typeface, TypefaceFontProvider } from "canvaskit-wasm";
 import wasmUrl from "canvaskit-wasm/bin/full/canvaskit.wasm?url";
 
 /** Mirrors DrawnUi.Net IFontCollection: fonts.AddFont(source, alias[, weight]), plus the Blazor-head AddSymbols/AddEmojis. */
@@ -17,7 +17,7 @@ export class FontCollection {
       .AddFont(FontCollection.ContentRoot + "NotoSansSymbols2-Subset.ttf", "FontSymbols2");
   }
 
-  /** Noto Color Emoji subset (faces + hands) as "FontEmoji" — DrawnUi.Blazor AddEmojis. */
+  /** Noto Color Emoji subset (faces, hands, skin tones and a few objects) as "FontEmoji" — DrawnUi.Blazor AddEmojis. */
   AddEmojis(): FontCollection {
     return this.AddFont(FontCollection.ContentRoot + "NotoColorEmoji-Subset.ttf", "FontEmoji");
   }
@@ -55,7 +55,7 @@ export class DrawnUiBuilder {
       let face = loaded.get(f.Source);
       if (!face) {
         const data = await (await fetch(Super.ResolveAssetUrl(f.Source))).arrayBuffer();
-        face = Super.CK.Typeface.MakeFreeTypeFaceFromData(data) ?? undefined;
+        face = Super.LoadFace(data);
         if (!face) throw new Error(`DrawnUi: cannot load font '${f.Source}'`);
         loaded.set(f.Source, face);
         // the same face as a CSS font under the alias: the accessibility overlay's selectable text lines up with the drawn glyphs
@@ -114,6 +114,30 @@ export class Super {
   /** CanvasKit's built-in face: what an empty FontFamily resolves to, like C# SKTypeface.CreateDefault(). */
   static SkiaDefaultTypeface?: Typeface;
   private static readonly fontCache = new Map<string, Font>();
+
+  /** Every face loaded from data, each under a family of its own: the paragraph module shapes text with them (`Shaping`). */
+  static ShapingFonts?: TypefaceFontProvider;
+  private static readonly shapingFamilyOfFace = new Map<Typeface, string>();
+  private static readonly shapingFamilyOfFont = new WeakMap<Font, string>();
+
+  /**
+   * A face from font file data, also usable for shaping (complex scripts, emoji sequences, right to left). Register fonts
+   * by alias with `Super.Fonts` / ConfigureFonts; this only makes the face. Undefined when the data is no font.
+   */
+  static LoadFace(data: ArrayBuffer | Uint8Array): Typeface | undefined {
+    const CK = Super.CK;
+    Super.ShapingFonts ??= CK.TypefaceFontProvider.Make();
+    const family = `drawnui-shaping-${Super.shapingFamilyOfFace.size}`;
+    Super.ShapingFonts.registerFont(data, family);
+    const face = Super.ShapingFonts.matchFamilyStyle(family, { weight: CK.FontWeight.Normal, width: CK.FontWidth.Normal, slant: CK.FontSlant.Upright });
+    if (face) { Super.shapingFamilyOfFace.set(face, family); return face; }
+    return CK.Typeface.MakeFreeTypeFaceFromData(data instanceof Uint8Array ? data.slice().buffer : data) ?? undefined;
+  }
+
+  /** The shaping family of a font made by GetFont, undefined for faces without shaping data (CanvasKit's built-in face). */
+  static ShapingFamilyOf(font: Font): string | undefined { return Super.shapingFamilyOfFont.get(font); }
+  /** Any shaping family (the bidirectional pass needs one, its font does not matter). */
+  static AnyShapingFamily(): string | undefined { for (const f of Super.shapingFamilyOfFace.values()) return f; return undefined; }
 
   static UseDrawnUi(): DrawnUiBuilder { return new DrawnUiBuilder(); }
 
@@ -193,6 +217,8 @@ export class Super {
       if (italic) font.setSkewX(-0.25);
       // no bold face registered: synthetic bold, like C# Font.Embolden = IsBold
       if (weight >= 600 && resolved.Weight < 600) font.setEmbolden(true);
+      const family = resolved.Typeface ? Super.shapingFamilyOfFace.get(resolved.Typeface) : undefined;
+      if (family) Super.shapingFamilyOfFont.set(font, family);
       Super.fontCache.set(key, font);
     }
     return font;

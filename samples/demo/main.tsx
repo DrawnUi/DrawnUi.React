@@ -37,7 +37,8 @@ await Super.UseDrawnUi()
     .AddFont("fonts/OpenSans-Semibold.ttf", "FontTextBold")
     .AddFont("fonts/Orbitron-Regular.ttf", "FontGame") // Pong score and messages, as in the .NET Pong samples
     .AddSymbols() // FontSymbols / FontSymbols2 (arrows, math, misc) shipped subsets, like DrawnUi.Blazor
-    .AddEmojis()) // FontEmoji (Noto Color Emoji faces + hands subset)
+    .AddEmojis() // FontEmoji (Noto Color Emoji subset: faces, hands, skin tones, the demo emoji)
+    .AddFont("fonts/NotoSansArabic-Subset.ttf", "FontArabic")) // Text page right-to-left card (Noto Sans Arabic subset)
   // Same style the .NET Blazor sandbox and the Fiddle register: every label defaults to the app font. Without it a
   // control that leaves FontFamily empty draws in the Skia built-in face, on this engine as on .NET.
   .ConfigureStyles((styles) => styles
