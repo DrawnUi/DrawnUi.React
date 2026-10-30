@@ -557,13 +557,15 @@ Updated whenever the port deliberately diverges or finds something worth back-po
 ### Shaping engine and bidirectional levels
 - **React**: runs that need shaping are laid out as one-font CanvasKit paragraphs (HarfBuzz) and their glyphs read back
   (`getShapedLines`); the run's left edge and width come from the paragraph (glyph positions include mark offsets).
-  Bidirectional levels come from a paragraph of the line (`getGlyphInfoAt` direction: levels 0 / 1 / 2 only).
+  Bidirectional runs come from the visual run order of a paragraph of the line (ICU), so every level is honored.
 - **.NET**: HarfBuzzSharp per span, one direction per shaped span (no bidirectional reordering of runs).
   **Rust**: harfrust per run and `unicode-bidi` levels, rule L2.
 - **Opinion**: same pictures for the demo text; React and Rust both reorder mixed lines, .NET does not. Explicit
   embeddings (U+202A..202E, U+2066..2069) nest deeper than level 2 only in Rust.
 
 ### Editor caret in right-to-left text
-- **React** and **Rust**: glyph boxes stay in logical order, so the caret and selection in right-to-left text are not
-  placed visually. **.NET**: the same limitation for shaped spans.
-- **Opinion**: fix in all engines together when an RTL editor is needed.
+- **React** and **Rust**: the caret, taps, Left / Right and the selection follow the screen in right-to-left and mixed
+  text, by the rules agreed between the two engines (drawnui-cross 6ak): caret at the trailing edge of the character
+  before it, taps to the nearest grapheme boundary, arrows to the nearest caret place on that side, selection = the
+  selected characters' boxes. **.NET**: no visual caret in right-to-left text (glyph boxes in logical order).
+- **Opinion**: port the same rules to .NET when an RTL editor is needed there.

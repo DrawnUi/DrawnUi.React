@@ -85,13 +85,19 @@ class FakeCanvas {
   // a pause during the start delay keeps what is left of it
   {
     const a = new SkiaValueAnimator(host); a.mMinValue = 0; a.mMaxValue = 100; a.Speed = 100;
+    // timers overshoot on a busy machine: every expectation uses the delay time that really passed while not paused
+    const t0 = performance.now();
     a.Start(150); await sleep(60);
+    const ran = performance.now() - t0;
     a.Pause(); await sleep(300);
-    check("paused during the delay: not started", !a.IsRunning);
+    check("paused during the delay: not started", ran >= 150 || !a.IsRunning, `${ran.toFixed(0)} ms of the delay ran`);
+    const t2 = performance.now();
     a.Resume(); await sleep(40);
-    check("resumed: the rest of the delay still waits", !a.IsRunning);
+    const waited = ran + performance.now() - t2;
+    check("resumed: the rest of the delay still waits", waited >= 140 || !a.IsRunning, `${waited.toFixed(0)} ms of 150`);
     await sleep(100);
-    check("then it starts", a.IsRunning);
+    const total = ran + performance.now() - t2;
+    check("then it starts", total < 170 || a.IsRunning, `${total.toFixed(0)} ms of 150`);
     a.Stop();
   }
 

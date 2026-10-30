@@ -7,7 +7,7 @@ import {
   type TextTransform, Thickness, type ThicknessValue,
 } from "../core/Types";
 import { TextSpan } from "./TextSpan";
-import { BidiLevels, HasCodePoint, IsRtl, JoinsPrevious, NeedsShaping, Shape, type Shaped } from "../core/Shaping";
+import { BidiRuns, type BidiMap, HasCodePoint, IsRtl, JoinsPrevious, NeedsShaping, Shape, type Shaped } from "../core/Shaping";
 
 /** Resolved faces for one style (the label itself or one span): main font + FontFamilyFallback chain + metrics. */
 interface SpanFonts { Key: string; Main: Font; Fallbacks: Font[]; Ascent: number; Descent: number; SizePx: number }
@@ -16,14 +16,14 @@ interface SpanFonts { Key: string; Main: Font; Fallbacks: Font[]; Ascent: number
  * layout, a run that needs shaping carries its shaped glyphs, and on a line with right-to-left text its bidirectional
  * level and its x from the line start (runs stay in logical order).
  */
-interface TextRun { Text: string; Font: Font; Width: number; Span?: TextSpan; Fonts: SpanFonts; Shaped?: Shaped; Level?: number; X?: number }
+interface TextRun { Text: string; Font: Font; Width: number; Span?: TextSpan; Fonts: SpanFonts; Shaped?: Shaped; Level?: number; X?: number; /** Rank of its visual run and its offset in the line text (bidirectional lines). */ Rank?: number; At?: number }
 /** One laid-out line: runs, total advance, max ascent above / descent below the baseline (pixels). */
 interface TextLine { Runs: TextRun[]; Width: number; Ascent: number; Descent: number; /** Starts a paragraph after the first one (ParagraphSpacing above it). */ Para?: boolean }
 /** A paragraph of wrap tokens; `LineBreak`: it follows a U+2028 line separator, not a new paragraph. */
 type Paragraph = Token[] & { LineBreak?: boolean };
 
 /** One code point of the laid-out text: its UTF-16 index/length in Text and its box in pixels relative to DrawingRect. */
-export interface GlyphBox { Index: number; Length: number; Line: number; Left: number; Top: number; Width: number; Height: number }
+export interface GlyphBox { Index: number; Length: number; Line: number; Left: number; Top: number; Width: number; Height: number; /** The code point runs right to left (its box is in visual place). */ Rtl?: boolean }
 /** A laid-out line: first text index, box in pixels relative to DrawingRect. */
 export interface LineBox { Line: number; Start: number; End: number; Left: number; Top: number; Width: number; Height: number }
 /**
@@ -480,7 +480,7 @@ export class SkiaLabel extends SkiaControl {
   }
 
   /** A paragraph is right to left when its first strong letter is (DrawnUi.Rust split_bidi). */
-  private static FirstStrongIsRtl(text: string): boolean {
+  static FirstStrongIsRtl(text: string): boolean {
     for (const ch of text) {
       const cp = ch.codePointAt(0)!;
       if (IsRtl(cp)) return true;
@@ -489,22 +489,21 @@ export class SkiaLabel extends SkiaControl {
     return false;
   }
 
-  /** The runs of a line cut where the bidirectional level changes; `levels` per UTF-16 index of the line text. */
-  private SplitByLevel(runs: TextRun[], levels: Uint8Array): TextRun[] {
+  /** The runs of a line cut where its visual run changes; `map` per UTF-16 index of the line text. */
+  private SplitByRuns(runs: TextRun[], map: BidiMap): TextRun[] {
     const out: TextRun[] = [];
     let at = 0;
     for (const r of runs) {
-      const piece = (from: number, to: number, level: number) => {
+      const piece = (from: number, to: number) => {
         const text = r.Text.slice(from, to);
-        out.push({ ...r, Text: text, Width: from === 0 && to === r.Text.length ? r.Width : this.Advance(r.Font, text), Level: level, Shaped: undefined, X: undefined });
+        out.push({ ...r, Text: text, Width: from === 0 && to === r.Text.length ? r.Width : this.Advance(r.Font, text), Level: map.Rtl[at + from] ? 1 : 0, Rank: map.Rank[at + from], At: at + from, Shaped: undefined, X: undefined });
       };
-      let from = 0, level = levels[at] ?? 0;
+      let from = 0;
       for (let i = 0; i < r.Text.length;) {
-        const next = levels[at + i] ?? level;
-        if (i > 0 && next !== level) { piece(from, i, level); from = i; level = next; }
+        if (i > 0 && map.Rank[at + i] !== map.Rank[at + from]) { piece(from, i); from = i; }
         i += r.Text.codePointAt(i)! > 0xFFFF ? 2 : 1;
       }
-      if (r.Text.length > 0) piece(from, r.Text.length, level);
+      if (r.Text.length > 0) piece(from, r.Text.length);
       at += r.Text.length;
     }
     return out;
@@ -512,9 +511,9 @@ export class SkiaLabel extends SkiaControl {
 
   /**
    * After the layout, lines whose text needs shaping or runs right to left (DrawnUi.Rust build_blobs): with
-   * right-to-left text every run is cut where the bidirectional level changes (Unicode bidirectional algorithm, the
+   * right-to-left text every run is cut where its bidirectional run changes (Unicode bidirectional algorithm, ICU, the
    * paragraph direction from its first strong letter); runs that are right to left or need shaping get shaped glyphs;
-   * runs are placed in visual order (rule L2). Lines without such text are left as they are (plain path).
+   * runs are placed in visual order. Lines without such text are left as they are (plain path).
    */
   private ShapeLines(lines: TextLine[]): void {
     const sp = this.glyphSpacing;
@@ -530,8 +529,8 @@ export class SkiaLabel extends SkiaControl {
           while (end < lines.length && !lines[end].Para) end++;
           rtlParagraph = SkiaLabel.FirstStrongIsRtl(lines.slice(li, end).map(lineText).join(""));
         }
-        const levels = BidiLevels(lineText(line), rtlParagraph);
-        if (levels) { line.Runs = this.SplitByLevel(line.Runs, levels); bidi = line.Runs.some((r) => (r.Level ?? 0) > 0); }
+        const map = BidiRuns(lineText(line), rtlParagraph);
+        if (map) { line.Runs = this.SplitByRuns(line.Runs, map); bidi = line.Runs.some((r) => (r.Level ?? 0) > 0); }
       }
       let shaped = false;
       for (const run of line.Runs) {
@@ -549,24 +548,15 @@ export class SkiaLabel extends SkiaControl {
   }
 
   /**
-   * Where each run of a line with right-to-left text goes, in visual order (Unicode rule L2: from the highest level down
-   * to the lowest odd one, every sequence of runs at that level or higher is reversed).
+   * Where each run of a line with right-to-left text goes: visual runs left to right; inside a run, pieces (spans, fonts)
+   * in logical order, reversed in a right-to-left run.
    */
   private static PlaceRuns(runs: TextRun[]): void {
-    const order = runs.map((_, i) => i);
-    const levelOf = (i: number) => runs[i].Level ?? 0;
-    const highest = Math.max(0, ...runs.map((r) => r.Level ?? 0));
-    const odd = runs.map((r) => r.Level ?? 0).filter((l) => l % 2 === 1);
-    const lowestOdd = odd.length ? Math.min(...odd) : highest + 1;
-    for (let level = highest; level >= lowestOdd && level > 0; level--) {
-      for (let i = 0; i < order.length;) {
-        if (levelOf(order[i]) < level) { i++; continue; }
-        const start = i;
-        while (i < order.length && levelOf(order[i]) >= level) i++;
-        const reversed = order.slice(start, i).reverse();
-        order.splice(start, reversed.length, ...reversed);
-      }
-    }
+    const order = runs.map((_, i) => i).sort((a, b) => {
+      const ra = runs[a], rb = runs[b];
+      if ((ra.Rank ?? 0) !== (rb.Rank ?? 0)) return (ra.Rank ?? 0) - (rb.Rank ?? 0);
+      return ((ra.Level ?? 0) % 2 === 1 ? -1 : 1) * ((ra.At ?? 0) - (rb.At ?? 0));
+    });
     let x = 0;
     for (const k of order) { runs[k].X = x; x += runs[k].Width; }
   }
@@ -667,17 +657,22 @@ export class SkiaLabel extends SkiaControl {
       const g = geo[li];
       let start = g.text.length ? this.text.indexOf(g.text, cursor) : cursor;
       if (start < 0) start = cursor;
-      // right-to-left runs are boxed left to right in logical order (the caret is not placed visually there)
+      // boxes in logical order, each at its visual place: a right-to-left run fills from its right edge
       let x = g.x, index = start;
+      const sp = this.glyphSpacing;
       for (const run of line.Runs) {
         if (run.X !== undefined) x = g.x + run.X;
         const cps = Array.from(run.Text);
-        const widths = run.Shaped ? run.Shaped.Advances.map((a) => a - this.glyphSpacing) : run.Font.getGlyphWidths(run.Font.getGlyphIDs(run.Text, cps.length));
+        const widths = run.Shaped ? run.Shaped.Advances.map((a) => a - sp) : run.Font.getGlyphWidths(run.Font.getGlyphIDs(run.Text, cps.length));
+        const rtl = (run.Level ?? 0) % 2 === 1;
+        let right = x + run.Width - sp;
         cps.forEach((cp, k) => {
           const w = widths[k] ?? 0;
-          out.push({ Index: index, Length: cp.length, Line: li, Left: x, Top: g.y, Width: w, Height: g.h });
-          x += w + this.glyphSpacing; index += cp.length;
+          if (rtl) { out.push({ Index: index, Length: cp.length, Line: li, Left: right - w, Top: g.y, Width: w, Height: g.h, Rtl: true }); right -= w + sp; }
+          else { out.push({ Index: index, Length: cp.length, Line: li, Left: x, Top: g.y, Width: w, Height: g.h }); x += w + sp; }
+          index += cp.length;
         });
+        if (rtl) x += run.Width;
       }
       cursor = start + g.text.length;
     });

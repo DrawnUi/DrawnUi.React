@@ -97,12 +97,13 @@ function ShapeNow(font: Font, family: string, size: number, text: string, rtl: b
     const lines = paragraph.getShapedLines();
     if (lines.length === 0) return undefined;
     // the code point of every UTF-8 byte offset (the shaped runs report clusters in UTF-8)
-    const cpOfByte: number[] = [];
-    let cps = 0;
+    const cpOfByte: number[] = [], u16OfCp: number[] = [];
+    let cps = 0, u16 = 0;
     for (const ch of text) {
       const c = ch.codePointAt(0)!, bytes = c < 0x80 ? 1 : c < 0x800 ? 2 : c < 0x10000 ? 3 : 4;
       for (let b = 0; b < bytes; b++) cpOfByte.push(cps);
-      cps++;
+      u16OfCp.push(u16);
+      cps++; u16 += ch.length;
     }
     const cpOf = (byte: number) => cpOfByte[Math.min(byte, cpOfByte.length - 1)] ?? 0;
     let count = 0;
@@ -123,11 +124,21 @@ function ShapeNow(font: Font, family: string, size: number, text: string, rtl: b
         }
       }
     }
-    // the advance of every cluster (caret boxes): its glyphs' advances, scaled to the shaped width (kerning, joins)
-    const glyphWidths = font.getGlyphWidths(glyphs);
+    // the advance of every grapheme on its first code point (caret boxes): the paragraph's own grapheme bounds, which
+    // follow the shaped pen advances (DrawnUi.Rust: HarfBuzz x_advance per cluster)
     let sum = 0;
-    for (let g = 0; g < count; g++) { advances[clusters[g]] += glyphWidths[g]; sum += glyphWidths[g]; }
-    if (sum > 0) for (let i = 0; i < advances.length; i++) advances[i] *= shapedWidth / sum;
+    for (let i = 0; i < cps; i++) {
+      const info = paragraph.getGlyphInfoAt(u16OfCp[i]);
+      if (!info || info.graphemeClusterTextRange.start !== u16OfCp[i]) continue;
+      const b = info.graphemeLayoutBounds;
+      advances[i] = b[2] - b[0]; sum += advances[i];
+    }
+    if (sum <= 0) {
+      // no grapheme bounds: the glyphs' own widths, scaled to the shaped width
+      const glyphWidths = font.getGlyphWidths(glyphs);
+      for (let g = 0; g < count; g++) { advances[clusters[g]] += glyphWidths[g]; sum += glyphWidths[g]; }
+      if (sum > 0) for (let i = 0; i < advances.length; i++) advances[i] *= shapedWidth / sum;
+    }
     if (spacing !== 0) {
       // visual order: the spacing of the code points between two clusters goes between them
       let extra = 0, last = -1;
@@ -145,27 +156,55 @@ function ShapeNow(font: Font, family: string, size: number, text: string, rtl: b
   }
 }
 
+/** The visual runs of a line: for every UTF-16 index, the rank of its run from the left and whether it runs right to left. */
+export interface BidiMap { Rank: Int32Array; Rtl: Uint8Array }
+
 /**
- * Bidirectional level of every UTF-16 index of a line (Unicode bidirectional algorithm, ICU in CanvasKit): 0 left to
- * right in a left-to-right paragraph, 1 right to left, 2 left to right inside a right-to-left paragraph. Explicit
- * embeddings (U+202A..202E, U+2066..2069) are resolved by ICU but reported as their direction only.
+ * Bidirectional runs of a line (Unicode bidirectional algorithm, ICU in CanvasKit), read from the visual order of a
+ * paragraph of that line: digits after Arabic in a left-to-right paragraph stay with the Arabic run (level 2), as the
+ * algorithm orders them. Undefined when no font was registered for shaping.
  */
-export function BidiLevels(text: string, rtlParagraph: boolean): Uint8Array | undefined {
+export function BidiRuns(text: string, rtlParagraph: boolean): BidiMap | undefined {
   const family = Super.AnyShapingFamily();
-  if (!family) return undefined;
+  if (!family || !text) return undefined;
   const CK = Super.CK;
   const paragraph = Paragraph(family, 12, text, rtlParagraph);
   try {
-    const levels = new Uint8Array(text.length);
-    let level = rtlParagraph ? 1 : 0;
-    for (let i = 0; i < text.length; i++) {
-      const c = text.charCodeAt(i);
-      if (c >= 0xDC00 && c <= 0xDFFF) { levels[i] = level; continue; } // low surrogate: as its pair
-      const info = paragraph.getGlyphInfoAt(i);
-      if (info) level = info.dir.value === CK.TextDirection.RTL.value ? 1 : rtlParagraph ? 2 : 0;
-      levels[i] = level;
+    // UTF-16 index of every UTF-8 byte offset (the shaped runs report clusters in UTF-8)
+    const u16OfByte: number[] = [];
+    let u = 0;
+    for (const ch of text) {
+      const c = ch.codePointAt(0)!, bytes = c < 0x80 ? 1 : c < 0x800 ? 2 : c < 0x10000 ? 3 : 4;
+      for (let k = 0; k < bytes; k++) u16OfByte.push(u);
+      u += ch.length;
     }
-    return levels;
+    u16OfByte.push(u);
+    // every cluster start with the rank of its run; runs come left to right
+    const starts: { At: number; Rank: number }[] = [];
+    const firstOfRank: number[] = [];
+    let rank = 0;
+    for (const l of paragraph.getShapedLines()) {
+      for (const r of l.runs) {
+        let first = Infinity;
+        for (let g = 0; g < r.glyphs.length; g++) { const at = u16OfByte[Math.min(r.offsets[g], u16OfByte.length - 1)]; starts.push({ At: at, Rank: rank }); first = Math.min(first, at); }
+        firstOfRank.push(first);
+        rank++;
+      }
+    }
+    if (starts.length === 0) return undefined;
+    starts.sort((x, y) => x.At - y.At);
+    const map: BidiMap = { Rank: new Int32Array(text.length), Rtl: new Uint8Array(text.length) };
+    let k = 0, current = starts[0].Rank;
+    for (let i = 0; i < text.length; i++) {
+      while (k < starts.length && starts[k].At <= i) current = starts[k++].Rank;
+      map.Rank[i] = current;
+    }
+    const rtlOfRank = firstOfRank.map((at) => {
+      const info = Number.isFinite(at) ? paragraph.getGlyphInfoAt(at) : null;
+      return info ? info.dir.value === CK.TextDirection.RTL.value : rtlParagraph;
+    });
+    for (let i = 0; i < text.length; i++) map.Rtl[i] = rtlOfRank[map.Rank[i]] ? 1 : 0;
+    return map;
   } finally {
     paragraph.delete();
   }

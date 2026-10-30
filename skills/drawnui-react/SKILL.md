@@ -60,7 +60,9 @@ createRoot(document.getElementById("root")!).render(
   `HorizontalTextAlignment="End"` for right-aligned Arabic paragraphs. Register a font for the script as a fallback,
   e.g. `.AddFont("fonts/NotoSansArabic-Subset.ttf", "FontArabic")` + `FontFamilyFallback="FontArabic"`. A joiner, skin
   tone or variation selector keeps the font of the emoji before it. Fonts must come through `ConfigureFonts` (or
-  `Super.LoadFace`) to be shaped. The editor caret in right-to-left text is not placed visually yet.
+  `Super.LoadFace`) to be shaped. `SkiaEditor` edits right-to-left and mixed text like a native field: the caret, taps, Left / Right and the selection
+  follow the screen, typing keeps the caret after the new letter; register the script's font in the editor's
+  `FontFamilyFallback` too.
 - A space keeps the style of the span it is written in: in `"as "` + `" BiG "` both spaces show, the highlight of
   `" BiG "` covers its own two spaces only. Inside one span a run of spaces counts as one; a line never starts with one.
 - A control with no `FontFamily` draws in CanvasKit's built-in face, not your font (same as DrawnUi.Net). Register the

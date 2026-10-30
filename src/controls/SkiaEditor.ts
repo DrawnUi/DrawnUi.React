@@ -5,7 +5,7 @@ import { type PrebuiltControlStyle, ResolveControlStyle } from "../core/ControlS
 import { type InputKey, KeyboardManager } from "../core/KeyboardManager";
 import { TextInputProxy } from "../core/TextInputProxy";
 import { type Color, Colors, type DrawTextAlignment, type ReturnType, ScaledSize, type SkiaEditorKeyboard, type SkiaGradient, SKRect, type TextAlignment, Thickness } from "../core/Types";
-import { type GlyphBox, SkiaLabel } from "./SkiaLabel";
+import { type GlyphBox, type LineBox, SkiaLabel } from "./SkiaLabel";
 import { SkiaShape } from "./SkiaShape";
 
 const ParagraphBreak = "\n";
@@ -87,6 +87,12 @@ export class SkiaEditor extends SkiaShape {
   private styleApplied: Record<string, unknown> = {};
   private layoutVersion = -1;
   private boxes: GlyphBox[] = [];
+  /** The glyph box starting at a text index, and the one ending at it. */
+  private readonly boxAt = new Map<number, GlyphBox>();
+  private readonly boxEnd = new Map<number, GlyphBox>();
+  /** Grapheme boundaries of the text, the places a caret may stand. */
+  private stops: number[] = [0];
+  private stopsText = "";
 
   constructor() {
     super();
@@ -305,24 +311,70 @@ export class SkiaEditor extends SkiaShape {
   }
 
   // ---- caret / selection geometry (pixels relative to the label's DrawingRect) ----
+  // Rules shared with DrawnUi.Rust (drawnui-cross 6ak): boxes are visual, the caret at index i is the trailing edge of
+  // character i - 1 on its line (the leading edge of the first character at a line start), taps and Left / Right go to
+  // the grapheme boundary whose caret x is nearest.
   private Boxes(): GlyphBox[] {
-    if (this.layoutVersion !== this.Label.LayoutVersion) { this.boxes = this.Label.GetGlyphBoxes(); this.layoutVersion = this.Label.LayoutVersion; }
+    if (this.layoutVersion !== this.Label.LayoutVersion) {
+      this.boxes = this.Label.GetGlyphBoxes(); this.layoutVersion = this.Label.LayoutVersion;
+      this.boxAt.clear(); this.boxEnd.clear();
+      for (const b of this.boxes) { this.boxAt.set(b.Index, b); this.boxEnd.set(b.Index + b.Length, b); }
+    }
     return this.boxes;
+  }
+
+  private Stops(): number[] {
+    if (this.stopsText !== this.text) {
+      this.stopsText = this.text;
+      this.stops = SkiaEditor.Graphemes(this.text).map((g) => g.index);
+      this.stops.push(this.text.length);
+    }
+    return this.stops;
+  }
+
+  /** The laid-out line a caret index belongs to: the line holding the character before it, else the one starting at it. */
+  private static LineOf(index: number, lines: LineBox[]): LineBox {
+    for (const l of lines) if (index > l.Start && index <= l.End) return l;
+    for (const l of lines) if (index === l.Start) return l;
+    let line = lines[0];
+    for (const l of lines) if (l.Start <= index) line = l; // in a space wrapped away: the line before it
+    return line;
+  }
+
+  /** Where the caret before character `index` stands (label pixels): its x, the direction of the text there, its line box. */
+  private CaretPlace(index: number): { X: number; Rtl: boolean; Top: number; Height: number } | undefined {
+    const lines = this.Label.GetLineBoxes();
+    if (lines.length === 0) return undefined;
+    const boxes = this.Boxes();
+    const line = SkiaEditor.LineOf(index, lines);
+    const trailing = (b: GlyphBox) => ({ X: b.Rtl ? b.Left : b.Left + b.Width, Rtl: !!b.Rtl, Top: b.Top, Height: b.Height });
+    if (index > line.Start) {
+      let prev = this.boxEnd.get(index);
+      if (!prev || prev.Line !== line.Line) { prev = undefined; for (const b of boxes) if (b.Line === line.Line && b.Index < index) prev = b; }
+      if (prev) return trailing(prev);
+    }
+    const cur = this.boxAt.get(index);
+    if (cur && cur.Line === line.Line) return { X: cur.Rtl ? cur.Left + cur.Width : cur.Left, Rtl: !!cur.Rtl, Top: cur.Top, Height: cur.Height };
+    return { X: line.Left, Rtl: false, Top: line.Top, Height: line.Height };
   }
 
   /** Rect of the caret before character `index` (label pixels), or undefined before the first layout. */
   private CaretRectLabelPx(index = this.cursorPosition + this.selectionLength): SKRect | undefined {
-    const boxes = this.Boxes();
-    const lines = this.Label.GetLineBoxes();
-    if (lines.length === 0) return undefined;
+    const place = this.CaretPlace(index);
+    if (!place) return undefined;
     const caretW = 2 * this.RenderingScale;
-    const at = boxes.find((b) => b.Index === index);
-    if (at) return SKRect.Create(at.Left, at.Top, caretW, at.Height);
-    let prev: GlyphBox | undefined;
-    for (const b of boxes) { if (b.Index < index) prev = b; else break; }
-    if (prev) return SKRect.Create(prev.Left + prev.Width, prev.Top, caretW, prev.Height);
-    const first = lines[0];
-    return SKRect.Create(first.Left, first.Top, caretW, first.Height);
+    return SKRect.Create(place.Rtl ? place.X - caretW : place.X, place.Top, caretW, place.Height);
+  }
+
+  /** The grapheme boundary of a line whose caret x is nearest to `x` (a tie: the smaller index). */
+  private NearestStop(line: LineBox, x: number): number {
+    let best = -1, bestD = Infinity;
+    for (const i of this.Stops()) {
+      if (i < line.Start || i > line.End) continue;
+      const d = Math.abs((this.CaretPlace(i)?.X ?? 0) - x);
+      if (d < bestD - 0.01) { best = i; bestD = d; }
+    }
+    return best >= 0 ? best : Math.min(line.Start, this.text.length);
   }
 
   /** C# GetCursorPosition: the text index nearest to a point in label pixels. */
@@ -331,12 +383,38 @@ export class SkiaEditor extends SkiaShape {
     if (lines.length === 0) return this.text.length;
     let line = lines[lines.length - 1];
     for (const l of lines) if (y < l.Top + l.Height) { line = l; break; }
-    const boxes = this.Boxes().filter((b) => b.Line === line.Line);
-    if (boxes.length === 0) return Math.min(line.Start, this.text.length);
-    if (x <= boxes[0].Left) return boxes[0].Index;
-    for (const b of boxes) if (x < b.Left + b.Width) return x < b.Left + b.Width / 2 ? b.Index : b.Index + b.Length;
-    const last = boxes[boxes.length - 1];
-    return Math.min(last.Index + last.Length, this.text.length);
+    return this.NearestStop(line, x);
+  }
+
+  /**
+   * Left / Right from a caret index: the grapheme boundary on its line whose caret x is nearest that way (equal x: the
+   * one logically nearest); at the visual edge of the line one grapheme logically, forward for Right in a
+   * left-to-right paragraph and backward in a right-to-left one (Left the other way round).
+   */
+  private VisualTarget(from: number, dir: -1 | 1): number {
+    const lines = this.Label.GetLineBoxes();
+    const stops = this.Stops();
+    let line: LineBox | undefined;
+    if (lines.length > 0) {
+      line = SkiaEditor.LineOf(from, lines);
+      const x0 = this.CaretPlace(from)?.X ?? 0;
+      let best = -1, bestX = 0;
+      for (const i of stops) {
+        if (i < line.Start || i > line.End || i === from) continue;
+        const x = this.CaretPlace(i)?.X ?? 0;
+        if ((x - x0) * dir <= 0.01) continue;
+        if (best < 0 || (x - bestX) * dir < -0.01 || (Math.abs(x - bestX) <= 0.01 && Math.abs(i - from) < Math.abs(best - from))) { best = i; bestX = x; }
+      }
+      if (best >= 0) return best;
+    }
+    const start = Math.max(this.text.lastIndexOf(ParagraphBreak, from - 1) + 1, 0);
+    const end = this.text.indexOf(ParagraphBreak, from);
+    const step = SkiaLabel.FirstStrongIsRtl(this.text.slice(start, end < 0 ? undefined : end)) ? -dir : dir;
+    let to = from;
+    if (step > 0) { for (const i of stops) if (i > from) { to = i; break; } }
+    else for (let k = stops.length - 1; k >= 0; k--) if (stops[k] < from) { to = stops[k]; break; }
+    // the step only crosses to the next or previous line: inside a mixed line the visual end stays put
+    return line && lines.length > 0 && SkiaEditor.LineOf(to, lines) === line ? from : to;
   }
 
   private LabelPoint(args: SkiaGesturesParameters, apply: GestureEventProcessingInfo, starting = false): SKPoint {
@@ -357,7 +435,8 @@ export class SkiaEditor extends SkiaShape {
       canvas.clipRect(clip, CK.ClipOp.Intersect, true);
       const paint = new CK.Paint(); paint.setColor(Super.ParseColor(this.SelectionColor));
       const end = this.cursorPosition + this.selectionLength;
-      for (const b of this.Boxes()) if (b.Index >= this.cursorPosition && b.Index < end) canvas.drawRect(CK.LTRBRect(lr.Left + b.Left, lr.Top + b.Top, lr.Left + b.Left + Math.max(b.Width, 2), lr.Top + b.Top + b.Height), paint);
+      // every selected character's own visual box: across a direction boundary the highlight can be two blocks
+      for (const b of this.Boxes()) if (b.Index >= this.cursorPosition && b.Index < end && b.Width > 0) canvas.drawRect(CK.LTRBRect(lr.Left + b.Left, lr.Top + b.Top, lr.Left + b.Left + b.Width, lr.Top + b.Top + b.Height), paint);
       paint.delete();
       canvas.restoreToCount(saved);
     }
@@ -499,8 +578,8 @@ export class SkiaEditor extends SkiaShape {
       case "Backspace": handled(); this.StubBackspace(); break;
       case "Delete": handled(); this.StubDelete(); break;
       case "Enter": case "NumpadEnter": handled(); this.StubPressEnter(alt, shift); break;
-      case "ArrowLeft": handled(); this.StubMoveCursor(-1, shift); break;
-      case "ArrowRight": handled(); this.StubMoveCursor(1, shift); break;
+      case "ArrowLeft": handled(); this.MoveVisual(-1, shift); break;
+      case "ArrowRight": handled(); this.MoveVisual(1, shift); break;
       case "ArrowUp": if (this.IsMultiline) { handled(); this.HandleVerticalArrow(true); } break;
       case "ArrowDown": if (this.IsMultiline) { handled(); this.HandleVerticalArrow(false); } break;
       case "Home": handled(); this.StubMoveCursor(-this.cursorPosition, shift); break;
@@ -563,6 +642,29 @@ export class SkiaEditor extends SkiaShape {
     this.selectionLength = 0;
     this.stubSelectionStop = -1; this.selectionMovingEdge = -1;
     this.OnCursorMoved();
+  }
+
+  /**
+   * Arrow Left (-1) / Right (1): visual moves, as native text fields (see VisualTarget). Without Shift a selection
+   * collapses to its visually left (Left) or right (Right) edge; with Shift its moving edge moves.
+   */
+  MoveVisual(dir: -1 | 1, extendSelection = false): void {
+    if (!extendSelection && this.HasSelection) {
+      const a = this.cursorPosition, b = this.cursorPosition + this.selectionLength;
+      const xa = this.CaretPlace(a)?.X ?? 0, xb = this.CaretPlace(b)?.X ?? 0;
+      const to = dir < 0 ? (xa <= xb ? a : b) : (xa >= xb ? a : b);
+      this.cursorPosition = to; this.selectionLength = 0;
+      this.stubSelectionStop = -1; this.selectionMovingEdge = -1;
+      this.OnCursorMoved();
+      return;
+    }
+    // a selection made by dragging has no moving edge yet: its end moves
+    if (extendSelection && this.HasSelection && this.selectionMovingEdge < 0) { this.stubSelectionStop = this.cursorPosition; this.selectionMovingEdge = this.cursorPosition + this.selectionLength; }
+    const from = extendSelection && this.HasSelection ? this.selectionMovingEdge : this.cursorPosition;
+    if (extendSelection && !this.HasSelection) { this.stubSelectionStop = this.cursorPosition; this.selectionMovingEdge = this.cursorPosition; }
+    const to = this.VisualTarget(from, dir);
+    if (extendSelection) { this.StubMoveCursor(to - this.selectionMovingEdge, true); return; }
+    this.StubMoveCursor(to - this.cursorPosition, false);
   }
 
   StubSelectRange(start: number, length: number): void {
