@@ -24,6 +24,9 @@ await Super.UseDrawnUi()
 </Canvas>
 ```
 
+## MIT, everywhere
+DrawnUI is MIT licensed in every language and on every platform: desktop, mobile, web and embedded devices. Ship it in commercial products with no attribution badge, no about screen and no per-device royalty.
+
 ## Install
 
 ```
