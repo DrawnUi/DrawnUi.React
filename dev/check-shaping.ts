@@ -97,9 +97,21 @@ class FakeCanvas {
   }
   {
     const got = width("Hello world", "");
-    const f = new CK.Font(text, 30); f.setSubpixel(true);
+    const f = new CK.Font(text, 30); f.setSubpixel(true); f.setLinearMetrics(true);
     let want = 0; for (const w of f.getGlyphWidths(f.getGlyphIDs("Hello world"))) want += w;
     check("Latin text keeps its plain widths", Math.abs(got - want) < 0.5, `${got.toFixed(2)} vs ${want.toFixed(2)}`);
+  }
+  {
+    // unhinted advances on every font (drawnui-cross 6f): the same widths as DrawnUi.Rust, not whole pixels
+    const label = new SkiaLabel(); label.Text = "H"; label.FontSize = 20;
+    const root = new SkiaLayout(); root.AddSubView(label); root._superview = new FakeCanvas() as unknown as Canvas;
+    root.Measure(W, H, 1);
+    const h = label.GetLineBoxes()[0]?.Width ?? 0;
+    const line = new SkiaLabel(); line.Text = "One label, many styles:"; line.FontSize = 16;
+    const root2 = new SkiaLayout(); root2.AddSubView(line); root2._superview = new FakeCanvas() as unknown as Canvas;
+    root2.Measure(W, H, 1);
+    const w16 = line.GetLineBoxes()[0]?.Width ?? 0;
+    check("text measures with unhinted advances: \"H\" at 20 = 14.76, \"One label, many styles:\" at 16 = 171.344 (DrawnUi.Rust)", Math.abs(h - 14.76) < 0.01 && Math.abs(w16 - 171.344) < 0.01, `${h.toFixed(3)}, ${w16.toFixed(3)}`);
   }
   {
     // the DrawnUI .NET demo's "Format text as  BiG  and small!": the highlight covers " BiG " only
@@ -108,7 +120,7 @@ class FakeCanvas {
     for (const s of [span("as ", "#FFFFFF"), big, span("and", "#FFFFFF")]) l.AddSubView(s);
     const px = draw(l);
     const yellow = columns(px, (r, g, b) => r > 200 && g > 200 && b < 80);
-    const f = new CK.Font(text, 30); f.setSubpixel(true);
+    const f = new CK.Font(text, 30); f.setSubpixel(true); f.setLinearMetrics(true);
     const w = (t: string) => { let s = 0; for (const a of f.getGlyphWidths(f.getGlyphIDs(t))) s += a; return s; };
     const as = w("as "), bigEnd = as + w(" BiG ");
     check("a space keeps the style of its span: the highlight starts after \"as \" and ends after \" BiG \"", !!yellow && yellow[0] >= as - 1 && Math.abs(yellow[1] - bigEnd) <= 2,

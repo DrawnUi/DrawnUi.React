@@ -214,6 +214,8 @@ export class Super {
       const resolved = Super.ResolveTypeface(alias, weight);
       font = new Super.CK.Font(resolved.Typeface, sizePx);
       font.setSubpixel(true);
+      // unhinted advances: the same text widths on every platform and engine (drawnui-cross 6f, DrawnUi.Rust fonts.rs)
+      font.setLinearMetrics(true);
       if (italic) font.setSkewX(-0.25);
       // no bold face registered: synthetic bold, like C# Font.Embolden = IsBold
       if (weight >= 600 && resolved.Weight < 600) font.setEmbolden(true);
