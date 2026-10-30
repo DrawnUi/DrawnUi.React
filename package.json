@@ -83,6 +83,8 @@
     "check:thickness": "node dev/check.mjs dev/check-thickness.ts",
     "check:scroll-recycled": "node dev/check.mjs dev/check-scroll-recycled.ts",
     "check:masonry-keys": "node dev/check.mjs dev/check-masonry-keys.ts",
+    "check:carousel-swipe": "node dev/check.mjs dev/check-carousel-swipe.ts",
+    "check:editor-focus": "node dev/check.mjs dev/check-editor-focus.ts",
     "site:extras": "node dev/site-extras.mjs dist/demo",
     "build:lib": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
     "prepublishOnly": "npm run build:lib",

@@ -60,6 +60,8 @@ export class SkiaEditor extends SkiaShape {
   CanShowCursor = true;
   SelectionColor: Color = "#5590CFFE";
   private cursorPosition = 0;
+  /** A caret position was given (by the app, a tap, a selection): focusing keeps it; otherwise focusing puts the caret at the end. */
+  private cursorPlaced = false;
   private selectionLength = 0;
   private isFocused = false;
   private controlStyle: PrebuiltControlStyle = "Unset";
@@ -145,6 +147,7 @@ export class SkiaEditor extends SkiaShape {
   /** Caret index (UTF-16 units) = the left edge of the selection when one exists. */
   get CursorPosition(): number { return this.cursorPosition; }
   set CursorPosition(v: number) {
+    this.cursorPlaced = true;
     const p = Math.max(0, Math.min(this.text.length, v | 0));
     if (p === this.cursorPosition) return;
     this.cursorPosition = p;
@@ -180,6 +183,9 @@ export class SkiaEditor extends SkiaShape {
     if (v) {
       if (SkiaEditor.Focused && SkiaEditor.Focused !== this) SkiaEditor.Focused.IsFocused = false;
       SkiaEditor.Focused = this;
+      // focused with no caret placed (from code, by the keyboard): the caret goes to the end of the text, as a tap after
+      // the text does, and the native field takes that position when it attaches (C# 2285b422: typing appends)
+      if (!this.cursorPlaced) { this.cursorPlaced = true; this.cursorPosition = this.text.length; this.selectionLength = 0; this.ScrollToCaret(); }
       this.SetFocusNative(true);
       this.StartBlink();
     } else {
@@ -389,6 +395,7 @@ export class SkiaEditor extends SkiaShape {
           this.cursorPosition = pos;
           this.stubSelectionStop = -1; this.selectionMovingEdge = -1;
         }
+        this.cursorPlaced = true;
         if (!this.isFocused) this.IsFocused = true;
         this.OnCursorMoved();
         return this;
@@ -407,6 +414,7 @@ export class SkiaEditor extends SkiaShape {
         this.SelectWord(this.HitTestIndex(p.X, p.Y));
         this.dragSelecting = true;
         this.selectionAnchor = this.cursorPosition;
+        this.cursorPlaced = true;
         if (!this.isFocused) this.IsFocused = true;
         return this;
       }
@@ -437,6 +445,7 @@ export class SkiaEditor extends SkiaShape {
   }
   SelectAll(): void { this.SetSelection(0, this.text.length); }
   SetSelection(start: number, end: number): void {
+    this.cursorPlaced = true;
     const s = Math.max(0, Math.min(this.text.length, Math.min(start, end))), e = Math.max(0, Math.min(this.text.length, Math.max(start, end)));
     this.cursorPosition = s; this.selectionLength = e - s;
     this.OnCursorMoved();

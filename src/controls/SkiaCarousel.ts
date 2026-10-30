@@ -230,8 +230,30 @@ export class SkiaCarousel extends SnappingLayout {
     super.ScrollToNearestAnchor(location, velocity);
   }
 
-  /** C# SkiaCarousel.SelectNextAnchor: base choice, plus a wrap to the virtual anchor at the strip borders when looped. */
+  /** C# SkiaCarousel.SelectNextAnchor: the choice below, at most one slide from where a finger gesture started. */
   override SelectNextAnchor(origin: SKPoint, velocity: SKPoint): SKPoint {
+    return this.LimitToNeighbours(this.SelectNextAnchorInternal(origin, velocity));
+  }
+
+  /**
+   * A finger release moves at most one slide from the slide its gesture started on, as iOS paging and the Android
+   * ViewPager do (C# 1070e0db): a drag past the middle makes the next slide the nearest one, and the flick then went one
+   * further. Code moves (ScrollTo, SelectedIndex) are not limited: releaseHome is set only while a release snaps.
+   */
+  private LimitToNeighbours(target: SKPoint): SKPoint {
+    const home = this.releaseHome;
+    if (!home) return target;
+    const at = (p: SKPoint) => this.SnapPoints.findIndex((s) => Math.abs(s.X - p.X) <= 1 && Math.abs(s.Y - p.Y) <= 1);
+    const from = at(home), to = at(target);
+    if (from < 0 || to < 0 || Math.abs(to - from) <= 1) return target; // a looped wrap goes to a virtual point next to the edge: one slide already
+    return this.SnapPoints[from + Math.sign(to - from)];
+  }
+  /** The slide a finger gesture started on (the target when it caught a snap in flight), see LimitToNeighbours. */
+  private gestureHome?: SKPoint;
+  private releaseHome?: SKPoint;
+
+  /** Base choice, plus a wrap to the virtual anchor at the strip borders when looped. */
+  private SelectNextAnchorInternal(origin: SKPoint, velocity: SKPoint): SKPoint {
     if (!this.ApplyLoopedLogic) return super.SelectNextAnchor(origin, velocity);
     const baseTarget = super.SelectNextAnchor(origin, velocity);
     let originSnap = this.FindNearestAnchorInternal(origin, velocity);
@@ -475,6 +497,9 @@ export class SkiaCarousel extends SnappingLayout {
       this.StopSnapAnimators(); this.velocityAccumulator.Clear();
       this.FixPosition();
       this.panningOffset = this.CurrentPosition; this.panningStart = this.CurrentPosition;
+      // a swipe that catches a snap in flight starts from the slide that snap was going to
+      const going = this.snapIfNoPanOnUp ? this.SnapPoints.find((s) => Math.abs(s.X - this.CurrentSnap.X) <= 1 && Math.abs(s.Y - this.CurrentSnap.Y) <= 1) : undefined;
+      this.gestureHome = going ?? (this.SnapPoints.length > 0 ? this.FindNearestAnchor(this.CurrentPosition) : undefined);
     };
     switch (args.Type) {
       case "Down":
@@ -508,7 +533,8 @@ export class SkiaCarousel extends SnappingLayout {
           consumed = this;
           const final = this.velocityAccumulator.CalculateFinalVelocity(500);
           this.CurrentSnap = this.CurrentPosition;
-          this.ScrollToNearestAnchor(this.CurrentSnap, new SKPoint(final.X, final.Y));
+          this.releaseHome = this.gestureHome;
+          try { this.ScrollToNearestAnchor(this.CurrentSnap, new SKPoint(final.X, final.Y)); } finally { this.releaseHome = undefined; }
           this.IsUserPanning = false; this.IsUserFocused = false; this.snapIfNoPanOnUp = false;
         } else if (this.snapIfNoPanOnUp) {
           // Down interrupted a snap but no carousel pan followed: still settle on the nearest slide, leave Up to the children
