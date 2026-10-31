@@ -10,7 +10,7 @@ import { TextSpan } from "./TextSpan";
 import { BidiRuns, type BidiMap, HasCodePoint, IsRtl, JoinsPrevious, NeedsShaping, Shape, type Shaped } from "../core/Shaping";
 
 /** Resolved faces for one style (the label itself or one span): main font + FontFamilyFallback chain + metrics. */
-interface SpanFonts { Key: string; Main: Font; Fallbacks: Font[]; Ascent: number; Descent: number; SizePx: number; /** Synthetic italic (skew). */ Italic: boolean }
+interface SpanFonts { Key: string; Main: Font; Fallbacks: Font[]; Ascent: number; Descent: number; SizePx: number }
 /**
  * A run of text drawn with one font (main, or a fallback for glyphs the main font lacks) and one span style. After the
  * layout, a run that needs shaping carries its shaped glyphs, and on a line with right-to-left text its bidirectional
@@ -167,7 +167,7 @@ export class SkiaLabel extends SkiaControl {
     const main = Super.GetFont(family, weight, italic, sizePx);
     const m = main.getMetrics();
     f = {
-      Key: key, Main: main, SizePx: sizePx, Ascent: -m.ascent, Descent: m.descent, Italic: italic,
+      Key: key, Main: main, SizePx: sizePx, Ascent: -m.ascent, Descent: m.descent,
       Fallbacks: this.fontFamilyFallback
         ? this.fontFamilyFallback.split(",").map((a) => a.trim()).filter(Boolean).map((a) => Super.GetFont(a, weight, italic, sizePx))
         : [],
@@ -576,17 +576,49 @@ export class SkiaLabel extends SkiaControl {
     return h;
   }
 
-  /** Skew of synthetic italic (Super.GetFont setSkewX -0.25): x moves by 0.25 per pixel above the baseline. */
-  private static readonly ItalicSkew = 0.25;
-  /** Pixels synthetic italic glyphs reach past the line box: right at the ascent, left at the descent. */
-  private slantRight = 0;
-  private slantLeft = 0;
+  /** Pixels of ink outside the lines' advance boxes, at their left and right ends (side bearings, italic slant). */
+  private inkLeft = 0;
+  private inkRight = 0;
 
-  /** The slant of synthetic italic is drawn outside the label's box: caches record that room too (C# / DrawnUi.Rust draw it whole). */
+  /** Ink drawn outside the label's box (a "j" hook, an italic slant) is recorded by caches too, as C# draws it whole. */
   override ComputeEffectsMargin(scale: number): Thickness {
     const m = super.ComputeEffectsMargin(scale);
-    if (this.slantRight === 0 && this.slantLeft === 0) return m;
-    return new Thickness(m.Left + this.slantLeft, m.Top, m.Right + this.slantRight, m.Bottom);
+    if (this.inkRight === 0 && this.inkLeft === 0) return m;
+    return new Thickness(m.Left + this.inkLeft, m.Top, m.Right + this.inkRight, m.Bottom);
+  }
+
+  /**
+   * C# (after 106e768a): the ink bounds of the first glyph of each line's leftmost run and the last glyph of its
+   * rightmost run, beyond the advance box of that run. Two glyph bounds per line, at measure.
+   */
+  private MeasureInkOverhang(): [number, number] {
+    const sp = this.glyphSpacing;
+    let left = 0, right = 0;
+    for (const line of this.lines) {
+      const runs = line.Runs.filter((r) => r.Text.trim().length > 0);
+      if (runs.length === 0) continue;
+      const first = runs.reduce((a, b) => ((b.X ?? 0) < (a.X ?? 0) ? b : a)), last = runs.reduce((a, b) => ((b.X ?? 0) >= (a.X ?? 0) ? b : a));
+      const firstX = first.X ?? 0, lastEnd = (last.X ?? line.Width) + (last.X === undefined ? 0 : last.Width - sp);
+      // ink x of a run's visually first / last glyph, from the line start
+      const ends = (r: TextRun, x0: number): [number, number] => {
+        if (r.Shaped) {
+          const g = r.Shaped.Glyphs, n = g.length;
+          if (n === 0) return [x0, x0];
+          const b = r.Font.getGlyphBounds([g[0], g[n - 1]]);
+          return [x0 + r.Shaped.Positions[0] + b[0], x0 + r.Shaped.Positions[(n - 1) * 2] + b[6]];
+        }
+        const ids = r.Font.getGlyphIDs(r.Text);
+        const n = ids.length;
+        const b = r.Font.getGlyphBounds([ids[0], ids[n - 1]]);
+        const lastAdvance = r.Font.getGlyphWidths([ids[n - 1]])[0];
+        return [x0 + b[0], x0 + r.Width - sp - lastAdvance + b[6]];
+      };
+      // a line without placed runs (no bidi): its runs follow each other from x 0, the last ends at the line width
+      const lastX0 = last.X ?? (line.Width - (last.Width - sp));
+      left = Math.max(left, firstX - ends(first, firstX)[0]);
+      right = Math.max(right, ends(last, lastX0)[1] - (last.X === undefined ? line.Width : lastEnd));
+    }
+    return [Math.max(0, left), Math.max(0, right)];
   }
 
   /**
@@ -609,10 +641,9 @@ export class SkiaLabel extends SkiaControl {
     const extraH = this.EffectsExtra(scale).H;
     this.lines = this.text || this.Spans.length > 0 ? this.LayoutLines(widthConstraint - px, scale, heightConstraint - py - extraH) : [];
     this.ShapeLines(this.lines);
-    // synthetic italic leans its glyphs past their advances: drawing room for caches, widths unchanged (DrawnUi.Rust label.rs)
-    let slantRight = 0, slantLeft = 0;
-    for (const l of this.lines) for (const r of l.Runs) if (r.Fonts.Italic && r.Text.trim()) { slantRight = Math.max(slantRight, SkiaLabel.ItalicSkew * r.Fonts.Ascent); slantLeft = Math.max(slantLeft, SkiaLabel.ItalicSkew * r.Fonts.Descent); }
-    if (slantRight !== this.slantRight || slantLeft !== this.slantLeft) { this.slantRight = slantRight; this.slantLeft = slantLeft; this.InvalidateEffectsMargin(); }
+    // ink past the lines' ends (a "j" hook, an italic slant) is drawing room for caches; widths unchanged
+    const [inkLeft, inkRight] = this.MeasureInkOverhang();
+    if (inkLeft !== this.inkLeft || inkRight !== this.inkRight) { this.inkLeft = inkLeft; this.inkRight = inkRight; this.InvalidateEffectsMargin(); }
     let width = 0;
     for (const l of this.lines) width = Math.max(width, l.Width);
     const extra = this.EffectsExtra(scale);

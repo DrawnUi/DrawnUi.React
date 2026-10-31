@@ -77,6 +77,22 @@ g.document = { createElement: () => field, body: { appendChild() {} }, activeEle
     check("the slant is drawing room only: the label's width does not change", image.width === none.width && none.right > none.width, `width ${none.width}, ink to ${none.right}`);
   }
 
+  {
+    // ink outside the advance box at a line's ends (drawnui-smart, C# after 106e768a): the hook of an upright "j" (negative
+    // left side bearing) and the italic slant; Margin left 50, FontSize 40; every cache shows the same leftmost /
+    // rightmost ink column as no cache
+    const ends = (value: string, italic: boolean, cache: SkiaCacheType) => {
+      const l = new SkiaLabel(); l.FontSize = 40; l.TextColor = "#FFFFFF"; l.UseCache = cache; l.Margin = new Thickness(50, 0, 0, 0);
+      const s = new TextSpan(); s.Text = value; s.IsItalic = italic; l.AddSubView(s);
+      return draw(l, 400, 120).ink();
+    };
+    for (const [value, italic] of [["jumps", false], ["jumps", true], ["Hello world", true]] as [string, boolean][]) {
+      const none = ends(value, italic, "None"), image = ends(value, italic, "Image"), ops = ends(value, italic, "Operations");
+      check(`"${value}"${italic ? " italic" : ""}: Image and Operations caches keep the ink at both ends (no cut)`,
+        image[0] === none[0] && image[1] === none[1] && ops[0] === none[0] && ops[1] === none[1], `None ${none}, Image ${image}, Operations ${ops}`);
+    }
+  }
+
   const W = 400, PAD = 10;
   const label = (value: string, align?: "Start" | "End" | "Center") => {
     const l = new SkiaLabel(); l.Text = value; l.FontSize = 20; l.TextColor = "#FFFFFF"; l.FontFamilyFallback = "FontArabic";

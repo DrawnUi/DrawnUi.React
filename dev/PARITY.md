@@ -574,7 +574,9 @@ Updated whenever the port deliberately diverges or finds something worth back-po
 - **React**, **Rust**, **.NET** (drawnui-cross 6am, 2026-10-31): Start / End follow each paragraph's direction; a
   right-to-left paragraph starts at the right. React has no Fill stretching: Fill* lines sit at the paragraph's start.
 
-### Synthetic italic in caches
-- **React**: the slant (0.25 x ascent right, 0.25 x descent left) is cache drawing room through `ComputeEffectsMargin`;
-  widths unchanged. **Rust** adds only the right room (label.rs); **.NET** draws it whole in every cache.
+### Ink past a line's ends in caches
+- **React** and **.NET** (after 106e768a): the ink bounds of each line's first and last glyph beyond its advance box
+  (italic slant, negative side bearings such as the hook of "j") are cache drawing room (`ComputeEffectsMargin`);
+  widths unchanged. **Rust** adds the italic slant on the right only (label.rs): an upright "j" at a line start may be
+  cut there in an Image cache (not measured in Rust).
 
