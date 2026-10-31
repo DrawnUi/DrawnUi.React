@@ -10,7 +10,7 @@ import { TextSpan } from "./TextSpan";
 import { BidiRuns, type BidiMap, HasCodePoint, IsRtl, JoinsPrevious, NeedsShaping, Shape, type Shaped } from "../core/Shaping";
 
 /** Resolved faces for one style (the label itself or one span): main font + FontFamilyFallback chain + metrics. */
-interface SpanFonts { Key: string; Main: Font; Fallbacks: Font[]; Ascent: number; Descent: number; SizePx: number }
+interface SpanFonts { Key: string; Main: Font; Fallbacks: Font[]; Ascent: number; Descent: number; SizePx: number; /** Synthetic italic (skew). */ Italic: boolean }
 /**
  * A run of text drawn with one font (main, or a fallback for glyphs the main font lacks) and one span style. After the
  * layout, a run that needs shaping carries its shaped glyphs, and on a line with right-to-left text its bidirectional
@@ -18,7 +18,7 @@ interface SpanFonts { Key: string; Main: Font; Fallbacks: Font[]; Ascent: number
  */
 interface TextRun { Text: string; Font: Font; Width: number; Span?: TextSpan; Fonts: SpanFonts; Shaped?: Shaped; Level?: number; X?: number; /** Rank of its visual run and its offset in the line text (bidirectional lines). */ Rank?: number; At?: number }
 /** One laid-out line: runs, total advance, max ascent above / descent below the baseline (pixels). */
-interface TextLine { Runs: TextRun[]; Width: number; Ascent: number; Descent: number; /** Starts a paragraph after the first one (ParagraphSpacing above it). */ Para?: boolean }
+interface TextLine { Runs: TextRun[]; Width: number; Ascent: number; Descent: number; /** Starts a paragraph after the first one (ParagraphSpacing above it). */ Para?: boolean; /** Its paragraph runs right to left (first strong letter). */ Rtl?: boolean }
 /** A paragraph of wrap tokens; `LineBreak`: it follows a U+2028 line separator, not a new paragraph. */
 type Paragraph = Token[] & { LineBreak?: boolean };
 
@@ -167,7 +167,7 @@ export class SkiaLabel extends SkiaControl {
     const main = Super.GetFont(family, weight, italic, sizePx);
     const m = main.getMetrics();
     f = {
-      Key: key, Main: main, SizePx: sizePx, Ascent: -m.ascent, Descent: m.descent,
+      Key: key, Main: main, SizePx: sizePx, Ascent: -m.ascent, Descent: m.descent, Italic: italic,
       Fallbacks: this.fontFamilyFallback
         ? this.fontFamilyFallback.split(",").map((a) => a.trim()).filter(Boolean).map((a) => Super.GetFont(a, weight, italic, sizePx))
         : [],
@@ -529,6 +529,7 @@ export class SkiaLabel extends SkiaControl {
           while (end < lines.length && !lines[end].Para) end++;
           rtlParagraph = SkiaLabel.FirstStrongIsRtl(lines.slice(li, end).map(lineText).join(""));
         }
+        line.Rtl = rtlParagraph;
         const map = BidiRuns(lineText(line), rtlParagraph);
         if (map) { line.Runs = this.SplitByRuns(line.Runs, map); bidi = line.Runs.some((r) => (r.Level ?? 0) > 0); }
       }
@@ -575,6 +576,31 @@ export class SkiaLabel extends SkiaControl {
     return h;
   }
 
+  /** Skew of synthetic italic (Super.GetFont setSkewX -0.25): x moves by 0.25 per pixel above the baseline. */
+  private static readonly ItalicSkew = 0.25;
+  /** Pixels synthetic italic glyphs reach past the line box: right at the ascent, left at the descent. */
+  private slantRight = 0;
+  private slantLeft = 0;
+
+  /** The slant of synthetic italic is drawn outside the label's box: caches record that room too (C# / DrawnUi.Rust draw it whole). */
+  override ComputeEffectsMargin(scale: number): Thickness {
+    const m = super.ComputeEffectsMargin(scale);
+    if (this.slantRight === 0 && this.slantLeft === 0) return m;
+    return new Thickness(m.Left + this.slantLeft, m.Top, m.Right + this.slantRight, m.Bottom);
+  }
+
+  /**
+   * Where a line starts inside [left, right] (drawnui-cross 6am): Start and End follow the paragraph's direction (in a
+   * right-to-left paragraph Start is the right edge); Center is centered; Fill* lines are not stretched here and sit
+   * at the paragraph's start.
+   */
+  private LineX(line: TextLine, left: number, right: number, lineW: number): number {
+    const a = this.horizontalTextAlignment;
+    if (a === "Center") return left + (right - left - lineW) / 2;
+    const atEnd = a === "End" ? !line.Rtl : !!line.Rtl;
+    return atEnd ? right - lineW : left;
+  }
+
   protected override MeasureAbsolute(widthConstraint: number, heightConstraint: number, scale: number): ScaledSize {
     this.mainFonts = this.ResolveMainFonts(scale);
     const glyphSpacing = scale * (this.characterSpacing - 1);
@@ -583,6 +609,10 @@ export class SkiaLabel extends SkiaControl {
     const extraH = this.EffectsExtra(scale).H;
     this.lines = this.text || this.Spans.length > 0 ? this.LayoutLines(widthConstraint - px, scale, heightConstraint - py - extraH) : [];
     this.ShapeLines(this.lines);
+    // synthetic italic leans its glyphs past their advances: drawing room for caches, widths unchanged (DrawnUi.Rust label.rs)
+    let slantRight = 0, slantLeft = 0;
+    for (const l of this.lines) for (const r of l.Runs) if (r.Fonts.Italic && r.Text.trim()) { slantRight = Math.max(slantRight, SkiaLabel.ItalicSkew * r.Fonts.Ascent); slantLeft = Math.max(slantLeft, SkiaLabel.ItalicSkew * r.Fonts.Descent); }
+    if (slantRight !== this.slantRight || slantLeft !== this.slantLeft) { this.slantRight = slantRight; this.slantLeft = slantLeft; this.InvalidateEffectsMargin(); }
     let width = 0;
     for (const l of this.lines) width = Math.max(width, l.Width);
     const extra = this.EffectsExtra(scale);
@@ -615,9 +645,7 @@ export class SkiaLabel extends SkiaControl {
       y += this.ParagraphSpace(line);
       const lh = this.LineHeightPx(line);
       const lineW = line.Width + extra.W;
-      let x = left;
-      if (this.horizontalTextAlignment === "Center") x = left + (right - left - lineW) / 2;
-      else if (this.horizontalTextAlignment === "End") x = right - lineW;
+      let x = this.LineX(line, left, right, lineW);
       x += extra.Stroke / 2;
       out.push({ x, y, w: line.Width, h: lh, text: line.Runs.map((r) => r.Text).join("") });
       y += lh * this.lineSpacing;
@@ -753,9 +781,7 @@ export class SkiaLabel extends SkiaControl {
       y += this.ParagraphSpace(line);
       const lh = this.LineHeightPx(line);
       const lineW = line.Width + extra.W;
-      let x = left;
-      if (this.horizontalTextAlignment === "Center") x = left + (right - left - lineW) / 2;
-      else if (this.horizontalTextAlignment === "End") x = right - lineW;
+      let x = this.LineX(line, left, right, lineW);
       x += extra.Stroke / 2;
       const baseline = y + line.Ascent;
       // C# paintDefault gets the gradient over rectDraw, or over line.Bounds per line (GradientByLines)

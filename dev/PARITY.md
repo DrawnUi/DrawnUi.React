@@ -569,3 +569,12 @@ Updated whenever the port deliberately diverges or finds something worth back-po
   before it, taps to the nearest grapheme boundary, arrows to the nearest caret place on that side, selection = the
   selected characters' boxes. **.NET**: no visual caret in right-to-left text (glyph boxes in logical order).
 - **Opinion**: port the same rules to .NET when an RTL editor is needed there.
+
+### Alignment by paragraph direction
+- **React**, **Rust**, **.NET** (drawnui-cross 6am, 2026-10-31): Start / End follow each paragraph's direction; a
+  right-to-left paragraph starts at the right. React has no Fill stretching: Fill* lines sit at the paragraph's start.
+
+### Synthetic italic in caches
+- **React**: the slant (0.25 x ascent right, 0.25 x descent left) is cache drawing room through `ComputeEffectsMargin`;
+  widths unchanged. **Rust** adds only the right room (label.rs); **.NET** draws it whole in every cache.
+

@@ -56,8 +56,9 @@ createRoot(document.getElementById("root")!).render(
 - Text that needs shaping is shaped by `SkiaLabel` (no extra setup, no extra wasm): Arabic and Hebrew join and run
   right to left, Indic conjuncts and vowel signs, emoji sequences (skin tones, ZWJ families, flags, keycaps) as one
   glyph when the font has them; other text keeps the fast glyph-by-glyph path. A line with right-to-left text is drawn
-  in bidirectional order, the paragraph direction taken from its first strong letter; use
-  `HorizontalTextAlignment="End"` for right-aligned Arabic paragraphs. Register a font for the script as a fallback,
+  in bidirectional order, the paragraph direction taken from its first strong letter. `HorizontalTextAlignment`
+  Start / End follow that direction per paragraph: an Arabic paragraph starts at the right edge with the default Start,
+  End puts it at the left; Center is centered; a paragraph without letters is left to right. Register a font for the script as a fallback,
   e.g. `.AddFont("fonts/NotoSansArabic-Subset.ttf", "FontArabic")` + `FontFamilyFallback="FontArabic"`. A joiner, skin
   tone or variation selector keeps the font of the emoji before it. Fonts must come through `ConfigureFonts` (or
   `Super.LoadFace`) to be shaped. `SkiaEditor` edits right-to-left and mixed text like a native field: the caret, taps, Left / Right and the selection

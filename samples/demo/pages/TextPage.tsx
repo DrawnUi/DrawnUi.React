@@ -96,8 +96,8 @@ export function TextPage() {
             Text={DEMO_MARKDOWN} />
         </Card>
 
-        <Card title="Right to left — Arabic, shaped and in bidirectional order · HorizontalTextAlignment=End">
-          <SkiaLabel Text={DEMO_RTL} FontSize={15} TextColor="#DEE2E6" HorizontalOptions="Fill" LineSpacing={1.3} HorizontalTextAlignment="End" FontFamilyFallback="FontArabic" />
+        <Card title="Right to left — Arabic, shaped and in bidirectional order · starts at the right (HorizontalTextAlignment Start)">
+          <SkiaLabel Text={DEMO_RTL} FontSize={15} TextColor="#DEE2E6" HorizontalOptions="Fill" LineSpacing={1.3} FontFamilyFallback="FontArabic" />
         </Card>
 
         <Card title="SkiaRichLabel — markdown in Text, rendered as spans">
