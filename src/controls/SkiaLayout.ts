@@ -25,6 +25,8 @@ class TemplatedSlot {
   MinimumWidthRequest = -1;
   MinimumHeightRequest = -1;
   MeasuredSize = ScaledSize.Default;
+  /** The view's fit-content size from the same measure (SkiaControl.FitPixels). */
+  FitPixels = { Width: 0, Height: 0 };
   WidthConstraint = Infinity;
   HeightConstraint = Infinity;
   /** The rect the layout arranged this slot in (pixels). */
@@ -42,8 +44,9 @@ class TemplatedSlot {
     if (!shown && item === this.measuredItem && scale === this.measuredScale
       && Object.is(widthConstraint, this.WidthConstraint) && Object.is(heightConstraint, this.HeightConstraint)) return this.MeasuredSize;
     const view = shown ?? this.factory.GetOrCreateViewForIndex(this.Index, true);
-    if (!view) return (this.MeasuredSize = ScaledSize.Default);
+    if (!view) { this.FitPixels = { Width: 0, Height: 0 }; return (this.MeasuredSize = ScaledSize.Default); }
     this.MeasuredSize = view.Measure(widthConstraint, heightConstraint, scale);
+    this.FitPixels = view.FitPixels;
     this.measuredItem = item;
     this.measuredScale = scale;
     this.WidthConstraint = widthConstraint;
@@ -442,17 +445,43 @@ export class SkiaLayout extends SkiaControl {
     if (this.IsMasonry) { const s = this.MeasureMasonry(w, scale); return ScaledSize.FromPixels(s.w + px, s.h + py, scale); }
     if (this.Type === "Grid") { const s = this.MeasureGrid(w, h, scale); return ScaledSize.FromPixels(s.w + px, s.h + py, scale); }
 
+    // fit-content of the children on the cross axis (Fill children included, drawnui-cross 6an)
+    let fitW = 0, fitH = 0;
+    const visible: LayoutChild[] = [];
     for (const v of this.LayoutViews()) {
       if (!v.IsVisible) continue;
       let s: ScaledSize;
       if (this.Type === "Column") { s = v.Measure(w, Infinity, scale); cw = Math.max(cw, s.Pixels.Width); ch += s.Pixels.Height; }
       else if (this.Type === "Row") { s = v.Measure(Infinity, h, scale); cw += s.Pixels.Width; ch = Math.max(ch, s.Pixels.Height); }
       else { s = v.Measure(w, h, scale); cw = Math.max(cw, s.Pixels.Width); ch = Math.max(ch, s.Pixels.Height); }
+      fitW = Math.max(fitW, v.FitPixels.Width); fitH = Math.max(fitH, v.FitPixels.Height);
+      visible.push(v);
       n++;
+    }
+    // a stack that sizes itself on its cross axis (no request, not Fill, or Fill on an unbounded axis) is as wide / tall
+    // as its widest / tallest child needs; its Fill children are measured again at that size, so their wrapped heights /
+    // widths are the drawn ones
+    if (this.Type === "Column" && (this.HorizontalOptions !== "Fill" || !isFinite(w)) && this.WidthRequest < 0 && this.LockRatio === 0) {
+      const size = isFinite(w) ? Math.min(fitW, w) : fitW;
+      if (size !== cw) {
+        cw = size; ch = 0;
+        for (const v of visible) ch += (v.HorizontalOptions === "Fill" && v.WidthRequest < 0 ? v.Measure(size, Infinity, scale) : v.MeasuredSize).Pixels.Height;
+      }
+    } else if (this.Type === "Row" && (this.VerticalOptions !== "Fill" || !isFinite(h)) && this.HeightRequest < 0 && this.LockRatio === 0) {
+      const size = isFinite(h) ? Math.min(fitH, h) : fitH;
+      if (size !== ch) {
+        ch = size; cw = 0;
+        for (const v of visible) cw += (v.VerticalOptions === "Fill" && v.HeightRequest < 0 ? v.Measure(Infinity, size, scale) : v.MeasuredSize).Pixels.Width;
+      }
     }
     const gaps = Math.max(0, n - 1) * gap;
     if (this.Type === "Column") ch += gaps;
     if (this.Type === "Row") cw += gaps;
+    // what this layout's own content needs, for a stack around it (a Fill layout still returns the whole constraint)
+    this.fitContentPixels = {
+      Width: (this.Type === "Row" ? cw : Math.min(cw, fitW)) + px,
+      Height: (this.Type === "Column" ? ch : Math.min(ch, fitH)) + py,
+    };
     return ScaledSize.FromPixels(cw + px, ch + py, scale);
   }
 

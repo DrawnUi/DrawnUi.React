@@ -388,7 +388,11 @@ export class SkiaLabel extends SkiaControl {
    * and MaxLines, the last kept one ending with a tail ellipsis (C# / DrawnUi.Rust: a label in a box too short for its
    * text cuts it, not only MaxLines).
    */
+  /** The last layout broke a line because the text did not fit: its max-content is wider than the constraint. */
+  private wrapped = false;
+
   private LayoutLines(maxWidth: number, scale: number, maxHeight = Infinity): TextLine[] {
+    this.wrapped = false;
     const wrap = this.lineBreakMode !== "NoWrap" && isFinite(maxWidth);
     // run widths carry the gap after every glyph; the one after a line's last glyph is not drawn
     const sp = this.glyphSpacing;
@@ -421,16 +425,16 @@ export class SkiaLabel extends SkiaControl {
           if (k > 0) {
             const [head, rest] = this.SplitWord(word, k);
             this.Append(line, space); this.Append(line, head);
-            out.push(line); line = this.NewLine(); word = rest;
+            out.push(line); line = this.NewLine(); word = rest; this.wrapped = true;
             continue;
           }
-          if (line.Runs.length > 0) { out.push(line); line = this.NewLine(); continue; }
+          if (line.Runs.length > 0) { out.push(line); line = this.NewLine(); this.wrapped = true; continue; }
           // word longer than the line: break by code points
           for (const r of word) {
             for (const ch of Array.from(r.Text)) {
               const run = this.Segment(ch, r.Fonts, r.Span);
               const chW = this.Width(run);
-              if (line.Runs.length > 0 && line.Width + chW - sp > maxWidth) { out.push(line); line = this.NewLine(); }
+              if (line.Runs.length > 0 && line.Width + chW - sp > maxWidth) { out.push(line); line = this.NewLine(); this.wrapped = true; }
               this.Append(line, run);
             }
           }
@@ -648,7 +652,10 @@ export class SkiaLabel extends SkiaControl {
     for (const l of this.lines) width = Math.max(width, l.Width);
     const extra = this.EffectsExtra(scale);
     this.LayoutVersion++;
-    return ScaledSize.FromPixels(Math.ceil(width + extra.W) + px, Math.ceil(this.BlockHeight() + extra.H) + py, scale);
+    const size = ScaledSize.FromPixels(Math.ceil(width + extra.W) + px, Math.ceil(this.BlockHeight() + extra.H) + py, scale);
+    // fit-content (drawnui-cross 6an): text that had to wrap needs the whole width it was given (min of max-content and it)
+    if (this.wrapped && isFinite(widthConstraint)) this.fitContentPixels = { Width: widthConstraint, Height: size.Pixels.Height };
+    return size;
   }
 
   /** C# GradientByLines: FillGradient spans each line's bounds (default) instead of the whole text block. */

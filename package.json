@@ -88,6 +88,7 @@
     "check:shaping": "node dev/check.mjs dev/check-shaping.ts",
     "check:editor-rtl": "node dev/check.mjs dev/check-editor-rtl.ts",
     "check:label-direction": "node dev/check.mjs dev/check-label-direction.ts",
+    "check:stack-fit": "node dev/check.mjs dev/check-stack-fit.ts",
     "site:extras": "node dev/site-extras.mjs dist/demo",
     "build:lib": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
     "prepublishOnly": "npm run build:lib",

@@ -451,6 +451,14 @@ export class SkiaControl {
 
   // ---- state (pixels) ----
   MeasuredSize: ScaledSize = ScaledSize.Default;
+  /**
+   * The size the control's content needs, in pixels with its margins, after the last measure: as MeasuredSize but a Fill
+   * axis keeps the content's size instead of taking the whole constraint (fit-content: requests, min / max applied). A
+   * stack that sizes itself to its children on the cross axis reads it (drawnui-cross 6an).
+   */
+  FitPixels = { Width: 0, Height: 0 };
+  /** Set by MeasureAbsolute when the content's fit size differs from the size it returns (a layout with Fill children). */
+  protected fitContentPixels?: { Width: number; Height: number };
   DrawingRect: SKRect = SKRect.Empty;
   RenderingScale = 1;
   NeedMeasure = true;
@@ -497,6 +505,7 @@ export class SkiaControl {
       if (lock > 0 && isFinite(lock)) { w = h = lock; locked = true; }
     }
 
+    this.fitContentPixels = undefined;
     const content = this.MeasureAbsolute(w, h, scale);
 
     let rw = locked || reqW >= 0 ? w : this.HorizontalOptions === "Fill" && isFinite(w) ? w : content.Pixels.Width;
@@ -507,6 +516,15 @@ export class SkiaControl {
     if (this.MaximumHeightRequest >= 0 && reqH < 0) rh = Math.min(rh, this.MaximumHeightRequest * scale);
 
     this.MeasuredSize = ScaledSize.FromPixels(rw + mx, rh + my, scale);
+    // fit-content: what the content needs (never more than the constraint), with the requests and min / max
+    const fit = this.fitContentPixels ?? { Width: content.Pixels.Width, Height: content.Pixels.Height };
+    let fw = locked || reqW >= 0 ? w : Math.min(fit.Width, isFinite(w) ? w : fit.Width);
+    let fh = locked || reqH >= 0 ? h : Math.min(fit.Height, isFinite(h) ? h : fit.Height);
+    if (this.MinimumWidthRequest >= 0) fw = Math.max(fw, this.MinimumWidthRequest * scale);
+    if (this.MinimumHeightRequest >= 0) fh = Math.max(fh, this.MinimumHeightRequest * scale);
+    if (this.MaximumWidthRequest >= 0 && reqW < 0) fw = Math.min(fw, this.MaximumWidthRequest * scale);
+    if (this.MaximumHeightRequest >= 0 && reqH < 0) fh = Math.min(fh, this.MaximumHeightRequest * scale);
+    this.FitPixels = { Width: fw + mx, Height: fh + my };
     this.NeedMeasure = false;
     return this.MeasuredSize;
   }

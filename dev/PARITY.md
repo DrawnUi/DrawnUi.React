@@ -580,3 +580,8 @@ Updated whenever the port deliberately diverges or finds something worth back-po
   widths unchanged. **Rust** adds the italic slant on the right only (label.rs): an upright "j" at a line start may be
   cut there in an Image cache (not measured in Rust).
 
+### Fit-content stacks (drawnui-cross 6an)
+- **React**: the fit-content size comes out of the normal measure (`SkiaControl.FitPixels`; a label that wrapped reports
+  the room it was given), no extra pass. **.NET**: one extra unbounded measure per Fill child of such a stack.
+  **Rust**: ordered 2026-10-31.
+

@@ -116,6 +116,10 @@ createRoot(document.getElementById("root")!).render(
   for a desktop bar the user can drag (thumb drag, track press; `HideDelaySecs` / `HideDurationSecs` auto-hide); `RefreshEnabled` +
   `RefreshCommand`, `SnapToChildren`, `TrackIndexPosition` / `CurrentIndex`.
 - A Fill child inside a `SkiaRow` auto-sizes (C# rule). Use a `SkiaGrid` with `*` columns, or the stack itself.
+- A Column with no width and not Fill (a centered card stack, say) is as wide as its widest child needs, Fill children
+  included: wrapping text needs all the room it has, short text only its own width, an empty Fill divider adds nothing;
+  the Fill children are then laid out at that width. A Row does the same on its height. Give the stack `Fill` or a
+  `WidthRequest` to make it take the whole width.
 - `SkiaShell` (React-level): `Routes` (page factories receive the navigation arguments), `GoToAsync("detail?id=7")`
   or `GoToAsync("detail", true, { id: 7 })`, `useShell()` inside pages (`GoBackAsync`, `OpenPopupAsync`,
   `PushModalAsync`, `ShowToast`, tabs), `Navigating` (set `e.Cancel`) / `Navigated` / `RouteChanged`, browser
