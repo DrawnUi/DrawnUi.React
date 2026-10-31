@@ -156,7 +156,11 @@ export class SkiaLabel extends SkiaControl {
   private lines: TextLine[] = [];
   private mainFonts?: SpanFonts;
   private readonly fontsCache = new Map<string, SpanFonts>();
-  private readonly runCache = new Map<string, TextRun[]>();
+  /** Runs of a text per style (Segment), and the same runs carrying a span; cleared when the glyph spacing changes. */
+  private runCache = new Map<SpanFonts, Map<string, TextRun[]>>();
+  private spanRunCache = new WeakMap<TextSpan, Map<SpanFonts, Map<string, TextRun[]>>>();
+  /** Wrap tokens of the text, kept while the label has not changed (NeedMeasure) at the same scale. */
+  private tokens?: { Scale: number; Paragraphs: Paragraph[] };
   /** CharacterSpacing in pixels at the measured scale: added after every glyph of a run (its Width includes them). */
   private glyphSpacing = 0;
 
@@ -223,14 +227,16 @@ export class SkiaLabel extends SkiaControl {
    */
   private Segment(text: string, fonts: SpanFonts, span?: TextSpan): TextRun[] {
     if (text.length === 0) return [];
-    const cacheKey = fonts.Key + " " + text;
-    let cached = this.runCache.get(cacheKey);
+    let byText = this.runCache.get(fonts);
+    if (!byText) { byText = new Map(); this.runCache.set(fonts, byText); }
+    let cached = byText.get(text);
+    const cacheKey = text;
     if (!cached) {
       const main = fonts.Main;
       const fbs = fonts.Fallbacks;
       cached = [];
       text = SkiaLabel.DropIgnorables(text, main, fbs);
-      if (text.length === 0) { this.runCache.set(cacheKey, cached); return cached; }
+      if (text.length === 0) { byText.set(cacheKey, cached); return cached; }
       if (fbs.length === 0) {
         cached.push({ Text: text, Font: main, Width: this.Advance(main, text), Fonts: fonts });
       } else {
@@ -254,9 +260,17 @@ export class SkiaLabel extends SkiaControl {
         const t = cps.slice(start).join("");
         cached.push({ Text: t, Font: current, Width: this.Advance(current, t), Fonts: fonts });
       }
-      this.runCache.set(cacheKey, cached);
+      byText.set(cacheKey, cached);
     }
-    return span ? cached.map((r) => ({ ...r, Span: span })) : cached;
+    if (!span) return cached;
+    // the same runs carrying the span, made once per span, style and text
+    let bySpan = this.spanRunCache.get(span);
+    if (!bySpan) { bySpan = new Map(); this.spanRunCache.set(span, bySpan); }
+    let spanByText = bySpan.get(fonts);
+    if (!spanByText) { spanByText = new Map(); bySpan.set(fonts, spanByText); }
+    let withSpan = spanByText.get(cacheKey);
+    if (!withSpan) { withSpan = cached.map((r) => ({ ...r, Span: span })); spanByText.set(cacheKey, withSpan); }
+    return withSpan;
   }
 
   private Width(runs: TextRun[]): number { let w = 0; for (const r of runs) w += r.Width; return w; }
@@ -407,7 +421,9 @@ export class SkiaLabel extends SkiaControl {
     const out: TextLine[] = [];
     const empty = (fonts: SpanFonts): TextLine => { const l = this.NewLine(); l.Ascent = fonts.Ascent; l.Descent = fonts.Descent; return l; };
 
-    for (const para of this.Tokenize(scale)) {
+    // the text's wrap tokens change only with the label (NeedMeasure) or the scale
+    if (this.NeedMeasure || !this.tokens || this.tokens.Scale !== scale) this.tokens = { Scale: scale, Paragraphs: this.Tokenize(scale) };
+    for (const para of this.tokens.Paragraphs) {
       let line = this.NewLine();
       if (out.length > 0 && !para.LineBreak) line.Para = true;
       let lastFonts = this.mainFonts!;
@@ -620,7 +636,10 @@ export class SkiaLabel extends SkiaControl {
           const b = r.Font.getGlyphBounds([g[0], g[n - 1]]);
           return [x0 + r.Shaped.Positions[0] + b[0], x0 + r.Shaped.Positions[(n - 1) * 2] + b[6]];
         }
-        const ids = r.Font.getGlyphIDs(r.Text);
+        // only the first and the last character matter
+        const first = String.fromCodePoint(r.Text.codePointAt(0)!);
+        const lastAt = r.Text.length - (r.Text.length > 1 && r.Text.charCodeAt(r.Text.length - 1) >= 0xDC00 && r.Text.charCodeAt(r.Text.length - 1) <= 0xDFFF ? 2 : 1);
+        const ids = r.Font.getGlyphIDs(first + r.Text.slice(lastAt));
         const n = ids.length;
         const b = r.Font.getGlyphBounds([ids[0], ids[n - 1]]);
         const lastAdvance = r.Font.getGlyphWidths([ids[n - 1]])[0];
@@ -649,7 +668,7 @@ export class SkiaLabel extends SkiaControl {
   protected override MeasureAbsolute(widthConstraint: number, heightConstraint: number, scale: number): ScaledSize {
     this.mainFonts = this.ResolveMainFonts(scale);
     const glyphSpacing = scale * (this.characterSpacing - 1);
-    if (glyphSpacing !== this.glyphSpacing) { this.glyphSpacing = glyphSpacing; this.runCache.clear(); }
+    if (glyphSpacing !== this.glyphSpacing) { this.glyphSpacing = glyphSpacing; this.runCache = new Map(); this.spanRunCache = new WeakMap(); }
     const px = this.padding.HorizontalThickness * scale, py = this.padding.VerticalThickness * scale;
     const extraH = this.EffectsExtra(scale).H;
     const roomW = widthConstraint - px, roomH = heightConstraint - py - extraH;
