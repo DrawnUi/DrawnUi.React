@@ -391,8 +391,16 @@ export class SkiaLabel extends SkiaControl {
   /** The last layout broke a line because the text did not fit: its max-content is wider than the constraint. */
   private wrapped = false;
 
+  /** The last layout cut lines (MaxLines, height, an ellipsis): its lines depend on the room it had. */
+  private truncated = false;
+  /**
+   * Lines laid out without wrapping or cutting stay the same for any room that holds them: reused, while nothing in the
+   * label changed (NeedMeasure), for a later measure with at least that width and height (C# 5f24f577 label line reuse).
+   */
+  private reusable?: { Scale: number; Spacing: number; Width: number; Height: number };
+
   private LayoutLines(maxWidth: number, scale: number, maxHeight = Infinity): TextLine[] {
-    this.wrapped = false;
+    this.wrapped = false; this.truncated = false;
     const wrap = this.lineBreakMode !== "NoWrap" && isFinite(maxWidth);
     // run widths carry the gap after every glyph; the one after a line's last glyph is not drawn
     const sp = this.glyphSpacing;
@@ -458,6 +466,7 @@ export class SkiaLabel extends SkiaControl {
       kept = Math.min(kept, fit);
     }
     if (kept < out.length) {
+      this.truncated = true;
       out.length = kept;
       const truncates = this.lineBreakMode === "TailTruncation" || this.lineBreakMode === "HeadTruncation" || this.lineBreakMode === "MiddleTruncation";
       if (truncates) {
@@ -643,11 +652,18 @@ export class SkiaLabel extends SkiaControl {
     if (glyphSpacing !== this.glyphSpacing) { this.glyphSpacing = glyphSpacing; this.runCache.clear(); }
     const px = this.padding.HorizontalThickness * scale, py = this.padding.VerticalThickness * scale;
     const extraH = this.EffectsExtra(scale).H;
-    this.lines = this.text || this.Spans.length > 0 ? this.LayoutLines(widthConstraint - px, scale, heightConstraint - py - extraH) : [];
-    this.ShapeLines(this.lines);
-    // ink past the lines' ends (a "j" hook, an italic slant) is drawing room for caches; widths unchanged
-    const [inkLeft, inkRight] = this.MeasureInkOverhang();
-    if (inkLeft !== this.inkLeft || inkRight !== this.inkRight) { this.inkLeft = inkLeft; this.inkRight = inkRight; this.InvalidateEffectsMargin(); }
+    const roomW = widthConstraint - px, roomH = heightConstraint - py - extraH;
+    const r = this.reusable;
+    if (this.NeedMeasure || !r || r.Scale !== scale || r.Spacing !== glyphSpacing || roomW < r.Width - 0.01 || roomH < r.Height - 0.01) {
+      this.lines = this.text || this.Spans.length > 0 ? this.LayoutLines(roomW, scale, roomH) : [];
+      this.ShapeLines(this.lines);
+      // ink past the lines' ends (a "j" hook, an italic slant) is drawing room for caches; widths unchanged
+      const [inkLeft, inkRight] = this.MeasureInkOverhang();
+      if (inkLeft !== this.inkLeft || inkRight !== this.inkRight) { this.inkLeft = inkLeft; this.inkRight = inkRight; this.InvalidateEffectsMargin(); }
+      let widest = 0;
+      for (const l of this.lines) widest = Math.max(widest, l.Width);
+      this.reusable = this.wrapped || this.truncated ? undefined : { Scale: scale, Spacing: glyphSpacing, Width: widest, Height: this.BlockHeight() };
+    }
     let width = 0;
     for (const l of this.lines) width = Math.max(width, l.Width);
     const extra = this.EffectsExtra(scale);

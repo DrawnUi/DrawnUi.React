@@ -1,6 +1,6 @@
 {
   "name": "drawnui-react",
-  "version": "0.1.0-preview.33",
+  "version": "0.1.0-preview.34",
   "description": "DrawnUi for React: the DrawnUi (.NET) drawn-UI engine in TypeScript on CanvasKit (Skia WASM). Same controls, same PascalCase API as DrawnUi.Net.",
   "license": "MIT",
   "author": "Nick Kovalsky (AppoMobi)",
@@ -89,6 +89,8 @@
     "check:editor-rtl": "node dev/check.mjs dev/check-editor-rtl.ts",
     "check:label-direction": "node dev/check.mjs dev/check-label-direction.ts",
     "check:stack-fit": "node dev/check.mjs dev/check-stack-fit.ts",
+    "check:label-reuse": "node dev/check.mjs dev/check-label-reuse.ts",
+    "bench:relayout": "node dev/check.mjs dev/bench-relayout.ts",
     "site:extras": "node dev/site-extras.mjs dist/demo",
     "build:lib": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
     "prepublishOnly": "npm run build:lib",
