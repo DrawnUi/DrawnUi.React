@@ -123,6 +123,33 @@ g.document = { createElement: () => field, body: { appendChild() {} }, activeEle
     check("editor: the selection of the first word covers its glyphs at the right", Math.abs(hi - (first.Left + first.Width)) < 0.5 && lo > labelW / 2, `${lo.toFixed(1)}..${hi.toFixed(1)}`);
   }
 
+  {
+    // "مرحبا بكم (End)": the brackets around the Latin word take the paragraph's direction and mirror (C# 656753d7):
+    // on screen "(End) مرحبا بكم", the lone ")" at the far left drawn as "("
+    const l = label("مرحبا بكم (End)");
+    draw(l, W, 80);
+    const f = Super.GetFont("FontText", 400, false, 20);
+    const open = f.getGlyphIDs("(")[0], close = f.getGlyphIDs(")")[0];
+    const runs = ((l as unknown as { lines: { Runs: { Text: string; X?: number; Shaped?: { Glyphs: Uint16Array } }[] }[] }).lines[0].Runs).slice().sort((a, b) => (a.X ?? 0) - (b.X ?? 0));
+    const glyphsOf = (r: (typeof runs)[number]) => (r.Shaped ? Array.from(r.Shaped.Glyphs) : Array.from(f.getGlyphIDs(r.Text)));
+    const firstGlyph = glyphsOf(runs[0])[0], afterEnd = runs[runs.findIndex((r) => r.Text === "End") + 1];
+    check("a bracket in a right-to-left paragraph mirrors: \"(End) مرحبا بكم\" on screen", firstGlyph === open && !!afterEnd && glyphsOf(afterEnd).includes(close),
+      runs.map((r) => `${JSON.stringify(r.Text)}@${(r.X ?? 0).toFixed(0)}`).join(" "));
+  }
+  {
+    // a single-line editor: its label gets the field width for a right-to-left paragraph with Start, so Arabic sits at the right
+    const editor = new SkiaEditor(); editor.WidthRequest = 300; editor.FontSize = 20; editor.FontFamily = "FontText"; editor.FontFamilyFallback = "FontArabic";
+    editor.Text = "مرحبا";
+    draw(editor, 400, 80);
+    const boxes = editor.Label.GetGlyphBoxes();
+    const first = boxes.find((b) => b.Index === 0)!;
+    const field = editor.WidthRequest - editor.Padding.HorizontalThickness; // scale 1
+    check("single-line editor: an Arabic text with Start sits at the right of the field", Math.abs(first.Left + first.Width - field) < 2 && editor.Label.DrawingRect.Width >= field - 1,
+      `first letter ends ${(first.Left + first.Width).toFixed(1)}, field ${field.toFixed(1)}, label ${editor.Label.DrawingRect.Width.toFixed(1)}`);
+    editor.Text = "Hello"; draw(editor, 400, 80);
+    check("single-line editor: Latin text with Start keeps its content-wide label at the left", editor.Label.DrawingRect.Width < field / 2, `label ${editor.Label.DrawingRect.Width.toFixed(1)}`);
+  }
+
   console.log(failures ? `FAIL: ${failures} checks` : "OK: label direction");
   process.exit(failures ? 1 : 0);
 })();
