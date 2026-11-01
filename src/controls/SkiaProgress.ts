@@ -1,6 +1,6 @@
 import { type DrawingContext, SkiaControl } from "../core/SkiaControl";
 import { Super } from "../core/Super";
-import { type PrebuiltControlStyle, ResolveControlStyle, type ResolvedControlStyle } from "../core/ControlStyle";
+import { DefaultAccent, type PrebuiltControlStyle, ResolveControlStyle, type ResolvedControlStyle } from "../core/ControlStyle";
 import { type Color, ScaledSize } from "../core/Types";
 
 /**
@@ -43,7 +43,7 @@ export class SkiaProgress extends SkiaControl {
       case "Material": return { track: "#E8EAED", progress: "#2196F3", height: 4, radius: 2 };
       case "Material3": return { track: "#E6E0E9", progress: "#6750A4", height: 4, radius: 2 };
       case "Windows": return { track: "#F3F2F1", progress: "#0078D4", height: 6, radius: 3 };
-      default: return { track: "#D7DBE0", progress: "#DC143C", height: 8, radius: 4 };
+      default: return { track: "#D7DBE0", progress: DefaultAccent, height: 8, radius: 4 };
     }
   }
 

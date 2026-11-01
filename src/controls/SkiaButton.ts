@@ -5,7 +5,7 @@ import { SKPoint, type GestureEventProcessingInfo, type SkiaGesturesParameters }
 import { SkiaLayout } from "./SkiaLayout";
 import { SkiaLabel } from "./SkiaLabel";
 import { SkiaShape } from "./SkiaShape";
-import { type PrebuiltControlStyle, ResolveControlStyle, type ResolvedControlStyle } from "../core/ControlStyle";
+import { DefaultAccent, type PrebuiltControlStyle, ResolveControlStyle, type ResolvedControlStyle } from "../core/ControlStyle";
 
 /**
  * Mirrors DrawnUi SkiaButton (default style): a SkiaShape frame tagged "BtnShape" + a centered SkiaLabel
@@ -96,7 +96,7 @@ export class SkiaButton extends SkiaLayout {
       case "Material": return { bg: "#2196F3", radius: 4, font: 14, weight: 0, minW: 100, minH: 40, shadow: new SkiaShadow({ X: 0, Y: 2, Blur: 4, Opacity: 0.3, Color: Colors.Black }) };
       case "Material3": return { bg: "#6750A4", radius: 20, font: 14, weight: 0, minW: 100, minH: 40 };
       case "Windows": return { bg: "#0078D7", radius: 4, font: 15, weight: 500, minW: 100, minH: 32, shadow: new SkiaShadow({ X: 0, Y: 1, Blur: 1, Opacity: 0.2, Color: Colors.Black }) };
-      default: return { bg: "#DC143C", radius: 8, font: 15, weight: 0, minW: 100, minH: 41 };
+      default: return { bg: DefaultAccent, radius: 8, font: 15, weight: 0, minW: 100, minH: 41 };
     }
   }
 

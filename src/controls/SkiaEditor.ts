@@ -1,7 +1,7 @@
 import type { DrawingContext, SkiaControl } from "../core/SkiaControl";
 import { type GestureEventProcessingInfo, SKPoint, type SkiaGesturesParameters } from "../core/Gestures";
 import { Super } from "../core/Super";
-import { type PrebuiltControlStyle, ResolveControlStyle } from "../core/ControlStyle";
+import { DefaultAccent, type PrebuiltControlStyle, ResolveControlStyle } from "../core/ControlStyle";
 import { type InputKey, KeyboardManager } from "../core/KeyboardManager";
 import { TextInputProxy } from "../core/TextInputProxy";
 import { type Color, Colors, type DrawTextAlignment, type ReturnType, ScaledSize, type SkiaEditorKeyboard, type SkiaGradient, SKRect, type TextAlignment, Thickness } from "../core/Types";
@@ -217,7 +217,7 @@ export class SkiaEditor extends SkiaShape {
       : style === "Material" ? { bg: "#EFEBF4", corner: 4, stroke: Colors.Transparent, strokeW: 0, cursor: "#2196F3" }
       : style === "Material3" ? { bg: "#E6E0E9", corner: 4, stroke: Colors.Transparent, strokeW: 0, cursor: "#6750A4" }
       : style === "Windows" ? { bg: "#FFFFFF", corner: 2, stroke: "#8A8A8A", strokeW: 1, cursor: "#0078D4" }
-      : { bg: "#F2F3F5", corner: 8, stroke: Colors.Transparent, strokeW: 0, cursor: "#DC143C" };
+      : { bg: "#F2F3F5", corner: 8, stroke: Colors.Transparent, strokeW: 0, cursor: DefaultAccent };
     const apply = <K extends string>(key: K, current: unknown, next: unknown, set: () => void) => {
       if (!(key in this.styleApplied) || this.styleApplied[key] === current) { set(); this.styleApplied[key] = next; }
     };

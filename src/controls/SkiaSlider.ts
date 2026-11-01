@@ -1,7 +1,7 @@
 import { type DrawingContext, SkiaControl } from "../core/SkiaControl";
 import { Super } from "../core/Super";
 import type { GestureEventProcessingInfo, SkiaGesturesParameters } from "../core/Gestures";
-import { type PrebuiltControlStyle, ResolveControlStyle, type ResolvedControlStyle } from "../core/ControlStyle";
+import { DefaultAccent, type PrebuiltControlStyle, ResolveControlStyle, type ResolvedControlStyle } from "../core/ControlStyle";
 import { type Color, Colors, ScaledSize, SkiaShadow, Thickness } from "../core/Types";
 import { SkiaShape } from "./SkiaShape";
 
@@ -79,7 +79,7 @@ export class SkiaSlider extends SkiaControl {
       case "Material": return { thumb: 20, trackH: 4, track: "#E8EAED", selected: "#2196F3", thumbColor: "#2196F3", shadow: new SkiaShadow({ X: 0, Y: 1, Blur: 2, Opacity: 0.3, Color: Colors.Black }) };
       case "Material3": return { thumb: 20, trackH: 4, track: "#E6E0E9", selected: "#6750A4", thumbColor: "#6750A4", shadow: new SkiaShadow({ X: 0, Y: 1, Blur: 2, Opacity: 0.3, Color: Colors.Black }) };
       case "Windows": return { thumb: 20, trackH: 4, track: "#C6C6C6", selected: "#0078D4", thumbColor: "#0078D4", shadow: new SkiaShadow({ X: 0, Y: 1, Blur: 2, Opacity: 0.25, Color: Colors.Black }) };
-      default: return { thumb: 35, trackH: 6, track: "#D7DBE0", selected: "#DC143C", thumbColor: "#DC143C", shadow: new SkiaShadow({ X: 0, Y: 1, Blur: 3, Opacity: 0.25, Color: Colors.Black }) };
+      default: return { thumb: 35, trackH: 6, track: "#D7DBE0", selected: DefaultAccent, thumbColor: DefaultAccent, shadow: new SkiaShadow({ X: 0, Y: 1, Blur: 3, Opacity: 0.25, Color: Colors.Black }) };
     }
   }
 

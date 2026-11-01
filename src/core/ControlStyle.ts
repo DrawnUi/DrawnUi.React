@@ -1,6 +1,9 @@
 /** DrawnUi PrebuiltControlStyle: the look a styled control builds its default content with. */
 export type PrebuiltControlStyle = "Unset" | "Platform" | "Cupertino" | "Material" | "Material3" | "Windows";
 
+/** Accent of the default look (controls without a ControlStyle): blue #3B82F6, the DrawnUI Designer's and Agent Signals' accent (C# DefaultStyle.Accent). */
+export const DefaultAccent = "#3B82F6";
+
 /** Resolved look: `Platform` picks from the browser's OS (C# picks from the running platform). */
 export type ResolvedControlStyle = Exclude<PrebuiltControlStyle, "Platform">;
 

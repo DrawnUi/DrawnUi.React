@@ -1,3 +1,4 @@
+import { DefaultAccent } from "../core/ControlStyle";
 import type { SkiaControl } from "../core/SkiaControl";
 import type { GestureEventProcessingInfo, SkiaGesturesParameters } from "../core/Gestures";
 import { type Color, Colors, Thickness } from "../core/Types";
@@ -19,7 +20,7 @@ export class SkiaRadioButton extends SkiaToggle {
   ViewOn!: SkiaShape;
   ViewText!: SkiaLabel;
 
-  private static readonly DefaultAccent = "#DC143C";
+  private static readonly DefaultAccent = DefaultAccent;
   private static readonly DefaultOutline = "#8E959D";
 
   constructor(text = "") {

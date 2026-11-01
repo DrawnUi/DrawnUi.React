@@ -35,7 +35,7 @@ export function EditorPage() {
           <SkiaWrap Spacing={8}>
             <SkiaButton Text="Focus" BackgroundColor="#0D6EFD" FontSize={13} Tapped={() => { if (editor.current) editor.current.IsFocused = true; }} />
             <SkiaButton Text="SelectAll()" BackgroundColor="#495057" FontSize={13} Tapped={() => editor.current?.SelectAll()} />
-            <SkiaButton Text="InsertAtCursor('🙂')" BackgroundColor="#495057" FontSize={13} FontFamilyFallback="FontSymbols,FontSymbols2" Tapped={() => editor.current?.InsertAtCursor("🙂")} />
+            <SkiaButton Text="InsertAtCursor('🙂')" BackgroundColor="#495057" FontSize={13} FontFamilyFallback="FontSymbols,FontSymbols2,FontEmoji" Tapped={() => editor.current?.InsertAtCursor("🙂")} />
             <SkiaButton Text="Set Text" BackgroundColor="#495057" FontSize={13} Tapped={() => { if (editor.current) editor.current.Text = "Hello from code"; }} />
             <SkiaButton Text="Clear" BackgroundColor="#495057" FontSize={13} Tapped={() => { if (editor.current) editor.current.Text = ""; }} />
           </SkiaWrap>

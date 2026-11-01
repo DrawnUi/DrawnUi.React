@@ -1,3 +1,4 @@
+import { DefaultAccent } from "../core/ControlStyle";
 import { type Color, Colors, Thickness } from "../core/Types";
 import type { SkiaControl } from "../core/SkiaControl";
 import { SkiaShape } from "./SkiaShape";
@@ -17,7 +18,7 @@ export class SkiaCheckbox extends SkiaToggle {
   ViewCheckOn!: SkiaControl;
   private colorCheckOn?: Color;
 
-  private static readonly DefaultAccent = "#DC143C";
+  private static readonly DefaultAccent = DefaultAccent;
   private static readonly DefaultOutline = "#8E959D";
 
   /** Color of the check mark (inner square for the default look). */
