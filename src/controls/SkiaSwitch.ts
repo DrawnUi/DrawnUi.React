@@ -39,7 +39,8 @@ export class SkiaSwitch extends SkiaToggle {
       case "Material": this.SetContentSize(46, 28); frame.CornerRadius = 7; frame.HeightRequest = 15; frame.VerticalOptions = "Center"; thumb.Margin = Thickness.Zero; thumb.Shadows = [new SkiaShadow({ X: 1, Y: 1, Blur: 3, Opacity: 0.1, Color: Colors.Black })]; break;
       case "Material3": this.SetContentSize(52, 32); frame.CornerRadius = 16; frame.StrokeWidth = 2; frame.StrokeColor = SkiaSwitch.MaterialOutline; thumb.Margin = new Thickness(4); thumb.WidthRequest = 24; thumb.LockRatio = 1; thumb.VerticalOptions = "Center"; thumb.Shadows = [new SkiaShadow({ X: 1, Y: 1, Blur: 3, Opacity: 0.1, Color: Colors.Black })]; break;
       case "Windows": this.SetContentSize(48, 22); frame.CornerRadius = 12; frame.StrokeWidth = 2.5; frame.StrokeColor = "#767676"; thumb.Margin = new Thickness(5.5); break;
-      default: this.SetContentSize(46, 28); frame.CornerRadius = 20; thumb.Margin = new Thickness(2); break;
+      // the DrawnUI Designer switch size (C# fe820f2a): a low 20 pt track, the thumb 16 pt inside its 2 pt margin
+      default: this.SetContentSize(46, 20); frame.CornerRadius = 20; thumb.Margin = new Thickness(2); break;
     }
     this.Track = frame; this.Thumb = thumb;
     this.AddSubView(frame);
