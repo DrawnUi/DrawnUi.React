@@ -181,6 +181,11 @@ export function createDrawnRoot(canvas: Canvas) {
   const container = reconciler.createContainer(canvas, ConcurrentRoot, null, false, null, "", onError, onError, onError, noop, null);
   return {
     render(children: ReactNode) { reconciler.updateContainer(children, container, null, null); },
+    /** Renders and commits now: the container holds the drawn controls when it returns. */
+    renderSync(children: ReactNode) {
+      const r = reconciler as unknown as { flushSyncFromReconciler<T>(fn: () => T): T };
+      r.flushSyncFromReconciler(() => reconciler.updateContainer(children, container, null, null));
+    },
     unmount() { reconciler.updateContainer(null, container, null, null); },
   };
 }

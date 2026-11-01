@@ -90,6 +90,7 @@
     "check:label-direction": "node dev/check.mjs dev/check-label-direction.ts",
     "check:stack-fit": "node dev/check.mjs dev/check-stack-fit.ts",
     "check:label-reuse": "node dev/check.mjs dev/check-label-reuse.ts",
+    "check:popups-tooltips": "node dev/check.mjs dev/check-popups-tooltips.ts",
     "bench:relayout": "node dev/check.mjs dev/bench-relayout.ts",
     "site:extras": "node dev/site-extras.mjs dist/demo",
     "build:lib": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",

@@ -212,6 +212,19 @@ createRoot(document.getElementById("root")!).render(
   no handler = browser menu as usual. `e.Location` points, `e.Local` pixels in the control, `e.Source`
   mouse / touch / keyboard, `e.Native` the DOM event. Every mouse button still taps (`e.Parameters.Event.Pointer.Button`
   "Left" / "Right" / "Middle" / "XButton1"…, `DeviceType`, `PressedButtons`): a handler meant for the primary button only checks it.
+- Tooltips: `Tooltip="Saves the file"` on any control; it shows after the mouse rests 600 ms, centered 6 pt above the
+  control (below where there is no room), the next one at once; it closes on leave, press, wheel, key, scrolling and
+  window blur, never shows on touch, takes no hover and has no accessibility node. `Super.TooltipsFromAccessibility =
+  true` makes icon buttons show their `AccessibilityLabel` (or any control its `AccessibilityHint`). Look and timing:
+  `Super.TooltipStyle = new TooltipStyle({ BackgroundColor, BorderColor, TextColor, FontSize, MaxWidth, ShowDelayMs,
+  AtCursor, OffsetX, OffsetY, CreateTooltip })` (or `canvas.TooltipStyle`), read when the next tooltip is built.
+- Popup windows (menus, dropdowns): `OpenPopupWindow(canvas, <SkiaShape …>…</SkiaShape>, anchor, options)` from
+  "drawnui-react" (or `canvas.OpenPopupWindow(control, anchor, options)` with a control) returns an id. Anchor: a point
+  in canvas points (the context menu's `e.Location`: opens there, flipped left / up at the edges), a rect or a control
+  (opens below it, above where there is no room). Drawn over everything and given input first; closes on a press outside
+  (that press goes nowhere), Escape, the wheel outside, window blur, `canvas.ClosePopupWindow(id)` /
+  `ClosePopupWindows()`; `canvas.PopupWindowClosed.add(id => …)`. Options: `Size`, `CloseOnPointerLeave`, `Passive`
+  (shows only). Menus are app content: give items `AccessibilityRole` menuitem and a hover look.
 - A control that consumes a gesture keeps it until it stops consuming, so a drag survives the finger leaving the
   control. To drag inside a `SkiaScroll` (the scroll owns vertical pans), take `Down` on a handle with
   `ConsumeGestures`, set `scroll.RespondsToGestures = false` for the drag and restore it on `Up`, and count travel in

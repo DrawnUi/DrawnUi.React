@@ -3,6 +3,9 @@ import { type AccessibilityNode, SkiaAccessibilityManager } from "../core/Access
 import { TextInputProxy } from "../core/TextInputProxy";
 import { Canvas as CanvasView } from "../core/Canvas";
 import type { SkiaControl } from "../core/SkiaControl";
+import type { PopupAnchor, PopupId, PopupWindowOptions } from "../core/PopupWindows";
+import type { SKPoint } from "../core/Gestures";
+import type { SKRect } from "../core/Types";
 import type { Thickness, ThicknessValue } from "../core/Types";
 import type { SkiaLabel as SkiaLabelCtrl } from "../controls/SkiaLabel";
 import type { TextSpan as TextSpanCtrl } from "../controls/TextSpan";
@@ -137,6 +140,28 @@ function removeStaticContent(): void {
   if (staticRemoved || typeof document === "undefined") return;
   staticRemoved = true;
   for (const el of document.querySelectorAll("[data-drawnui-static]")) el.remove();
+}
+
+/**
+ * Opens a popup window (drawnui-cross 6at) whose content is drawn elements, e.g. a menu:
+ * `OpenPopupWindow(canvas, <SkiaShape ...>...</SkiaShape>, e.Location)`. The elements are rendered at once in a React
+ * root of their own and unmounted when the popup closes; the anchor is a point (canvas points), a rect, a control or a
+ * `PopupAnchor`. Returns the popup's id (for `canvas.ClosePopupWindow`).
+ */
+export function OpenPopupWindow(canvas: CanvasView, content: ReactNode, anchor: PopupAnchor | SKPoint | SKRect | SkiaControl | { X: number; Y: number }, options?: PopupWindowOptions): PopupId {
+  const holder = { Content: undefined as SkiaControl | undefined };
+  const root = createDrawnRoot(holder as unknown as CanvasView);
+  root.renderSync(content);
+  const control = holder.Content;
+  if (!control) { root.unmount(); throw new Error("DrawnUi: OpenPopupWindow content rendered no control"); }
+  const id = canvas.OpenPopupWindow(control, anchor, options);
+  const closed = (which: PopupId) => {
+    if (which !== id) return;
+    canvas.PopupWindowClosed.delete(closed);
+    root.unmount();
+  };
+  canvas.PopupWindowClosed.add(closed);
+  return id;
 }
 
 /**

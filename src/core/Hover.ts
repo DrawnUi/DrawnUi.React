@@ -25,6 +25,10 @@ export class HoverManager {
   private y = 0;
   private paused = false;
   private check = false;
+  /** Picks the root under a point (canvas pixels): a popup window over the content, else the content. */
+  RootAt?: (x: number, y: number) => SkiaControl | undefined;
+  /** Content moves under the pointer (a scroll glide, a carousel transition): hover waits. */
+  get Paused(): boolean { return this.paused; }
 
   /**
    * The mouse (or a pen in range) moved to (x, y), canvas pixels, nothing pressed. The hit path is taken also while
@@ -44,6 +48,7 @@ export class HoverManager {
   private HitTest(root: SkiaControl | undefined): void {
     const path = this.Path;
     path.length = 0; this.PathX.length = 0; this.PathY.length = 0;
+    if (this.RootAt) root = this.RootAt(this.x, this.y);
     if (root && root.IsVisible && !root.InputTransparent) {
       const point = root.TransformPointToLocalSpace(new SKPoint(this.x, this.y));
       if (root.HitIsInside(point.X, point.Y)) root.CollectHovered(point, path, this.PathX, this.PathY);

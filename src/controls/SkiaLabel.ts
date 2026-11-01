@@ -131,6 +131,9 @@ export class SkiaLabel extends SkiaControl {
   get Padding(): Thickness { return this.padding; }
   set Padding(v: ThicknessValue) { this.Set("padding" as keyof this, Thickness.From(v) as this[keyof this]); }
 
+  /** A label with text, in Text or in its spans, shows text of its own (no accessibility-label tooltip). */
+  override ShowsText(): boolean { return !!this.text || this.Spans.some((s) => !!s.Text); }
+
   /** Number of laid-out lines after the last measure. */
   get LinesCount(): number { return this.lines.length; }
 

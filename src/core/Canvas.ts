@@ -4,6 +4,9 @@ import type { AnimatorBase } from "./Animators";
 import { Super } from "./Super";
 import { SkiaAccessibilityManager } from "./Accessibility";
 import { HoverManager } from "./Hover";
+import { TooltipController, type TooltipStyleLike } from "./Tooltips";
+import { PopupAnchor, PopupLayer, type PopupId, type PopupWindowOptions } from "./PopupWindows";
+import { KeyboardManager, type InputKey } from "./KeyboardManager";
 import { type Color, Colors, type RenderingModeType, SKRect } from "./Types";
 import {
   ContextMenuEventArgs, type ContextMenuSource,
@@ -53,6 +56,66 @@ export class Canvas {
   /** Mouse hover of the controls (drawnui-cross 6m): ReceivesHover / IsHovered / HoverChanged. */
   readonly Hover = new HoverManager();
 
+  // ---- tooltips (drawnui-cross 6ar) ----
+  private tooltipController?: TooltipController;
+  /** Made on first use: a canvas that never shows a tooltip allocates nothing for it. */
+  private get tooltip(): TooltipController { return this.tooltipController ??= new TooltipController(this); }
+  /** Look and timing of the tooltips on this canvas; unset uses `Super.TooltipStyle`. */
+  TooltipStyle?: TooltipStyleLike;
+  get TooltipStyleUsed(): TooltipStyleLike { return this.TooltipStyle ?? Super.TooltipStyle!; }
+  /** The text of the tooltip shown now, undefined when none is shown. */
+  get ShownTooltip(): string | undefined { return this.tooltip.ShownText; }
+
+  // ---- popup windows (drawnui-cross 6at, the DrawnUi.Rust / .NET API) ----
+  private popupLayer?: PopupLayer;
+  /** Made on first use, like the tooltip. */
+  private get popups(): PopupLayer { return this.popupLayer ??= new PopupLayer(this); }
+  private popupKeysHooked = false;
+  /** Raised when a popup window closed: picked, a press outside, Escape, the wheel, window blur or ClosePopupWindow. */
+  readonly PopupWindowClosed = new Set<(id: PopupId) => void>();
+
+  /**
+   * Shows `content` over everything, opening from `anchor` the way native menus do: at a point (a right click, canvas
+   * points), or below a rect or a control (a dropdown), flipped to the other side where it does not fit. It closes with
+   * a press outside it, Escape, the wheel outside it, window blur, `ClosePopupWindow` and the options.
+   */
+  OpenPopupWindow(content: SkiaControl, anchor: PopupAnchor | SKPoint | SKRect | SkiaControl | { X: number; Y: number }, options: PopupWindowOptions = {}): PopupId {
+    const id = this.popups.Open(content, PopupAnchor.From(anchor), options, this);
+    this.HookPopupKeys(true);
+    if (!options.Passive) this.tooltip.Reset(); // a menu opening closes the tooltip
+    this.Hover.RequestCheck();
+    this.Update();
+    return id;
+  }
+  /** Closes the popup window (nothing when it is closed already). */
+  ClosePopupWindow(id: PopupId): void { this.popups.Close(id); this.AfterPopupsChanged(); }
+  /** Closes every popup window. */
+  ClosePopupWindows(): void { this.popups.CloseAll(true); this.AfterPopupsChanged(); }
+  /** The popup window is still open. */
+  IsPopupWindowOpen(id: PopupId): boolean { return this.popups.IsOpen(id); }
+  /** True while a popup window that takes input is open. */
+  get HasPopupWindows(): boolean { return this.popups.HasInteractive; }
+  /** The content of the top popup window that takes input. */
+  get TopPopupWindow(): SkiaControl | undefined { return this.popups.TopInteractive; }
+  /** The window stopped being active (blur): popup windows and the tooltip close, as native menus do. */
+  OnWindowDeactivated(): void { this.ClosePopupWindows(); this.tooltip.CloseOnInput(); }
+  RaisePopupWindowClosed(id: PopupId): void { for (const h of [...this.PopupWindowClosed]) h(id); }
+
+  private AfterPopupsChanged(): void {
+    if (!this.popups.HasAny) this.HookPopupKeys(false);
+    this.Hover.RequestCheck();
+    this.Update();
+  }
+  private readonly onPopupKey = (key: InputKey) => { if (key === "Escape" && this.popups.CloseTop()) this.AfterPopupsChanged(); };
+  private readonly onPopupChar = () => {};
+  private HookPopupKeys(on: boolean): void {
+    if (on === this.popupKeysHooked) return;
+    this.popupKeysHooked = on;
+    if (on) KeyboardManager.Subscribe(this.onPopupKey, this.onPopupChar);
+    else KeyboardManager.Unsubscribe(this.onPopupKey, this.onPopupChar);
+  }
+  private readonly onWindowBlur = () => this.OnWindowDeactivated();
+
   private content?: SkiaControl;
   get Content(): SkiaControl | undefined { return this.content; }
   set Content(value: SkiaControl | undefined) {
@@ -84,6 +147,7 @@ export class Canvas {
     init?.(this);
     Element.addEventListener("webglcontextlost", this.onContextLost);
     Element.addEventListener("webglcontextrestored", this.onContextRestored);
+    this.Hover.RootAt = (x, y) => this.popupLayer?.At(x, y) ?? this.content;
     this.observer = new ResizeObserver(() => this.OnResized());
     this.observer.observe(Element);
     this.OnResized();
@@ -201,8 +265,13 @@ export class Canvas {
       root.Arrange(new SKRect(0, 0, w, h), root.WidthRequest, root.HeightRequest, scale);
       root.Render({ Context: { Canvas: canvas, Surface: this.surface }, Destination: new SKRect(0, 0, w, h), Scale: scale });
     }
+    // popup windows, then the tooltip, over everything
+    const top = { Context: { Canvas: canvas, Surface: this.surface }, Destination: new SKRect(0, 0, this.Element.width, this.Element.height), Scale: this.RenderingScale };
+    if (this.popupLayer?.HasAny) this.popupLayer.Draw(top, top.Destination);
+    this.tooltipController?.Draw(top, top.Destination);
     this.AccessibilityManager.OnFrameEnd(this.RenderingScale, this.Element.width, this.Element.height, () => this.Update());
     this.Hover.AfterFrame(this.content, this.activeTouchIds.size > 0);
+    if (this.Hover.Paused) this.tooltipController?.Reset(); // content moves under the pointer
     const now = performance.now();
     this.FrameTime = now - started;
     this.FrameIndex++;
@@ -325,6 +394,9 @@ export class Canvas {
     this.Element.removeEventListener("webglcontextlost", this.onContextLost);
     this.Element.removeEventListener("webglcontextrestored", this.onContextRestored);
     this.Gestures = "Disabled";
+    this.tooltipController?.Dispose();
+    this.popupLayer?.Dispose();
+    this.HookPopupKeys(false);
     this.observer.disconnect();
     this.content?.Dispose();
     this.Content = undefined;
@@ -359,12 +431,18 @@ export class Canvas {
     if (!type) return;
     if (type === "Moved" && !this.activeTouchIds.has(e.pointerId)) {
       if (e.pointerType === "touch") return; // touch never hovers
-      if (this.activeTouchIds.size === 0) this.Hover.Move(this.content, e.offsetX * this.RenderingScale, e.offsetY * this.RenderingScale);
+      const hx = e.offsetX * this.RenderingScale, hy = e.offsetY * this.RenderingScale;
+      if (this.activeTouchIds.size === 0) {
+        this.Hover.Move(this.content, hx, hy);
+        this.tooltip.OnPointerMove(this.Hover.Path, hx, hy);
+      }
+      if (this.popups.HasAny) this.popups.PointerAt(hx, hy);
       if (e.pointerType === "mouse") this.UpdateCursor();
       return;
     }
     if ((type === "Released" || type === "Cancelled") && !this.activeTouchIds.has(e.pointerId)) return; // Up of a pointer that never pressed here
     // Capture so Up outside the element still arrives; throws for synthetic events (tests) — harmless.
+    if (type === "Pressed") this.tooltip.CloseOnInput();
     if (type === "Pressed") { try { this.Element.setPointerCapture(e.pointerId); } catch { /* synthetic pointer */ } }
 
     const rect = this.Element.getBoundingClientRect();
@@ -385,7 +463,12 @@ export class Canvas {
     if (type === "Released" || type === "Cancelled") { this.claimedTouches.delete(e.pointerId); this.UpdateTouchAction(); }
   };
   /** The mouse left the canvas: hover ends at once, also while content moves. */
-  private readonly onPointerLeave = (e: PointerEvent) => { if (e.pointerType !== "touch") this.Hover.Leave(); };
+  private readonly onPointerLeave = (e: PointerEvent) => {
+    if (e.pointerType === "touch") return;
+    this.Hover.Leave();
+    this.tooltip.Reset();
+    if (this.popups.HasAny) this.popups.PointerAt(undefined, undefined);
+  };
   private readonly preventTouch = (e: TouchEvent) => e.preventDefault();
   /** Gestures="Enabled": touch / pen pointers whose Down a control used (see OnTouchAction). */
   private readonly claimedTouches = new Set<number>();
@@ -403,6 +486,12 @@ export class Canvas {
     const pointerType = (e as PointerEvent).pointerType;
     const source: ContextMenuSource = pointerType === "touch" || pointerType === "pen" ? "touch" : pointerType === "mouse" || e.button === 2 ? "mouse" : "keyboard";
     const args = new ContextMenuEventArgs(new SKPoint(x, y), new SKPoint(x * scale, y * scale), source, e);
+    this.tooltip.CloseOnInput();
+    // over a popup window its content is asked; elsewhere the popups close and the request goes on, so a new menu can
+    // open there (C# PopupLayer ContextMenu)
+    const popupRoot = this.popups.HasInteractive ? this.popups.At(args.Pixels.X, args.Pixels.Y) : undefined;
+    if (popupRoot) { popupRoot.ProcessContextMenu(args.Pixels, args); e.preventDefault(); return; }
+    if (this.popups.HasInteractive) { this.popups.CloseAll(false); this.AfterPopupsChanged(); }
     let handled = this.content?.ProcessContextMenu(args.Pixels, args) ?? false;
     if (!handled && this.ContextMenu) handled = this.ContextMenu(this, args) === true;
     if (handled) e.preventDefault();
@@ -447,6 +536,7 @@ export class Canvas {
     const factor = e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? 800 : 1;
     const horizontal = Math.abs(e.deltaX) > Math.abs(e.deltaY);
     args.Wheel = { Delta: (horizontal ? e.deltaX : e.deltaY) * factor, IsHorizontal: horizontal };
+    this.tooltip.CloseOnInput();
     if (this.gestures === "Lock") {
       e.preventDefault();
       this.OnGestureEvent(args, "Wheel");
@@ -519,6 +609,7 @@ export class Canvas {
     el.addEventListener("pointerleave", this.onPointerLeave);
     el.addEventListener("contextmenu", this.onContextMenu);
     el.addEventListener("wheel", this.onWheel, { passive: false });
+    window.addEventListener("blur", this.onWindowBlur);
     if (this.gestures === "Lock") {
       el.addEventListener("touchmove", this.preventTouch, { passive: false });
       // the canvas owns every touch (DrawnUi.Web applyGestureStyle, DrawnUi.Rust host): no iOS callout or text
@@ -544,6 +635,7 @@ export class Canvas {
     el.removeEventListener("pointerleave", this.onPointerLeave);
     el.removeEventListener("contextmenu", this.onContextMenu);
     el.removeEventListener("wheel", this.onWheel);
+    window.removeEventListener("blur", this.onWindowBlur);
     el.removeEventListener("touchmove", this.preventTouch);
     el.removeEventListener("touchmove", this.preventClaimedTouch);
     if (this.pageOverscroll) {
@@ -664,6 +756,13 @@ export class Canvas {
   /** Entry into the control tree, same shape as DrawnUi Canvas.ProcessGestures. */
   protected ProcessGestures(root: SkiaControl, args: SkiaGesturesParameters): SkiaControl | null {
     const info = () => new GestureEventProcessingInfo(args.Event.Location, SKPoint.Empty, SKPoint.Empty, null);
+    const popups = this.popups, at = args.Event.Location;
+
+    // the rest of a press that closed the popup windows goes nowhere (native menus)
+    if (args.Type === "Down") popups.SwallowPress = false;
+    if (popups.SwallowPress) { if (args.Type === "Up") popups.SwallowPress = false; return null; }
+    // the wheel outside the popup windows closes them (what they opened from is about to move), before any owner takes it
+    if (args.Type === "Wheel" && popups.HasInteractive && !popups.At(at.X, at.Y)) { popups.CloseAll(false); this.AfterPopupsChanged(); }
 
     // the wheel goes to the press owner only while a press is held; between presses it goes by position, and it
     // never makes an owner: a wheel over a second scroll moves that one, not the last one the wheel moved
@@ -682,6 +781,22 @@ export class Canvas {
       // it let go (a button whose press turned into a pan): route normally again; a wheel it does not use goes by
       // position and leaves it the press
       if (!wheel) this.gestureOwner = null;
+    }
+
+    // over a popup window its controls take the gesture and nothing below sees it; a press elsewhere closes them
+    if (popups.HasInteractive) {
+      const popupRoot = popups.At(at.X, at.Y);
+      if (popupRoot) {
+        const used = popupRoot.ProcessGestures(args, info()) ?? popupRoot;
+        if (!wheel) this.gestureOwner = args.Type !== "Up" ? used : null;
+        return used;
+      }
+      if (args.Type === "Down") {
+        popups.CloseAll(false);
+        popups.SwallowPress = true;
+        this.AfterPopupsChanged();
+        return null;
+      }
     }
 
     const consumed = root.ProcessGestures(args, info());

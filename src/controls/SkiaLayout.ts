@@ -380,6 +380,9 @@ export class SkiaLayout extends SkiaControl {
     if (changed) { this.orderedViews = undefined; this.InvalidateMeasure(); }
   }
 
+  /** A child showing text (a caption inside a button) is text of its own: the accessibility label then makes no tooltip. */
+  override ShowsText(): boolean { return this.views.some((v) => v.ShowsText()); }
+
   /** C# ClearChildren: removes every subview, the control's own parts included. */
   ClearChildren(): void {
     for (const v of [...this.views]) this.RemoveSubView(v);

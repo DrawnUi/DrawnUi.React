@@ -111,6 +111,13 @@ export class Super {
   static readonly Fonts = new Map<string, Map<number, Typeface>>();
   /** First registered font, or CanvasKit's built-in one. */
   static DefaultTypeface?: Typeface;
+  /**
+   * App-wide opt-in (drawnui-cross 6ar): a control without a `Tooltip` shows its `AccessibilityHint` as tooltip, else its
+   * `AccessibilityLabel` when it shows no text of its own, so icon buttons get their screen-reader name as tooltip.
+   */
+  static TooltipsFromAccessibility = false;
+  /** Look and timing of the tooltips (a `TooltipStyle`), for every canvas without its own. Read when a tooltip is built. */
+  static TooltipStyle?: import("./Tooltips").TooltipStyleLike;
   /** CanvasKit's built-in face: what an empty FontFamily resolves to, like C# SKTypeface.CreateDefault(). */
   static SkiaDefaultTypeface?: Typeface;
   private static readonly fontCache = new Map<string, Font>();

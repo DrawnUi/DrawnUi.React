@@ -612,6 +612,26 @@ export class SkiaControl {
   get AccessibilityHint(): string | undefined { return this.accessibilityHint; }
   set AccessibilityHint(v: string | undefined) { if (this.accessibilityHint !== v) { this.accessibilityHint = v; this.AccessibilityChanged(); } }
 
+  /** Text of the tooltip shown when the mouse rests on the control (drawnui-cross 6ar); undefined = none. */
+  Tooltip?: string;
+  /** The control may have tooltip text: the cheap check made on every mouse move. */
+  get MayHaveTooltip(): boolean {
+    return !!this.Tooltip || (Super.TooltipsFromAccessibility && (this.accessibilityHint != null || this.accessibilityLabel != null));
+  }
+  /**
+   * The text of this control's tooltip, undefined for none: `Tooltip`, else with `Super.TooltipsFromAccessibility` its
+   * `AccessibilityHint`, else its own `AccessibilityLabel` when it shows no text of its own (icon buttons).
+   */
+  GetTooltipText(): string | undefined {
+    if (this.Tooltip) return this.Tooltip;
+    if (!Super.TooltipsFromAccessibility) return undefined;
+    if (this.accessibilityHint) return this.accessibilityHint;
+    if (this.accessibilityLabel && !this.ShowsText()) return this.accessibilityLabel;
+    return undefined;
+  }
+  /** The control shows text of its own (a label with text, spans included, inside it). */
+  ShowsText(): boolean { return false; }
+
   /**
    * Whether keyboard navigation and assistive technology may focus and use this node: the explicit value, else the class
    * default (true when the control handles Tapped), and in both cases only while a tap could reach the control
