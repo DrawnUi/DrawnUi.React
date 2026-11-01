@@ -580,6 +580,12 @@ Updated whenever the port deliberately diverges or finds something worth back-po
   widths unchanged. **Rust** adds the italic slant on the right only (label.rs): an upright "j" at a line start may be
   cut there in an Image cache (not measured in Rust).
 
+### Menu shortcuts the browser keeps (Hello Tooltips & Menus)
+- **React**: a page gets no key events for Ctrl+N, Ctrl+W and Ctrl+T (Chrome opens / closes a window or tab), so the
+  menu bar's New and Close shortcuts work only from the open menu. Tooltips and popup windows stay inside the canvas.
+  **.NET / Rust desktop**: every shortcut reaches the app; a tooltip near the window edge opens in a window of its own.
+- **Opinion**: browser limits, nothing to port.
+
 ### Fit-content stacks (drawnui-cross 6an)
 - **React**: the fit-content size comes out of the normal measure (`SkiaControl.FitPixels`; a label that wrapped reports
   the room it was given), no extra pass. **.NET**: one extra unbounded measure per Fill child of such a stack.

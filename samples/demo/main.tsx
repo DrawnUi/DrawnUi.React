@@ -1,9 +1,10 @@
 import { StrictMode, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Canvas, SkiaLabelFps, SkiaLayer, SkiaShell, Super } from "drawnui-react";
-import { type Canvas as CanvasView, SkiaImageManager, Thickness } from "drawnui-react/core";
+import { type Canvas as CanvasView, SkiaImageManager, Thickness, TooltipStyle } from "drawnui-react/core";
 import { CanvasViewContext } from "./pages/canvasView";
 import { RootPage } from "./pages/RootPage";
+import { MenusPage } from "./pages/MenusPage";
 import { DemoContextMenu, handleContextMenu } from "./pages/DemoContextMenu";
 import { SAMPLES } from "./pages/catalog";
 import { ImagesPage } from "./pages/ImagesPage";
@@ -50,6 +51,8 @@ await Super.UseDrawnUi()
 // Accessibility: every label is read as text, every button is a button (React extension; C# opts in per control).
 SkiaLabelCtrl.DefaultAccessibilityRole = Aria.RoleText;
 SkiaButtonCtrl.DefaultAccessibilityRole = Aria.RoleButton;
+// Hello tooltips in the menus' panel colors (drawnui-hello-app palette rule)
+Super.TooltipStyle = new TooltipStyle({ BackgroundColor: "#262B3B", BorderColor: "#3B4256", TextColor: "#FFFFFF" });
 
 const ROUTES = {
   images: () => <ImagesPage />,
@@ -65,6 +68,7 @@ const ROUTES = {
   snapping: () => <SnappingPage />,
   animations: () => <AnimationsPage />,
   shell: () => <ShellPage />,
+  menus: () => <MenusPage />,
   editor: () => <EditorPage />,
   keyboard: () => <KeyboardPage />,
   sprites: () => <SpritesPage />,

@@ -143,6 +143,9 @@ createRoot(document.getElementById("root")!).render(
 - Invalidation vocabulary when writing custom controls: `Update()` = remeasure + redraw; `InvalidateCache()` = own
   content changed; `RepaintComposition()` = my transform / paint changed, ancestor caches go stale; `Repaint()` =
   just ask for a frame. A control that changes its own drawing calls `InvalidateCache(); RepaintComposition();`.
+- Most control properties are plain fields: a value set from code (a hover or selection look in `HoverChanged`, a
+  ref) shows only after `UpdateDraw()` (a look: color, gradient) or `Update()` (anything that changes size), which is
+  what a JSX prop change does for you. `SkiaLabel` text properties invalidate by themselves.
 - A control drawn entirely outside the canvas clip (scrolled away, off a page) is skipped with its subtree; its cache
   is still recorded when it is stale. A custom control that paints outside its rect must say how far
   (`ComputeEffectsMargin`), and nothing that has to happen every frame belongs in `Paint`: use an animator.

@@ -49,7 +49,8 @@ function SliderRow({ name, min, max, slider, apply }: { name: string; min: numbe
   return (
     <SkiaLayer HorizontalOptions="Fill">
       <SkiaLabel Text={name} FontSize={13} TextColor="#ADB5BD" VerticalOptions="Center" />
-      <SkiaSlider ref={slider} AccessibilityLabel={name} Min={min} Max={max} Margin={new Thickness(104, 0, 0, 0)} HorizontalOptions="Fill" VerticalOptions="Center" EndChanged={(_, v) => apply(v)} />
+      <SkiaSlider ref={slider} AccessibilityLabel={name} Min={min} Max={max} Margin={new Thickness(104, 0, 0, 0)} HorizontalOptions="Fill" VerticalOptions="Center" EndChanged={(_, v) => apply(v)}
+        TrackSelectedColor="#0D6EFD" TrackColor="#495057" ThumbColor="#FFFFFF" />
     </SkiaLayer>
   );
 }

@@ -192,6 +192,16 @@ const element = {
   fire("el:contextmenu", { clientX: 300, clientY: 300, button: 2, pointerType: "mouse", preventDefault() {} });
   check("a right click elsewhere closes the menu and the request gives its canvas point", !canvas.IsPopupWindowOpen(p5) && !!contextAt && contextAt.X === 300 && contextAt.Y === 300);
   frame();
+  // a look change inside an open popup is drawn (a menu's highlight under a shape's default Operations cache)
+  {
+    const panel = new SkiaShape(); panel.WidthRequest = 100; panel.HeightRequest = 60; panel.BackgroundColor = "#262B3B";
+    const row = box(0, 0, 100, 30, "#262B3B"); panel.AddSubView(row);
+    const id = canvas.OpenPopupWindow(panel, new SKPoint(400, 300)); frame();
+    // a color set from code is a field: UpdateDraw() is what a prop change does after it
+    row.BackgroundColor = "#7A3B52"; row.UpdateDraw(); frame();
+    check("a change inside an open popup is drawn", !!boxOf([0x7A, 0x3B, 0x52]));
+    canvas.ClosePopupWindow(id); frame();
+  }
 
   // ---- span underline in the label's color ----
   {

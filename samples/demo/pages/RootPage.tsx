@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
+import type { SkiaControl, SkiaShape as SkiaShapeCtrl } from "drawnui-react/core";
 import { PUBLISH } from "../publish";
 import { SAMPLES } from "./catalog";
-import { Aria, Colors, SkiaLabel, SkiaScroll, SkiaShape, SkiaStack, SkiaSvg, SkiaWrap, TextSpan, Thickness, useShell } from "drawnui-react";
+import { Aria, Colors, SkiaLabel, SkiaMasonry, SkiaScroll, SkiaShape, SkiaStack, SkiaSvg, TextSpan, Thickness, useShell } from "drawnui-react";
 
 
 /** Root menu styled after drawnui.net: dark body, logo + bold title, sample cards below. */
@@ -17,17 +18,25 @@ function OpenRepository(): void {
   window.open("https://github.com/DrawnUi/DrawnUi.React", "_blank", "noopener,noreferrer");
 }
 
-/** Card width in points: two columns when the page is wide enough, one otherwise (SkiaWrap flows them). */
-function useCardWidth(): number {
-  const compute = () => { const inner = Math.min(MAX_WIDTH, window.innerWidth) - PAGE_PADDING * 2; return inner >= 640 ? (inner - GAP) / 2 : inner; };
-  const [width, setWidth] = useState(compute);
-  useEffect(() => { const onResize = () => setWidth(compute()); window.addEventListener("resize", onResize); return () => window.removeEventListener("resize", onResize); }, []);
-  return width;
+/** Masonry columns: two when the page is wide enough (inner width >= 640 points), one otherwise; follows resizes. */
+function useColumns(): number {
+  const compute = () => (Math.min(MAX_WIDTH, window.innerWidth) - PAGE_PADDING * 2 >= 640 ? 2 : 1);
+  const [columns, setColumns] = useState(compute);
+  useEffect(() => { const onResize = () => setColumns(compute()); window.addEventListener("resize", onResize); return () => window.removeEventListener("resize", onResize); }, []);
+  return columns;
 }
+
+/** A card under the mouse turns a step lighter (desktop hover). */
+const hoverCard = (me: SkiaControl, on: boolean) => {
+  const card = me as SkiaShapeCtrl;
+  card.BackgroundColor = on ? "#343A40" : "#2B3035";
+  card.StrokeColor = on ? "#495057" : "#373B3E";
+  card.UpdateDraw();
+};
 
 export function RootPage() {
   const shell = useShell();
-  const cardWidth = useCardWidth();
+  const columns = useColumns();
   return (
     <SkiaScroll Orientation="Vertical">
 
@@ -37,10 +46,10 @@ export function RootPage() {
         <SkiaLabel Text="A UI rendering engine on top of CanvasKit: layouts, controls, gestures, effects and animations" FontSize={16} TextColor="#ADB5BD" HorizontalOptions="Center" HorizontalTextAlignment="Center" Margin={SUBTITLE_MARGIN} />
 
         {/* samples */}
-        {/* two columns on wide screens, one on phones: fixed-width cards flowing in a SkiaWrap */}
-        <SkiaWrap Spacing={GAP} HorizontalOptions="Fill">
+        {/* two columns on wide screens, one on phones: cards in a SkiaMasonry, each column as tall as its cards */}
+        <SkiaMasonry Split={columns} Spacing={GAP} HorizontalOptions="Fill" UseCache="ImageComposite">
           {SAMPLES.map((s, i) => (
-            <SkiaShape key={s.route} Type="Rectangle" CornerRadius={12} BackgroundColor="#2B3035" StrokeColor="#373B3E" StrokeWidth={1} WidthRequest={cardWidth} AnimationTapped="Ripple" Tapped={(_, e) => { if ((e.Parameters.Event.Pointer?.Button ?? "Left") === "Left") void shell.GoToAsync(s.route); }}
+            <SkiaShape key={s.route} Type="Rectangle" CornerRadius={12} BackgroundColor="#2B3035" StrokeColor="#373B3E" StrokeWidth={1} HorizontalOptions="Fill" AnimationTapped="Ripple" HoverChanged={hoverCard} Tapped={(_, e) => { if ((e.Parameters.Event.Pointer?.Button ?? "Left") === "Left") void shell.GoToAsync(s.route); }}
               AccessibilityRole={Aria.RoleButton} AccessibilityLabel={s.title} AccessibilityHint={s.text}>
               <SkiaStack Spacing={6} Padding={new Thickness(24, 20, 48, 20)}>
                 <SkiaLabel Text={s.title} FontSize={22} FontFamily="FontTextBold" TextColor={Colors.White} FillGradient={{ Type: "Linear", Angle: 0, Colors: TITLE_GRADIENTS[i % TITLE_GRADIENTS.length] }} AccessibilityRole={Aria.RolePresentation} />
@@ -49,7 +58,7 @@ export function RootPage() {
               <SkiaLabel Text="›" FontSize={28} TextColor="#6EA8FE" HorizontalOptions="End" VerticalOptions="Center" Margin={new Thickness(0, 0, 20, 0)} AccessibilityRole={Aria.RolePresentation} />
             </SkiaShape>
           ))}
-        </SkiaWrap>
+        </SkiaMasonry>
 
         {/* the original single centred label; the repository fragment is a tappable span (coloured, no underline) */}
         <SkiaLabel FontSize={12} TextColor="#6C757D" HorizontalOptions="Center" Margin={FOOTER_MARGIN}>
