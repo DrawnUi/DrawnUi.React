@@ -1,7 +1,7 @@
 import type { DrawingContext, SkiaControl } from "./SkiaControl";
 import { SKPoint } from "./Gestures";
 import { SKRect } from "./Types";
-import { Aria } from "./Accessibility";
+import { Aria, type SkiaAccessibilityManager } from "./Accessibility";
 
 /** A popup window opened with `Canvas.OpenPopupWindow` (drawnui-cross 6at, C# PopupId, Rust PopupId). */
 export type PopupId = number;
@@ -64,6 +64,7 @@ interface PopupHostCanvas {
   Update(): void;
   DisposeObject(o: { Dispose(): void }): void;
   RaisePopupWindowClosed(id: PopupId): void;
+  readonly AccessibilityManager: SkiaAccessibilityManager;
 }
 
 /**
@@ -111,6 +112,9 @@ export class PopupLayer {
     const i = this.popups.indexOf(popup);
     if (i < 0) return;
     this.popups.splice(i, 1);
+    // its nodes leave the accessibility tree with this frame, not when the disposal runs after it
+    this.canvas.AccessibilityManager.UnregisterSubtree(popup.Root);
+    this.canvas.AccessibilityManager.ForceRebuildOnNextFrame();
     this.canvas.DisposeObject(popup.Root);
     this.canvas.Update();
     this.canvas.RaisePopupWindowClosed(popup.Id);

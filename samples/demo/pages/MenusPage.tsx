@@ -165,29 +165,45 @@ export function MenusPage() {
 
   useEffect(() => {
     const onKey = (key: InputKey, e: KeyboardEvent) => {
-      if (KeyboardManager.IsOwnedByElement(e)) return;
+      // keys of a page element are not ours; keys of this canvas' own controls in keyboard focus (Tab) are
+      const canvas = tops.current[0]?.Superview;
+      const focused = canvas?.AccessibilityManager.FocusedNode;
+      const drawn = !!focused && focused.Superview === canvas;
+      if (KeyboardManager.IsOwnedByElement(e) && !drawn) return;
+      // a key the menu bar used stops here: the focused control must not act on it too
+      const take = () => { e.preventDefault(); e.stopPropagation(); };
       const b = bar.current;
       // Alt + the first letter of a menu opens it, its first line ready for the arrows
       if (KeyboardManager.IsAltPressed) {
         const index = MENUS.findIndex((m) => m.Accelerator === key);
-        if (index >= 0) { e.preventDefault(); openBarMenu(index, true); }
+        if (index >= 0) { take(); openBarMenu(index, true); }
         return;
       }
       if (!barOpen()) {
+        // a title in keyboard focus: Enter, Space or Down opens its menu with the first line highlighted
+        const title = tops.current.findIndex((t) => t === focused);
+        if (title >= 0 && (key === "Enter" || key === "NumpadEnter" || key === "Space" || key === "ArrowDown")) { take(); openBarMenu(title, true); return; }
         // the shortcuts work with the menus closed (the browser keeps a few for itself: Ctrl+N, Ctrl+W, Ctrl+T)
         const ctrl = KeyboardManager.IsControlPressed;
         const found = MENUS.flatMap((m) => m.Entries).find((x) => x.Text && x.Key === key && (x.Ctrl ?? true) === ctrl);
-        if (found) { e.preventDefault(); run(found); }
+        if (found) { take(); run(found); }
         return;
       }
       const count = b.items.length;
       switch (key) {
+        // on a title in keyboard focus the arrow also moves that focus to the next title
         case "ArrowLeft": e.preventDefault(); openBarMenu((b.open - 1 + MENUS.length) % MENUS.length, true); break;
         case "ArrowRight": e.preventDefault(); openBarMenu((b.open + 1) % MENUS.length, true); break;
-        case "ArrowDown": e.preventDefault(); b.highlighted = (b.highlighted + 1) % count; paintItems(); break;
-        case "ArrowUp": e.preventDefault(); b.highlighted = b.highlighted <= 0 ? count - 1 : b.highlighted - 1; paintItems(); break;
-        case "Enter": case "NumpadEnter": case "Space": e.preventDefault(); if (b.highlighted >= 0) run(b.items[b.highlighted].Entry); break;
-        case "Escape": closeMenu(); break;
+        case "ArrowDown": take(); b.highlighted = (b.highlighted + 1) % count; paintItems(); break;
+        case "ArrowUp": take(); b.highlighted = b.highlighted <= 0 ? count - 1 : b.highlighted - 1; paintItems(); break;
+        case "Enter": case "NumpadEnter": case "Space": {
+          take();
+          const at = b.items.findIndex((it) => it.View === focused); // a menu line in keyboard focus is the one picked
+          if (at >= 0) b.highlighted = at;
+          if (b.highlighted >= 0) run(b.items[b.highlighted].Entry);
+          break;
+        }
+        case "Escape": take(); closeMenu(); break;
       }
     };
     const onChar = () => {};

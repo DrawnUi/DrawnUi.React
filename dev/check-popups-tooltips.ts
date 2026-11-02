@@ -202,6 +202,17 @@ const element = {
     check("a change inside an open popup is drawn", !!boxOf([0x7A, 0x3B, 0x52]));
     canvas.ClosePopupWindow(id); frame();
   }
+  // a closed popup leaves the accessibility tree in the frame that follows (no ghost menu for screen readers)
+  {
+    const panel = new SkiaShape(); panel.WidthRequest = 100; panel.HeightRequest = 60; panel.BackgroundColor = "#262B3B";
+    panel.AccessibilityRole = "menu"; panel.AccessibilityLabel = "Ghost";
+    const id = canvas.OpenPopupWindow(panel, new SKPoint(400, 300)); frame();
+    const inTree = () => canvas.AccessibilityManager.Snapshot.some((n) => n.Label === "Ghost");
+    canvas.AccessibilityManager.ForceRebuildOnNextFrame(); frame();
+    const before = inTree();
+    canvas.ClosePopupWindow(id); frame();
+    check("a closed popup leaves the accessibility tree at once", before && !inTree(), `open ${before}, closed ${inTree()}`);
+  }
 
   // ---- span underline in the label's color ----
   {
