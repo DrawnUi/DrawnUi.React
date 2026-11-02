@@ -27,6 +27,7 @@ export class KeyboardManager {
     window.addEventListener("pointerdown", () => window.focus(), true);
     window.addEventListener("keydown", (e) => {
       const code = e.code || "";
+      KeyboardManager.SyncModifiers(e);
       KeyboardManager.pressed.add(code);
       for (const h of [...KeyboardManager.keyDown]) h(code, e);
       const proxied = (e.target as HTMLElement | null)?.dataset?.drawnuiTextInput === "1"; // TextInputProxy: characters come through its input events
@@ -34,10 +35,26 @@ export class KeyboardManager {
     }, true);
     window.addEventListener("keyup", (e) => {
       const code = e.code || "";
+      KeyboardManager.SyncModifiers(e);
       KeyboardManager.pressed.delete(code);
       for (const h of [...KeyboardManager.keyUp]) h(code, e);
     }, true);
     window.addEventListener("blur", () => KeyboardManager.pressed.clear());
+  }
+
+  /**
+   * The modifier state follows each key event's own flags: a modifier pressed while the page had no focus (its keydown
+   * went elsewhere) still counts, and one released elsewhere stops counting.
+   */
+  private static SyncModifiers(e: KeyboardEvent): void {
+    const sync = (down: boolean, left: InputKey, right: InputKey) => {
+      const p = KeyboardManager.pressed;
+      if (!down) { p.delete(left); p.delete(right); } else if (!p.has(left) && !p.has(right)) p.add(left);
+    };
+    sync(!!e.altKey, "AltLeft", "AltRight");
+    sync(!!e.ctrlKey, "ControlLeft", "ControlRight");
+    sync(!!e.shiftKey, "ShiftLeft", "ShiftRight");
+    sync(!!e.metaKey, "MetaLeft", "MetaRight");
   }
 
   static Subscribe(down: (key: InputKey, e: KeyboardEvent) => void, char: (ch: string, e: KeyboardEvent) => void, up?: (key: InputKey, e: KeyboardEvent) => void): void {

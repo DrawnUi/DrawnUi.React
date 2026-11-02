@@ -3,7 +3,7 @@
 // and key handlers. Also: a span without a color draws its underline in the label's color (C# a0ca2cbc).
 import { readFileSync } from "node:fs";
 import {
-  Super, SKRect, SKPoint, Canvas, SkiaLayer, SkiaShape, SkiaButton, SkiaLabel, TextSpan, TooltipStyle, Thickness,
+  Super, SKRect, SKPoint, Canvas, SkiaLayer, SkiaShape, SkiaButton, SkiaLabel, TextSpan, TooltipStyle, Thickness, SkiaStack, SkiaAccessibilityManager,
   type SkiaControl,
 } from "../src/index.ts";
 
@@ -212,6 +212,23 @@ const element = {
     const before = inTree();
     canvas.ClosePopupWindow(id); frame();
     check("a closed popup leaves the accessibility tree at once", before && !inTree(), `open ${before}, closed ${inTree()}`);
+  }
+  // keyboard in popup menus (drawnui-cross 6ao): an opening menu takes the keyboard on its first line, the arrows move
+  // through lines held by a column inside the menu's shape, and a closing menu gives the keyboard back to its opener
+  {
+    const mgr = canvas.AccessibilityManager;
+    const opener = box(40, 150, 60, 30, "#405060"); opener.AccessibilityRole = "button"; opener.AccessibilityLabel = "Opener"; opener.Tapped = () => {};
+    const r = new SkiaLayer(); r.WidthRequest = W; r.HeightRequest = H; r.BackgroundColor = "#000000"; r.AddSubView(opener);
+    canvas.Content = r; frame();
+    const panel = new SkiaShape(); panel.WidthRequest = 120; panel.AccessibilityRole = "menu"; panel.AccessibilityLabel = "Menu";
+    const column = new SkiaStack(); column.Spacing = 0; panel.AddSubView(column);
+    const lines = ["One", "Two", "Three"].map((t) => { const l = new SkiaShape(); l.HeightRequest = 30; l.HorizontalOptions = "Fill"; l.AccessibilityRole = "menuitem"; l.AccessibilityLabel = t; l.Tapped = () => {}; column.AddSubView(l); return l; });
+    const id = canvas.OpenPopupWindow(panel, opener); frame();
+    check("an opening menu takes the keyboard on its first line", mgr.FocusedNode === lines[0], `${mgr.FocusedNode?.AccessibilityLabel}`);
+    SkiaAccessibilityManager.Key(lines[0], "ArrowDown"); frame();
+    check("Down moves to the next line of a column inside the menu's shape", mgr.FocusedNode === lines[1], `${mgr.FocusedNode?.AccessibilityLabel}`);
+    canvas.ClosePopupWindow(id); frame();
+    check("a closing menu gives the keyboard back to the control it opened from", mgr.FocusedNode === opener, `${mgr.FocusedNode?.AccessibilityLabel}`);
   }
 
   // ---- span underline in the label's color ----

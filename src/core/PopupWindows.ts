@@ -57,7 +57,7 @@ export interface PopupWindowOptions {
   Passive?: boolean;
 }
 
-interface PopupWindow { Id: PopupId; Root: SkiaControl; Anchor: PopupAnchor; Options: PopupWindowOptions; Rect: SKRect; LeftAt: number }
+interface PopupWindow { Id: PopupId; Root: SkiaControl; Anchor: PopupAnchor; Options: PopupWindowOptions; Rect: SKRect; LeftAt: number; Opener?: SkiaControl }
 
 /** The canvas side the layer needs. */
 interface PopupHostCanvas {
@@ -92,8 +92,11 @@ export class PopupLayer {
     if (options.Passive) { root.InputTransparent = true; root.AccessibilityRole ??= Aria.RolePresentation; }
     root.Parent = undefined;
     root._superview = superview;
-    const popup: PopupWindow = { Id: ++this.nextId, Root: root, Anchor: anchor, Options: options, Rect: SKRect.Empty, LeftAt: 0 };
+    // the control it opens from (a menu title, a dropdown button), else the one the keyboard was on: the focus goes back there
+    const opener = anchor.Control ?? this.canvas.AccessibilityManager.FocusedNode;
+    const popup: PopupWindow = { Id: ++this.nextId, Root: root, Anchor: anchor, Options: options, Rect: SKRect.Empty, LeftAt: 0, Opener: opener };
     this.popups.push(popup);
+    if (!options.Passive) this.canvas.AccessibilityManager.FocusOpenedPopup(root); // its menu takes the keyboard (6ao)
     return popup.Id;
   }
 
@@ -113,8 +116,14 @@ export class PopupLayer {
     if (i < 0) return;
     this.popups.splice(i, 1);
     // its nodes leave the accessibility tree with this frame, not when the disposal runs after it
-    this.canvas.AccessibilityManager.UnregisterSubtree(popup.Root);
-    this.canvas.AccessibilityManager.ForceRebuildOnNextFrame();
+    const a11y = this.canvas.AccessibilityManager;
+    const focused = a11y.FocusedNode;
+    let inside = false;
+    for (let c = focused; c && !inside; c = c.Parent) inside = c === popup.Root;
+    // the keyboard was in it (or nowhere): it goes back to the control the popup opened from, as native menus do
+    if (popup.Opener && !popup.Options.Passive && (!focused || inside)) a11y.RequestKeyboardFocus(popup.Opener);
+    a11y.UnregisterSubtree(popup.Root);
+    a11y.ForceRebuildOnNextFrame();
     this.canvas.DisposeObject(popup.Root);
     this.canvas.Update();
     this.canvas.RaisePopupWindowClosed(popup.Id);

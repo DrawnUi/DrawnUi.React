@@ -190,19 +190,22 @@ export function MenusPage() {
         return;
       }
       const count = b.items.length;
+      // a line in keyboard focus (an opening menu takes it, drawnui-cross 6ao): the keyboard moves it up and down and
+      // Enter / Space activate it; the highlight goes along
+      const line = b.items.findIndex((it) => it.View === focused);
+      if (line >= 0 && key !== "ArrowLeft" && key !== "ArrowRight" && key !== "Escape") {
+        const to = key === "ArrowDown" ? Math.min(line + 1, count - 1) : key === "ArrowUp" ? Math.max(line - 1, 0)
+          : key === "Home" ? 0 : key === "End" ? count - 1 : -1;
+        if (to >= 0) { b.highlighted = to; paintItems(); }
+        return;
+      }
       switch (key) {
         // on a title in keyboard focus the arrow also moves that focus to the next title
         case "ArrowLeft": e.preventDefault(); openBarMenu((b.open - 1 + MENUS.length) % MENUS.length, true); break;
         case "ArrowRight": e.preventDefault(); openBarMenu((b.open + 1) % MENUS.length, true); break;
         case "ArrowDown": take(); b.highlighted = (b.highlighted + 1) % count; paintItems(); break;
         case "ArrowUp": take(); b.highlighted = b.highlighted <= 0 ? count - 1 : b.highlighted - 1; paintItems(); break;
-        case "Enter": case "NumpadEnter": case "Space": {
-          take();
-          const at = b.items.findIndex((it) => it.View === focused); // a menu line in keyboard focus is the one picked
-          if (at >= 0) b.highlighted = at;
-          if (b.highlighted >= 0) run(b.items[b.highlighted].Entry);
-          break;
-        }
+        case "Enter": case "NumpadEnter": case "Space": take(); if (b.highlighted >= 0) run(b.items[b.highlighted].Entry); break;
         case "Escape": take(); closeMenu(); break;
       }
     };

@@ -150,9 +150,16 @@ export class SkiaAccessibilityManager {
    * The arrow-key group around `control`: its nearest ancestor with a composite role (Aria.IsCompositeRole, e.g.
    * Aria.RoleList on a SkiaStack), and the item of that group holding the control (one of its children, a cell).
    */
-  static TryFindGroup(control: SkiaControl): { Group: SkiaControl; Item: SkiaControl } | undefined {
+  static TryFindGroup(control: SkiaControl): { Group: SkiaControl; Item: SkiaControl; Holder: SkiaControl } | undefined {
+    const path: SkiaControl[] = [];
     for (let child = control, parent = control.Parent; parent; child = parent, parent = parent.Parent) {
-      if (Aria.IsCompositeRole(parent.AccessibilityRole)) return { Group: parent, Item: child };
+      path.push(child);
+      if (!Aria.IsCompositeRole(parent.AccessibilityRole)) continue;
+      // drawnui-cross 6ao: the role may sit on a wrapper (a menu shape around a column of lines); the items are the
+      // children of the control that holds them, found down the path through single children that are not nodes
+      let holder = parent, k = path.length - 1;
+      while (k > 0 && ViewsOf(holder).length === 1 && !IsInteractiveNode(path[k])) { holder = path[k]; k--; }
+      return { Group: parent, Item: path[k], Holder: holder };
     }
     return undefined;
   }
@@ -197,7 +204,7 @@ export class SkiaAccessibilityManager {
   MoveInGroup(focused: SkiaControl, key: InputKey): boolean {
     const found = SkiaAccessibilityManager.TryFindGroup(focused);
     if (!found) return false;
-    const { Group: group, Item: item } = found;
+    const { Holder: group, Item: item } = found;
     const scroll = FindScroll(group), axis = AxisOf(group), count = ItemCount(group);
     const current = this.groupRequest?.Group === group ? this.groupRequest.Index : IndexOf(group, item);
     if (current < 0 || count < 1) return false;
@@ -220,6 +227,34 @@ export class SkiaAccessibilityManager {
     this.groupRequest = { Group: group, Scroll: scroll, Index: target, Step: step, Deadline: performance.now() + 3000, ScrollIssued: false };
     group.Superview?.Update(); // resolved at the end of the next frame, together with the snapshot
     return true;
+  }
+
+  // ---- keyboard focus moved by popup windows (drawnui-cross 6ao rule 2, and back to the opener on close) ----
+
+  private focusRequest?: SkiaControl;
+  private popupFocusRoot?: SkiaControl;
+
+  /** The keyboard goes to this control at the end of the next frame (a popup closed: back to what opened it). */
+  RequestKeyboardFocus(control: SkiaControl): void { this.focusRequest = control; this.popupFocusRoot = undefined; }
+
+  /**
+   * A popup window just opened: at the end of the frame that draws it, the keyboard goes to its arrow-key group's current
+   * choice (a checked radio, menuitemradio, option or tab), else to its first interactive item, however it was opened.
+   */
+  FocusOpenedPopup(root: SkiaControl): void { this.popupFocusRoot = root; }
+
+  private ProcessFocusRequests(scale: number, w: number, h: number): void {
+    const request = this.focusRequest, root = this.popupFocusRoot;
+    this.focusRequest = this.popupFocusRoot = undefined;
+    if (root && !root.IsDisposed && root.Superview) {
+      this.Rebuild(scale, w, h);
+      const inside = (c: SkiaControl) => { for (let p: SkiaControl | undefined = c; p; p = p.Parent) if (p === root) return true; return false; };
+      const choice = (role: string) => role === Aria.RoleRadio || role === Aria.RoleMenuItemRadio || role === "option" || role === "tab";
+      const items = this.Snapshot.filter((n) => n.CanInteract && inside(n.Source) && SkiaAccessibilityManager.TryFindGroup(n.Source));
+      const target = items.find((n) => n.IsPressed === true && choice(n.Role)) ?? items[0];
+      if (target) { this.FocusFromKeyboard(target.Source, scale, w, h); return; }
+    }
+    if (request && !request.IsDisposed && request.Superview && request.AccessibilityCanInteract) this.FocusFromKeyboard(request, scale, w, h);
   }
 
   /** Frame end: focus the requested item once it is drawn, skipping items that cannot take input. */
@@ -281,6 +316,7 @@ export class SkiaAccessibilityManager {
    */
   OnFrameEnd(scale: number, canvasWidthPx: number, canvasHeightPx: number, requestFrame: () => void): void {
     this.ProcessGroupFocus(scale, canvasWidthPx, canvasHeightPx, requestFrame);
+    if (this.focusRequest || this.popupFocusRoot) this.ProcessFocusRequests(scale, canvasWidthPx, canvasHeightPx);
     if (this.nodes.size === 0 && this.Snapshot.length === 0) return;
     const now = performance.now();
     const wait = this.MinUpdateIntervalMs - (now - this.lastRebuild);
@@ -378,6 +414,11 @@ function SameValue(a?: AccessibilityValue, b?: AccessibilityValue): boolean {
 }
 
 // ---- group helpers (duck-typed layouts and scrolls) ----
+
+/** A node the keyboard can land on: a role that is not presentation and takes input. */
+function IsInteractiveNode(c: SkiaControl): boolean {
+  return !!c.AccessibilityRole && c.AccessibilityRole !== Aria.RolePresentation && c.IsAccessibilityElement && c.AccessibilityCanInteract;
+}
 
 /** Children of a control (a layout's Views, a scroll's Content). */
 function ViewsOf(c: SkiaControl): readonly SkiaControl[] {

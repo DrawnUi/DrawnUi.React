@@ -211,6 +211,15 @@ class Cell extends SkiaDynamicDrawnCell {
   check("Backspace is Backspace, Delete is Delete", KeyboardManager.IsOwnedByElement(key("Backspace", "HTML")) === false
     && (editor.CursorPosition = 1, down(key("Delete", "BODY")) && editor.Text === "ax"), editor.Text);
 
+  // the modifier state follows each key event's flags: Alt held before the page had focus still counts
+  const sync = (e: Partial<KeyboardEvent>) => (KeyboardManager as unknown as { SyncModifiers(e: Partial<KeyboardEvent>): void }).SyncModifiers(e);
+  sync({ code: "KeyF", altKey: true });
+  check("a key with the Alt flag counts Alt as pressed", KeyboardManager.IsAltPressed && !KeyboardManager.IsControlPressed);
+  sync({ code: "KeyS", ctrlKey: true });
+  check("a key without the Alt flag drops it, the Ctrl flag counts", !KeyboardManager.IsAltPressed && KeyboardManager.IsControlPressed);
+  sync({ code: "KeyS" });
+  check("a key without flags leaves no modifier pressed", !KeyboardManager.IsControlPressed && !KeyboardManager.IsShiftPressed);
+
   // range values (drawnui-cross 6c): a value, not a name; read back on the next frame after a key
   const sliderNode = () => mgr.Snapshot.find((n) => n.Source === slider);
   check("slider: value in the snapshot, no name from the value", sliderNode()?.Value?.Now === slider.End && sliderNode()?.Value?.Min === 0 && sliderNode()?.Value?.Max === 50
