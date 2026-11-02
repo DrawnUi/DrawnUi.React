@@ -17,6 +17,9 @@ export class KeyboardManager {
 
   static get IsShiftPressed(): boolean { return KeyboardManager.pressed.has("ShiftLeft") || KeyboardManager.pressed.has("ShiftRight"); }
   static get IsControlPressed(): boolean { return KeyboardManager.pressed.has("ControlLeft") || KeyboardManager.pressed.has("ControlRight") || KeyboardManager.pressed.has("MetaLeft") || KeyboardManager.pressed.has("MetaRight"); }
+  /** True while the keydown handlers run: a popup opened now was opened from the keyboard (Alt+F). */
+  static IsDispatchingKeyDown = false;
+
   static get IsAltPressed(): boolean { return KeyboardManager.pressed.has("AltLeft") || KeyboardManager.pressed.has("AltRight"); }
 
   /** C# AttachToKeyboardAsync / JS attachGlobalKeyboard: idempotent. */
@@ -29,7 +32,8 @@ export class KeyboardManager {
       const code = e.code || "";
       KeyboardManager.SyncModifiers(e);
       KeyboardManager.pressed.add(code);
-      for (const h of [...KeyboardManager.keyDown]) h(code, e);
+      KeyboardManager.IsDispatchingKeyDown = true;
+      try { for (const h of [...KeyboardManager.keyDown]) h(code, e); } finally { KeyboardManager.IsDispatchingKeyDown = false; }
       const proxied = (e.target as HTMLElement | null)?.dataset?.drawnuiTextInput === "1"; // TextInputProxy: characters come through its input events
       if (!proxied && e.key && e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) for (const h of [...KeyboardManager.keyChar]) h(e.key, e);
     }, true);

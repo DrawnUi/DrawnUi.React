@@ -229,8 +229,10 @@ createRoot(document.getElementById("root")!).render(
   `ClosePopupWindows()`; `canvas.PopupWindowClosed.add(id => …)`. Options: `Size`, `CloseOnPointerLeave`, `Passive`
   (shows only). Menus are app content: give items `AccessibilityRole` menuitem and a hover look. A popup with a
   menu, list or radio group in it takes the keyboard on its checked item, else its first one, when it opens (the
-  arrows walk its items, also when the role sits on a shape around their column); when it closes with the keyboard
-  in it, the keyboard goes back to the control it opened from.
+  arrows walk its items, also when the role sits on a shape around their column) when it is opened from the keyboard
+  (Enter on a focused control, a key handler such as Alt+F); Tab stays inside it while it is open; when it closes
+  with the keyboard in it, the keyboard goes back to the control it opened from. A popup opened with the mouse leaves
+  the keyboard where it is.
 - A control that consumes a gesture keeps it until it stops consuming, so a drag survives the finger leaving the
   control. To drag inside a `SkiaScroll` (the scroll owns vertical pans), take `Down` on a handle with
   `ConsumeGestures`, set `scroll.RespondsToGestures = false` for the drag and restore it on `Up`, and count travel in

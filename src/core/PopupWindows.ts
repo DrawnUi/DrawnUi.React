@@ -1,6 +1,7 @@
 import type { DrawingContext, SkiaControl } from "./SkiaControl";
 import { SKPoint } from "./Gestures";
 import { SKRect } from "./Types";
+import { KeyboardManager } from "./KeyboardManager";
 import { Aria, type SkiaAccessibilityManager } from "./Accessibility";
 
 /** A popup window opened with `Canvas.OpenPopupWindow` (drawnui-cross 6at, C# PopupId, Rust PopupId). */
@@ -92,11 +93,18 @@ export class PopupLayer {
     if (options.Passive) { root.InputTransparent = true; root.AccessibilityRole ??= Aria.RolePresentation; }
     root.Parent = undefined;
     root._superview = superview;
-    // the control it opens from (a menu title, a dropdown button), else the one the keyboard was on: the focus goes back there
-    const opener = anchor.Control ?? this.canvas.AccessibilityManager.FocusedNode;
-    const popup: PopupWindow = { Id: ++this.nextId, Root: root, Anchor: anchor, Options: options, Rect: SKRect.Empty, LeftAt: 0, Opener: opener };
+    const a11y = this.canvas.AccessibilityManager;
+    const popup: PopupWindow = { Id: ++this.nextId, Root: root, Anchor: anchor, Options: options, Rect: SKRect.Empty, LeftAt: 0 };
+    // opened from the keyboard (Enter on a focused control, a key handler such as Alt+F): it takes the keyboard (6ao) and
+    // gives it back when it closes, to the control it opens from, else to where the keyboard was (unless that is inside a
+    // popup closing now: Left / Right in a menu bar). A popup opened with the mouse leaves the keyboard alone.
+    if (!options.Passive && (a11y.FocusedNode || KeyboardManager.IsDispatchingKeyDown)) {
+      const keyboard = a11y.FocusedNode;
+      popup.Opener = anchor.Control ?? (keyboard && !this.popups.some((p) => PopupLayer.IsInside(keyboard, p.Root)) ? keyboard : undefined);
+      a11y.FocusOpenedPopup(root);
+    }
     this.popups.push(popup);
-    if (!options.Passive) this.canvas.AccessibilityManager.FocusOpenedPopup(root); // its menu takes the keyboard (6ao)
+    this.UpdateKeyboardScope();
     return popup.Id;
   }
 
@@ -118,15 +126,26 @@ export class PopupLayer {
     // its nodes leave the accessibility tree with this frame, not when the disposal runs after it
     const a11y = this.canvas.AccessibilityManager;
     const focused = a11y.FocusedNode;
-    let inside = false;
-    for (let c = focused; c && !inside; c = c.Parent) inside = c === popup.Root;
     // the keyboard was in it (or nowhere): it goes back to the control the popup opened from, as native menus do
-    if (popup.Opener && !popup.Options.Passive && (!focused || inside)) a11y.RequestKeyboardFocus(popup.Opener);
+    if (popup.Opener && (!focused || PopupLayer.IsInside(focused, popup.Root))) a11y.RequestKeyboardFocus(popup.Opener);
+    this.UpdateKeyboardScope();
     a11y.UnregisterSubtree(popup.Root);
     a11y.ForceRebuildOnNextFrame();
     this.canvas.DisposeObject(popup.Root);
     this.canvas.Update();
     this.canvas.RaisePopupWindowClosed(popup.Id);
+  }
+
+  private static IsInside(control: SkiaControl, root: SkiaControl): boolean {
+    for (let c: SkiaControl | undefined = control; c; c = c.Parent) if (c === root) return true;
+    return false;
+  }
+
+  /** Tab stays inside the top popup window that takes input (a menu, a dropdown) while it is open. */
+  private UpdateKeyboardScope(): void {
+    let top: SkiaControl | undefined;
+    for (let i = this.popups.length - 1; i >= 0 && !top; i--) if (!this.popups[i].Options.Passive) top = this.popups[i].Root;
+    this.canvas.AccessibilityManager.KeyboardScope = top;
   }
 
   /** The top popup window taking input whose content is under the point (canvas pixels). */

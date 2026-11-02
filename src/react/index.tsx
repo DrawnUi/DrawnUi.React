@@ -327,6 +327,12 @@ function AccessibilityOverlay({ view }: { view: CanvasView }) {
             onClick={activate}
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") { e.preventDefault(); activate(); }
+              else if (e.key === "Tab" && view.AccessibilityManager.KeyboardScope) {
+                // an open popup window keeps the keyboard: Tab goes round its stops (a menu is one stop)
+                e.preventDefault();
+                const next = view.AccessibilityManager.NextTabStop(n.Source, !e.shiftKey);
+                if (next) elementOf(next.AccessibilityId)?.focus({ preventScroll: true });
+              }
               else if (NAVIGATION_KEYS.has(e.key) && SkiaAccessibilityManager.Key(n.Source, e.key)) e.preventDefault();
             }}
             onFocus={(e) => {

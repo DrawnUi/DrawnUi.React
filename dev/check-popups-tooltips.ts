@@ -223,12 +223,26 @@ const element = {
     const panel = new SkiaShape(); panel.WidthRequest = 120; panel.AccessibilityRole = "menu"; panel.AccessibilityLabel = "Menu";
     const column = new SkiaStack(); column.Spacing = 0; panel.AddSubView(column);
     const lines = ["One", "Two", "Three"].map((t) => { const l = new SkiaShape(); l.HeightRequest = 30; l.HorizontalOptions = "Fill"; l.AccessibilityRole = "menuitem"; l.AccessibilityLabel = t; l.Tapped = () => {}; column.AddSubView(l); return l; });
-    const id = canvas.OpenPopupWindow(panel, opener); frame();
-    check("an opening menu takes the keyboard on its first line", mgr.FocusedNode === lines[0], `${mgr.FocusedNode?.AccessibilityLabel}`);
-    SkiaAccessibilityManager.Key(lines[0], "ArrowDown"); frame();
-    check("Down moves to the next line of a column inside the menu's shape", mgr.FocusedNode === lines[1], `${mgr.FocusedNode?.AccessibilityLabel}`);
+    // opened with the mouse (no keyboard focus, no key being handled): the keyboard is left alone
+    const byMouse = canvas.OpenPopupWindow(panel, opener); frame();
+    check("a menu opened with the mouse leaves the keyboard alone", mgr.FocusedNode === undefined, `${mgr.FocusedNode?.AccessibilityLabel}`);
+    check("while a menu is open, controls outside it are no Tab stops", !mgr.IsTabStop(opener));
+    canvas.ClosePopupWindow(byMouse); frame();
+    check("closing it moves no keyboard focus", mgr.FocusedNode === undefined, `${mgr.FocusedNode?.AccessibilityLabel}`);
+    // opened from the keyboard (Enter on the focused opener)
+    const panel2 = new SkiaShape(); panel2.WidthRequest = 120; panel2.AccessibilityRole = "menu"; panel2.AccessibilityLabel = "Menu";
+    const column2 = new SkiaStack(); column2.Spacing = 0; panel2.AddSubView(column2);
+    const lines2 = ["One", "Two", "Three"].map((t) => { const l = new SkiaShape(); l.HeightRequest = 30; l.HorizontalOptions = "Fill"; l.AccessibilityRole = "menuitem"; l.AccessibilityLabel = t; l.Tapped = () => {}; column2.AddSubView(l); return l; });
+    opener.NotifyAccessibilityFocused(true);
+    const id = canvas.OpenPopupWindow(panel2, opener); frame();
+    check("a menu opened from the keyboard takes it on its first line", mgr.FocusedNode === lines2[0], `${mgr.FocusedNode?.AccessibilityLabel}`);
+    SkiaAccessibilityManager.Key(lines2[0], "ArrowDown"); frame();
+    check("Down moves to the next line of a column inside the menu's shape", mgr.FocusedNode === lines2[1], `${mgr.FocusedNode?.AccessibilityLabel}`);
+    check("Tab stays inside the open menu (one stop: the focused line)", mgr.NextTabStop(lines2[1], true) === lines2[1] && mgr.NextTabStop(lines2[1], false) === lines2[1],
+      `${mgr.NextTabStop(lines2[1], true)?.AccessibilityLabel}`);
     canvas.ClosePopupWindow(id); frame();
     check("a closing menu gives the keyboard back to the control it opened from", mgr.FocusedNode === opener, `${mgr.FocusedNode?.AccessibilityLabel}`);
+    check("with no menu open, Tab reaches the page again", mgr.IsTabStop(opener));
   }
 
   // ---- span underline in the label's color ----

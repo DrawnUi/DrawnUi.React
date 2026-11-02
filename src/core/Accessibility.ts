@@ -176,6 +176,9 @@ export class SkiaAccessibilityManager {
    * item; the arrow keys move between items. Every node outside a group is a stop.
    */
   IsTabStop(node: SkiaControl): boolean {
+    // an open popup window keeps the keyboard: Tab never leaves it, as with native menus
+    const scope = this.KeyboardScope;
+    if (scope) { let c: SkiaControl | undefined = node; while (c && c !== scope) c = c.Parent; if (!c) return false; }
     const found = SkiaAccessibilityManager.TryFindGroup(node);
     if (!found) return true;
     let stopItem: SkiaControl | undefined;
@@ -235,7 +238,24 @@ export class SkiaAccessibilityManager {
   private popupFocusRoot?: SkiaControl;
 
   /** The keyboard goes to this control at the end of the next frame (a popup closed: back to what opened it). */
-  RequestKeyboardFocus(control: SkiaControl): void { this.focusRequest = control; this.popupFocusRoot = undefined; }
+  RequestKeyboardFocus(control: SkiaControl): void { this.focusRequest = control; }
+
+  /**
+   * While set, Tab stays inside this control: only its nodes are Tab stops and Tab / Shift+Tab go round them. The canvas
+   * sets it to the top popup window that takes input (a menu, a dropdown), undefined when none is open.
+   */
+  KeyboardScope?: SkiaControl;
+
+  /** The Tab stop after (or before) `from` in reading order; inside a KeyboardScope it goes round, never leaving. */
+  NextTabStop(from: SkiaControl | undefined, forward: boolean): SkiaControl | undefined {
+    const stops = this.Snapshot.filter((n) => n.CanInteract && this.IsTabStop(n.Source)).map((n) => n.Source);
+    if (stops.length === 0) return undefined;
+    let current = from ? stops.indexOf(from) : -1;
+    if (current < 0) current = forward ? -1 : stops.length;
+    const next = forward ? current + 1 : current - 1;
+    if (this.KeyboardScope) return stops[(next + stops.length) % stops.length];
+    return next >= 0 && next < stops.length ? stops[next] : undefined;
+  }
 
   /**
    * A popup window just opened: at the end of the frame that draws it, the keyboard goes to its arrow-key group's current
