@@ -295,6 +295,17 @@ export class SkiaControl {
   BlockGesturesBelow = false;
   LockChildrenGestures: LockTouch = "Disabled";
 
+  // ---- focus on a completed tap (drawnui-cross 6ap, C# CanBeFocused / LockFocus / SetFrameworkFocus) ----
+  /**
+   * A tap this control takes moves the canvas focus to it, and whatever had it (an editor) lets it go. Default false: a
+   * plain control declines the focus, so tapping it (a Send button) leaves the current focus alone.
+   */
+  CanBeFocused = false;
+  /** While this control has the canvas focus, taps elsewhere do not move it. */
+  LockFocus = false;
+  /** The canvas gives (true) or takes (false) the focus; returns whether the control takes it. */
+  SetFrameworkFocus(_focus: boolean): boolean { return this.CanBeFocused; }
+
   // ---- hover (drawnui-cross 6m, C# ReceivesHover / IsHovered / HoverChanged) ----
   private receivesHover?: boolean;
   /**

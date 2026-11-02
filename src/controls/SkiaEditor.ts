@@ -152,16 +152,19 @@ export class SkiaEditor extends SkiaShape {
 
   /** Caret index (UTF-16 units) = the left edge of the selection when one exists. */
   get CursorPosition(): number { return this.cursorPosition; }
+  /** A position from app code as a whole number: beyond the text (MAX_SAFE_INTEGER, Infinity) is the end, NaN is 0. */
+  private static Whole(v: number): number { return Number.isNaN(v) ? 0 : Math.trunc(v); }
+
   set CursorPosition(v: number) {
     this.cursorPlaced = true;
-    const p = Math.max(0, Math.min(this.text.length, v | 0));
+    const p = Math.max(0, Math.min(this.text.length, SkiaEditor.Whole(v)));
     if (p === this.cursorPosition) return;
     this.cursorPosition = p;
     this.OnCursorMoved();
   }
   get SelectionLength(): number { return this.selectionLength; }
   set SelectionLength(v: number) {
-    const l = Math.max(0, Math.min(this.text.length - this.cursorPosition, v | 0));
+    const l = Math.max(0, Math.min(this.text.length - this.cursorPosition, SkiaEditor.Whole(v)));
     if (l === this.selectionLength) return;
     this.selectionLength = l;
     this.OnCursorMoved();
@@ -202,6 +205,9 @@ export class SkiaEditor extends SkiaShape {
       this.StopBlink();
       this.SetFocusNative(false);
     }
+    // the canvas focus follows the editor's own (a press, Tab, code), so a tap elsewhere can end the editing (6ap)
+    const canvas = this.Superview;
+    if (canvas) { if (v) canvas.ReportFocus(this, this); else if (canvas.FocusedChild === this) canvas.ReportFocus(undefined, this); }
     this.FocusChanged?.(this, v);
     this.NotifyAccessibility();
     this.InvalidateCache(); this.RepaintComposition();
@@ -504,6 +510,9 @@ export class SkiaEditor extends SkiaShape {
     }
     return this;
   }
+
+  /** The canvas gives or takes the focus (a tap elsewhere): an editor always takes it. */
+  override SetFrameworkFocus(focus: boolean): boolean { this.IsFocused = focus; return true; }
 
   /** A text field is a Tab stop by default, like a native text box, with no Tapped handler needed. */
   protected override DefaultAccessibilityCanInteract(): boolean { return true; }

@@ -198,6 +198,15 @@ class Cell extends SkiaDynamicDrawnCell {
   };
   const down = (e: KeyboardEvent) => { (editor as unknown as { OnKeyDown(k: string, e: KeyboardEvent): void }).OnKeyDown(e.code, e); return e.defaultPrevented; };
   const char = (ch: string, e: KeyboardEvent) => { (editor as unknown as { onKeyChar(c: string, e: KeyboardEvent): void }).onKeyChar(ch, e); return e.defaultPrevented; };
+  // positions from app code: beyond the text is the end, NaN is the start
+  editor.Text = "abc"; editor.CursorPosition = Number.MAX_SAFE_INTEGER;
+  check("CursorPosition = MAX_SAFE_INTEGER puts the caret at the end", editor.CursorPosition === 3, `${editor.CursorPosition}`);
+  editor.CursorPosition = 0; editor.CursorPosition = Infinity;
+  check("CursorPosition = Infinity puts the caret at the end", editor.CursorPosition === 3, `${editor.CursorPosition}`);
+  editor.CursorPosition = 1; editor.SelectionLength = Number.MAX_SAFE_INTEGER;
+  check("SelectionLength = MAX_SAFE_INTEGER selects to the end", editor.SelectionLength === 2, `${editor.SelectionLength}`);
+  editor.SelectionLength = 0; editor.CursorPosition = NaN;
+  check("CursorPosition = NaN is the start", editor.CursorPosition === 0, `${editor.CursorPosition}`);
   editor.Text = "abc"; editor.CursorPosition = 3;
   check("page keys: Backspace deletes and is taken", down(key("Backspace", "BODY")) && editor.Text === "ab", editor.Text);
   check("a page button keeps Enter (no submit, not taken)", !down(key("Enter", "BUTTON")) && submitted === 0);

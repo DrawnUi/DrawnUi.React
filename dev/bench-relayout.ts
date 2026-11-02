@@ -18,6 +18,8 @@ class FakeCanvas {
   RenderingScale = 1.25;
   GpuEpoch = 0;
   Update(): void {}
+  FocusedChild: unknown = undefined;
+  ReportFocus(value: unknown): void { this.FocusedChild = value; }
   DisposeObject(o: { Dispose(): void }): void { o.Dispose(); }
   RegisterAnimator(a: AnimatorBase): boolean { this.AnimatingControls.set(a.Uid, a); return true; }
   UnregisterAnimator(uid: number): void { this.AnimatingControls.delete(uid); }

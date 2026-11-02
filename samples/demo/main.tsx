@@ -1,4 +1,4 @@
-import { StrictMode, useState } from "react";
+import { type ReactElement, StrictMode, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Canvas, SkiaLabelFps, SkiaLayer, SkiaShell, Super } from "drawnui-react";
 import { type Canvas as CanvasView, SkiaImageManager, Thickness, TooltipStyle } from "drawnui-react/core";
@@ -54,7 +54,15 @@ SkiaButtonCtrl.DefaultAccessibilityRole = Aria.RoleButton;
 // Hello tooltips in the menus' panel colors (drawnui-hello-app palette rule)
 Super.TooltipStyle = new TooltipStyle({ BackgroundColor: "#262B3B", BorderColor: "#3B4256", TextColor: "#FFFFFF" });
 
-const ROUTES = {
+/**
+ * A tap on a page's empty space (or a card's) takes the focus, so an editor stops editing; buttons leave it alone
+ * (drawnui-cross 6ap, as the .NET and Rust hello apps: the page root BlockGesturesBelow + CanBeFocused).
+ */
+const page = (content: () => ReactElement) => () => (
+  <SkiaLayer HorizontalOptions="Fill" VerticalOptions="Fill" CanBeFocused BlockGesturesBelow>{content()}</SkiaLayer>
+);
+
+const ROUTES = Object.fromEntries(Object.entries({
   images: () => <ImagesPage />,
   svg: () => <SvgPage />,
   cells: () => <CellsPage />,
@@ -76,7 +84,7 @@ const ROUTES = {
   scroll: () => <ScrollPage />,
   reorder: () => <ReorderPage />,
   pong: () => <PongPage />,
-};
+} satisfies Record<string, () => ReactElement>).map(([route, content]) => [route, page(content)]));
 const TITLES = Object.fromEntries(SAMPLES.map((s) => [s.route, s.title]));
 const FPS_MARGIN = new Thickness(0, 0, 4, 24);
 

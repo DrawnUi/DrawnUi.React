@@ -215,6 +215,11 @@ createRoot(document.getElementById("root")!).render(
   no handler = browser menu as usual. `e.Location` points, `e.Local` pixels in the control, `e.Source`
   mouse / touch / keyboard, `e.Native` the DOM event. Every mouse button still taps (`e.Parameters.Event.Pointer.Button`
   "Left" / "Right" / "Middle" / "XButton1"…, `DeviceType`, `PressedButtons`): a handler meant for the primary button only checks it.
+- Focus follows a completed tap: it moves to the control that took the tap when it has `CanBeFocused`, a tap on
+  nothing clears it (an editor stops editing), a tap taken by a control that cannot be focused (a Send button) leaves
+  it alone, and `LockFocus` on the focused control keeps it. To end editing on a tap on a page's empty space, give the
+  page root (and any container that takes taps) `CanBeFocused`, plus `BlockGesturesBelow` when it has no tap handler.
+  `canvas.FocusedChild` / `canvas.ReportFocus(control | undefined)`.
 - Tooltips: `Tooltip="Saves the file"` on any control; it shows after the mouse rests 600 ms, centered 6 pt above the
   control (below where there is no room), the next one at once; it closes on leave, press, wheel, key, scrolling and
   window blur, never shows on touch, takes no hover and has no accessibility node. `Super.TooltipsFromAccessibility =

@@ -3,7 +3,7 @@
 // and key handlers. Also: a span without a color draws its underline in the label's color (C# a0ca2cbc).
 import { readFileSync } from "node:fs";
 import {
-  Super, SKRect, SKPoint, Canvas, SkiaLayer, SkiaShape, SkiaButton, SkiaLabel, TextSpan, TooltipStyle, Thickness, SkiaStack, SkiaAccessibilityManager,
+  Super, SKRect, SKPoint, Canvas, SkiaLayer, SkiaShape, SkiaButton, SkiaLabel, TextSpan, TooltipStyle, Thickness, SkiaStack, SkiaAccessibilityManager, SkiaEditor,
   type SkiaControl,
 } from "../src/index.ts";
 
@@ -26,7 +26,7 @@ g.window = Object.assign(g.window ?? {}, {
 });
 g.requestAnimationFrame = () => 1;
 g.cancelAnimationFrame = () => {};
-g.document = { documentElement: { style: style() }, body: { style: style(), appendChild() {} }, createElement: () => ({ style: style(), dataset: {}, setAttribute() {}, addEventListener() {} }), activeElement: null };
+g.document = { documentElement: { style: style() }, body: { style: style(), appendChild() {} }, createElement: () => ({ style: style(), dataset: {}, setAttribute() {}, addEventListener() {}, removeEventListener() {}, setSelectionRange() {}, focus() {}, blur() {}, remove() {}, value: "" }), activeElement: null };
 g.ResizeObserver = class { observe() {} disconnect() {} };
 g.getComputedStyle = () => ({ overflowX: "visible", overflowY: "visible" });
 const element = {
@@ -243,6 +243,29 @@ const element = {
     canvas.ClosePopupWindow(id); frame();
     check("a closing menu gives the keyboard back to the control it opened from", mgr.FocusedNode === opener, `${mgr.FocusedNode?.AccessibilityLabel}`);
     check("with no menu open, Tab reaches the page again", mgr.IsTabStop(opener));
+  }
+
+  // ---- focus on a completed tap (drawnui-cross 6ap) ----
+  {
+    const r = new SkiaLayer(); r.WidthRequest = W; r.HeightRequest = H; r.BackgroundColor = "#000000";
+    const editor = new SkiaEditor(); editor.WidthRequest = 200; editor.HeightRequest = 40; editor.Margin = new Thickness(40, 40, 0, 0); editor.Text = "Hello";
+    let sends = 0;
+    const send = box(300, 40, 80, 40, "#405060"); send.Tapped = () => { sends++; };
+    const card = box(40, 200, 200, 100, "#304030"); card.CanBeFocused = true; card.BlockGesturesBelow = true;
+    for (const c of [editor, send, card]) r.AddSubView(c);
+    canvas.Content = r; frame();
+    click(100, 60); frame();
+    check("a tap on an editor focuses it and the canvas focus follows", editor.IsFocused && canvas.FocusedChild === editor);
+    click(340, 60); frame();
+    check("a tap on a button that cannot be focused keeps the editor focused", sends === 1 && editor.IsFocused);
+    click(500, 350); frame();
+    check("a tap on nothing ends the editing", !editor.IsFocused && canvas.FocusedChild === undefined);
+    click(100, 60); frame(); click(140, 250); frame();
+    check("a tap on a container with CanBeFocused takes the focus from the editor", !editor.IsFocused && canvas.FocusedChild === card);
+    click(100, 60); frame(); editor.LockFocus = true; click(500, 350); frame();
+    check("LockFocus keeps the editor focused", editor.IsFocused && canvas.FocusedChild === editor);
+    editor.LockFocus = false; editor.IsFocused = false; frame();
+    check("an editor letting go itself clears the canvas focus", canvas.FocusedChild === undefined);
   }
 
   // ---- span underline in the label's color ----

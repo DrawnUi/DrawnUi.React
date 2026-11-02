@@ -753,8 +753,44 @@ export class Canvas {
     return type === "Panning" || type === "Wheel" || type === "Up";
   }
 
-  /** Entry into the control tree, same shape as DrawnUi Canvas.ProcessGestures. */
+  // ---- focus (C# DrawnView FocusedChild / ReportFocus, drawnui-cross 6ap) ----
+  private focusedChild?: SkiaControl;
+  private focusAtDown?: SkiaControl;
+  private tapNoFocus = false;
+  private reportingFocus = false;
+
+  /** The control that has the canvas focus (an editor while it edits, a CanBeFocused control that was tapped). */
+  get FocusedChild(): SkiaControl | undefined { return this.focusedChild; }
+
+  /**
+   * Moves the focus. The new control is asked first and the focus moves only when it takes it (a tap on a button leaves an
+   * editor focused); undefined clears it. Nothing moves while the focused control has LockFocus. `setter` is a control
+   * that focused itself already (an editor on its press) or the focused control letting go itself (Escape, submit).
+   */
+  ReportFocus(value: SkiaControl | undefined, setter?: SkiaControl): void {
+    if (value === this.focusedChild || this.reportingFocus) return;
+    if (this.focusedChild?.LockFocus && setter !== this.focusedChild) return;
+    this.reportingFocus = true;
+    try {
+      if (value && value !== setter && !value.SetFrameworkFocus(true)) return;
+      const previous = this.focusedChild;
+      this.focusedChild = value;
+      if (previous && !previous.IsDisposed) previous.SetFrameworkFocus(false);
+    } finally { this.reportingFocus = false; }
+  }
+
+  /** Entry into the control tree; on a completed tap the focus follows it (C# Canvas: focus only on Tapped). */
   protected ProcessGestures(root: SkiaControl, args: SkiaGesturesParameters): SkiaControl | null {
+    if (args.Type === "Down") { this.focusAtDown = this.focusedChild; this.tapNoFocus = false; }
+    const consumed = this.RouteGestures(root, args);
+    // a control that claimed the focus during this gesture (an editor on its press) keeps it; a press that closed the
+    // popup windows moves nothing
+    if (args.Type === "Tapped" && !this.tapNoFocus && this.focusedChild === this.focusAtDown) this.ReportFocus(consumed ?? undefined);
+    return consumed;
+  }
+
+  /** Same shape as DrawnUi Canvas.ProcessGestures. */
+  private RouteGestures(root: SkiaControl, args: SkiaGesturesParameters): SkiaControl | null {
     const info = () => new GestureEventProcessingInfo(args.Event.Location, SKPoint.Empty, SKPoint.Empty, null);
     const popups = this.popups, at = args.Event.Location;
 
@@ -792,6 +828,7 @@ export class Canvas {
         return used;
       }
       if (args.Type === "Down") {
+        this.tapNoFocus = true;
         popups.CloseAll(false);
         popups.SwallowPress = true;
         this.AfterPopupsChanged();
