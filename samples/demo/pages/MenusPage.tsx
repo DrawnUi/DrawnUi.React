@@ -3,7 +3,7 @@ import {
   Aria, Colors, OpenPopupWindow, SkiaLabel, SkiaLayer, SkiaRow, SkiaScroll, SkiaShape, SkiaStack, SkiaSvg, SkiaSwitch,
   SkiaWrap, TextSpan, Thickness,
 } from "drawnui-react";
-import { type Canvas as CanvasView, type InputKey, KeyboardManager, type PopupId, Super, type SkiaControl, type SkiaShape as SkiaShapeCtrl } from "drawnui-react/core";
+import { type Canvas as CanvasView, type ControlTappedEventArgs, type InputKey, KeyboardManager, type PopupId, Super, type SkiaControl, type SkiaShape as SkiaShapeCtrl } from "drawnui-react/core";
 
 /**
  * Tooltips & Menus (HelloMaui Pages/TooltipsMenusPage.cs): a desktop menu bar, a context menu (right-click anywhere on
@@ -50,13 +50,16 @@ function Card({ title, note, children }: { title: string; note: string; children
   );
 }
 
+/** Every mouse button taps: opening and picking act on the primary one (keys and touch count as primary). */
+const primary = (e: ControlTappedEventArgs) => (e.Parameters.Event.Pointer?.Button ?? "Left") === "Left";
+
 const hoverButton = (me: SkiaControl, on: boolean) => { (me as SkiaShapeCtrl).BackgroundColor = on ? BUTTON_HOVER : BUTTON; me.UpdateDraw(); };
 
 /** A text button in the page's colors. */
 function TextButton({ text, tooltip, tapped }: { text: string; tooltip?: string; tapped?: (me: SkiaControl) => void }) {
   return (
     <SkiaShape CornerRadius={8} BackgroundColor={BUTTON} Padding={BUTTON_PADDING} AnimationTapped="Ripple" AccessibilityRole={Aria.RoleButton}
-      AccessibilityLabel={text} Tooltip={tooltip} HoverChanged={hoverButton} Tapped={(me) => tapped?.(me)}>
+      AccessibilityLabel={text} Tooltip={tooltip} HoverChanged={hoverButton} Tapped={(me, e) => { if (primary(e)) tapped?.(me); }}>
       <SkiaLabel Text={text} FontSize={14} TextColor={Colors.White} />
     </SkiaShape>
   );
@@ -80,7 +83,7 @@ function MenuPanel({ name, items, picked }: { name: string; items: string[]; pic
       <SkiaStack Spacing={0}>
         {items.map((text) => (
           <SkiaShape key={text} CornerRadius={6} HorizontalOptions="Fill" Padding={ITEM_PADDING} AccessibilityRole={Aria.RoleMenuItem} AccessibilityLabel={text}
-            HoverChanged={(me, on) => { (me as SkiaShapeCtrl).BackgroundColor = on ? HIGHLIGHT : Colors.Transparent; }} Tapped={(me) => picked(text, me)}>
+            HoverChanged={(me, on) => { (me as SkiaShapeCtrl).BackgroundColor = on ? HIGHLIGHT : Colors.Transparent; me.UpdateDraw(); }} Tapped={(me, e) => { if (primary(e)) picked(text, me); }}>
             <SkiaLabel Text={text} FontSize={15} TextColor={Colors.White} AccessibilityRole={Aria.RolePresentation} />
           </SkiaShape>
         ))}
@@ -149,7 +152,7 @@ export function MenusPage() {
             return (
               <SkiaShape key={k} CornerRadius={6} HorizontalOptions="Fill" Padding={ITEM_PADDING} AccessibilityRole={Aria.RoleMenuItem} AccessibilityLabel={e.Text}
                 ref={(v: SkiaShapeCtrl | null) => { if (v) bar.current.items[at] = { View: v, Entry: e }; }}
-                HoverChanged={(_, on) => { if (on) { bar.current.highlighted = at; paintItems(); } }} Tapped={() => run(e)}>
+                HoverChanged={(_, on) => { if (on) { bar.current.highlighted = at; paintItems(); } }} Tapped={(_, t) => { if (primary(t)) run(e); }}>
                 <SkiaLabel Text={e.Text} FontSize={14} TextColor={Colors.White} AccessibilityRole={Aria.RolePresentation} />
                 <SkiaLabel Text={e.Shortcut ?? ""} FontSize={13} TextColor={MUTED} HorizontalOptions="End" AccessibilityRole={Aria.RolePresentation} />
               </SkiaShape>
@@ -237,7 +240,7 @@ export function MenusPage() {
                   <SkiaShape key={m.Title} CornerRadius={6} Padding={TITLE_PADDING} BackgroundColor={Colors.Transparent} AccessibilityRole={Aria.RoleMenuItem} AccessibilityLabel={m.Title}
                     ref={(v: SkiaShapeCtrl | null) => { if (v) tops.current[index] = v; }}
                     HoverChanged={(_, on) => { if (on && barOpen() && bar.current.open !== index) openBarMenu(index, false); paintBar(index, on); }}
-                    Tapped={() => { if (barOpen() && bar.current.open === index) closeMenu(); else openBarMenu(index, false); }}>
+                    Tapped={(_, e) => { if (!primary(e)) return; if (barOpen() && bar.current.open === index) closeMenu(); else openBarMenu(index, false); }}>
                     {/* the accelerator letter (Alt + it opens the menu) is underlined, as in desktop menu bars */}
                     <SkiaLabel FontSize={14} TextColor={Colors.White} AccessibilityRole={Aria.RolePresentation}>
                       <TextSpan Text={m.Title.slice(0, 1)} Underline />
