@@ -125,6 +125,12 @@ export class TooltipController {
   }
 
   /** The pointer left the canvas, content moves under it or a popup opened: closed, its control forgotten. */
+  /** A control that left the canvas is forgotten: its tooltip closes, a press on it suppresses nothing any more. */
+  ForgetGone(gone: (c: SkiaControl | undefined) => boolean): void {
+    if (gone(this.suppressed)) this.suppressed = undefined;
+    if (gone(this.owner)) { this.owner = undefined; this.text = undefined; this.Hide(); }
+  }
+
   Reset(): void {
     this.owner = undefined; this.text = undefined; this.suppressed = undefined;
     this.Hide();

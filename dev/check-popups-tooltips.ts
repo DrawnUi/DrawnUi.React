@@ -266,6 +266,17 @@ const element = {
     check("LockFocus keeps the editor focused", editor.IsFocused && canvas.FocusedChild === editor);
     editor.LockFocus = false; editor.IsFocused = false; frame();
     check("an editor letting go itself clears the canvas focus", canvas.FocusedChild === undefined);
+
+    // controls that leave the canvas are not kept by it (C# 4cb28ab6): a focused editor removed with its page, a
+    // button pressed under its tooltip
+    click(100, 60); frame();
+    r.RemoveSubView(editor); editor.Dispose(); frame();
+    check("a removed focused editor is let go by the canvas focus", canvas.FocusedChild === undefined);
+    send.Tooltip = "Send it"; move(340, 60); frame(); await sleep(80); frame(); click(340, 60); frame();
+    r.RemoveSubView(send); send.Dispose(); frame();
+    const tips = (canvas as unknown as { tooltipController: { owner?: SkiaControl; suppressed?: SkiaControl } }).tooltipController;
+    check("a removed pressed control is let go by the tooltips", tips.owner !== send && tips.suppressed !== send);
+    check("the gesture dispatch keeps no removed control", (canvas as unknown as { gestureOwner: SkiaControl | null }).gestureOwner !== send);
   }
 
   // ---- span underline in the label's color ----

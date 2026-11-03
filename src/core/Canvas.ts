@@ -278,6 +278,7 @@ export class Canvas {
     this.frameTimes.push(now);
     while (this.frameTimes.length && this.frameTimes[0] < now - 1000) this.frameTimes.shift();
     this.FPS = this.frameTimes.length;
+    this.ForgetGoneControls();
     if (executed > 0) this.Update(); // animators running: keep frames coming
     // C# order: WasDrawn at the end of the frame, then the frame counts as rendered
     this.WasDrawn?.(this);
@@ -758,6 +759,18 @@ export class Canvas {
   private focusAtDown?: SkiaControl;
   private tapNoFocus = false;
   private reportingFocus = false;
+
+  /**
+   * A control that left the canvas (removed or disposed) is let go by the focus, the gesture dispatch and the tooltips,
+   * so the last control that took input does not keep its page alive (C# 4cb28ab6). Checked once per frame.
+   */
+  private ForgetGoneControls(): void {
+    const gone = (c: SkiaControl | null | undefined) => !!c && (c.IsDisposed || c.Superview !== this);
+    if (gone(this.focusedChild)) this.focusedChild = undefined;
+    if (gone(this.focusAtDown)) this.focusAtDown = undefined;
+    if (gone(this.gestureOwner)) this.gestureOwner = null;
+    this.tooltipController?.ForgetGone(gone);
+  }
 
   /** The control that has the canvas focus (an editor while it edits, a CanBeFocused control that was tapped). */
   get FocusedChild(): SkiaControl | undefined { return this.focusedChild; }
