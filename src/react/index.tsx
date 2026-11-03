@@ -202,9 +202,11 @@ export function Canvas({ BackgroundColor, RenderingMode, Gestures, children, sty
     root.current!.render(children);
   });
 
-  // The drawn surface is aria-hidden; the overlay is the accessibility tree (DrawnUi.Blazor pattern).
+  // The drawn surface is aria-hidden; the overlay is the accessibility tree (DrawnUi.Blazor pattern). The host takes the
+  // DOM focus (from code only, no ring) when the focused control leaves: no control is focused and the keys belong to the
+  // app, as in the other engines, while a screen reader stays at the canvas instead of the top of the page.
   return (
-    <div className={className} style={{ position: "relative", ...style }}>
+    <div className={className} tabIndex={-1} data-drawnui-host="1" style={{ position: "relative", outline: "none", ...style }}>
       <canvas ref={ref} aria-hidden style={{ display: "block", width: "100%", height: "100%" }} />
       {engine && <AccessibilityOverlay view={engine} />}
     </div>
@@ -257,19 +259,18 @@ function AccessibilityOverlay({ view }: { view: CanvasView }) {
     setFocusRequest(undefined);
     elementOf(focusRequest.id)?.focus({ preventScroll: true });
   }, [focusRequest]);
-  // the focused node went away (its page or popup closed): the focus goes to the first Tab stop on screen in reading
-  // order instead of falling back to the page (drawnui-cross 6c refocus); a focus the user moved away stays away
+  // the focused node went away (its page or popup closed): no control keeps the focus and its ring goes with it, the keys
+  // belong to the app again (as in the other engines); the DOM focus stays on the canvas host, so a screen reader is not
+  // thrown to the top of the page and the next Tab starts from the canvas. A focus the user moved away stays away.
   const focusedId = useRef(0);
   useLayoutEffect(() => {
     const id = focusedId.current;
     if (!id || nodes.some((n) => n.Id === id)) return;
     focusedId.current = 0;
+    if (view.AccessibilityManager.FocusedNode?.AccessibilityId === id) view.AccessibilityManager.NotifyFocused(undefined);
     const active = document.activeElement;
     if (active && active !== document.body) return;
-    const box = overlayRef.current?.getBoundingClientRect();
-    const first = nodes.find((n) => n.CanInteract && view.AccessibilityManager.IsTabStop(n.Source)
-      && (!box || (n.Rect.Bottom > 0 && n.Rect.Top < box.height && n.Rect.Right > 0 && n.Rect.Left < box.width)));
-    if (first) elementOf(first.Id)?.focus({ preventScroll: true });
+    overlayRef.current?.parentElement?.focus({ preventScroll: true });
   }, [nodes]);
   // Tab / Shift+Tab in a text field leave it for the next node, also after a click into it: DOM focus goes to the
   // field's own element (without taking the caret again) and the browser's Tab moves on from there

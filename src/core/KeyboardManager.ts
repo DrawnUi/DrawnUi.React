@@ -77,8 +77,10 @@ export class KeyboardManager {
    * those of its own element.
    */
   static IsOwnedByElement(e: KeyboardEvent): boolean {
-    const tag = (e.target as { tagName?: string } | null)?.tagName;
-    return !!tag && tag !== "BODY" && tag !== "HTML" && tag !== "CANVAS";
+    const target = e.target as { tagName?: string; dataset?: Record<string, string> } | null;
+    const tag = target?.tagName;
+    // the canvas host holds the DOM focus when no drawn control has it: its keys are the app's, as the canvas' own
+    return !!tag && tag !== "BODY" && tag !== "HTML" && tag !== "CANVAS" && target?.dataset?.drawnuiHost !== "1";
   }
 
   /**
