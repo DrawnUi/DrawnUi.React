@@ -86,7 +86,7 @@ export class CachedObject {
     canvas.translate(-this.Bounds.Left, -this.Bounds.Top);
     canvas.drawPicture(this.Picture);
     this.pictureImage = surface.makeImageSnapshot();
-    surface.delete();
+    surface.dispose(); // a CK.MakeSurface fallback owns its pixels
     return this.pictureImage;
   }
   private pictureImage?: Image;

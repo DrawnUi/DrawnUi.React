@@ -279,6 +279,16 @@ const element = {
     check("the gesture dispatch keeps no removed control", (canvas as unknown as { gestureOwner: SkiaControl | null }).gestureOwner !== send);
   }
 
+  // ---- surfaces with their own pixels give them back (CanvasKit: dispose(), delete() keeps them) ----
+  {
+    const rss = () => (process as unknown as { memoryUsage(): { rss: number } }).memoryUsage().rss;
+    canvas.TakeScreenShot();
+    const before = rss();
+    for (let i = 0; i < 100; i++) canvas.TakeScreenShot(); // 100 x 600 x 400 x 4 = 96 MB if each kept its pixels
+    const grown = (rss() - before) / 1e6;
+    check("screenshots give their surface's pixels back", grown < 30, `${grown.toFixed(0)} MB more`);
+  }
+
   // ---- span underline in the label's color ----
   {
     const l = new SkiaLabel(); l.FontSize = 40; l.TextColor = "#FF0000"; l.Margin = new Thickness(10, 20, 0, 0);

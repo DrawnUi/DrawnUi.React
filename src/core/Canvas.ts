@@ -166,7 +166,8 @@ export class Canvas {
   /** Deletes the current surface; a pending frame on it is cancelled first (drawing on a deleted surface faults). */
   private ReleaseSurface(): void {
     if (this.frameId) { cancelAnimationFrame(this.frameId); this.frameId = 0; }
-    this.surface?.delete();
+    // dispose, not delete: a software surface owns pixels CanvasKit allocated for it, which delete() leaves behind
+    this.surface?.dispose();
     this.surface = undefined;
   }
 
@@ -224,7 +225,7 @@ export class Canvas {
   private readonly onContextRestored = () => {
     if (this.disposed) return;
     if (this.grContext) this.grContext.releaseResourcesAndAbandonContext();
-    this.surface?.delete();
+    this.surface?.dispose();
     this.surface = undefined;
     this.grContext?.delete();
     this.grContext = undefined;
@@ -385,7 +386,7 @@ export class Canvas {
       if (!image) return null;
       try { return image.encodeToBytes(); } finally { image.delete(); }
     } finally {
-      surface.delete();
+      surface.dispose(); // its pixels too (CK.MakeSurface allocates them)
     }
   }
 
