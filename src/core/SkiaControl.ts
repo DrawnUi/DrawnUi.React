@@ -6,7 +6,7 @@ import { type AnimatorBase, type IOverlayEffect, RippleAnimator, SkiaValueAnimat
 import { Easing } from "./Easing";
 import type { Canvas } from "./Canvas";
 import type { InputKey } from "./KeyboardManager";
-import { Aria } from "./Accessibility";
+import { AccessibilityModals, Aria } from "./Accessibility";
 import { ContextMenuEventArgs, ControlTappedEventArgs, GestureEventProcessingInfo, type LockTouch, SKPoint, SkiaGesturesInfo, SkiaGesturesParameters, TouchActionEventArgs } from "./Gestures";
 import { type CachedTexture, type IPostRendererEffect, IsPostRendererEffect, type SkiaEffect } from "./SkiaEffect";
 
@@ -610,8 +610,26 @@ export class SkiaControl {
    * ARIA role; setting it exposes the control to assistive technology (use `Aria` constants). Unset = the class
    * default (`SkiaLabel.DefaultAccessibilityRole` etc.), which is itself unset unless the app opts in.
    */
-  get AccessibilityRole(): string | undefined { return this.accessibilityRole ?? (this.constructor as typeof SkiaControl).DefaultAccessibilityRole; }
+  get AccessibilityRole(): string | undefined {
+    return this.accessibilityRole ?? (this.accessibilityModal ? Aria.RoleDialog : (this.constructor as typeof SkiaControl).DefaultAccessibilityRole);
+  }
   set AccessibilityRole(v: string | undefined) { if (this.accessibilityRole !== v) { this.accessibilityRole = v; this.AccessibilityChanged(); } }
+  private accessibilityModal = false;
+  /**
+   * A modal overlay, such as a dialog drawn over the screen (C# AccessibilityModal, drawnui-cross 6av): while it shows,
+   * screen readers and Tab reach only its controls (and open popup windows); the content around it leaves accessibility
+   * until it goes. With several, the one drawn on top wins. The keyboard moves into it when it appears while the
+   * keyboard is in use, and back when it goes. Taps are not affected: blocking them is the backdrop's job. Without a role
+   * of its own it reads as a dialog. Default false: nothing changes unless an app sets it.
+   */
+  get AccessibilityModal(): boolean { return this.accessibilityModal; }
+  set AccessibilityModal(v: boolean) {
+    if (this.accessibilityModal === v) return;
+    this.accessibilityModal = v;
+    if (v) AccessibilityModals.add(this); else AccessibilityModals.delete(this);
+    this.AccessibilityChanged();
+    this.Superview?.Update();
+  }
   /** Per-class default role (React extension): e.g. `SkiaLabel.DefaultAccessibilityRole = Aria.RoleText` reads every label. */
   static DefaultAccessibilityRole?: string;
 
@@ -1302,6 +1320,7 @@ export class SkiaControl {
   Dispose(): void {
     if (this.IsDisposed) return;
     this.IsDisposed = true;
+    if (this.accessibilityModal) AccessibilityModals.delete(this);
     this.OnDisposing();
     for (const c of this.ownAnimations.values()) c.abort();
     this.ownAnimations.clear();

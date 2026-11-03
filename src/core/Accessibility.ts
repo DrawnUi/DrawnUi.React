@@ -2,6 +2,9 @@ import type { InputKey } from "./KeyboardManager";
 import type { SkiaControl } from "./SkiaControl";
 import { SKRect } from "./Types";
 
+/** Controls with `AccessibilityModal` set, on every canvas (drawnui-cross 6av). Empty: no modal work at all. */
+export const AccessibilityModals = new Set<SkiaControl>();
+
 /** ARIA role constants (DrawnUi.Models.Aria) for `AccessibilityRole`. */
 export const Aria = {
   // interactive widgets
@@ -236,15 +239,56 @@ export class SkiaAccessibilityManager {
 
   private focusRequest?: SkiaControl;
   private popupFocusRoot?: SkiaControl;
+  private focusAnyInside = false;
 
   /** The keyboard goes to this control at the end of the next frame (a popup closed: back to what opened it). */
   RequestKeyboardFocus(control: SkiaControl): void { this.focusRequest = control; }
 
+  private popupScope?: SkiaControl;
   /**
-   * While set, Tab stays inside this control: only its nodes are Tab stops and Tab / Shift+Tab go round them. The canvas
-   * sets it to the top popup window that takes input (a menu, a dropdown), undefined when none is open.
+   * While set, Tab stays inside this control: only its nodes are Tab stops and Tab / Shift+Tab go round them: the top
+   * popup window that takes input (a menu, a dropdown; set by the canvas), else the active modal.
    */
-  KeyboardScope?: SkiaControl;
+  get KeyboardScope(): SkiaControl | undefined { return this.popupScope ?? this.ActiveModal; }
+  set KeyboardScope(v: SkiaControl | undefined) { this.popupScope = v; }
+
+  // ---- modal accessibility scope (drawnui-cross 6av, C# AccessibilityModal) ----
+
+  /** The modal that accessibility is limited to: the topmost `AccessibilityModal` control that shows. Undefined when none. */
+  ActiveModal?: SkiaControl;
+  // where the keyboard was when each modal became active, to go back there when it goes
+  private readonly modalReturns = new Map<SkiaControl, SkiaControl>();
+
+  /** A control behind the active modal (not in it, not in a popup window over it): no focus for navigation. */
+  IsOutsideModal(control: SkiaControl): boolean {
+    const modal = this.ActiveModal;
+    return !!modal && !IsInside(control, modal) && TopRoot(control) === TopRoot(modal);
+  }
+
+  /** Frame end, only while some control is flagged modal or one was active: follows the top modal. */
+  private UpdateActiveModal(): void {
+    let next: SkiaControl | undefined;
+    for (const m of AccessibilityModals) {
+      if (m.IsDisposed || !m.IsVisible || m.Opacity <= 0 || AccessibilityManagerHiddenByAncestor(m)
+        || m.Superview?.AccessibilityManager !== this || !IsDrawn(m)) continue;
+      if (!next || IsDrawnAbove(m, next)) next = m;
+    }
+    const previous = this.ActiveModal;
+    if (previous === next) return;
+    this.ActiveModal = next;
+    this.ForceRebuildOnNextFrame(); // readers and Tab switch to the new scope in this frame
+    const keyboard = this.FocusedNode;
+    if (next && keyboard && !IsInside(keyboard, next)) {
+      // the keyboard is in use: into the modal, and back here when it goes
+      this.modalReturns.set(next, keyboard);
+      this.popupFocusRoot = next; this.focusAnyInside = true;
+    }
+    const back = previous && this.modalReturns.get(previous);
+    if (previous) this.modalReturns.delete(previous);
+    // back unless the keyboard went elsewhere meanwhile; a keyboard node that left with the modal (disposed, detached) was in it
+    const leftWithIt = !!keyboard && (keyboard.IsDisposed || !keyboard.Superview);
+    if (back && (!keyboard || leftWithIt || IsInside(keyboard, previous!)) && (!next || IsInside(back, next))) this.focusRequest = back;
+  }
 
   /** The Tab stop after (or before) `from` in reading order; inside a KeyboardScope it goes round, never leaving. */
   NextTabStop(from: SkiaControl | undefined, forward: boolean): SkiaControl | undefined {
@@ -261,7 +305,7 @@ export class SkiaAccessibilityManager {
    * A popup window just opened: at the end of the frame that draws it, the keyboard goes to its arrow-key group's current
    * choice (a checked radio, menuitemradio, option or tab), else to its first interactive item, however it was opened.
    */
-  FocusOpenedPopup(root: SkiaControl): void { this.popupFocusRoot = root; }
+  FocusOpenedPopup(root: SkiaControl): void { this.popupFocusRoot = root; this.focusAnyInside = false; }
 
   private ProcessFocusRequests(scale: number, w: number, h: number): void {
     const request = this.focusRequest, root = this.popupFocusRoot;
@@ -270,7 +314,8 @@ export class SkiaAccessibilityManager {
       this.Rebuild(scale, w, h);
       const inside = (c: SkiaControl) => { for (let p: SkiaControl | undefined = c; p; p = p.Parent) if (p === root) return true; return false; };
       const choice = (role: string) => role === Aria.RoleRadio || role === Aria.RoleMenuItemRadio || role === "option" || role === "tab";
-      const items = this.Snapshot.filter((n) => n.CanInteract && inside(n.Source) && SkiaAccessibilityManager.TryFindGroup(n.Source));
+      // a popup: the items of its arrow-key group; a modal: its first control that takes input
+      const items = this.Snapshot.filter((n) => n.CanInteract && inside(n.Source) && (this.focusAnyInside || SkiaAccessibilityManager.TryFindGroup(n.Source)));
       const target = items.find((n) => n.IsPressed === true && choice(n.Role)) ?? items[0];
       if (target) { this.FocusFromKeyboard(target.Source, scale, w, h); return; }
     }
@@ -335,6 +380,7 @@ export class SkiaAccessibilityManager {
    * per MinUpdateIntervalMs otherwise (keeps rects in sync with scrolling); notifies only when the snapshot differs.
    */
   OnFrameEnd(scale: number, canvasWidthPx: number, canvasHeightPx: number, requestFrame: () => void): void {
+    if (AccessibilityModals.size > 0 || this.ActiveModal) this.UpdateActiveModal();
     this.ProcessGroupFocus(scale, canvasWidthPx, canvasHeightPx, requestFrame);
     if (this.focusRequest || this.popupFocusRoot) this.ProcessFocusRequests(scale, canvasWidthPx, canvasHeightPx);
     if (this.nodes.size === 0 && this.Snapshot.length === 0) return;
@@ -353,9 +399,11 @@ export class SkiaAccessibilityManager {
     this.lastRebuild = performance.now();
 
     let list: AccessibilityNode[] = [];
+    const modal = this.ActiveModal;
     for (const n of this.nodes) {
       if (!n.Superview) { this.nodes.delete(n); n.OnAccessibilityUnregistered(); continue; } // detached from the tree
       if (!n.IsVisible || !n.IsAccessibilityElement || n.AccessibilityRole === Aria.RolePresentation) continue;
+      if (modal && this.IsOutsideModal(n)) continue; // a modal is shown: only its nodes, and those of popup windows over it
       if (AccessibilityManagerHiddenByAncestor(n)) continue; // e.g. the root page kept mounted under a pushed shell page
       const px = n.GetAccessibilityPixelRect();
       if (px.Width <= 0 || px.Height <= 0) continue;
@@ -423,6 +471,8 @@ function SayNamesOnce(list: AccessibilityNode[]): AccessibilityNode[] {
     let owner: AccessibilityNode | undefined;
     for (let p = x.Source.Parent; p && !owner; p = p.Parent) owner = bySource.get(p);
     if (!owner || owner.Label !== x.Label) continue;
+    // a dialog keeps its name though its title says it too: readers announce the dialog by name on entry
+    if (owner.Role === Aria.RoleDialog || owner.Role === Aria.RoleAlertDialog) continue;
     if (owner.CanInteract) said.add(x);
     else owner.Label = undefined;
   }
@@ -434,6 +484,33 @@ function SameValue(a?: AccessibilityValue, b?: AccessibilityValue): boolean {
 }
 
 // ---- group helpers (duck-typed layouts and scrolls) ----
+
+function IsInside(control: SkiaControl, root: SkiaControl): boolean {
+  for (let c: SkiaControl | undefined = control; c; c = c.Parent) if (c === root) return true;
+  return false;
+}
+
+/** The top of the tree a control is in: the canvas content, or a popup window's root. */
+function TopRoot(control: SkiaControl): SkiaControl {
+  let c = control;
+  while (c.Parent) c = c.Parent;
+  return c;
+}
+
+/** Drawing order: `a` draws over `b` (ZIndex, then tree order; a nested control over its ancestor). */
+function IsDrawnAbove(a: SkiaControl, b: SkiaControl): boolean {
+  const path = (c: SkiaControl) => { const p: SkiaControl[] = []; for (let x: SkiaControl | undefined = c; x; x = x.Parent) p.unshift(x); return p; };
+  const pa = path(a), pb = path(b);
+  let i = 0;
+  while (i < pa.length && i < pb.length && pa[i] === pb[i]) i++;
+  if (i === pa.length) return false; // a contains b
+  if (i === pb.length) return true; // b contains a
+  if (i === 0) return false; // different trees (a popup window): the first one found stays
+  const sa = pa[i], sb = pb[i];
+  if (sa.ZIndex !== sb.ZIndex) return sa.ZIndex > sb.ZIndex;
+  const views = ViewsOf(sa.Parent!);
+  return views.indexOf(sa) > views.indexOf(sb);
+}
 
 /** A node the keyboard can land on: a role that is not presentation and takes input. */
 function IsInteractiveNode(c: SkiaControl): boolean {

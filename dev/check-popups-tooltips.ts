@@ -279,6 +279,51 @@ const element = {
     check("the gesture dispatch keeps no removed control", (canvas as unknown as { gestureOwner: SkiaControl | null }).gestureOwner !== send);
   }
 
+  // ---- modal accessibility scope (drawnui-cross 6av) and arrows that start keyboard navigation ----
+  {
+    const mgr = canvas.AccessibilityManager;
+    mgr.MinUpdateIntervalMs = 0;
+    const button = (x: number, y: number, label: string) => { const b = box(x, y, 80, 30, "#405060"); b.AccessibilityRole = "button"; b.AccessibilityLabel = label; b.Tapped = () => {}; return b; };
+    const r = new SkiaLayer(); r.WidthRequest = W; r.HeightRequest = H; r.BackgroundColor = "#000000";
+    const behind = button(20, 20, "Behind"), after = button(120, 20, "After");
+    const dialog = new SkiaLayer(); dialog.WidthRequest = 300; dialog.HeightRequest = 200; dialog.Margin = new Thickness(100, 100, 0, 0);
+    dialog.AccessibilityModal = true; dialog.AccessibilityLabel = "Settings"; dialog.IsVisible = false;
+    const title = new SkiaLabel(); title.Text = "Settings"; title.AccessibilityRole = "heading"; title.AccessibilityLabel = "Settings";
+    const ok = button(20, 60, "OK"), cancel = button(120, 60, "Cancel");
+    for (const c of [title, ok, cancel]) dialog.AddSubView(c);
+    for (const c of [behind, after, dialog]) r.AddSubView(c);
+    canvas.Content = r; frame(); frame();
+    const labels = () => mgr.Snapshot.map((n) => `${n.Role}:${n.Label ?? ""}`);
+    check("no modal shown: the page is in the snapshot", labels().includes("button:Behind") && mgr.ActiveModal === undefined);
+    behind.NotifyAccessibilityFocused(true); // the keyboard is on Behind
+    dialog.IsVisible = true; dialog.Update(); frame(); frame();
+    check("a shown modal is active and only its nodes stay", mgr.ActiveModal === dialog && !labels().includes("button:Behind") && labels().includes("button:OK"), labels().join(", "));
+    check("it reads as a dialog and keeps its name though its title says it", labels().includes("dialog:Settings"), labels().join(", "));
+    check("the keyboard moves into it when it appears", mgr.FocusedNode === ok, `${mgr.FocusedNode?.AccessibilityLabel}`);
+    check("Tab goes round inside it", mgr.NextTabStop(cancel, true) === ok && mgr.NextTabStop(ok, false) === cancel);
+    const pid = canvas.OpenPopupWindow(button(0, 0, "In popup"), new SKPoint(20, 300)); frame(); frame();
+    check("a popup window over the modal stays readable", labels().includes("button:In popup"), labels().join(", "));
+    canvas.ClosePopupWindow(pid); frame(); frame();
+    dialog.IsVisible = false; dialog.Update(); frame(); frame();
+    check("when it goes, the page is back and the keyboard returns where it was", mgr.ActiveModal === undefined && labels().includes("button:Behind") && mgr.FocusedNode === behind, `${mgr.FocusedNode?.AccessibilityLabel}`);
+    behind.NotifyAccessibilityFocused(false); frame();
+    // arrows start keyboard navigation (off by default)
+    key("ArrowDown"); frame();
+    check("off by default: an arrow with nothing focused moves no focus", mgr.FocusedNode === undefined);
+    canvas.ArrowsStartKeyboardNavigation = true;
+    key("ArrowDown"); frame();
+    check("on: ArrowDown with nothing focused goes to the first Tab stop", mgr.FocusedNode === behind, `${mgr.FocusedNode?.AccessibilityLabel}`);
+    mgr.FocusedNode?.NotifyAccessibilityFocused(false); frame();
+    key("ArrowUp"); frame();
+    check("on: ArrowUp goes to the last Tab stop", mgr.FocusedNode === after, `${mgr.FocusedNode?.AccessibilityLabel}`);
+    mgr.FocusedNode?.NotifyAccessibilityFocused(false); frame();
+    dialog.IsVisible = true; dialog.Update(); frame(); frame(); behind.NotifyAccessibilityFocused(true); frame();
+    key("ArrowDown"); frame();
+    check("a control behind the active modal is no focus: the arrow starts inside the dialog", mgr.FocusedNode === ok, `${mgr.FocusedNode?.AccessibilityLabel}`);
+    canvas.ArrowsStartKeyboardNavigation = false; dialog.IsVisible = false; dialog.Update(); frame(); frame();
+    mgr.MinUpdateIntervalMs = 1000;
+  }
+
   // ---- surfaces with their own pixels give them back (CanvasKit: dispose(), delete() keeps them) ----
   {
     const rss = () => (process as unknown as { memoryUsage(): { rss: number } }).memoryUsage().rss;

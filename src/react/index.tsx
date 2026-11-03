@@ -117,6 +117,8 @@ export interface CanvasProps {
    * scrolls it unless a control used the wheel. A page that cannot scroll keeps every touch. Lock keeps all input.
    */
   Gestures?: GesturesMode;
+  /** While nothing has keyboard focus, an arrow key starts keyboard navigation as the first Tab does (off by default: games keep their arrows). */
+  ArrowsStartKeyboardNavigation?: boolean;
   children?: ReactNode;
   style?: CSSProperties;
   className?: string;
@@ -168,7 +170,7 @@ export function OpenPopupWindow(canvas: CanvasView, content: ReactNode, anchor: 
  * Mirrors DrawnUi Canvas: the bridge between the DOM (react-dom) and the drawn tree (DrawnUi reconciler).
  * Requires Super.UseDrawnUi()...BuildAsync() to have completed.
  */
-export function Canvas({ BackgroundColor, RenderingMode, Gestures, children, style, className, ref: viewRef, ContextMenu, WillFirstTimeDraw, WasDrawn }: CanvasProps) {
+export function Canvas({ BackgroundColor, RenderingMode, Gestures, ArrowsStartKeyboardNavigation, children, style, className, ref: viewRef, ContextMenu, WillFirstTimeDraw, WasDrawn }: CanvasProps) {
   const ref = useRef<HTMLCanvasElement>(null);
   const view = useRef<CanvasView>(null);
   const root = useRef<ReturnType<typeof createDrawnRoot>>(null);
@@ -196,6 +198,7 @@ export function Canvas({ BackgroundColor, RenderingMode, Gestures, children, sty
     const v = view.current!;
     if (BackgroundColor !== undefined && v.BackgroundColor !== BackgroundColor) { v.BackgroundColor = BackgroundColor; v.Update(); }
     v.Gestures = Gestures ?? "Disabled";
+    v.ArrowsStartKeyboardNavigation = ArrowsStartKeyboardNavigation ?? false;
     v.ContextMenu = ContextMenu;
     v.WillFirstTimeDraw = WillFirstTimeDraw;
     v.WasDrawn = WasDrawn;
@@ -313,10 +316,16 @@ function AccessibilityOverlay({ view }: { view: CanvasView }) {
   if (!hasNodes) return null;
   // the browser scrolls an overflow:hidden container to reveal a focused child; the overlay must stay pinned to the canvas
   const pin = (e: React.SyntheticEvent<HTMLDivElement>) => { e.currentTarget.scrollTop = 0; e.currentTarget.scrollLeft = 0; };
+  // an active modal (drawnui-cross 6av): the overlay itself is the dialog (role, name, aria-modal) around the dialog's
+  // controls, which are its elements; aria-modal on a separate element of this flat overlay would hide them
+  const modal = view.AccessibilityManager.ActiveModal;
+  const modalNode = modal ? nodes.find((n) => n.Source === modal) : undefined;
   return (
-    <div className="drawnui-a11y-overlay" onScroll={pin} ref={overlayRef}>
+    <div className="drawnui-a11y-overlay" onScroll={pin} ref={overlayRef}
+      role={modal ? modalNode?.Role ?? "dialog" : undefined} aria-label={modalNode?.Label} aria-modal={modal ? true : undefined}>
       <style>{A11Y_CSS}</style>
       {nodes.map((n) => {
+        if (n === modalNode) return null;
         const pos: CSSProperties = { left: n.Rect.Left, top: n.Rect.Top, width: n.Rect.Width, height: n.Rect.Height };
         const activate = () => SkiaAccessibilityManager.Activate(n.Source);
         return n.CanInteract ? (

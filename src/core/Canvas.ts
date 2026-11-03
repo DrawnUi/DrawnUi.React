@@ -396,6 +396,7 @@ export class Canvas {
     this.Element.removeEventListener("webglcontextlost", this.onContextLost);
     this.Element.removeEventListener("webglcontextrestored", this.onContextRestored);
     this.Gestures = "Disabled";
+    this.ArrowsStartKeyboardNavigation = false;
     this.tooltipController?.Dispose();
     this.popupLayer?.Dispose();
     this.HookPopupKeys(false);
@@ -754,6 +755,34 @@ export class Canvas {
   private static IsSavedGesture(type: SkiaGesturesParameters["Type"]): boolean {
     return type === "Panning" || type === "Wheel" || type === "Up";
   }
+
+  // ---- arrows start keyboard navigation (C# 6aee5c51) ----
+  private arrowsStart = false;
+  /**
+   * While no drawn control has keyboard focus (or only one behind the active modal), the arrow keys start keyboard
+   * navigation as the first Tab does: Down and Right go to the first Tab stop, Up and Left to the last, and the key is used
+   * for that. Once a control has focus the arrows work as usual (inside a list or a menu). Off by default, since games use
+   * the arrows as their own keys while nothing is focused: an app turns it on for its menu screens and off while playing.
+   */
+  get ArrowsStartKeyboardNavigation(): boolean { return this.arrowsStart; }
+  set ArrowsStartKeyboardNavigation(v: boolean) {
+    if (this.arrowsStart === v) return;
+    this.arrowsStart = v;
+    if (v) KeyboardManager.Subscribe(this.onArrowKey, this.onArrowChar); else KeyboardManager.Unsubscribe(this.onArrowKey, this.onArrowChar);
+  }
+  private readonly onArrowChar = () => {};
+  private readonly onArrowKey = (key: InputKey, e: KeyboardEvent) => {
+    const forward = key === "ArrowDown" || key === "ArrowRight" ? true : key === "ArrowUp" || key === "ArrowLeft" ? false : undefined;
+    // a page element, a drawn control's element or the editor's input has the keys: nothing to start
+    if (forward === undefined || this.disposed || KeyboardManager.IsOwnedByElement(e) || e.defaultPrevented) return;
+    const mgr = this.AccessibilityManager, focused = mgr.FocusedNode;
+    if (focused && !mgr.IsOutsideModal(focused)) return;
+    const first = mgr.NextTabStop(undefined, forward);
+    if (!first) return;
+    e.preventDefault();
+    mgr.RequestKeyboardFocus(first);
+    this.Update();
+  };
 
   // ---- focus (C# DrawnView FocusedChild / ReportFocus, drawnui-cross 6ap) ----
   private focusedChild?: SkiaControl;
