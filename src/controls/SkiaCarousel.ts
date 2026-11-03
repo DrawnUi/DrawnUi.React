@@ -220,6 +220,24 @@ export class SkiaCarousel extends SnappingLayout {
   override ScrollToNearestAnchor(location: SKPoint, velocity: SKPoint): void {
     const t = this.SnapVelocityThreshold;
     velocity = new SKPoint(Math.abs(velocity.X) < t ? 0 : velocity.X, Math.abs(velocity.Y) < t ? 0 : velocity.Y);
+    const home = this.releaseHome;
+    if (this.ApplyLoopedLogic && home && this.SnapPoints.length > 1) {
+      // a finger release on a looped carousel: one slide at most from the slide the gesture started on, counted along the
+      // strip, so across the edge it is the virtual slot next to it. A flick goes one slide its way, a slow drag to the
+      // nearest of that slide and its two neighbours. Measured from the slide nearest the release instead, a drag past
+      // the middle went the wrong way at the wrap (C# 11196529)
+      const step = new SKPoint(this.SnapPoints[1].X - this.SnapPoints[0].X, this.SnapPoints[1].Y - this.SnapPoints[0].Y);
+      const stepAxis = this.IsVertical ? step.Y : step.X;
+      if (stepAxis !== 0) {
+        const vel = this.IsVertical ? velocity.Y : velocity.X;
+        const moved = this.IsVertical ? location.Y - home.Y : location.X - home.X;
+        const k = vel !== 0 ? Math.sign(vel) * Math.sign(stepAxis) : Math.max(-1, Math.min(1, Math.round(moved / stepAxis)));
+        const target = new SKPoint(home.X + step.X * k, home.Y + step.Y * k);
+        if (SnappingLayout.Dist(location, target) >= 0.5) this.ScrollToOffset(target, velocity, this.CanAnimate);
+        else this.UpdateReportedPosition();
+        return;
+      }
+    }
     if (this.ApplyLoopedLogic) {
       const origin = this.FindNearestAnchorInternal(location, velocity);
       const target = this.SelectNextAnchor(origin, velocity);

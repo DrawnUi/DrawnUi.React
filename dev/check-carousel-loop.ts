@@ -40,13 +40,13 @@ class FakeCanvas {
     const fake = new FakeCanvas();
     root._superview = fake as unknown as Canvas;
     let ms = 1000;
+    // one surface for the carousel's life, as a real canvas has: a surface per frame grew the wasm heap without end
+    const surface = CK.MakeSurface(W, H);
     const frame = () => {
       fake.FrameTimeNanos = Math.round(ms * 1_000_000);
       for (const a of [...fake.AnimatingControls.values()]) if (!a.IsPaused) a.TickFrame(fake.FrameTimeNanos);
-      const surface = CK.MakeSurface(W, H);
       root.Measure(W, H, 1); root.Arrange(new SKRect(0, 0, W, H), W, H, 1);
       root.Render({ Context: { Canvas: surface.getCanvas(), Surface: surface }, Destination: new SKRect(0, 0, W, H), Scale: 1 });
-      surface.delete();
       if (record) record(carousel);
     };
     const frames = (n: number) => { for (let i = 0; i < n; i++) { ms += 16; frame(); } };
@@ -129,6 +129,27 @@ class FakeCanvas {
       let forward = 0;
       for (let i = 1; i < positions.length; i++) { let d = positions[i] - positions[i - 1]; d -= 4 * Math.round(d / 4); if (d < -0.02) forward -= d; }
       check(`a swipe back against a running transition ${name} goes straight back`, forward < 0.05 && t.carousel.SelectedIndex === from, `back first ${forward.toFixed(2)}, index ${t.carousel.SelectedIndex}`);
+    }
+  }
+
+  {
+    // a release moves one slide at most from the slide the gesture started on, the right way, also across the wrap
+    // (C# 11196529 SlowDragsPastHalf_MoveOneSlide_BothWaysAcrossTheWrap): a slow drag of 0.6 slide, a fast half swipe
+    for (const shader of [false, true]) {
+      const wrong: string[] = [];
+      for (let from = 0; from < 4; from++) for (const dir of [-1, 1] as const) for (const how of ["slow 0.6", "fast 0.5"]) {
+        const t = create(true, undefined, shader);
+        t.carousel.ScrollTo(from, false); t.frames(4);
+        const x0 = dir < 0 ? 360 : 40;
+        t.send("Pressed", x0, 0);
+        if (how === "slow 0.6") { for (let i = 1; i <= 24; i++) t.send("Moved", x0 + (dir * 0.6 * W * i) / 24, 40); t.send("Moved", x0 + dir * 0.6 * W, 200); t.send("Released", x0 + dir * 0.6 * W, 200); }
+        else { for (let i = 1; i <= 4; i++) t.send("Moved", x0 + (dir * 0.5 * W * i) / 4, 15); t.send("Released", x0 + dir * 0.5 * W, 1); }
+        t.frames(120);
+        const want = (from - dir + 4) % 4; // a finger moving left (dir -1) shows the next slide
+        if (t.carousel.SelectedIndex !== want) wrong.push(`${how} ${dir < 0 ? "forward" : "back"} from ${from}: ${t.carousel.SelectedIndex}, want ${want}`);
+        t.carousel.Parent?.Dispose(); // frees the carousel's caches and effects before the next case
+      }
+      check(`${shader ? "shader" : "plain"} looped carousel: a drag past half moves one slide its way from every slide`, wrong.length === 0, wrong.join("; "));
     }
   }
 
