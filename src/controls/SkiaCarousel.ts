@@ -281,9 +281,16 @@ export class SkiaCarousel extends SnappingLayout {
   /** C# FixIndex: a virtual anchor becomes the real one, the position keeps its offset (visually identical, looped drawing wraps). */
   private FixIndex(): void {
     if (this.IsLooped && this.SnapPoints.length > 1 && this.selectedIndex >= 0 && this.selectedIndex < this.SnapPoints.length) {
-      const snap = this.GetVirtualAnchor(this.CurrentPosition);
-      const ox = this.CurrentPosition.X - snap.Location.X, oy = this.CurrentPosition.Y - snap.Location.Y;
-      const real = this.SnapPoints[this.selectedIndex];
+      // the offset is measured from the anchor that stands for the selected slide where the position is now: the slide
+      // itself or its virtual copy past an edge. From the nearest anchor of another slide it moved a wrap in progress (the
+      // last slide 3% toward the first) onto another pair (C# b75f233a)
+      const real = this.SnapPoints[this.selectedIndex], last = this.MaxIndex;
+      let anchor = real;
+      for (const v of this.GetVirtualSnapPoints()) {
+        const standsFor = v.Id === this.selectedIndex || (v.Id === -1 && this.selectedIndex === last) || (v.Id === -2 && this.selectedIndex === 0);
+        if (standsFor && SnappingLayout.Dist(v.Location, this.CurrentPosition) < SnappingLayout.Dist(anchor, this.CurrentPosition)) anchor = v.Location;
+      }
+      const ox = this.CurrentPosition.X - anchor.X, oy = this.CurrentPosition.Y - anchor.Y;
       this.CurrentSnap = real;
       this.CurrentPosition = new SKPoint(real.X + ox, real.Y + oy);
     }

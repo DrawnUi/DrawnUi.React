@@ -192,6 +192,11 @@ export class SkiaShaderCarousel extends SkiaCarousel {
     if (!this.wasInTransitionAtDown) return super.ScrollToOffset(targetOffset, velocity, animate);
     this.wasInTransitionAtDown = false;
 
+    // a swipe back against the interrupted transition goes straight to its slide: wrapping that transition up first ran
+    // it on to its end and then back, a visible jump forward and back (C# b75f233a)
+    const heading = axis(this.gestureOrigin) - axis(this.gestureFrom), turn = axis(targetOffset) - axis(this.gestureOrigin);
+    if (heading !== 0 && turn !== 0 && Math.sign(heading) !== Math.sign(turn)) return super.ScrollToOffset(targetOffset, velocity, animate);
+
     // the pan may already have carried the position PAST the interrupted transition's destination toward the new
     // target: wrapping it up would animate backward first. Only run phase 1 while that destination is still ahead.
     const toOrigin = axis(this.gestureOrigin) - axis(this.CurrentPosition);
