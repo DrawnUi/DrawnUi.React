@@ -211,6 +211,22 @@ export class SkiaAccessibilityManager {
     const found = SkiaAccessibilityManager.TryFindGroup(focused);
     if (!found) return false;
     const { Holder: group, Item: item } = found;
+    // a menu, list or radio group whose items are not the children of one layout (a panel with a title, a divider and
+    // columns of items): its items in reading order, one after another (drawnui-cross 6ao rule 1b, as DrawnUi.Rust)
+    const role = found.Group.AccessibilityRole;
+    const linear = role === Aria.RoleMenu || role === Aria.RoleMenuBar || role === Aria.RoleList || role === Aria.RoleListBox || role === Aria.RoleRadioGroup;
+    const holdsMany = (child: SkiaControl) => this.Snapshot.filter((n) => n.CanInteract && IsInside(n.Source, child)).length > 1;
+    if (linear && item !== focused && ViewsOf(group).some(holdsMany)) {
+      const items = this.Snapshot.filter((n) => n.CanInteract && SkiaAccessibilityManager.TryFindGroup(n.Source)?.Group === found.Group).map((n) => n.Source);
+      const current = items.indexOf(focused);
+      if (current < 0) return false;
+      const target = key === "ArrowDown" || key === "ArrowRight" ? Math.min(current + 1, items.length - 1)
+        : key === "ArrowUp" || key === "ArrowLeft" ? Math.max(current - 1, 0)
+        : key === "Home" ? 0 : key === "End" ? items.length - 1 : -1;
+      if (target < 0) return false;
+      if (target !== current) { this.RequestKeyboardFocus(items[target]); found.Group.Superview?.Update(); }
+      return true;
+    }
     const scroll = FindScroll(group), axis = AxisOf(group), count = ItemCount(group);
     const current = this.groupRequest?.Group === group ? this.groupRequest.Index : IndexOf(group, item);
     if (current < 0 || count < 1) return false;

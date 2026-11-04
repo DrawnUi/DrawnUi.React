@@ -3,7 +3,7 @@
 // and key handlers. Also: a span without a color draws its underline in the label's color (C# a0ca2cbc).
 import { readFileSync } from "node:fs";
 import {
-  Super, SKRect, SKPoint, Canvas, SkiaLayer, SkiaShape, SkiaButton, SkiaLabel, TextSpan, TooltipStyle, Thickness, SkiaStack, SkiaAccessibilityManager, SkiaEditor,
+  Super, SKRect, SKPoint, Canvas, SkiaLayer, SkiaShape, SkiaButton, SkiaLabel, TextSpan, TooltipStyle, Thickness, SkiaStack, SkiaRow, SkiaAccessibilityManager, SkiaEditor,
   type SkiaControl,
 } from "../src/index.ts";
 
@@ -321,6 +321,36 @@ const element = {
     key("ArrowDown"); frame();
     check("a control behind the active modal is no focus: the arrow starts inside the dialog", mgr.FocusedNode === ok, `${mgr.FocusedNode?.AccessibilityLabel}`);
     canvas.ArrowsStartKeyboardNavigation = false; dialog.IsVisible = false; dialog.Update(); frame(); frame();
+    mgr.MinUpdateIntervalMs = 1000;
+  }
+
+  // ---- a menu whose items sit in several layouts (drawnui-cross 6ao rule 1b): the arrows walk them all in reading order ----
+  {
+    const mgr = canvas.AccessibilityManager;
+    mgr.MinUpdateIntervalMs = 0;
+    const item = (label: string) => { const b = new SkiaShape(); b.HeightRequest = 30; b.WidthRequest = 100; b.AccessibilityRole = "menuitem"; b.AccessibilityLabel = label; b.Tapped = () => {}; return b; };
+    const column = (labels: string[]) => { const c = new SkiaStack(); c.Spacing = 4; for (const l of labels) c.AddSubView(item(l)); return c; };
+    const panel = new SkiaLayer(); panel.AccessibilityRole = "menu"; panel.AccessibilityLabel = "Panel"; panel.WidthRequest = 260; panel.Margin = new Thickness(20, 20, 0, 0);
+    const inner = new SkiaStack(); inner.Spacing = 6;
+    const heading = new SkiaLabel(); heading.Text = "Recent"; heading.AccessibilityRole = "heading";
+    const divider = new SkiaShape(); divider.HeightRequest = 1; divider.HorizontalOptions = "Fill"; divider.BackgroundColor = "#444444";
+    const columns = new SkiaRow(); columns.Spacing = 20;
+    const left = column(["A1", "A2"]), right = column(["B1", "B2"]);
+    columns.AddSubView(left); columns.AddSubView(right);
+    for (const c of [heading, divider, columns]) inner.AddSubView(c);
+    panel.AddSubView(inner);
+    const r = new SkiaLayer(); r.WidthRequest = W; r.HeightRequest = H; r.AddSubView(panel);
+    canvas.Content = r; frame(); frame();
+    const at = (label: string) => mgr.Snapshot.find((n) => n.Label === label)!.Source;
+    const walk: string[] = [];
+    at("A1").NotifyAccessibilityFocused(true);
+    for (const k of ["ArrowDown", "ArrowDown", "ArrowDown", "ArrowUp", "End", "Home"]) {
+      SkiaAccessibilityManager.Key(mgr.FocusedNode, k); frame(); frame();
+      walk.push(mgr.FocusedNode?.AccessibilityLabel ?? "none");
+    }
+    // reading order: A1 and B1 share the first row, A2 and B2 the second
+    check("a menu with items in several layouts: the arrows walk all of them in reading order", walk.join(" ") === "B1 A2 B2 A2 B2 A1", walk.join(" "));
+    mgr.FocusedNode?.NotifyAccessibilityFocused(false);
     mgr.MinUpdateIntervalMs = 1000;
   }
 
