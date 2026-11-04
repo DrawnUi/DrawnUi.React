@@ -265,7 +265,10 @@ createRoot(document.getElementById("root")!).render(
 - Dialogs drawn over the screen: `AccessibilityModal` on the dialog's root (a backdrop still blocks the taps). While it
   shows, screen readers and Tab reach only its controls (and popup windows over it), the one drawn on top wins, it
   reads as a dialog with its `AccessibilityLabel` as name, the keyboard moves into it when it appears with the keyboard
-  in use and goes back where it was when it closes. Default off: nothing changes unless an app sets it.
+  in use and goes back where it was when it closes. Default off: nothing changes unless an app sets it. `SkiaShell`
+  popups and modals are such dialogs while open (a popup's outside tap still closes it, the popup is no Tab stop).
+- `AccessibilityLive="polite"` on a status text: its new text reaches screen readers on the next frame. A caption
+  beside a control that says the same name (a slider's label) gets `Aria.RolePresentation`, so it is heard once.
 - Input off: `RespondsToGestures={false}` is the one switch on `SkiaButton`, switch, checkbox, radio, slider, scroll,
   carousel and drawer (`IsDisabled` on a button is its obsolete opposite). A button, toggle or radio that is off
   ignores taps and presses (no `Tapped` / `Down` / `Up`, no toggle), and a tap on it stops there instead of reaching

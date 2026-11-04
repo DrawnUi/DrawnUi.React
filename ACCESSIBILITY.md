@@ -27,7 +27,7 @@ NVDA, JAWS and Narrator with Chrome or Edge, VoiceOver with Safari, TalkBack wit
   menu items, `aria-selected` for option and tab, `aria-pressed` for a toggle button.
 - A control role that takes no input (`RespondsToGestures={false}`, `InputTransparent`, a locked parent) is read as
   unavailable (`aria-disabled`) and is no Tab stop.
-- `AccessibilityLive="polite"` (or `"assertive"`) on a status text: its new text is announced.
+- `AccessibilityLive="polite"` (or `"assertive"`) on a status text: its new text is announced, on the next frame.
 - `AccessibilityTextSelectable` on a label: its lines are real selectable text in the overlay (select, copy).
 
 **Keyboard.** The browser's own Tab order and focus ring run through the overlay:
@@ -36,7 +36,9 @@ NVDA, JAWS and Narrator with Chrome or Edge, VoiceOver with Safari, TalkBack wit
 - A group (`Aria.RoleList`, `RoleListBox`, `RoleGrid`, `RoleToolbar`, `RoleRadioGroup`, `RoleTabList`, `RoleMenu`,
   `RoleMenuBar`) is one Tab stop that remembers its item; the arrows move by index (Up / Down in a column, Left /
   Right in a row, all four in a wrap or grid), Home / End, PageUp / PageDown by a viewport; recycled items are scrolled
-  in, then focused. The group role may sit on a wrapper: the items are the children of the layout inside it.
+  in, then focused. The group role may sit on a wrapper: the items are the children of the layout inside it. A menu,
+  menubar, list, listbox or radio group whose items sit in several layouts (a title, a divider and columns) walks all
+  of them in reading order.
 - The focused control gets the arrow keys first: a slider steps (what a screen reader's Increment / Decrement sends in
   the browser), an editor keeps them while editing.
 - The scrolls around the focused control bring it into view.
@@ -56,6 +58,8 @@ NVDA, JAWS and Narrator with Chrome or Edge, VoiceOver with Safari, TalkBack wit
   windows over it). The overlay itself becomes the dialog (role, name, `aria-modal`) around the dialog's controls. The
   keyboard moves into it when it appears with the keyboard in use, and goes back where it was when it closes. A
   control behind the dialog counts as no focus.
+- `SkiaShell` popups and modals are such dialogs while open; a popup's tap outside still closes it, and the popup
+  itself is no Tab stop.
 
 ## What an app does
 
@@ -78,7 +82,7 @@ NVDA, JAWS and Narrator with Chrome or Edge, VoiceOver with Safari, TalkBack wit
 | Platform | How | Date | Screens | Result |
 |---|---|---|---|---|
 | Chrome (Windows) | Chrome accessibility tree over CDP (`npm run audit:a11y`), every catalog page scrolled to its end | 2026-11-04 | all 22 | 1931 control nodes, every one named, every range with min < max; no console errors |
-| Chrome (Windows) | real keys through the overlay, Chrome accessibility tree | 2026-11-04 | Common Controls, Tooltips & Menus, Shell, Editor, catalog | switch, checkbox and radio checked states; slider 65 to 66 with ArrowRight, read back 9 ms later; menus by Tab, arrows, Enter, Escape; a dialog read as a dialog with only its controls, Tab round inside, focus back on close |
+| Chrome (Windows) | real keys through the overlay, Chrome accessibility tree | 2026-11-04 | Common Controls, Tooltips & Menus, Shell, Editor, catalog | switch, checkbox and radio checked states; slider 65 to 66 with ArrowRight, read back 9 ms later; a live status read 12-26 ms after the key; menus by Tab, arrows, Enter, Escape; the shell's modal and popup read as dialogs with only their controls, Tab round inside, focus back on close |
 | Node | the engine's checks (`npm run check:keyboard`, `check:popups-tooltips` and the others) | 2026-11-04 | | groups, reading order, values, disabled roles, popups, dialogs, focus rules |
 
 No screen reader has been heard on DrawnUI for React yet; see "Not yet".
@@ -86,11 +90,6 @@ No screen reader has been heard on DrawnUI for React yet; see "Not yet".
 ## Not yet
 
 - Screen readers by ear: NVDA and Narrator with Chrome and Edge, VoiceOver with Safari, TalkBack with Chrome.
-- Live regions are announced within a second of the change, not on the next frame.
-- The shell's own popups and modals are not dialogs for screen readers yet (an app can set `AccessibilityModal` on
-  their content meanwhile).
-- A menu or list whose items sit in several layouts (a panel with a title, a divider and columns) walks only the
-  first layout with the arrows.
 - Browsers have no scroll actions for screen readers: a reader moves through the overlay's elements and the focused
   one is scrolled into view, but a three-finger page swipe does not page a drawn scroll.
 - A page title in the shell bar and the page's own heading are both read.

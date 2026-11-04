@@ -28,8 +28,8 @@ Before starting: turn the reader on, then load the page; set the browser zoom to
    Expected: the File menu opens on its first line ("New, Ctrl+N, menu item"); Down reads the next line; Escape
    closes it and the reader is back on "File". Then Tab to "Choose a fruit", Activate: the list opens on "Apple";
    Escape: back on the button.
-   Optional, a shell dialog: on the "Shell" page, "Push modal": the modal's text and buttons are read; its
-   "PopModalAsync()" closes it. (Shell modals are not announced as dialogs yet: note what the reader says.)
+   A shell dialog: on the "Shell" page, "Push modal": announced as a dialog, the reader on its first button, Tab
+   stays inside; "PopModalAsync()" closes it and the reader is back on "Push modal".
 5. **Back.** From any page, the page's Back button, and the browser's Back.
    Expected: the catalog is read again from where the reader lands; nothing from the closed page is still read.
 
