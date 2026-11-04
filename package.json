@@ -92,6 +92,7 @@
     "check:label-reuse": "node dev/check.mjs dev/check-label-reuse.ts",
     "check:popups-tooltips": "node dev/check.mjs dev/check-popups-tooltips.ts",
     "check:carousel-loop": "node dev/check.mjs dev/check-carousel-loop.ts",
+    "audit:a11y": "node dev/audit-a11y.mjs",
     "bench:relayout": "node dev/check.mjs dev/bench-relayout.ts",
     "site:extras": "node dev/site-extras.mjs dist/demo",
     "build:lib": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
