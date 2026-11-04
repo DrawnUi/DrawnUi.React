@@ -310,7 +310,10 @@ export const SkiaShell = forwardRef<ShellNavigation, SkiaShellProps>(function Sk
     const showOverlay = options?.showOverlay ?? true;
     const overlay = options?.backgroundColor ?? ShellDefaults.PopupBackgroundColor;
     entry.node = (
+      // a dialog for screen readers and the keyboard while open (drawnui-cross 6av, C# 2be842b8): its outside-tap close
+      // stays, but the wrapper is no Tab stop; the backdrop is no node
       <SkiaLayer key={entry.id} VerticalOptions="Fill" HorizontalOptions="Fill" ZIndex={ShellDefaults.ZIndexPopups + entry.id} BlockGesturesBelow Opacity={animated ? 0.1 : 1}
+        AccessibilityModal AccessibilityCanInteract={false}
         ref={(c: SkiaControl | null) => { if (c) entry.ctrl = c; }}
         Tapped={(_, e: ControlTappedEventArgs) => {
           // C# PopupWrapper: a tap outside the content closes it
@@ -363,7 +366,8 @@ export const SkiaShell = forwardRef<ShellNavigation, SkiaShellProps>(function Sk
     // the user closed it (drag down / IsOpen = false): leave through history when it owns an entry, else remove
     const userClosed = () => { if (entry.closing) return; if (entry.history && backThroughHistory("modal")) entry.history = false; else { entry.closing = true; removeModal(entry); } };
     entry.node = (
-      <SkiaLayer key={entry.id} VerticalOptions="Fill" HorizontalOptions="Fill" ZIndex={ShellDefaults.ZIndexModals + entry.id} BlockGesturesBelow>
+      // a dialog for screen readers and the keyboard while open (drawnui-cross 6av, C# 2be842b8)
+      <SkiaLayer key={entry.id} VerticalOptions="Fill" HorizontalOptions="Fill" ZIndex={ShellDefaults.ZIndexModals + entry.id} BlockGesturesBelow AccessibilityModal>
         {overlay && <SkiaBackdrop Blur={ShellDefaults.PopupsBackgroundBlur} BackgroundColor={overlay} InputTransparent />}
         <SkiaDrawer ref={(d: SkiaDrawerCtrl | null) => { if (d) entry.drawer = d; }} Direction="FromBottom" HeaderSize={0} HorizontalOptions="Fill" VerticalOptions="Fill"
           RespondsToGestures={options?.useGestures ?? false} Animated={animated} Bounces={false} BlockGesturesBelow

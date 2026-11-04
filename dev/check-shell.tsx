@@ -3,7 +3,7 @@
 // and control kept) and the pushed page of the other tab mounted too, shown again when its tab is selected.
 import { readFileSync } from "node:fs";
 import { useEffect, useState } from "react";
-import { SkiaShell, SkiaLabel, SkiaLayer, type ShellNavigation } from "../src/react/index.tsx";
+import { SkiaShell, SkiaLabel, SkiaLayer, SkiaShape, type ShellNavigation } from "../src/react/index.tsx";
 import { createDrawnRoot } from "../src/react/reconciler.ts";
 import { Super, SKRect, Thickness, SkiaAccessibilityManager, HoverManager, type SkiaControl, type AnimatorBase, type Canvas } from "../src/index.ts";
 
@@ -34,7 +34,7 @@ const controls: Record<string, SkiaControl> = {};
 function Page({ name }: { name: string }) {
   const [state] = useState(() => Math.random());
   useEffect(() => { mounts[name] = (mounts[name] ?? 0) + 1; }, [name]);
-  return <SkiaLayer VerticalOptions="Fill" ref={(c: SkiaControl | null) => { if (c) controls[name] = c; }}><SkiaLabel Text={`${name} ${state}`} /></SkiaLayer>;
+  return <SkiaLayer VerticalOptions="Fill" ref={(c: SkiaControl | null) => { if (c) controls[name] = c; }}><SkiaLabel Text={`${name} ${state}`} AccessibilityRole="text" /></SkiaLayer>;
 }
 
 (async () => {
@@ -55,6 +55,7 @@ function Page({ name }: { name: string }) {
       for (const a of [...fake.AnimatingControls.values()]) a.TickFrame(performance.now() * 1e6);
       c.Measure(400, 600, 1); c.Arrange(new SKRect(0, 0, 400, 600), -1, -1, 1);
       c.Render({ Context: { Canvas: surface.getCanvas(), Surface: surface }, Destination: new SKRect(0, 0, 400, 600), Scale: 1 });
+      fake.AccessibilityManager.OnFrameEnd(1, 400, 600, () => {});
     }
   };
   root.render(<SkiaShell ref={(s: ShellNavigation | null) => { if (s) shell = s; }} Routes={routes} Tabs={[{ route: "home", title: "Home" }, { route: "search", title: "Search" }]}
@@ -79,6 +80,29 @@ function Page({ name }: { name: string }) {
   await frames(3);
   check("search again: its root kept", mounts.search === 1);
 
-  console.log(failures ? `FAIL: ${failures} checks` : "OK: shell tabs keep their stacks");
+  // shell popups and modals are dialogs for screen readers and the keyboard (drawnui-cross 6av, C# 2be842b8, as Rust)
+  const mgr = fake.AccessibilityManager;
+  mgr.MinUpdateIntervalMs = 0;
+  await shell.SelectTabAsync(0);
+  await frames(3);
+  const said = () => mgr.Snapshot.map((n) => `${n.Role}:${n.Label ?? ""}`);
+  const inside = () => <SkiaShape WidthRequest={120} HeightRequest={40} AccessibilityRole="button" AccessibilityLabel="Inside" Tapped={() => {}} />;
+  void shell.OpenPopupAsync(inside(), { animated: false });
+  await frames(6);
+  const popup = mgr.ActiveModal;
+  check("an open shell popup is the active dialog: only its controls are read", !!popup && said().includes("button:Inside") && !said().some((x) => x.startsWith("text:")), said().join(", "));
+  const popupNode = mgr.Snapshot.find((n) => n.Source === popup);
+  check("the popup is read as a dialog and is no Tab stop (its outside tap stays)", popupNode?.Role === "dialog" && popupNode?.CanInteract === false && mgr.NextTabStop(undefined, true) !== popup && mgr.NextTabStop(undefined, false) !== popup, `${popupNode?.Role} ${popupNode?.CanInteract}`);
+  await shell.ClosePopupAsync(false);
+  await frames(6);
+  check("closed: the page is read again", mgr.ActiveModal === undefined && said().some((x) => x.startsWith("text:")), said().join(", "));
+  void shell.PushModalAsync(inside(), { animated: false });
+  await frames(8);
+  check("an open shell modal is the active dialog", !!mgr.ActiveModal && mgr.ActiveModal !== popup && said().includes("button:Inside") && !said().some((x) => x.startsWith("text:")), said().join(", "));
+  await shell.PopModalAsync(false);
+  await frames(8);
+  check("closed: no dialog any more", mgr.ActiveModal === undefined, said().join(", "));
+
+  console.log(failures ? `FAIL: ${failures} checks` : "OK: shell tabs keep their stacks, popups and modals are dialogs");
   process.exit(failures ? 1 : 0);
 })();
