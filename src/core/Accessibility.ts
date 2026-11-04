@@ -377,6 +377,13 @@ export class SkiaAccessibilityManager {
     if (node.AccessibilityLive) for (const cb of this.liveUpdated) cb(node);
   }
 
+  /** What the last snapshot says for each live region, to rebuild on the next frame when that changes. */
+  private readonly liveSaid = new Map<SkiaControl, string>();
+  private LiveChanged(): boolean {
+    for (const [control, said] of this.liveSaid) if (!control.IsDisposed && (control.AccessibilityLabel ?? "") !== said) return true;
+    return false;
+  }
+
   ForceRebuildOnNextFrame(): void { this.lastRebuild = -Infinity; this.dirty = true; }
 
   Unregister(node: SkiaControl): void {
@@ -402,6 +409,8 @@ export class SkiaAccessibilityManager {
     if (this.nodes.size === 0 && this.Snapshot.length === 0) return;
     const now = performance.now();
     const wait = this.MinUpdateIntervalMs - (now - this.lastRebuild);
+    // a live region whose text changed is read on the next frame, not at the next timed rebuild (accessibility-plan B2)
+    if (wait > 0 && this.liveSaid.size > 0 && this.LiveChanged()) { this.Rebuild(scale, canvasWidthPx, canvasHeightPx); return; }
     if (wait > 0) {
       // rate-limited: rendering is on demand, so make sure a frame comes back once the interval has passed
       if (!this.pending) this.pending = window.setTimeout(() => { this.pending = 0; requestFrame(); }, wait);
@@ -449,6 +458,9 @@ export class SkiaAccessibilityManager {
       }
       start = i;
     }
+    this.liveSaid.clear();
+    // the control's own name (a name given to a child that says it is no change)
+    for (const n of list) if (n.Live) this.liveSaid.set(n.Source, n.Source.AccessibilityLabel ?? "");
     if (SkiaAccessibilityManager.Same(list, this.Snapshot)) return;
     this.Snapshot = list;
     for (const cb of this.changed) cb();

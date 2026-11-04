@@ -354,6 +354,18 @@ const element = {
     mgr.MinUpdateIntervalMs = 1000;
   }
 
+  // ---- a live region's new text reaches screen readers on the next frame (accessibility-plan B2) ----
+  {
+    const mgr = canvas.AccessibilityManager;
+    const status = new SkiaLabel(); status.Text = "Last command: none"; status.AccessibilityRole = "status"; status.AccessibilityLive = "polite";
+    const r = new SkiaLayer(); r.WidthRequest = W; r.HeightRequest = H; r.AddSubView(status);
+    canvas.Content = r; mgr.ForceRebuildOnNextFrame(); frame(); frame();
+    mgr.ForceRebuildOnNextFrame(); frame(); // a rebuild just ran: the next timed one is a second away
+    status.Text = "Last command: Save"; frame();
+    const said = mgr.Snapshot.find((n) => n.Source === status)?.Label;
+    check("a live region's new text is in the snapshot on the next frame", said === "Last command: Save", `${said}`);
+  }
+
   // ---- surfaces with their own pixels give them back (CanvasKit: dispose(), delete() keeps them) ----
   {
     const rss = () => (process as unknown as { memoryUsage(): { rss: number } }).memoryUsage().rss;
