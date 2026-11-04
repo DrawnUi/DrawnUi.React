@@ -88,6 +88,11 @@ export class SkiaRadioButton extends SkiaToggle {
   protected override DefaultAccessibilityLabel(): string | undefined { return this.text || undefined; }
 
   // ---- group (C# RadioButtons.All) ----
+  /** A disposed radio leaves its group, and an empty group goes: the module-level registry keeps no page alive. */
+  protected override OnDisposing(): void {
+    if (this.groupKey) { const set = groups.get(this.groupKey); set?.delete(this); if (set?.size === 0) groups.delete(this.groupKey); }
+    super.OnDisposing();
+  }
   private UpdateGroup(): void {
     if (this.groupKey) groups.get(this.groupKey)?.delete(this);
     this.groupKey = this.groupName || this.Parent;
