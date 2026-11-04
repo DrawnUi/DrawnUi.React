@@ -6,7 +6,8 @@
 // - a range role (slider, progressbar, spinbutton, scrollbar, meter) without min < max, or its value outside them;
 // - a focusable node that is neither named nor given a role;
 // - console errors or warnings.
-// Reported, not failed: a name said twice by two sibling nodes in a row (a shell bar title and the page heading).
+// - a caption that repeats the name of the control next to it (hello-app rule: the caption is presentation);
+// Reported, not failed: a name said twice by two other nodes in a row (a shell bar title and the page heading).
 import { readFileSync } from "node:fs";
 
 const CDP = process.env.CDP ?? "http://127.0.0.1:9222";
@@ -51,7 +52,7 @@ try {
     let still = 0;
     for (let page = 0; page <= MAX_PAGES && still < 3; page++) {
       const { result } = await S("Accessibility.getFullAXTree");
-      let fresh = 0, previous;
+      let fresh = 0;
       for (const n of result.nodes) {
         if (n.ignored) continue;
         const role = n.role?.value ?? "", name = (n.name?.value ?? "").trim();
@@ -70,8 +71,21 @@ try {
           const d = (await S("DOM.describeNode", { backendNodeId: n.backendDOMNodeId })).result?.node;
           problems.add(`a focusable ${role || "node"} with neither a name nor a role: <${d?.nodeName?.toLowerCase()} ${(d?.attributes ?? []).join(" ")}>`);
         }
-        if (name && previous && previous === name) twice.add(name);
-        if (name) previous = name;
+      }
+      // names said twice in a row, from the overlay's own order (its elements are in reading order; Chrome's AX list
+      // leaves a text element unnamed): a caption next to the control it names fails, other repeats are reported
+      const pairs = (await S("Runtime.evaluate", { returnByValue: true, expression: `(() => {
+        const out = []; let prev;
+        for (const e of document.querySelectorAll('.drawnui-a11y-overlay > *')) {
+          const role = e.getAttribute('role') || '', name = (e.getAttribute('aria-label') || (role === 'text' ? e.textContent : '') || '').trim();
+          if (!name) continue;
+          if (prev && prev.name === name) out.push([name, prev.role, role]);
+          prev = { name, role };
+        }
+        return out; })()` })).result.result.value ?? [];
+      for (const [name, a, b] of pairs) {
+        if (CONTROL_ROLES.has(a) !== CONTROL_ROLES.has(b)) problems.add(`"${name}" is said by a caption and by the ${CONTROL_ROLES.has(a) ? a : b} next to it`);
+        else twice.add(name);
       }
       still = fresh === 0 ? still + 1 : 0;
       // the next page down: the wheel at the middle goes to the innermost scroll there, the page margin to the page

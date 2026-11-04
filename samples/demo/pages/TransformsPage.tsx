@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Colors, SkiaButton, SkiaLabel, SkiaLayer, SkiaRow, SkiaScroll, SkiaShape, SkiaSlider, SkiaStack, SkiaSvg, SkiaWrap, Thickness } from "drawnui-react";
+import { Aria, Colors, SkiaButton, SkiaLabel, SkiaLayer, SkiaRow, SkiaScroll, SkiaShape, SkiaSlider, SkiaStack, SkiaSvg, SkiaWrap, Thickness } from "drawnui-react";
 import { Easing, type SkiaLabel as SkiaLabelCtrl, type SkiaShape as SkiaShapeCtrl, type SkiaSlider as SkiaSliderCtrl, type SkiaSvg as SkiaSvgCtrl } from "drawnui-react/core";
 
 /** Tile gradients of the tilted strip: the root page's card title colors, G0..G5. */
@@ -48,7 +48,8 @@ function Face({ from, to, title, text, face }: { from: string; to: string; title
 function SliderRow({ name, min, max, slider, apply }: { name: string; min: number; max: number; slider: React.Ref<SkiaSliderCtrl>; apply: (v: number) => void }) {
   return (
     <SkiaLayer HorizontalOptions="Fill">
-      <SkiaLabel Text={name} FontSize={13} TextColor="#ADB5BD" VerticalOptions="Center" />
+      {/* the slider says its name: its caption is presentation, so a screen reader hears it once (hello-app rule) */}
+      <SkiaLabel Text={name} FontSize={13} TextColor="#ADB5BD" VerticalOptions="Center" AccessibilityRole={Aria.RolePresentation} />
       <SkiaSlider ref={slider} AccessibilityLabel={name} Min={min} Max={max} Margin={new Thickness(104, 0, 0, 0)} HorizontalOptions="Fill" VerticalOptions="Center" EndChanged={(_, v) => apply(v)}
         TrackSelectedColor="#0D6EFD" TrackColor="#495057" ThumbColor="#FFFFFF" />
     </SkiaLayer>
