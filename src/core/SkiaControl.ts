@@ -1285,7 +1285,10 @@ export class SkiaControl {
     return [sx, sy, ex, ey];
   }
 
-  /** C# MakeDarker / MakeLighter: HSL lightness scaled down (light < 1) or pushed toward white (light > 1). */
+  /**
+   * A gradient's Light: below 1 the HSL lightness scaled down; above 1 the HSL lightness multiplied by Light, clamped to 1,
+   * hue and saturation kept (.NET MAUI Color.AddLuminosity, C# f77136c4 MakeLighter).
+   */
   static AdjustLightness(rgb: [number, number, number], light: number): [number, number, number] {
     const [r, g, b] = rgb;
     const max = Math.max(r, g, b), min = Math.min(r, g, b);
@@ -1297,7 +1300,7 @@ export class SkiaControl {
       if (max === r) h = (g - b) / d + (g < b ? 6 : 0); else if (max === g) h = (b - r) / d + 2; else h = (r - g) / d + 4;
       h /= 6;
     }
-    l = light < 1 ? l * light : l + (1 - l) * (light - 1);
+    l = l * light;
     l = Math.max(0, Math.min(1, l));
     if (s === 0) return [l, l, l];
     const hue = (p: number, q: number, t: number) => { if (t < 0) t += 1; if (t > 1) t -= 1; if (t < 1 / 6) return p + (q - p) * 6 * t; if (t < 1 / 2) return q; if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6; return p; };

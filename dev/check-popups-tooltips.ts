@@ -396,6 +396,28 @@ const element = {
     check("a transparent BackgroundColor is no background: the gradient colors the text", transparent < 5, `${transparent} white pixels`);
   }
 
+  // ---- a gradient's Light above 1 multiplies the HSL lightness, hue and saturation kept (.NET MAUI AddLuminosity,
+  // C# f77136c4 GradientLightTests) ----
+  {
+    const hsl = ([r, g, b]: number[]) => {
+      const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2;
+      if (max === min) return [0, 0, l];
+      const d = max - min, s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+      let h = max === r ? (g - b) / d + (g < b ? 6 : 0) : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+      return [h / 6, s, l];
+    };
+    const rgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+    const wrong: string[] = [];
+    for (const hex of ["#20C997", "#0F3460", "#E94560"]) for (const light of [1.4, 1.25]) {
+      const [h0, s0, l0] = hsl(rgb(hex));
+      const [h1, s1, l1] = hsl(SkiaLayer.AdjustLightness(rgb(hex) as [number, number, number], light));
+      const want = Math.min(1, l0 * light);
+      const dh = Math.min(Math.abs(h1 - h0), 1 - Math.abs(h1 - h0));
+      if (Math.abs(l1 - want) > 0.015 || (want < 1 && (dh > 0.002 || Math.abs(s1 - s0) > 0.01))) wrong.push(`${hex} x${light}: l ${l1.toFixed(3)} want ${want.toFixed(3)}, h ${h0.toFixed(3)}->${h1.toFixed(3)}, s ${s0.toFixed(3)}->${s1.toFixed(3)}`);
+    }
+    check("Light above 1: lightness x Light, hue and saturation kept", wrong.length === 0, wrong.join("; "));
+  }
+
   // ---- span underline in the label's color ----
   {
     const l = new SkiaLabel(); l.FontSize = 40; l.TextColor = "#FF0000"; l.Margin = new Thickness(10, 20, 0, 0);
