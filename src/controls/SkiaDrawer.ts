@@ -110,11 +110,15 @@ export class SkiaDrawer extends SnappingLayout {
     const consumedDefault = this.BlockGesturesBelow ? this : null;
     const scale = this.RenderingScale;
     const e = args.Event;
-    // the drawer sits in a full-size layer: touches outside its (translated) box are not ours
-    const local = apply.MappedLocation;
-    const hit = this.HitIsInside(local.X + apply.ChildOffset.X, local.Y + apply.ChildOffset.Y);
+    // touches outside its content are not ours, also when the drawer is larger than the panel it slides (C# hitContent:
+    // CheckChildGestureHit(Content)); a press there closes it with AutoClose
+    const point = new SKPoint(apply.MappedLocation.X + apply.ChildOffset.X, apply.MappedLocation.Y + apply.ChildOffset.Y);
+    const hitContent = this.GetGestureListeners().some((c) => c.IsVisible && !c.InputTransparent && this.IsGestureForChild(c, point));
     if (!this.hadDown && args.Type !== "Up") {
-      if (!hit) { if (this.AutoClose && this.isOpen && !this.InTransition) this.IsOpen = false; return null; }
+      if (!hitContent) {
+        if (this.AutoClose && this.isOpen && !this.InTransition && (args.Type === "Down" || args.Type === "Tapped")) this.IsOpen = false;
+        return consumedDefault; // a drawer that blocks gestures below still does (C# OnSkiaGestureEvent)
+      }
     }
     let passed = false;
     const passToChildren = () => { passed = true; return super.ProcessGestures(args, apply); };

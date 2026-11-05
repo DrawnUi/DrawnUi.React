@@ -1,7 +1,8 @@
 // A touch on a drawer moving to a snap (C# DrawerInterruptedSnapTests, 58f4a25c), on a real engine Canvas in Node with
 // pointer input (`npm run check:drawer-interrupted`): Down stops the move so a pan can take the drawer from where it
 // is; a touch that ends without a pan lets the drawer finish the move to the snap it was sent to, instead of leaving it
-// between its snaps. A pan during the move still takes it; a touch on the panel ends with its Up (AutoClose).
+// between its snaps. A pan during the move still takes it; a touch on the panel ends with its Up (AutoClose). AutoClose
+// tests the content's hit, so a drawer larger than its panel closes on a press outside the panel.
 import { readFileSync } from "node:fs";
 import { Super, Canvas, SkiaDrawer, SkiaShape } from "../src/index.ts";
 
@@ -112,6 +113,20 @@ g.getComputedStyle = () => ({ overflowX: "visible", overflowY: "visible" });
     const stillOpen = d.IsOpen;
     await tap(150, 50);
     check("AutoClose: after a touch on the panel, a press outside closes it", stillOpen && await closed(d), where(d));
+  }
+
+  {
+    // AutoClose with a drawer filling the screen and a smaller panel at its bottom (C# tests the content's hit)
+    const drawer = new SkiaDrawer();
+    drawer.Direction = "FromBottom"; drawer.AutoClose = true; drawer.HorizontalOptions = "Fill"; drawer.VerticalOptions = "Fill";
+    const panel = new SkiaShape(); panel.BackgroundColor = "#808080"; panel.HorizontalOptions = "Fill"; panel.HeightRequest = 150; panel.VerticalOptions = "End";
+    drawer.AddSubView(panel);
+    canvas.Content = drawer;
+    await frames(4); drawer.IsOpen = true; await frames(60);
+    await tap(150, H - 50); await frames(4);
+    const stillOpen = drawer.IsOpen;
+    await tap(150, 50);
+    check("AutoClose, a Fill drawer with a smaller panel: a press above the panel closes it", stillOpen && await closed(drawer), where(drawer));
   }
 
   canvas.Dispose();
