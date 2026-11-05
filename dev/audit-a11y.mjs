@@ -76,13 +76,15 @@ try {
       // names said twice in a row, from the overlay's own order (its elements are in reading order; Chrome's AX list
       // leaves a text element unnamed): a caption next to the control it names fails, other repeats are reported
       const pairs = (await S("Runtime.evaluate", { returnByValue: true, expression: `(() => {
-        const out = []; let prev, bar;
+        const out = []; let prev, bar, titleSeen = false;
         for (const e of document.querySelectorAll('.drawnui-a11y-overlay > *')) {
           const role = e.getAttribute('role') || '', name = (e.getAttribute('aria-label') || (role === 'text' ? e.textContent : '') || '').trim();
           if (!name) continue;
           // the shell bar's title is the first heading; a page text or heading saying it again reads the page name twice
+          // the page's title: any heading, or its first text after the bar (a stat tile titled the same is no page title)
           if (role === 'heading' && bar === undefined) bar = name;
-          else if (bar && name === bar && (role === 'heading' || role === 'text')) out.push([name, 'bar title', role]);
+          else if (bar && name === bar && (role === 'heading' || (role === 'text' && !titleSeen))) out.push([name, 'bar title', role]);
+          if (bar !== undefined && role === 'text') titleSeen = true;
           if (prev && prev.name === name) out.push([name, prev.role, role]);
           prev = { name, role };
         }
