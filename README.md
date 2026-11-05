@@ -1,15 +1,13 @@
-# DrawnUi.React
+# DrawnUI for React
 
-[DrawnUi](https://drawnui.net) engine ptototype for React, TypeScript on top of
-[CanvasKit](https://skia.org/docs/user/modules/canvaskit/) (Skia for the browser), composed with React
-through a custom `react-reconciler` renderer.
+[![npm](https://img.shields.io/npm/v/drawnui-react/preview.svg)](https://www.npmjs.com/package/drawnui-react)
+![License](https://img.shields.io/github/license/DrawnUi/DrawnUi.React.svg)
 
-Check out latest playbook: [helloreact.drawnui.net](https://helloreact.drawnui.net/) 👈
+Build rich, fluid UI for the web by drawing it. Every control is painted on one hardware-accelerated canvas by
+DrawnUI, the Skia engine behind DrawnUI for .NET and Rust, and you compose it with React: JSX, hooks, state, the
+way you already work.
 
-Playground to use and test live: [drawfiddle.com](https://drawfiddle.com/) 👈
-
-*Work in progress*: the goal is same API surface and semantics as DrawnUi (.NET) — same control names, same PascalCase
-property names, same measure/arrange/paint contract — so knowledge and docs transfer 1:1.
+Live demo: [helloreact.drawnui.net](https://helloreact.drawnui.net) · Playground: [drawfiddle.com](https://drawfiddle.com) · Docs: [drawnui.net](https://drawnui.net/articles/react/index.html)
 
 ```tsx
 await Super.UseDrawnUi()
@@ -24,7 +22,29 @@ await Super.UseDrawnUi()
 </Canvas>
 ```
 
+## One family
+
+DrawnUI for React is the same engine as [DrawnUI for .NET](https://github.com/DrawnUi/DrawnUi.Net) (MAUI, Blazor,
+WPF, OpenTK, WebAssembly) and [DrawnUI for Rust](https://github.com/DrawnUi/DrawnUi.Rust): the same controls,
+property names, layout and drawing rules. What you learn here works there, and screens move between them.
+
+## What you get, all drawn on one canvas
+
+- **Layouts:** stacks, rows, grids, wrap and masonry, layers with any alignment.
+- **Lists that stay smooth:** 100 000 recycled rows, items of different heights, load more at both ends.
+- **Animations:** a frame loop for anything, Lottie and GIF, spritesheets.
+- **Transforms in 2D and 3D:** rotate, scale, skew, perspective and depth; taps still land on the right control.
+- **Gestures:** tap, long press, pan, swipe, drag to reorder, mouse hover, right-click menus.
+- **Shaders:** SkSL effects on any control, shader transitions between images.
+- **Navigation:** shell with pages, popups, modals, toasts, carousel and drawer.
+- **Text:** rich spans, markdown, emoji and symbols, a drawn text editor.
+- **Keyboard:** Tab, arrows, Enter and Escape move through every control, list, menu and dialog.
+- **Accessibility:** screen readers read your drawn UI, names, values and dialogs included.
+- **Games:** a game loop and sprites, with Pong as a sample.
+- **AI-ready:** a [skill file](https://helloreact.drawnui.net/skills/drawnui-react/SKILL.md) teaches coding agents to build with it.
+
 ## MIT, everywhere
+
 DrawnUI is MIT licensed in every language and on every platform: desktop, mobile, web and embedded devices. Ship it in commercial products with no attribution badge, no about screen and no per-device royalty.
 
 ## Install
@@ -100,10 +120,11 @@ key) and `Native` (the DOM event, for modifiers). Web-only: DrawnUi.Net has no m
 
 ## Accessibility
 
-Same model as DrawnUi.Blazor: the `<canvas>` is `aria-hidden`, an invisible DOM overlay mirrors every
-accessible drawn control (`role`, `aria-label`, `title` hint, `aria-pressed`, `aria-live`, `tabindex`), rebuilt
-at most once per second from the arranged rects. Keyboard (Tab / Enter / Space) and screen-reader activation
-are routed back into the gesture pipeline as a `Tapped` on the control.
+Same model as DrawnUI for .NET in the browser: the `<canvas>` is `aria-hidden`, and an invisible ARIA layer mirrors
+every accessible drawn control (role, name, hint, value, pressed state, live regions). Tab, the arrow keys, Home /
+End, PageUp / PageDown, Enter, Space and Escape move through controls, lists, menus and dialogs; screen-reader
+activation reaches the control as a `Tapped`. A dialog marked `AccessibilityModal` (shell popups and modals are by
+themselves) keeps readers and the keyboard inside it, and a live region's new text is read on the next frame.
 
 Per control (C# names): `AccessibilityRole` (enables the node; use `Aria.*`), `AccessibilityLabel`
 (defaults to the control's text), `AccessibilityHint`, `AccessibilityCanInteract` (defaults to "has a
