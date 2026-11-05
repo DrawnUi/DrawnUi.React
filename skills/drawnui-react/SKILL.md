@@ -177,7 +177,7 @@ createRoot(document.getElementById("root")!).render(
   the width it draws. Chinese and Japanese wrap between characters, never before closing punctuation or small kana
   (`SkiaLabel.CanBreakInsideWord`); Korean and Latin wrap at spaces, a Latin word wider than the line by characters.
 - A gradient's `Light` above 1 lightens each color by multiplying its lightness (1.25 = a quarter lighter, hue and
-  saturation kept, as in DrawnUI for .NET); below 1 darkens it.
+  saturation kept, as in DrawnUI for .NET); below 1 darkens it by multiplying red, green and blue (0.7 = 70 %).
 - A label's `FillGradient` colors its text (each line, or the whole block with `GradientByLines={false}`); on a label
   with a `BackgroundColor` it fills that background instead and the text keeps `TextColor`.
 - `SkiaScroll.ScrollToIndex(index, animate, "Start" | "Center" | "End")` keeps aiming until the row's place is

@@ -1286,11 +1286,12 @@ export class SkiaControl {
   }
 
   /**
-   * A gradient's Light: below 1 the HSL lightness scaled down; above 1 the HSL lightness multiplied by Light, clamped to 1,
-   * hue and saturation kept (.NET MAUI Color.AddLuminosity, C# f77136c4 MakeLighter).
+   * A gradient's Light: below 1 red, green and blue multiplied by Light (C# MakeDarker, as Rust); above 1 the HSL
+   * lightness multiplied by Light, clamped to 1, hue and saturation kept (.NET MAUI Color.AddLuminosity, C# f77136c4).
    */
   static AdjustLightness(rgb: [number, number, number], light: number): [number, number, number] {
     const [r, g, b] = rgb;
+    if (light < 1) { const k = Math.max(0, light); return [r * k, g * k, b * k]; }
     const max = Math.max(r, g, b), min = Math.min(r, g, b);
     let h = 0, s = 0;
     let l = (max + min) / 2;

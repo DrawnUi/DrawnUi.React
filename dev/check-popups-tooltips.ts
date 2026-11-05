@@ -416,6 +416,14 @@ const element = {
       if (Math.abs(l1 - want) > 0.015 || (want < 1 && (dh > 0.002 || Math.abs(s1 - s0) > 0.01))) wrong.push(`${hex} x${light}: l ${l1.toFixed(3)} want ${want.toFixed(3)}, h ${h0.toFixed(3)}->${h1.toFixed(3)}, s ${s0.toFixed(3)}->${s1.toFixed(3)}`);
     }
     check("Light above 1: lightness x Light, hue and saturation kept", wrong.length === 0, wrong.join("; "));
+    // below 1: red, green and blue multiplied by Light (C# MakeDarker, Rust)
+    const darker: string[] = [];
+    const byte = (v: number) => Math.round(v * 255);
+    for (const [hex, light, want] of [["#E94560", 0.7, "#A33043"], ["#E94560", 0.5, "#752330"], ["#20C997", 0.7, "#168D6A"], ["#20C997", 0.5, "#10654C"], ["#0F3460", 0.7, "#0B2443"], ["#0F3460", 0.5, "#081A30"]] as const) {
+      const got = SkiaLayer.AdjustLightness(rgb(hex) as [number, number, number], light).map(byte), exp = rgb(want).map(byte);
+      if (got.some((v, i) => Math.abs(v - exp[i]) > 1)) darker.push(`${hex} x${light}: ${got.join(",")} want ${exp.join(",")}`);
+    }
+    check("Light below 1: red, green and blue x Light", darker.length === 0, darker.join("; "));
   }
 
   // ---- span underline in the label's color ----
