@@ -4,7 +4,7 @@
 // at real rest, never between the phases, and InTransition stays true from phase 1 to the end of phase 2. A move by
 // code during phase 1 drops the queued phase 2. A tap clears the carousel's finger state (IsUserFocused).
 import {
-  Super, SKRect, SKPoint, Canvas, SkiaAccessibilityManager, HoverManager, SkiaLayer, SkiaShape, SkiaShaderCarousel, TouchActionEventArgs,
+  Super, SKRect, SKPoint, Canvas, SkiaAccessibilityManager, HoverManager, SkiaLayer, SkiaShape, SkiaShaderCarousel, TouchActionEventArgs, MultitouchTracker,
   type AnimatorBase, type TouchActionType,
 } from "../src/index.ts";
 
@@ -51,7 +51,7 @@ class FakeCanvas {
     const c = Object.create(Canvas.prototype) as Record<string, unknown>;
     Object.assign(c, {
       gestures: "Lock", gestureOwner: null, content: root, activeTouchIds: new Set(), pointerDownArgs: new Map(), previousTouchArgs: new Map(),
-      pendingGestures: [], claimedTouches: new Set(), longPressTimers: new Map(), longPressed: new Set(), Update() {},
+      pendingGestures: [], claimedTouches: new Set(), longPressTimers: new Map(), longPressed: new Set(), fingers: new MultitouchTracker(), multiTouch: false, Update() {},
     });
     const cv = c as unknown as Canvas & { ProcessPendingGestures(): void };
     const send = (type: TouchActionType, x: number, dt: number) => {

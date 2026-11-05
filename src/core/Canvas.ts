@@ -10,7 +10,7 @@ import { KeyboardManager, type InputKey } from "./KeyboardManager";
 import { type Color, Colors, type RenderingModeType, SKRect } from "./Types";
 import {
   ContextMenuEventArgs, type ContextMenuSource,
-  GestureEventProcessingInfo, PointerData, type GesturesMode, SKPoint, SkiaGesturesParameters, TouchActionEventArgs,
+  GestureEventProcessingInfo, MultitouchTracker, PointerData, type GesturesMode, SKPoint, SkiaGesturesParameters, TouchActionEventArgs,
   type TouchActionResult, type TouchActionType,
 } from "./Gestures";
 
@@ -704,7 +704,7 @@ export class Canvas {
     this.claimedTouches.clear();
     for (const id of [...this.longPressTimers.keys()]) this.DisarmLongPress(id);
     this.longPressed.clear();
-    this.activeTouchIds.clear(); this.pointerDownArgs.clear(); this.previousTouchArgs.clear();
+    this.activeTouchIds.clear(); this.pointerDownArgs.clear(); this.previousTouchArgs.clear(); this.fingers.Reset();
   }
 
   /** Port of DrawnUi.Blazor Canvas.OnTouchAction: per-pointer state machine producing Down / Panning / Tapped / Up. */
@@ -714,6 +714,13 @@ export class Canvas {
 
     if (args.Type === "Pressed") {
       this.ArmLongPress(id, args);
+      // the fingers for pinch and turn: the first restarts them, a second one makes the press no tap
+      if (this.activeTouchIds.size === 0) { this.fingers.Restart(id, args.Location); this.multiTouch = false; }
+      else {
+        for (const [other, last] of this.previousTouchArgs) this.fingers.AddMovement(other, last.Location); // their latest places
+        this.fingers.AddMovement(id, args.Location);
+        this.multiTouch = true;
+      }
       this.activeTouchIds.add(id);
       args.NumberOfTouches = this.activeTouchIds.size;
       args.StartingLocation = args.Location;
@@ -739,6 +746,7 @@ export class Canvas {
     args.StartingLocation = downArgs ? downArgs.StartingLocation : args.Location;
 
     if (args.Type === "Moved") {
+      if (this.activeTouchIds.size > 1) args.Manipulation = this.fingers.AddMovement(id, args.Location); // nothing for one finger
       const threshold = Canvas.TappedCancelMoveThresholdPoints * Math.max(0.1, this.RenderingScale);
       if (Math.abs(args.Distance.Total.X) >= threshold || Math.abs(args.Distance.Total.Y) >= threshold) this.DisarmLongPress(id);
       if (args.Distance.Delta.X !== 0 || args.Distance.Delta.Y !== 0) this.OnGestureEvent(args, "Panning");
@@ -750,7 +758,7 @@ export class Canvas {
       args.IsInContact = args.NumberOfTouches > 1;
       const longPressed = this.longPressed.delete(id);
       this.DisarmLongPress(id);
-      if (!args.IsInContact && downArgs && args.Type === "Released" && !longPressed) {
+      if (!args.IsInContact && downArgs && args.Type === "Released" && !longPressed && !this.multiTouch) {
         const threshold = Canvas.TappedCancelMoveThresholdPoints * Math.max(0.1, this.RenderingScale);
         if (Math.abs(args.Distance.Total.X) < threshold && Math.abs(args.Distance.Total.Y) < threshold) this.OnGestureEvent(args, "Tapped");
       }
@@ -758,8 +766,14 @@ export class Canvas {
       this.previousTouchArgs.delete(id);
       this.pointerDownArgs.delete(id);
       this.activeTouchIds.delete(id);
+      if (this.activeTouchIds.size === 0) this.fingers.Reset(); else this.fingers.Lifted(id);
     }
   }
+
+  /** The fingers down, for TouchActionEventArgs.Manipulation (pinch and turn). */
+  private readonly fingers = new MultitouchTracker();
+  /** The press had a second finger: it is no tap (AppoMobi.Blazor.Gestures). */
+  private multiTouch = false;
 
   private readonly longPressTimers = new Map<number, number>();
   private readonly longPressed = new Set<number>();

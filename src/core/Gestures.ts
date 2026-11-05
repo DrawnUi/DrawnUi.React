@@ -94,6 +94,84 @@ export class PointerData {
   PressedButtons = 0;
 }
 
+/**
+ * AppoMobi.Gestures ManipulationInfo: what two or more fingers did since the previous move, on a Panning while they are
+ * down. Pinch to zoom from `Scale`, turn from `Rotation`. Pixels.
+ */
+export class ManipulationInfo {
+  constructor(
+    /** The middle of the fingers now, and at the previous move. */
+    readonly Center: SKPoint,
+    readonly PreviousCenter: SKPoint,
+    /** The fingers' spread now over the previous one, minus 1: 0.05 = 5% further apart. */
+    readonly Scale: number,
+    /** Degrees the first two fingers turned since the previous move, the short way (never a jump across ±180). */
+    readonly Rotation: number,
+    /** `Scale` and `Rotation` added up since the number of fingers last changed. */
+    readonly ScaleTotal: number,
+    readonly RotationTotal: number,
+    readonly TouchesCount: number,
+  ) {}
+}
+
+/**
+ * The fingers down and what they did (AppoMobi.Gestures MultitouchTracker, after Mapsui; as DrawnUi.Rust): their middle,
+ * the first one's distance from it, the first two's angle. A new finger count starts the totals again.
+ */
+export class MultitouchTracker {
+  private readonly fingers = new Map<number, SKPoint>();
+  private state?: { Center: SKPoint; Radius: number; Angle: number; Count: number };
+  private scaleTotal = 0;
+  private rotationTotal = 0;
+
+  get Count(): number { return this.fingers.size; }
+
+  /** The first finger came down: everything before is forgotten. */
+  Restart(id: number, at: SKPoint): void {
+    this.fingers.clear();
+    this.fingers.set(id, at);
+    this.scaleTotal = this.rotationTotal = 0;
+    this.state = this.Measure();
+  }
+
+  /** A finger came down or moved; what the fingers did while two or more are down and they moved. */
+  AddMovement(id: number, at: SKPoint): ManipulationInfo | undefined {
+    this.fingers.set(id, at);
+    return this.Calculate();
+  }
+
+  Lifted(id: number): void { if (this.fingers.delete(id)) this.Calculate(); }
+
+  Reset(): void { this.fingers.clear(); this.state = undefined; }
+
+  private Measure(): { Center: SKPoint; Radius: number; Angle: number; Count: number } | undefined {
+    const points = [...this.fingers.values()];
+    if (points.length === 0) return undefined;
+    const first = points[0];
+    if (points.length === 1) return { Center: first, Radius: 0, Angle: 0, Count: 1 };
+    let x = 0, y = 0;
+    for (const p of points) { x += p.X; y += p.Y; }
+    const center = new SKPoint(x / points.length, y / points.length), second = points[1];
+    return {
+      Center: center, Radius: Math.hypot(first.X - center.X, first.Y - center.Y),
+      Angle: (Math.atan2(second.Y - first.Y, second.X - first.X) * 180) / Math.PI, Count: points.length,
+    };
+  }
+
+  private Calculate(): ManipulationInfo | undefined {
+    const now = this.Measure(), previous = this.state;
+    this.state = now;
+    if (!now || !previous || now.Count < 2) return undefined;
+    if (now.Count !== previous.Count) { this.scaleTotal = this.rotationTotal = 0; return undefined; }
+    const scale = previous.Radius > 0 && now.Radius !== previous.Radius ? now.Radius / previous.Radius - 1 : 0;
+    const rotation = ((((now.Angle - previous.Angle + 540) % 360) + 360) % 360) - 180;
+    this.scaleTotal += scale;
+    this.rotationTotal += rotation;
+    if (now.Center.X === previous.Center.X && now.Center.Y === previous.Center.Y && now.Radius === previous.Radius && now.Angle === previous.Angle) return undefined;
+    return new ManipulationInfo(now.Center, previous.Center, scale, rotation, this.scaleTotal, this.rotationTotal, now.Count);
+  }
+}
+
 /** AppoMobi.Gestures TouchActionEventArgs. */
 export class TouchActionEventArgs {
   Id = 0;
@@ -106,6 +184,8 @@ export class TouchActionEventArgs {
   Distance = new DistanceInfo();
   NumberOfTouches = 1;
   IsInContact = false;
+  /** Panning while two or more fingers are down: how they pinched and turned since the previous move. */
+  Manipulation?: ManipulationInfo;
   Scale = 1;
   Timestamp = performance.now();
   /** ms since the previous event of the same pointer. */

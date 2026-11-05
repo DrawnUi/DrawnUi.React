@@ -2,7 +2,7 @@
 // checked in Node (`npm run check:carousel-swipe`) through the engine Canvas touch state machine with timed moves: from
 // slide N a release lands on N-1, N or N+1, whatever the pan distance and velocity; code moves are not limited.
 import {
-  Super, SKRect, SKPoint, Canvas, SkiaAccessibilityManager, HoverManager, SkiaLayer, SkiaShape, SkiaCarousel, TouchActionEventArgs,
+  Super, SKRect, SKPoint, Canvas, SkiaAccessibilityManager, HoverManager, SkiaLayer, SkiaShape, SkiaCarousel, TouchActionEventArgs, MultitouchTracker,
   type SkiaControl, type AnimatorBase, type TouchActionType,
 } from "../src/index.ts";
 
@@ -50,7 +50,7 @@ class FakeCanvas {
     const c = Object.create(Canvas.prototype) as Record<string, unknown>;
     Object.assign(c, {
       gestures: "Lock", gestureOwner: null, content: root, activeTouchIds: new Set(), pointerDownArgs: new Map(), previousTouchArgs: new Map(),
-      pendingGestures: [], claimedTouches: new Set(), longPressTimers: new Map(), longPressed: new Set(), Update() {},
+      pendingGestures: [], claimedTouches: new Set(), longPressTimers: new Map(), longPressed: new Set(), fingers: new MultitouchTracker(), multiTouch: false, Update() {},
     });
     const cv = c as unknown as Canvas & { ProcessPendingGestures(): void };
     /** One raw pointer event `dt` ms after the previous one; the frame clock moves with it. */

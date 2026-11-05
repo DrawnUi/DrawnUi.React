@@ -2,7 +2,7 @@
 // in Node (`npm run check:longpress`) on the engine Canvas without its DOM: a press held still for LongPressTimeMs
 // gives one LongPressing at the press point and its release no Tapped; a quick press is a Tapped; a press that moves
 // past the tap threshold first gives no LongPressing.
-import { Canvas, SKPoint, TouchActionEventArgs, PointerData, type SkiaGesturesParameters } from "../src/index.ts";
+import { Canvas, SKPoint, TouchActionEventArgs, MultitouchTracker, PointerData, type SkiaGesturesParameters } from "../src/index.ts";
 
 let failures = 0;
 const check = (name: string, ok: boolean, detail = "") => { if (!ok) failures++; console.log(`${ok ? "ok  " : "FAIL"} ${name}${detail ? ` (${detail})` : ""}`); };
@@ -13,7 +13,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
   const canvas = Object.create(Canvas.prototype) as Canvas & Record<string, unknown>;
   Object.assign(canvas, {
     gestures: "Lock", RenderingScale: 1, activeTouchIds: new Set(), pointerDownArgs: new Map(), previousTouchArgs: new Map(),
-    pendingGestures: [], claimedTouches: new Set(), longPressTimers: new Map(), longPressed: new Set(), Update: () => {},
+    pendingGestures: [], claimedTouches: new Set(), longPressTimers: new Map(), longPressed: new Set(), fingers: new MultitouchTracker(), multiTouch: false, Update: () => {},
   });
   const pending = () => canvas.pendingGestures as SkiaGesturesParameters[];
   const send = (type: TouchActionEventArgs["Type"], x: number, y: number) => {

@@ -4,7 +4,7 @@
 // position moving by less than half a slide per frame.
 import {
   Super, SKRect, SKPoint, Canvas, SkiaAccessibilityManager, HoverManager, SkiaLayer, SkiaShape, SkiaCarousel, SkiaShaderCarousel, SkiaStack, SkiaLabel, SkiaScroll,
-  TouchActionEventArgs, type SkiaControl, type AnimatorBase, type TouchActionType,
+  TouchActionEventArgs, MultitouchTracker, type SkiaControl, type AnimatorBase, type TouchActionType,
 } from "../src/index.ts";
 
 declare const CanvasKitInit: (o: { locateFile: () => string }) => Promise<any>;
@@ -54,7 +54,7 @@ class FakeCanvas {
     const c = Object.create(Canvas.prototype) as Record<string, unknown>;
     Object.assign(c, {
       gestures: "Lock", gestureOwner: null, content: root, activeTouchIds: new Set(), pointerDownArgs: new Map(), previousTouchArgs: new Map(),
-      pendingGestures: [], claimedTouches: new Set(), longPressTimers: new Map(), longPressed: new Set(), Update() {},
+      pendingGestures: [], claimedTouches: new Set(), longPressTimers: new Map(), longPressed: new Set(), fingers: new MultitouchTracker(), multiTouch: false, Update() {},
     });
     const cv = c as unknown as Canvas & { ProcessPendingGestures(): void };
     /** One raw pointer event `dt` ms after the previous one; the frame clock moves with it. */
