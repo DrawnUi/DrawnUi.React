@@ -70,7 +70,7 @@ export abstract class SnappingLayout extends SkiaLayout {
     if (this.stoppingSilently) return; // interrupted / restarted: not a finished transition
     this.InTransition = !this.CheckTransitionEnded();
     this.UpdateReportedPosition(); // subclasses gate reporting on InTransition: report the settled state now
-    this.Stopped?.(this, this.CurrentPosition);
+    if (!this.InTransition) this.Stopped?.(this, this.CurrentPosition); // at real rest only (a queued next move keeps it in transition)
   }
 
   protected override OnDisposing(): void { this.StopSnapAnimators(); }

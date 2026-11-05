@@ -88,6 +88,7 @@ export class SkiaShaderCarousel extends SkiaCarousel {
   }
 
   protected override OnChildrenInitialized(): void {
+    this.pendingTarget = undefined; // new slides: an offset queued for the old ones means nothing here
     this.indexFrom = -1; this.indexTo = -1; this.indexFromLast = -1; this.indexToLast = -1;
     this.initialized = false;
     super.OnChildrenInitialized();
@@ -171,6 +172,9 @@ export class SkiaShaderCarousel extends SkiaCarousel {
    * first wraps that transition up within InterruptedTransitionMs, then the new one plays.
    */
   protected override ScrollToOffset(targetOffset: SKPoint, velocity: SKPoint, animate: boolean): boolean {
+    // a real move by code (ScrollTo, SelectedIndex, GoNext / GoPrev) drops a queued phase 2: its raw offset would replay
+    // over that move; the carousel's own echo of its index (a target already at CurrentSnap) is not a move and keeps it
+    if (!this.inGestureRelease && (targetOffset.X !== this.CurrentSnap.X || targetOffset.Y !== this.CurrentSnap.Y)) this.pendingTarget = undefined;
     if (!this.inGestureRelease || !animate || this.SnapPoints.length < 2) return super.ScrollToOffset(targetOffset, velocity, animate);
     const axis = (p: SKPoint) => (this.IsVertical ? p.Y : p.X);
     const step = new SKPoint(this.SnapPoints[1].X - this.SnapPoints[0].X, this.SnapPoints[1].Y - this.SnapPoints[0].Y);
@@ -223,10 +227,19 @@ export class SkiaShaderCarousel extends SkiaCarousel {
     return started;
   }
 
-  protected override OnTransitionChanged(): void {
-    super.OnTransitionChanged();
-    // phase 2: the interrupted transition is wrapped up, now go where the swipe pointed
+  /**
+   * Phase 2 of an interrupted swipe starts here, the moment phase 1 arrives, so the carousel never reports a stop between
+   * the two phases: InTransition stays true and Stopped fires once, at real rest (C# f4628b7e, drawnui-cross 6y). A stop in
+   * between let an app move its slides there, and the queued raw offset then replayed in the new slides.
+   */
+  override CheckTransitionEnded(): boolean {
+    const ended = super.CheckTransitionEnded();
     const next = this.pendingTarget;
-    if (!this.InTransition && next) { this.pendingTarget = undefined; this.ScrollToOffset(next, SKPoint.Empty, true); }
+    if (ended && next) {
+      this.pendingTarget = undefined;
+      this.FixPosition(); // looped: back from a virtual slot first, as at every stop
+      if (this.ScrollToOffset(next, SKPoint.Empty, true)) return false; // phase 2 runs
+    }
+    return ended;
   }
 }

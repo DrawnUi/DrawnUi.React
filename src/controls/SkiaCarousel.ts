@@ -314,7 +314,7 @@ export class SkiaCarousel extends SnappingLayout {
     }
   }
 
-  private FixPosition(): void {
+  protected FixPosition(): void {
     if (this.IsLooped && this.SnapPoints.length > 1) {
       const v = this.GetVirtualAnchor(this.CurrentSnap);
       if (v.Id === -1 || v.Id === -2) this.FixIndex();

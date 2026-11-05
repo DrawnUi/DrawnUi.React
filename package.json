@@ -100,6 +100,7 @@
     "check:drawer-interrupted": "node dev/check.mjs dev/check-drawer-interrupted.ts",
     "check:animated-frames": "node dev/check.mjs dev/check-animated-frames.ts",
     "check:image-features": "node dev/check.mjs dev/check-image-features.ts",
+    "check:shader-carousel-interrupted": "node dev/check.mjs dev/check-shader-carousel-interrupted.ts",
     "audit:a11y": "node dev/audit-a11y.mjs",
     "bench:relayout": "node dev/check.mjs dev/bench-relayout.ts",
     "site:extras": "node dev/site-extras.mjs dist/demo",
