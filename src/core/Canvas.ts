@@ -73,6 +73,16 @@ export class Canvas {
   private popupKeysHooked = false;
   /** Raised when a popup window closed: picked, a press outside, Escape, the wheel, window blur or ClosePopupWindow. */
   readonly PopupWindowClosed = new Set<(id: PopupId) => void>();
+  /** The root controls of the open popup windows, bottom to top: a read-only view for tools (a new array per read). */
+  get PopupWindowRoots(): readonly SkiaControl[] { return this.popupLayer?.Roots ?? []; }
+
+  private wasDrawnListeners?: Set<(sender: Canvas) => void>;
+  /**
+   * Handlers run at the end of every drawn frame, after the `WasDrawn` callback and before the surface is flushed (a
+   * tool drawing an overlay on `Surface.getCanvas()`). Made on first use: a canvas without listeners does no work.
+   */
+  get WasDrawnListeners(): Set<(sender: Canvas) => void> { return this.wasDrawnListeners ??= new Set(); }
+  private readonly raiseWasDrawn = (f: (sender: Canvas) => void) => f(this);
 
   /**
    * Shows `content` over everything, opening from `anchor` the way native menus do: at a point (a right click, canvas
@@ -283,6 +293,8 @@ export class Canvas {
     if (executed > 0) this.Update(); // animators running: keep frames coming
     // C# order: WasDrawn at the end of the frame, then the frame counts as rendered
     this.WasDrawn?.(this);
+    const listeners = this.wasDrawnListeners;
+    if (listeners !== undefined && listeners.size > 0) listeners.forEach(this.raiseWasDrawn);
     if (!this.WasRendered && canRender) this.WasRendered = true;
   }
 

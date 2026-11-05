@@ -70,6 +70,45 @@ function applyProps(inst: HostInstance, prev: Props | null, next: Props): void {
   else if (repaint && prev) (inst as SkiaControl).RepaintComposition?.();
 }
 
+// DrawnUI Designer, dev builds only: the React fiber that created each control (DesignerSourceOf). Vite replaces
+// import.meta.env.DEV, false in production builds, so the map and its use compile away; without Vite it is undefined
+// and nothing is kept.
+const designerSources: WeakMap<object, DesignerFiber> | undefined = import.meta.env?.DEV ? new WeakMap() : undefined;
+interface DesignerFiber { _debugStack?: { stack?: string }; _debugOwner?: { type?: { name?: string; displayName?: string } | string } }
+
+/** What DrawnUI Designer reads about the JSX element that created a control (dev builds; undefined in production). */
+export interface DesignerSource {
+  /** The React fiber that created the control. */
+  Fiber: unknown;
+  /** The name of the component that rendered the element (the fiber's owner). */
+  Component?: string;
+  /** The raw stack captured where the element was created. */
+  Stack?: string;
+  /** The first app frame of that stack: positions in the served (transformed) module, map them through its source map. */
+  File?: string;
+  Line?: number;
+  Column?: number;
+}
+
+/**
+ * The JSX element that created `control`, for DrawnUI Designer: its fiber, owner component and source position (parsed
+ * from the fiber's stack only when asked). Undefined in production builds and for controls made outside React.
+ */
+export function DesignerSourceOf(control: SkiaControl): DesignerSource | undefined {
+  if (!import.meta.env?.DEV) return undefined;
+  const fiber = designerSources?.get(control);
+  if (!fiber) return undefined;
+  const owner = fiber._debugOwner?.type;
+  const stack = fiber._debugStack?.stack;
+  const source: DesignerSource = { Fiber: fiber, Component: typeof owner === "string" ? owner : owner?.displayName ?? owner?.name, Stack: stack };
+  // React's stack: "Error: react-stack-top-frame", the jsx runtime's own frame, then the frame that wrote the JSX
+  // ("at Card (url-or-path:line:col)", or "at url-or-path:line:col" for an anonymous function)
+  const frames = stack?.split("\n").filter((l) => /^\s*at /.test(l)) ?? [];
+  const m = frames.length > 1 ? /^\s*at (?:.*? \()?(.+?):(\d+):(\d+)\)?\s*$/.exec(frames[1]) : null;
+  if (m) { source.File = m[1]; source.Line = Number(m[2]); source.Column = Number(m[3]); }
+  return source;
+}
+
 let currentUpdatePriority: number = DefaultEventPriority;
 const noop = () => {};
 
@@ -98,13 +137,14 @@ const hostConfig: Cfg & Record<string, unknown> = {
   supportsMicrotasks: true,
   scheduleMicrotask: queueMicrotask,
 
-  createInstance(type: string, props: Props) {
+  createInstance(type: string, props: Props, _root: unknown, _host: unknown, fiber: DesignerFiber) {
     const ctor = Registry[type];
     if (!ctor) throw new Error(`DrawnUi: unknown control <${type}>`);
     const inst = new ctor();
     // ConfigureStyles defaults first, the JSX props below override them (a TextSpan is not a control, it has none)
     (inst as Partial<SkiaControl>).ApplyInitialStyles?.(true);
     applyProps(inst, null, props);
+    if (import.meta.env?.DEV) designerSources!.set(inst, fiber);
     return inst as SkiaControl;
   },
   createTextInstance(text: string): never {

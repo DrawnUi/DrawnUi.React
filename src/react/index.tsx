@@ -39,6 +39,7 @@ import type { SkiaShape as SkiaShapeCtrl } from "../controls/SkiaShape";
 import type { Color, RenderingModeType } from "../core/Types";
 import type { GesturesMode } from "../core/Gestures";
 import { createDrawnRoot } from "./reconciler";
+export { DesignerSourceOf, type DesignerSource } from "./reconciler";
 
 /**
  * Public settable properties of a control become its JSX props, same PascalCase names as C#.

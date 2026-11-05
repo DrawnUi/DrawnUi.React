@@ -81,6 +81,8 @@ export class PopupLayer {
   constructor(private readonly canvas: PopupHostCanvas) {}
 
   get HasAny(): boolean { return this.popups.length > 0; }
+  /** The root controls of the open popup windows, bottom to top (a new array per call). */
+  get Roots(): SkiaControl[] { return this.popups.map((p) => p.Root); }
   get HasInteractive(): boolean { return this.popups.some((p) => !p.Options.Passive); }
   /** The content of the top popup window that takes input. */
   get TopInteractive(): SkiaControl | undefined { for (let i = this.popups.length - 1; i >= 0; i--) if (!this.popups[i].Options.Passive) return this.popups[i].Root; return undefined; }
