@@ -426,6 +426,29 @@ const element = {
     check("Light below 1: red, green and blue x Light", darker.length === 0, darker.join("; "));
   }
 
+  // ---- designer hooks: the open popup windows' roots, several end-of-frame listeners ----
+  {
+    const r = new SkiaLayer(); r.WidthRequest = W; r.HeightRequest = H; canvas.Content = r; frame();
+    check("no popup window open: no roots", canvas.PopupWindowRoots.length === 0);
+    const one = new SkiaShape(); one.WidthRequest = 50; one.HeightRequest = 30;
+    const two = new SkiaShape(); two.WidthRequest = 50; two.HeightRequest = 30;
+    const a = canvas.OpenPopupWindow(one, new SKPoint(10, 10)), b = canvas.OpenPopupWindow(two, new SKPoint(100, 10)); frame();
+    const roots = canvas.PopupWindowRoots;
+    check("PopupWindowRoots lists the open popup windows' roots, bottom to top", roots.length === 2 && roots[0] === one && roots[1] === two);
+    canvas.ClosePopupWindow(a); canvas.ClosePopupWindow(b); frame();
+    check("closed: none left", canvas.PopupWindowRoots.length === 0);
+    const calls: string[] = [];
+    let prop = 0;
+    canvas.WasDrawn = () => { prop++; };
+    const first = () => calls.push("first"), second = () => calls.push("second");
+    canvas.WasDrawnListeners.add(first); canvas.WasDrawnListeners.add(second);
+    frame();
+    check("every WasDrawn listener runs after a frame, and the WasDrawn callback still does", calls.join() === "first,second" && prop === 1, `${calls.join()} / ${prop}`);
+    canvas.WasDrawnListeners.delete(first); calls.length = 0; frame();
+    check("a removed listener does not run", calls.join() === "second", calls.join());
+    canvas.WasDrawnListeners.clear(); canvas.WasDrawn = undefined;
+  }
+
   // ---- span underline in the label's color ----
   {
     const l = new SkiaLabel(); l.FontSize = 40; l.TextColor = "#FF0000"; l.Margin = new Thickness(10, 20, 0, 0);

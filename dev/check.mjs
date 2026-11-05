@@ -11,6 +11,8 @@ const entry = process.argv[2];
 const outfile = join(tmpdir(), `drawnui-${basename(entry).replace(/\.tsx?$/, "")}.cjs`);
 await esbuild.build({
   entryPoints: [entry], outfile, bundle: true, platform: "node", format: "cjs", target: "node20", logLevel: "warning", jsx: "automatic",
+  // a check named *-dev.* runs as a Vite dev build would (import.meta.env.DEV true)
+  define: /-dev\.tsx?$/.test(entry) ? { "import.meta.env": '{"DEV":true}' } : undefined,
   banner: { js: `globalThis.CanvasKitInit = require(${JSON.stringify(ck)}); globalThis.window ??= globalThis;` },
   plugins: [{ name: "stub-wasm-url", setup(b) { b.onResolve({ filter: /\?url$/ }, (a) => ({ path: a.path, namespace: "stub" })); b.onLoad({ filter: /.*/, namespace: "stub" }, () => ({ contents: "export default ''", loader: "js" })); } }],
 });

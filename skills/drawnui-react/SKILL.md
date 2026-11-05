@@ -321,6 +321,10 @@ createRoot(document.getElementById("root")!).render(
 
 ## Debugging in the browser
 
+- Tools (DrawnUI Designer and the like): `canvas.PopupWindowRoots` (the open popup windows' roots),
+  `canvas.WasDrawnListeners` (a Set of handlers run after every drawn frame, next to the `WasDrawn` prop), and in dev
+  builds `DesignerSourceOf(control)` from "drawnui-react" (the React element that created it: owner component, source
+  position). Production builds keep nothing for it.
 - The `Canvas` ref exposes the engine view: `FPS`, `FrameTime`, `RenderingScale`, `AccessibilityManager.Snapshot`.
   Draw events as props (DrawnView names): `WillFirstTimeDraw={(canvas, ctx) => …}` runs once right before the first frame, `WasDrawn={(canvas) => …}` after every frame (keep it cheap, it runs at frame rate); `canvas.WasRendered` becomes true after the first frame. The first frame is drawn before your JSX content mounts, so it shows only the background.
 - On-screen FPS: `<SkiaLabelFps />` (C# SkiaLabelFps) as a sibling on top of your content, e.g. `{import.meta.env.DEV && <SkiaLabelFps VerticalOptions="End" HorizontalOptions="End" />}` inside a `<SkiaLayer>`. It never asks for a frame itself: the value refreshes only while animators run (scrolling, transitions, Lottie, game loops), and an idle canvas keeps the last value.

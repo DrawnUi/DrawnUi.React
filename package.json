@@ -93,6 +93,7 @@
     "check:popups-tooltips": "node dev/check.mjs dev/check-popups-tooltips.ts",
     "check:carousel-loop": "node dev/check.mjs dev/check-carousel-loop.ts",
     "check:release": "node dev/check.mjs dev/check-release.tsx",
+    "check:designer-dev": "node dev/check.mjs dev/check-designer-dev.tsx",
     "audit:a11y": "node dev/audit-a11y.mjs",
     "bench:relayout": "node dev/check.mjs dev/bench-relayout.ts",
     "site:extras": "node dev/site-extras.mjs dist/demo",
