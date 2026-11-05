@@ -42,8 +42,15 @@ NVDA, JAWS and Narrator with Chrome or Edge, VoiceOver with Safari, TalkBack wit
 - `KeyboardWrap` on a group: the arrows go round, from the last item to the first and back, as in desktop menus (Home /
   End unchanged).
 - App code moves the keyboard and screen-reader focus with `canvas.SetAccessibilityFocus(control)` (at the end of the
-  next frame; a control not drawn yet gets it once drawn, within 3 seconds); `SetAccessibilityFocus(undefined)` gives
-  the keys back to the app. The focus ring shows only while the keyboard is in use.
+  next frame; a control not drawn yet gets it once drawn, within 3 seconds). It wins over the canvas' own move in the
+  same frame (a group's arrow move, a closed popup window giving the keyboard back to its opener);
+  `SetAccessibilityFocus(undefined)` cancels a move still waiting and the focus stays; `canvas.KeyboardFocusNode =
+  undefined` leaves no drawn control focused, the keys are the app's. The focus ring shows only while the keyboard is
+  in use.
+- One key order, as in every DrawnUI engine: the canvas navigation (activation, group arrows, slider steps, Escape
+  closing a popup window) gets each key first, then the app's `KeyboardManager` KeyDown runs with
+  `KeyboardManager.IsKeyHandled` telling whether navigation used it (Enter, Space, the arrows, Escape; Tab is the
+  browser's).
 - The focused control gets the arrow keys first: a slider steps (what a screen reader's Increment / Decrement sends in
   the browser), an editor keeps them while editing.
 - The scrolls around the focused control bring it into view.
@@ -85,6 +92,8 @@ NVDA, JAWS and Narrator with Chrome or Edge, VoiceOver with Safari, TalkBack wit
   arrows go round.
 - A control that opens something (a menu title) sets `AccessibilityExpanded`; app code that moves its own highlight
   calls `canvas.SetAccessibilityFocus(control)` so screen readers follow.
+- A global key handler skips keys with `KeyboardManager.IsKeyHandled`, so the press that activated the focused control
+  does not act a second time.
 - A custom range control returns an `AccessibilityValue` (now, min, max, step, text) and steps in
   `OnAccessibilityKey`.
 - `AccessibilityLive="polite"` on status text that should be read when it changes.

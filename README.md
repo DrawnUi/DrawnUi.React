@@ -143,7 +143,9 @@ themselves) keeps readers and the keyboard inside it, and a live region's new te
 Per control (C# names): `AccessibilityRole` (enables the node; use `Aria.*`), `AccessibilityLabel`
 (defaults to the control's text), `AccessibilityHint`, `AccessibilityCanInteract` (defaults to "has a
 `Tapped` handler"), `AccessibilityIsPressed`, `AccessibilityExpanded`, `AccessibilityLive`, `KeyboardWrap` (the arrows
-go round a group); `canvas.SetAccessibilityFocus(control)` moves the keyboard and screen-reader focus from app code. `Aria.RolePresentation` hides a control that
+go round a group); `canvas.SetAccessibilityFocus(control)` moves the keyboard and screen-reader focus from app code.
+The canvas navigation gets every key first, then `KeyboardManager` subscribers run with `KeyboardManager.IsKeyHandled`
+telling whether navigation used it, so one press does one thing. `Aria.RolePresentation` hides a control that
 would otherwise get a default role.
 
 App-wide opt-in (React extension): `SkiaLabel.DefaultAccessibilityRole = Aria.RoleText` and

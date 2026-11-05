@@ -5,6 +5,11 @@
  * subscribes while focused. Characters typed into the hidden TextInputProxy textarea (IME, soft keyboard) arrive
  * as input events there, so its key events are not forwarded as KeyChar here (a React-port addition over
  * DrawnUi.Blazor, which has no DOM text input).
+ *
+ * One key routing order on every head (drawnui-cross 6az, C# KeyboardManager.IsKeyHandled): the canvas keyboard
+ * navigation gets a key first (an accessibility overlay node: activation, group arrows, slider steps; then the canvas'
+ * own handlers: Escape closing a popup window, arrows starting navigation), then the app's KeyDown handlers run with
+ * `IsKeyHandled` telling whether navigation used it. Tab belongs to the browser.
  */
 export type InputKey = string;
 
@@ -14,6 +19,19 @@ export class KeyboardManager {
   private static readonly keyDown = new Set<(key: InputKey, e: KeyboardEvent) => void>();
   private static readonly keyUp = new Set<(key: InputKey, e: KeyboardEvent) => void>();
   private static readonly keyChar = new Set<(ch: string, e: KeyboardEvent) => void>();
+  private static readonly navigation = new Set<(key: InputKey, e: KeyboardEvent) => boolean>();
+  private static usedKey?: InputKey;
+  private static deferred?: KeyboardEvent;
+
+  /**
+   * True while KeyDown handlers run for a key the canvas keyboard navigation already used: Enter / Space activated the
+   * focused control, an arrow moved inside a list or a menu or stepped a slider, Escape closed a popup window. An app
+   * handler that would act on the same key (a menu that opens on Enter) skips it, so one press does one thing.
+   */
+  static IsKeyHandled = false;
+
+  /** For the accessibility overlay and canvas navigation: `key` was used, the KeyDown raised next for it reports IsKeyHandled. */
+  static MarkKeyHandled(key: InputKey): void { KeyboardManager.usedKey = key; }
 
   static get IsShiftPressed(): boolean { return KeyboardManager.pressed.has("ShiftLeft") || KeyboardManager.pressed.has("ShiftRight"); }
   static get IsControlPressed(): boolean { return KeyboardManager.pressed.has("ControlLeft") || KeyboardManager.pressed.has("ControlRight") || KeyboardManager.pressed.has("MetaLeft") || KeyboardManager.pressed.has("MetaRight"); }
@@ -29,18 +47,22 @@ export class KeyboardManager {
     // inside a cross-frame iframe the embedding page keeps DOM focus: a pointerdown pulls it to this window
     window.addEventListener("pointerdown", () => window.focus(), true);
     window.addEventListener("keydown", (e) => {
-      const code = e.code || "";
       KeyboardManager.SyncModifiers(e);
-      KeyboardManager.pressed.add(code);
-      KeyboardManager.IsDispatchingKeyDown = true;
-      try { for (const h of [...KeyboardManager.keyDown]) h(code, e); } finally { KeyboardManager.IsDispatchingKeyDown = false; }
-      const proxied = (e.target as HTMLElement | null)?.dataset?.drawnuiTextInput === "1"; // TextInputProxy: characters come through its input events
-      if (!proxied && e.key && e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) for (const h of [...KeyboardManager.keyChar]) h(e.key, e);
+      KeyboardManager.pressed.add(e.code || "");
+      // a key for an overlay node: its keydown (the canvas navigation) runs first, the key is raised when it bubbles here
+      if ((e.target as HTMLElement | null)?.dataset?.a11yId) { KeyboardManager.deferred = e; return; }
+      KeyboardManager.RaiseKeyDown(e);
     }, true);
+    window.addEventListener("keydown", (e) => {
+      if (KeyboardManager.deferred !== e) return;
+      KeyboardManager.deferred = undefined;
+      KeyboardManager.RaiseKeyDown(e);
+    });
     window.addEventListener("keyup", (e) => {
       const code = e.code || "";
       KeyboardManager.SyncModifiers(e);
       KeyboardManager.pressed.delete(code);
+      if (KeyboardManager.usedKey === code) KeyboardManager.usedKey = undefined;
       for (const h of [...KeyboardManager.keyUp]) h(code, e);
     }, true);
     window.addEventListener("blur", () => KeyboardManager.pressed.clear());
@@ -60,6 +82,25 @@ export class KeyboardManager {
     sync(!!e.shiftKey, "ShiftLeft", "ShiftRight");
     sync(!!e.metaKey, "MetaLeft", "MetaRight");
   }
+
+  private static RaiseKeyDown(e: KeyboardEvent): void {
+    const code = e.code || "";
+    let used = KeyboardManager.usedKey === code;
+    KeyboardManager.usedKey = undefined;
+    KeyboardManager.IsDispatchingKeyDown = true;
+    try {
+      // the canvas' own navigation (a popup window's Escape, arrows starting navigation), then the app with the result
+      if (!used) for (const h of [...KeyboardManager.navigation]) if (h(code, e)) { used = true; break; }
+      KeyboardManager.IsKeyHandled = used;
+      for (const h of [...KeyboardManager.keyDown]) h(code, e);
+    } finally { KeyboardManager.IsDispatchingKeyDown = false; KeyboardManager.IsKeyHandled = false; }
+    const proxied = (e.target as HTMLElement | null)?.dataset?.drawnuiTextInput === "1"; // TextInputProxy: characters come through its input events
+    if (!proxied && e.key && e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) for (const h of [...KeyboardManager.keyChar]) h(e.key, e);
+  }
+
+  /** For the canvas: keyboard navigation that runs before the app's KeyDown handlers; returns true when it used the key. */
+  static SubscribeNavigation(handler: (key: InputKey, e: KeyboardEvent) => boolean): void { KeyboardManager.AttachToKeyboard(); KeyboardManager.navigation.add(handler); }
+  static UnsubscribeNavigation(handler: (key: InputKey, e: KeyboardEvent) => boolean): void { KeyboardManager.navigation.delete(handler); }
 
   static Subscribe(down: (key: InputKey, e: KeyboardEvent) => void, char: (ch: string, e: KeyboardEvent) => void, up?: (key: InputKey, e: KeyboardEvent) => void): void {
     KeyboardManager.AttachToKeyboard();

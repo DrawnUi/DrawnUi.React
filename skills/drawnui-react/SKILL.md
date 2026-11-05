@@ -257,11 +257,14 @@ createRoot(document.getElementById("root")!).render(
     accent color; the hover keeps its lighter look; a resting mouse does not take the highlight back while the keyboard
     drives (count a hover only after a real `pointermove`).
   - Screen readers: `AccessibilityExpanded` on each title (aria-expanded, read as a menu opener), and
-    `canvas.SetAccessibilityFocus(control)` on every line or title the keys light, so the reader follows it;
-    `canvas.SetAccessibilityFocus(undefined)` when the bar lets go.
+    `canvas.SetAccessibilityFocus(control)` on every line or title the keys light, so the reader follows it. When the
+    bar lets go with nowhere to give the keyboard back to: `canvas.SetAccessibilityFocus(undefined)` (cancels the
+    canvas' return to the closed menu's title) and `canvas.KeyboardFocusNode = undefined` (the keys are the app's).
   - The keys: `KeyboardManager.Subscribe(down, char, up)` (Alt alone = an Alt key up with nothing pressed between),
-    `KeyboardManager.IsAltPressed` / `IsControlPressed`; call `preventDefault()` and `stopPropagation()` on the keys
-    the bar uses. Unselect the title on `canvas.PopupWindowClosed`. Shortcuts show at the right of each item and work
+    `KeyboardManager.IsAltPressed` / `IsControlPressed`; `preventDefault()` on the keys the bar uses. The canvas
+    navigation has each key first: skip Enter / Space when `KeyboardManager.IsKeyHandled` (the focused title or line
+    was activated already, its `Tapped` did the work), and Escape when it is handled (the canvas closed the open menu:
+    one level). Unselect the title on `canvas.PopupWindowClosed`. Shortcuts show at the right of each item and work
     with the menus closed too. Let the menu walk its own items from the keys, so it works the same in a canvas popup and
     in a popup window of its own.
   - Reference: the HelloReact Tooltips & Menus page (`samples/demo/pages/MenusPage.tsx`).
@@ -309,6 +312,13 @@ createRoot(document.getElementById("root")!).render(
   also those typed into a page input or sent to a focused button: before acting on a key or calling preventDefault,
   return when `KeyboardManager.IsOwnedByElement(e)` (or `IsInputMethodKey(e)` for text input), so the focused
   element keeps its keys.
+- Key order (same in every DrawnUI engine): the canvas keyboard navigation gets a key first (the focused control's
+  Enter / Space activation, group arrows, slider steps, Escape closing a popup window, arrows starting navigation),
+  then the KeyDown subscribers run with `KeyboardManager.IsKeyHandled` true when navigation used it; Tab belongs to the
+  browser. A handler that would act on the same key (a menu opening on Enter) skips handled keys: one press does one
+  thing. `canvas.SetAccessibilityFocus(control)` in that handler wins over the canvas' own focus move of the same
+  frame (a group's arrow move, a closed popup giving the keyboard back to its opener); `undefined` cancels a waiting
+  move; `canvas.KeyboardFocusNode = undefined` leaves no drawn control focused.
 - Accessibility: an invisible DOM overlay mirrors accessible controls over the `aria-hidden` canvas
   (`AccessibilityRole`, `AccessibilityLabel`, `AccessibilityHint`, `AccessibilityIsPressed`, `AccessibilityLive`,
   `Aria.RolePresentation` to hide). `AccessibilityTextSelectable` (opt-in) makes a label's text natively

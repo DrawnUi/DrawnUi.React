@@ -106,9 +106,20 @@ export class Canvas {
   /**
    * Moves the keyboard and screen-reader focus to `control` at the end of the next frame, for app code such as a custom
    * menu that moves its highlight (C# DrawnView.SetAccessibilityFocus). A control not drawn yet gets it once it is, within
-   * 3 seconds; undefined gives the keys back to the app. The focus ring shows only if the keyboard is in use.
+   * 3 seconds. It wins over the library's own moves in the same frame (a closed popup window giving the keyboard back to
+   * its opener); undefined cancels a move still waiting. The focus ring shows only if the keyboard is in use.
    */
   SetAccessibilityFocus(control?: SkiaControl): void { this.AccessibilityManager.SetAccessibilityFocus(control); this.Update(); }
+
+  /**
+   * The drawn control with the keyboard and screen-reader focus (C# KeyboardFocusNode). Set undefined to let no drawn
+   * control keep it: the DOM focus goes back to the canvas and the keys belong to the app; a control moves it there.
+   */
+  get KeyboardFocusNode(): SkiaControl | undefined { return this.AccessibilityManager.FocusedNode; }
+  set KeyboardFocusNode(control: SkiaControl | undefined) {
+    if (control) this.AccessibilityManager.SetAccessibilityFocus(control); else this.AccessibilityManager.ClearKeyboardFocus();
+    this.Update();
+  }
   /** True while a popup window that takes input is open. */
   get HasPopupWindows(): boolean { return this.popups.HasInteractive; }
   /** The content of the top popup window that takes input. */
@@ -122,13 +133,16 @@ export class Canvas {
     this.Hover.RequestCheck();
     this.Update();
   }
-  private readonly onPopupKey = (key: InputKey) => { if (key === "Escape" && this.popups.CloseTop()) this.AfterPopupsChanged(); };
-  private readonly onPopupChar = () => {};
+  private readonly onPopupKey = (key: InputKey): boolean => {
+    if (key !== "Escape" || !this.popups.CloseTop()) return false;
+    this.AfterPopupsChanged();
+    return true;
+  };
   private HookPopupKeys(on: boolean): void {
     if (on === this.popupKeysHooked) return;
     this.popupKeysHooked = on;
-    if (on) KeyboardManager.Subscribe(this.onPopupKey, this.onPopupChar);
-    else KeyboardManager.Unsubscribe(this.onPopupKey, this.onPopupChar);
+    if (on) KeyboardManager.SubscribeNavigation(this.onPopupKey);
+    else KeyboardManager.UnsubscribeNavigation(this.onPopupKey);
   }
   private readonly onWindowBlur = () => this.OnWindowDeactivated();
 
@@ -808,20 +822,20 @@ export class Canvas {
   set ArrowsStartKeyboardNavigation(v: boolean) {
     if (this.arrowsStart === v) return;
     this.arrowsStart = v;
-    if (v) KeyboardManager.Subscribe(this.onArrowKey, this.onArrowChar); else KeyboardManager.Unsubscribe(this.onArrowKey, this.onArrowChar);
+    if (v) KeyboardManager.SubscribeNavigation(this.onArrowKey); else KeyboardManager.UnsubscribeNavigation(this.onArrowKey);
   }
-  private readonly onArrowChar = () => {};
-  private readonly onArrowKey = (key: InputKey, e: KeyboardEvent) => {
+  private readonly onArrowKey = (key: InputKey, e: KeyboardEvent): boolean => {
     const forward = key === "ArrowDown" || key === "ArrowRight" ? true : key === "ArrowUp" || key === "ArrowLeft" ? false : undefined;
     // a page element, a drawn control's element or the editor's input has the keys: nothing to start
-    if (forward === undefined || this.disposed || KeyboardManager.IsOwnedByElement(e) || e.defaultPrevented) return;
+    if (forward === undefined || this.disposed || KeyboardManager.IsOwnedByElement(e) || e.defaultPrevented) return false;
     const mgr = this.AccessibilityManager, focused = mgr.FocusedNode;
-    if (focused && !mgr.IsOutsideModal(focused)) return;
+    if (focused && !mgr.IsOutsideModal(focused)) return false;
     const first = mgr.NextTabStop(undefined, forward);
-    if (!first) return;
+    if (!first) return false;
     e.preventDefault();
     mgr.RequestKeyboardFocus(first);
     this.Update();
+    return true;
   };
 
   // ---- focus (C# DrawnView FocusedChild / ReportFocus, drawnui-cross 6ap) ----

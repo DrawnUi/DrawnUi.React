@@ -159,21 +159,28 @@ export function MenusPage() {
     }
     b.title = title;
   };
-  /** The bar lets go: menus closed, the keyboard back where it was. */
+  /** The bar lets go: menus closed, the keyboard back where it was (nowhere before: the keys are the app's again). */
   const leaveBar = () => {
     const b = bar.current;
     closeMenu();
     const back = b.back;
     b.active = false; b.title = -1; b.back = undefined;
     paintBar();
-    focus(back);
+    const canvas = canvasOf();
+    canvas?.SetAccessibilityFocus(back); // wins over the canvas' return to the closed menu's title; undefined cancels it
+    if (canvas && !back) canvas.KeyboardFocusNode = undefined;
   };
-  /** A menu closed from outside (a click elsewhere, the wheel, the window losing focus): the bar lets go. */
+  /**
+   * A menu closed by the canvas: Escape (the canvas takes it first) closes one level, the keyboard on its title; a click
+   * elsewhere, the wheel or the window losing focus lets the bar go.
+   */
   const onClosed = (id: PopupId) => {
     const b = bar.current;
     if (id !== b.popup || b.open < 0 || b.closing) return;
+    const t = b.open;
     b.open = -1; b.line = -1; b.hoverLine = -1;
-    if (b.active) leaveBar(); else paintBar();
+    if (KeyboardManager.IsDispatchingKeyDown) { enterBar(t); paintBar(); focus(tops.current[t]); }
+    else if (b.active) leaveBar(); else paintBar();
   };
   const closeMenu = () => {
     const b = bar.current;
@@ -242,8 +249,9 @@ export function MenusPage() {
       const focused = canvas?.AccessibilityManager.FocusedNode;
       const drawn = !!focused && focused.Superview === canvas;
       if (KeyboardManager.IsOwnedByElement(e) && !drawn) return;
-      // a key the menu bar used stops here: the focused control must not act on it too
-      const take = () => { e.preventDefault(); e.stopPropagation(); b.keyAt = performance.now(); };
+      // the canvas navigation had the key first: Enter / Space it used (activated the focused title or line) are done
+      const take = () => { e.preventDefault(); b.keyAt = performance.now(); };
+      const handled = KeyboardManager.IsKeyHandled;
       // Alt + the first letter of a menu opens it on its first line
       if (KeyboardManager.IsAltPressed) {
         const index = MENUS.findIndex((m) => m.Accelerator === key);
@@ -260,8 +268,8 @@ export function MenusPage() {
             case "ArrowLeft": case "ArrowRight":
               take(); b.title = (b.title + (key === "ArrowRight" ? 1 : n - 1)) % n; paintBar(); focus(tops.current[b.title]); return;
             case "ArrowDown": case "Enter": case "NumpadEnter": case "Space":
-              take(); openBarMenu(b.title, true); return;
-            case "Escape": take(); leaveBar(); return;
+              take(); if (key === "ArrowDown" || !handled) openBarMenu(b.title, true); return;
+            case "Escape": take(); if (!handled) leaveBar(); return; // handled: the canvas closed the menu, one level
             case "Tab": b.active = false; b.title = -1; b.back = undefined; paintBar(); return; // the keyboard moves on: the bar lets go
           }
         }
@@ -280,7 +288,7 @@ export function MenusPage() {
           b.line = step(b.items.length, b.line, key); paintItems(); focus(b.items[b.line].View); break;
         case "ArrowRight": openBarMenu((b.open + 1) % n, true); break;
         case "ArrowLeft": openBarMenu((b.open - 1 + n) % n, true); break;
-        case "Enter": case "NumpadEnter": case "Space": if (b.line >= 0) run(b.items[b.line].Entry); break;
+        case "Enter": case "NumpadEnter": case "Space": if (b.line >= 0 && !handled) run(b.items[b.line].Entry); break;
         case "Escape": { const t = b.open; closeMenu(); b.title = t; paintBar(); focus(tops.current[t]); break; } // one level: back on its title
       }
     };
@@ -332,7 +340,13 @@ export function MenusPage() {
                       b.hoverTitle = on ? index : b.hoverTitle === index ? -1 : b.hoverTitle;
                       if (on && barOpen() && b.open !== index) openBarMenu(index, false); else paintBar();
                     }}
-                    Tapped={(_, e) => { if (!primary(e)) return; if (barOpen() && bar.current.open === index) closeMenu(); else openBarMenu(index, false); }}>
+                    Tapped={(_, e) => {
+                      if (!primary(e)) return;
+                      // Enter / Space of keyboard navigation or a screen reader on the focused title: as on the bar
+                      const keyboard = canvasOf()?.KeyboardFocusNode === tops.current[index];
+                      if (barOpen() && bar.current.open === index) { closeMenu(); if (keyboard) { enterBar(index); paintBar(); } }
+                      else { if (keyboard) enterBar(index); openBarMenu(index, keyboard); }
+                    }}>
                     {/* the accelerator letter (Alt + it opens the menu) is underlined, as in desktop menu bars */}
                     <SkiaLabel FontSize={14} TextColor={Colors.White} AccessibilityRole={Aria.RolePresentation}>
                       <TextSpan Text={m.Title.slice(0, 1)} Underline />

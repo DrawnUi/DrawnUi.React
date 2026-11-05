@@ -263,23 +263,33 @@ export class SkiaAccessibilityManager {
   private focusAnyInside = false;
 
   /** The keyboard goes to this control at the end of the next frame (a popup closed: back to what opened it). */
-  RequestKeyboardFocus(control: SkiaControl): void { this.focusRequest = control; }
+  RequestKeyboardFocus(control: SkiaControl): void { if (!this.appFocusThisFrame) this.focusRequest = control; }
 
   private appFocus?: SkiaControl;
   private appFocusDeadline = 0;
+  private appFocusThisFrame = false; // until the frame end: the app said where the focus goes, the library's moves give way
   private clearFocusRequest = false;
   /**
    * App code moves the keyboard and screen-reader focus at the end of the next frame (C# DrawnView.SetAccessibilityFocus,
    * Rust `Cx::set_accessibility_focus`), for a custom menu that moves its highlight: to `control`, which gets it once
-   * drawn, within 3 seconds; or nowhere (undefined: the keys belong to the app again, the DOM focus goes back to the
-   * canvas). The focus ring shows only if the keyboard is in use (the browser's focus-visible).
+   * drawn, within 3 seconds. It wins over the library's own moves in the same frame (a group's arrow move, a closed popup
+   * window giving the keyboard back to its opener); undefined cancels a move still waiting, the focus stays where it is.
+   * The focus ring shows only if the keyboard is in use (the browser's focus-visible).
    */
   SetAccessibilityFocus(control?: SkiaControl): void {
+    this.appFocusThisFrame = true;
+    this.focusRequest = undefined;
+    this.groupRequest = undefined;
     this.appFocus = control;
     this.appFocusDeadline = performance.now() + 3000;
-    this.clearFocusRequest = !control;
     control?.Superview?.Update();
   }
+
+  /**
+   * No drawn control keeps the keyboard and screen-reader focus (C# KeyboardFocusNode = null): at the end of the next
+   * frame the DOM focus goes back to the canvas and the keys belong to the app again.
+   */
+  ClearKeyboardFocus(): void { this.appFocus = undefined; this.clearFocusRequest = true; }
 
   private ProcessAppFocus(scale: number, w: number, h: number, requestFrame: () => void): void {
     const wanted = this.appFocus!;
@@ -333,7 +343,7 @@ export class SkiaAccessibilityManager {
     if (previous) this.modalReturns.delete(previous);
     // back unless the keyboard went elsewhere meanwhile; a keyboard node that left with the modal (disposed, detached) was in it
     const leftWithIt = !!keyboard && (keyboard.IsDisposed || !keyboard.Superview);
-    if (back && (!keyboard || leftWithIt || IsInside(keyboard, previous!)) && (!next || IsInside(back, next))) this.focusRequest = back;
+    if (back && (!keyboard || leftWithIt || IsInside(keyboard, previous!)) && (!next || IsInside(back, next))) this.RequestKeyboardFocus(back);
   }
 
   /** The Tab stop after (or before) `from` in reading order; inside a KeyboardScope it goes round, never leaving. */
@@ -446,6 +456,7 @@ export class SkiaAccessibilityManager {
     }
     if (this.appFocus) this.ProcessAppFocus(scale, canvasWidthPx, canvasHeightPx, requestFrame);
     if (this.focusRequest || this.popupFocusRoot) this.ProcessFocusRequests(scale, canvasWidthPx, canvasHeightPx);
+    this.appFocusThisFrame = false;
     if (this.nodes.size === 0 && this.Snapshot.length === 0) return;
     const now = performance.now();
     const wait = this.MinUpdateIntervalMs - (now - this.lastRebuild);

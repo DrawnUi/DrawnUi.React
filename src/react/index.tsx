@@ -1,5 +1,6 @@
 import { type CSSProperties, type FC, type ReactNode, type Ref, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
 import { type AccessibilityNode, SkiaAccessibilityManager } from "../core/Accessibility";
+import { KeyboardManager } from "../core/KeyboardManager";
 import { TextInputProxy } from "../core/TextInputProxy";
 import { Canvas as CanvasView } from "../core/Canvas";
 import type { SkiaControl } from "../core/SkiaControl";
@@ -340,14 +341,15 @@ function AccessibilityOverlay({ view }: { view: CanvasView }) {
             tabIndex={view.AccessibilityManager.IsTabStop(n.Source) ? 0 : -1} className="drawnui-a11y-node" style={{ ...pos, fontSize: 0, userSelect: "none" }}
             onClick={activate}
             onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") { e.preventDefault(); activate(); }
+              // the canvas navigation gets the key first; the app's KeyDown runs after it with IsKeyHandled (6az)
+              if (e.key === "Enter" || e.key === " ") { e.preventDefault(); if (activate()) KeyboardManager.MarkKeyHandled(e.nativeEvent.code); }
               else if (e.key === "Tab" && view.AccessibilityManager.KeyboardScope) {
                 // an open popup window keeps the keyboard: Tab goes round its stops (a menu is one stop)
                 e.preventDefault();
                 const next = view.AccessibilityManager.NextTabStop(n.Source, !e.shiftKey);
                 if (next) elementOf(next.AccessibilityId)?.focus({ preventScroll: true });
               }
-              else if (NAVIGATION_KEYS.has(e.key) && SkiaAccessibilityManager.Key(n.Source, e.key)) e.preventDefault();
+              else if (NAVIGATION_KEYS.has(e.key) && SkiaAccessibilityManager.Key(n.Source, e.key)) { e.preventDefault(); KeyboardManager.MarkKeyHandled(e.nativeEvent.code); }
             }}
             onFocus={(e) => {
               focusedId.current = n.Id;

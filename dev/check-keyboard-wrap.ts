@@ -1,7 +1,7 @@
 // KeyboardWrap and Canvas.SetAccessibilityFocus on a real engine Canvas in Node (`npm run check:keyboard-wrap`), as
 // DrawnUi.Net KeyboardWrapAndFocusTests (15f38307): on an arrow-key group with KeyboardWrap the arrows go round, without
 // it they stop at the ends; app code moves the keyboard and screen-reader focus at the frame end, also to a control
-// drawn only later, and gives it back with undefined.
+// drawn only later; KeyboardFocusNode = undefined gives it back to the app.
 import { readFileSync } from "node:fs";
 import { Super, Canvas, SkiaStack, SkiaButton, Aria, SkiaAccessibilityManager, type InputKey } from "../src/index.ts";
 
@@ -54,7 +54,8 @@ const element = {
   const name = () => focused()?.AccessibilityLabel ?? "none";
 
   check("a control set by the app gets the keyboard and reader focus at the frame end", (canvas.SetAccessibilityFocus(items[2]), frame(), focused() === items[2]), name());
-  check("undefined gives the focus back to the app", (canvas.SetAccessibilityFocus(undefined), frame(), focused() === undefined), name());
+  check("undefined keeps the focus where it is", (canvas.SetAccessibilityFocus(undefined), frame(), focused() === items[2]), name());
+  check("KeyboardFocusNode = undefined gives the focus back to the app", (canvas.KeyboardFocusNode = undefined, frame(), focused() === undefined), name());
 
   canvas.SetAccessibilityFocus(items[0]); frame();
   check("the keyboard on the first item", focused() === items[0], name());
