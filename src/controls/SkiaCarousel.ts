@@ -511,7 +511,10 @@ export class SkiaCarousel extends SnappingLayout {
     if (!this.IsUserPanning || !this.RespondsToGestures || args.Type === "Tapped") {
       consumed = passToChildren();
       if (consumed === this) consumed = null;
-      if (consumed && !(args.Type === "Up" && this.snapIfNoPanOnUp)) return consumed;
+      if (consumed && !(args.Type === "Up" && this.snapIfNoPanOnUp)) {
+        if (args.Type === "Up") this.IsUserFocused = false; // the finger left, also when a slide took the tap (C# dbf507fd)
+        return consumed;
+      }
     }
     if (!this.RespondsToGestures || this.ChildrenTotal < 2) return consumedDefault;
     const scale = this.RenderingScale;
@@ -567,6 +570,7 @@ export class SkiaCarousel extends SnappingLayout {
           this.ScrollToNearestAnchor(this.CurrentSnap, SKPoint.Empty);
           this.IsUserFocused = false; this.IsUserPanning = false; this.snapIfNoPanOnUp = false;
         }
+        this.IsUserFocused = false; // every Up ends the finger's hold, a tap included (C# dbf507fd)
         break;
     }
     if (consumed || this.IsUserPanning) return consumed ?? (args.Type !== "Up" ? this : consumedDefault);

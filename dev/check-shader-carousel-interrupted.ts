@@ -2,7 +2,7 @@
 // checked in Node (`npm run check:shader-carousel-interrupted`) through the engine Canvas touch state machine: a second
 // swipe while the first still animates finishes it fast (phase 1), then goes one slide on (phase 2); Stopped fires once,
 // at real rest, never between the phases, and InTransition stays true from phase 1 to the end of phase 2. A move by
-// code during phase 1 drops the queued phase 2.
+// code during phase 1 drops the queued phase 2. A tap clears the carousel's finger state (IsUserFocused).
 import {
   Super, SKRect, SKPoint, Canvas, SkiaAccessibilityManager, HoverManager, SkiaLayer, SkiaShape, SkiaShaderCarousel, TouchActionEventArgs,
   type AnimatorBase, type TouchActionType,
@@ -69,7 +69,7 @@ class FakeCanvas {
     let stops = 0;
     carousel.Stopped = () => { stops++; };
     frames(8);
-    return { carousel, frames, flick, stopsSince: () => stops, resetStops: () => { stops = 0; } };
+    return { carousel, frames, flick, send, stopsSince: () => stops, resetStops: () => { stops = 0; } };
   };
 
   {
@@ -99,6 +99,16 @@ class FakeCanvas {
     t.flick(); t.frames(4);
     t.flick(); t.frames(90);
     check("looped, from the last slide: two swipes wrap to slide 1, one Stopped", t.carousel.SelectedIndex === 1 && t.stopsSince() === 1, `index ${t.carousel.SelectedIndex}, ${t.stopsSince()} stops`);
+  }
+
+  {
+    // C# dbf507fd: the "finger on it" state clears at every Up, a tap included, also when a slide takes the tap
+    const t = create();
+    t.send("Pressed", 200, 0); t.send("Released", 200, 40); t.frames(4);
+    const plain = t.carousel.IsUserFocused;
+    for (const slide of t.carousel.Views) (slide as { Tapped?: unknown }).Tapped = () => {};
+    t.send("Pressed", 200, 300); t.send("Released", 200, 40); t.frames(4);
+    check("a tap leaves no finger on the carousel (IsUserFocused false), also on a tappable slide", plain === false && t.carousel.IsUserFocused === false, `plain ${plain}, tappable slide ${t.carousel.IsUserFocused}`);
   }
 
   console.log(failures ? `FAIL: ${failures} checks` : "OK: an interrupted swipe stops once");
