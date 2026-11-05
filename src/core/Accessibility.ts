@@ -73,6 +73,8 @@ export interface AccessibilityNode {
   /** A role a user operates (Aria.IsInteractiveRole) that cannot take input: aria-disabled, no tab stop. */
   Disabled: boolean;
   IsPressed?: boolean;
+  /** A control that opens something (a menu title): open or closed (aria-expanded); undefined when it opens nothing. */
+  Expanded?: boolean;
   Live?: string;
   Source: SkiaControl;
   /** A range control's value (aria-valuenow / min / max / valuetext); its name stays the app's label. */
@@ -94,7 +96,7 @@ export class SkiaAccessibilityManager {
   private pending = 0;
   private readonly changed = new Set<() => void>();
   private readonly liveUpdated = new Set<(node: SkiaControl) => void>();
-  private readonly keyboardFocusRequested = new Set<(node: SkiaControl) => void>();
+  private readonly keyboardFocusRequested = new Set<(node: SkiaControl | undefined) => void>();
 
   /** Minimum milliseconds between snapshot rebuilds. */
   MinUpdateIntervalMs = 1000;
@@ -110,7 +112,7 @@ export class SkiaAccessibilityManager {
    * Keyboard focus moved by the manager itself (arrow keys in a group): the overlay moves DOM focus to that node's
    * element (C# KeyboardFocusRequested). Returns the unsubscribe function.
    */
-  OnKeyboardFocusRequested(cb: (node: SkiaControl) => void): () => void { this.keyboardFocusRequested.add(cb); return () => this.keyboardFocusRequested.delete(cb); }
+  OnKeyboardFocusRequested(cb: (node: SkiaControl | undefined) => void): () => void { this.keyboardFocusRequested.add(cb); return () => this.keyboardFocusRequested.delete(cb); }
 
   NotifyFocused(node?: SkiaControl): void {
     if (this.FocusedNode === node) return;
@@ -202,7 +204,7 @@ export class SkiaAccessibilityManager {
   /**
    * Moves keyboard focus between the items of the group around `focused`, by item index like a native list: Down / Up in
    * a Column, Right / Left in a Row, all four in a Wrap, a Grid or a Split layout (Up / Down by one row), Home / End to the
-   * first / last item, PageDown / PageUp by one viewport of the scroll around it. No wrap at the ends. The target is the
+   * first / last item, PageDown / PageUp by one viewport of the scroll around it. The ends stop the arrows, unless the group has KeyboardWrap. The target is the
    * item itself when it is an interactive node, else its first interactive node; items the pointer cannot use are
    * skipped. An item not realized (recycled cells) is scrolled in with ScrollToIndex when the group is the scroll's
    * content, and focused once drawn. True when the key belongs to the group.
@@ -220,9 +222,10 @@ export class SkiaAccessibilityManager {
       const items = this.Snapshot.filter((n) => n.CanInteract && SkiaAccessibilityManager.TryFindGroup(n.Source)?.Group === found.Group).map((n) => n.Source);
       const current = items.indexOf(focused);
       if (current < 0) return false;
-      const target = key === "ArrowDown" || key === "ArrowRight" ? Math.min(current + 1, items.length - 1)
-        : key === "ArrowUp" || key === "ArrowLeft" ? Math.max(current - 1, 0)
-        : key === "Home" ? 0 : key === "End" ? items.length - 1 : -1;
+      const n = items.length, wrap = found.Group.KeyboardWrap || group.KeyboardWrap;
+      const target = key === "ArrowDown" || key === "ArrowRight" ? (wrap ? (current + 1) % n : Math.min(current + 1, n - 1))
+        : key === "ArrowUp" || key === "ArrowLeft" ? (wrap ? (current - 1 + n) % n : Math.max(current - 1, 0))
+        : key === "Home" ? 0 : key === "End" ? n - 1 : -1;
       if (target < 0) return false;
       if (target !== current) { this.RequestKeyboardFocus(items[target]); found.Group.Superview?.Update(); }
       return true;
@@ -245,6 +248,8 @@ export class SkiaAccessibilityManager {
     else if (key === "PageDown" && scroll) { target = Math.min(count - 1, current + page()); step = 1; }
     else if (key === "PageUp" && scroll) { target = Math.max(0, current - page()); step = -1; }
     else return false;
+    // KeyboardWrap on the group: the arrows go round, the last item to the first and back
+    if ((target < 0 || target >= count) && key.startsWith("Arrow") && (found.Group.KeyboardWrap || group.KeyboardWrap)) target = target < 0 ? count - 1 : 0;
     if (target < 0 || target >= count || target === current) return true; // at the end of the group nothing happens, the key still belongs to it
     this.groupRequest = { Group: group, Scroll: scroll, Index: target, Step: step, Deadline: performance.now() + 3000, ScrollIssued: false };
     group.Superview?.Update(); // resolved at the end of the next frame, together with the snapshot
@@ -259,6 +264,31 @@ export class SkiaAccessibilityManager {
 
   /** The keyboard goes to this control at the end of the next frame (a popup closed: back to what opened it). */
   RequestKeyboardFocus(control: SkiaControl): void { this.focusRequest = control; }
+
+  private appFocus?: SkiaControl;
+  private appFocusDeadline = 0;
+  private clearFocusRequest = false;
+  /**
+   * App code moves the keyboard and screen-reader focus at the end of the next frame (C# DrawnView.SetAccessibilityFocus,
+   * Rust `Cx::set_accessibility_focus`), for a custom menu that moves its highlight: to `control`, which gets it once
+   * drawn, within 3 seconds; or nowhere (undefined: the keys belong to the app again, the DOM focus goes back to the
+   * canvas). The focus ring shows only if the keyboard is in use (the browser's focus-visible).
+   */
+  SetAccessibilityFocus(control?: SkiaControl): void {
+    this.appFocus = control;
+    this.appFocusDeadline = performance.now() + 3000;
+    this.clearFocusRequest = !control;
+    control?.Superview?.Update();
+  }
+
+  private ProcessAppFocus(scale: number, w: number, h: number, requestFrame: () => void): void {
+    const wanted = this.appFocus!;
+    if (wanted.IsDisposed || performance.now() > this.appFocusDeadline) { this.appFocus = undefined; return; }
+    this.Rebuild(scale, w, h);
+    if (!this.Snapshot.some((n) => n.Source === wanted)) { requestFrame(); return; } // not drawn yet: look again next frame
+    this.appFocus = undefined;
+    this.Focus(wanted);
+  }
 
   private popupScope?: SkiaControl;
   /**
@@ -364,6 +394,10 @@ export class SkiaAccessibilityManager {
 
   private FocusFromKeyboard(node: SkiaControl, scale: number, w: number, h: number): void {
     this.Rebuild(scale, w, h); // the overlay looks the node up in the snapshot: make sure it is there now
+    this.Focus(node);
+  }
+
+  private Focus(node: SkiaControl): void {
     this.NoteFocus(node);
     this.FocusedNode = node;
     for (const cb of this.keyboardFocusRequested) cb(node);
@@ -405,6 +439,12 @@ export class SkiaAccessibilityManager {
   OnFrameEnd(scale: number, canvasWidthPx: number, canvasHeightPx: number, requestFrame: () => void): void {
     if (AccessibilityModals.size > 0 || this.ActiveModal) this.UpdateActiveModal();
     this.ProcessGroupFocus(scale, canvasWidthPx, canvasHeightPx, requestFrame);
+    if (this.clearFocusRequest) {
+      this.clearFocusRequest = false;
+      this.FocusedNode = undefined;
+      for (const cb of this.keyboardFocusRequested) cb(undefined);
+    }
+    if (this.appFocus) this.ProcessAppFocus(scale, canvasWidthPx, canvasHeightPx, requestFrame);
     if (this.focusRequest || this.popupFocusRoot) this.ProcessFocusRequests(scale, canvasWidthPx, canvasHeightPx);
     if (this.nodes.size === 0 && this.Snapshot.length === 0) return;
     const now = performance.now();
@@ -438,7 +478,7 @@ export class SkiaAccessibilityManager {
       list.push({
         Id: n.AccessibilityId, Label: n.AccessibilityLabel, Hint: n.AccessibilityHint, Role: n.AccessibilityRole!, Value: n.AccessibilityValue,
         Rect: new SKRect(px.Left / scale, px.Top / scale, px.Right / scale, px.Bottom / scale),
-        CanInteract: n.AccessibilityCanInteract, IsPressed: n.AccessibilityIsPressed, Live: n.AccessibilityLive, Source: n,
+        CanInteract: n.AccessibilityCanInteract, IsPressed: n.AccessibilityIsPressed, Expanded: n.AccessibilityExpanded, Live: n.AccessibilityLive, Source: n,
         Disabled: !n.AccessibilityCanInteract && Aria.IsInteractiveRole(n.AccessibilityRole),
         TextLines: n.AccessibilityTextSelectable ? n.GetAccessibilityTextLines(scale) : undefined,
       });
@@ -471,7 +511,7 @@ export class SkiaAccessibilityManager {
     for (let i = 0; i < a.length; i++) {
       const x = a[i], y = b[i];
       if (x.Source !== y.Source || x.Label !== y.Label || x.Hint !== y.Hint || x.Role !== y.Role || x.CanInteract !== y.CanInteract || x.Disabled !== y.Disabled
-        || x.IsPressed !== y.IsPressed || x.Live !== y.Live || !SameValue(x.Value, y.Value)
+        || x.IsPressed !== y.IsPressed || x.Expanded !== y.Expanded || x.Live !== y.Live || !SameValue(x.Value, y.Value)
         || Math.abs(x.Rect.Left - y.Rect.Left) > 0.5 || Math.abs(x.Rect.Top - y.Rect.Top) > 0.5
         || Math.abs(x.Rect.Right - y.Rect.Right) > 0.5 || Math.abs(x.Rect.Bottom - y.Rect.Bottom) > 0.5) return false;
       const tx = x.TextLines, ty = y.TextLines;

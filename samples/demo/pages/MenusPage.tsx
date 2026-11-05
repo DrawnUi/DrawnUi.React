@@ -11,7 +11,8 @@ import { type Canvas as CanvasView, type ControlTappedEventArgs, type InputKey, 
  * buttons.
  */
 const CARD = "#2B3035", BUTTON = "#373B3E", BUTTON_HOVER = "#495057", MUTED = "#ADB5BD", ACCENT = "#6EA8FE";
-const PANEL = "#262B3B", PANEL_STROKE = "#3B4256", HIGHLIGHT = "#343B52", TITLE_OPEN = "#5A6270";
+/** The menus' selected color, and the accent edge of an open menu's title (the keyboard's place gets the focus ring). */
+const PANEL = "#262B3B", PANEL_STROKE = "#3B4256", HIGHLIGHT = "#343B52", KEYBOARD_EDGE = "#0D6EFD";
 
 const ICON_NEW = "<svg viewBox='0 0 24 24'><path fill='#fff' d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zm4 18H6V4h7v5h5zM11 11h2v3h3v2h-3v3h-2v-3H8v-2h3z'/></svg>";
 const ICON_OPEN = "<svg viewBox='0 0 24 24'><path fill='#fff' d='M20 6h-8l-2-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2m0 12H4V8h16z'/></svg>";
@@ -106,40 +107,94 @@ export function MenusPage() {
     if (canvas) menu.current = OpenPopupWindow(canvas, <MenuPanel name={name} items={items} picked={pick} />, anchor);
   };
 
-  // ---- menu bar ----
+  // ---- menu bar, as DrawnUI Designer's (ToolBox 3826151 + b793169): Alt alone puts the keyboard on the bar; on the bar
+  // Left / Right go round the titles and Down, Enter or Space open one on its first line; in a menu Up / Down / Home / End
+  // go round its lines, Right / Left open the next / previous menu, Enter or Space run the line, Escape closes one level;
+  // Alt again, or Escape on the bar, gives the keyboard back. The keyboard's place reads selected (the menus' selected
+  // color, ringed by the focus ring), an open menu's title is edged in the accent, the mouse keeps its light hover look, and a mouse resting under a menu that opens or
+  // closes moves nothing. ----
   const tops = useRef<SkiaShapeCtrl[]>([]);
-  const bar = useRef({ open: -1, highlighted: -1, popup: 0 as PopupId, items: [] as { View: SkiaShapeCtrl; Entry: MenuEntry }[], canvas: undefined as CanvasView | undefined });
+  const bar = useRef({
+    active: false,     // the keyboard drives the menu bar
+    title: -1,         // the title the keyboard is on (no menu open)
+    open: -1,          // the open menu
+    line: -1,          // the line the keyboard lit in the open menu
+    hoverTitle: -1, hoverLine: -1,
+    back: undefined as SkiaControl | undefined, // where the keyboard was before the bar took it
+    closing: false, altAlone: false, keyAt: 0, mouseAt: 0,
+    popup: 0 as PopupId, items: [] as { View: SkiaShapeCtrl; Entry: MenuEntry }[], canvas: undefined as CanvasView | undefined,
+  });
+  const canvasOf = () => tops.current[0]?.Superview;
   const barOpen = () => { const b = bar.current; return b.open >= 0 && !!b.canvas?.IsPopupWindowOpen(b.popup); };
-  const paintBar = (hovered = -1, on = false) => {
-    const open = barOpen() ? bar.current.open : -1;
-    tops.current.forEach((t, i) => { t.BackgroundColor = i === open ? TITLE_OPEN : i === hovered && on ? BUTTON_HOVER : Colors.Transparent; t.UpdateDraw(); });
+  /** A real mouse move since the last key: a resting mouse under a menu that opened or closed changes nothing. */
+  const mouseMoved = () => bar.current.mouseAt > bar.current.keyAt;
+  const paintBar = () => {
+    const b = bar.current, open = barOpen() ? b.open : -1;
+    tops.current.forEach((t, i) => {
+      const selected = i === open || (b.active && open < 0 && i === b.title);
+      t.BackgroundColor = selected ? HIGHLIGHT : i === b.hoverTitle ? BUTTON_HOVER : Colors.Transparent;
+      t.StrokeColor = i === open ? KEYBOARD_EDGE : Colors.Transparent;
+      t.AccessibilityExpanded = i === open;
+      t.UpdateDraw();
+    });
   };
-  const paintItems = () => bar.current.items.forEach((it, i) => { it.View.BackgroundColor = i === bar.current.highlighted ? HIGHLIGHT : Colors.Transparent; it.View.UpdateDraw(); });
-  /** A menu closed from outside (a click elsewhere, the wheel, the window losing focus) unselects its title. */
+  const paintItems = () => bar.current.items.forEach((it, i) => {
+    const b = bar.current, selected = i === b.line;
+    it.View.BackgroundColor = selected || i === b.hoverLine ? HIGHLIGHT : Colors.Transparent;
+    it.View.UpdateDraw();
+  });
+  /** The keyboard and the screen reader go to `control` (undefined: back to the canvas, the keys are the app's). */
+  const focus = (control?: SkiaControl) => canvasOf()?.SetAccessibilityFocus(control);
+  /** The line an arrow moves to: round past either end; Home and End the first and last (every Hello line can act). */
+  const step = (count: number, from: number, key: InputKey) =>
+    key === "Home" || (key === "ArrowDown" && from < 0) ? 0 : key === "End" || (key === "ArrowUp" && from < 0) ? count - 1
+      : key === "ArrowDown" ? (from + 1) % count : (from - 1 + count) % count;
+  const isBarControl = (c?: SkiaControl) => !!c && (tops.current.includes(c as SkiaShapeCtrl) || bar.current.items.some((it) => it.View === c));
+  /** The keyboard comes to the bar, remembering where it was to give it back. */
+  const enterBar = (title: number) => {
+    const b = bar.current;
+    if (!b.active) {
+      const focused = canvasOf()?.AccessibilityManager.FocusedNode;
+      b.active = true; b.back = isBarControl(focused) ? undefined : focused;
+    }
+    b.title = title;
+  };
+  /** The bar lets go: menus closed, the keyboard back where it was. */
+  const leaveBar = () => {
+    const b = bar.current;
+    closeMenu();
+    const back = b.back;
+    b.active = false; b.title = -1; b.back = undefined;
+    paintBar();
+    focus(back);
+  };
+  /** A menu closed from outside (a click elsewhere, the wheel, the window losing focus): the bar lets go. */
   const onClosed = (id: PopupId) => {
     const b = bar.current;
-    if (id !== b.popup || b.open < 0) return;
-    b.open = -1; b.highlighted = -1;
-    paintBar();
+    if (id !== b.popup || b.open < 0 || b.closing) return;
+    b.open = -1; b.line = -1; b.hoverLine = -1;
+    if (b.active) leaveBar(); else paintBar();
   };
   const closeMenu = () => {
     const b = bar.current;
-    b.canvas?.ClosePopupWindow(b.popup);
-    b.open = -1; b.highlighted = -1;
+    b.closing = true;
+    try { b.canvas?.ClosePopupWindow(b.popup); } finally { b.closing = false; }
+    b.open = -1; b.line = -1; b.hoverLine = -1;
     paintBar();
   };
   const run = (e: MenuEntry) => {
     const title = MENUS.find((m) => m.Entries.includes(e))!.Title;
     setCommand(e.Shortcut ? `Last command: ${title} › ${e.Text} (${e.Shortcut})` : `Last command: ${title} › ${e.Text}`);
-    closeMenu();
+    if (bar.current.active) leaveBar(); else closeMenu();
   };
   const openBarMenu = (index: number, keyboard: boolean) => {
     const b = bar.current, canvas = tops.current[index]?.Superview;
     if (!canvas) return;
     if (b.canvas !== canvas) { b.canvas?.PopupWindowClosed.delete(onClosed); b.canvas = canvas; canvas.PopupWindowClosed.add(onClosed); }
-    canvas.ClosePopupWindow(b.popup);
+    b.closing = true;
+    try { canvas.ClosePopupWindow(b.popup); } finally { b.closing = false; }
     b.items = [];
-    b.open = index;
+    b.open = index; b.title = -1; b.hoverLine = -1;
     const m = MENUS[index];
     let item = 0;
     b.popup = OpenPopupWindow(canvas, (
@@ -150,9 +205,16 @@ export function MenusPage() {
             if (!e.Text) return <SkiaShape key={k} HeightRequest={1} HorizontalOptions="Fill" BackgroundColor={PANEL_STROKE} Margin={SEPARATOR_MARGIN} />;
             const at = item++;
             return (
-              <SkiaShape key={k} CornerRadius={6} HorizontalOptions="Fill" Padding={ITEM_PADDING} AccessibilityRole={Aria.RoleMenuItem} AccessibilityLabel={e.Text}
+              <SkiaShape key={k} CornerRadius={6} HorizontalOptions="Fill" Padding={ITEM_PADDING}
+                AccessibilityRole={Aria.RoleMenuItem} AccessibilityLabel={e.Text}
                 ref={(v: SkiaShapeCtrl | null) => { if (v) bar.current.items[at] = { View: v, Entry: e }; }}
-                HoverChanged={(_, on) => { if (on) { bar.current.highlighted = at; paintItems(); } }} Tapped={(_, t) => { if (primary(t)) run(e); }}>
+                HoverChanged={(_, on) => {
+                  if (!mouseMoved()) return;
+                  const bb = bar.current;
+                  bb.hoverLine = on ? at : bb.hoverLine === at ? -1 : bb.hoverLine;
+                  paintItems();
+                }}
+                Tapped={(_, t) => { if (primary(t)) run(e); }}>
                 <SkiaLabel Text={e.Text} FontSize={14} TextColor={Colors.White} AccessibilityRole={Aria.RolePresentation} />
                 <SkiaLabel Text={e.Shortcut ?? ""} FontSize={13} TextColor={MUTED} HorizontalOptions="End" AccessibilityRole={Aria.RolePresentation} />
               </SkiaShape>
@@ -161,61 +223,84 @@ export function MenusPage() {
         </SkiaStack>
       </SkiaShape>
     ), tops.current[index]);
-    b.highlighted = keyboard ? 0 : -1;
+    b.line = keyboard ? step(b.items.length, -1, "Home") : -1;
     paintItems();
     paintBar();
+    if (keyboard && b.line >= 0) focus(b.items[b.line].View);
   };
 
   useEffect(() => {
+    const NAV = ["ArrowDown", "ArrowUp", "Home", "End", "ArrowLeft", "ArrowRight", "Enter", "NumpadEnter", "Space", "Escape"];
     const onKey = (key: InputKey, e: KeyboardEvent) => {
+      const b = bar.current;
+      const isAlt = key === "AltLeft" || key === "AltRight";
+      // Alt alone (pressed and let go) puts the keyboard on the bar; anything pressed with it is no "Alt alone"
+      b.altAlone = isAlt && !e.ctrlKey && !e.shiftKey && !e.metaKey;
+      if (isAlt) return;
       // keys of a page element are not ours; keys of this canvas' own controls in keyboard focus (Tab) are
-      const canvas = tops.current[0]?.Superview;
+      const canvas = canvasOf();
       const focused = canvas?.AccessibilityManager.FocusedNode;
       const drawn = !!focused && focused.Superview === canvas;
       if (KeyboardManager.IsOwnedByElement(e) && !drawn) return;
       // a key the menu bar used stops here: the focused control must not act on it too
-      const take = () => { e.preventDefault(); e.stopPropagation(); };
-      const b = bar.current;
-      // Alt + the first letter of a menu opens it, its first line ready for the arrows
+      const take = () => { e.preventDefault(); e.stopPropagation(); b.keyAt = performance.now(); };
+      // Alt + the first letter of a menu opens it on its first line
       if (KeyboardManager.IsAltPressed) {
         const index = MENUS.findIndex((m) => m.Accelerator === key);
-        if (index >= 0) { take(); openBarMenu(index, true); }
+        if (index >= 0) { take(); enterBar(index); openBarMenu(index, true); }
         return;
       }
+      const n = MENUS.length;
       if (!barOpen()) {
-        // a title in keyboard focus: Enter, Space or Down opens its menu with the first line highlighted
-        const title = tops.current.findIndex((t) => t === focused);
-        if (title >= 0 && (key === "Enter" || key === "NumpadEnter" || key === "Space" || key === "ArrowDown")) { take(); openBarMenu(title, true); return; }
+        // a title reached with Tab: the arrows, Down, Enter and Space work as on the bar
+        const titleFocused = tops.current.findIndex((t) => t === focused);
+        if (!b.active && titleFocused >= 0 && NAV.includes(key) && key !== "Escape") { b.active = true; b.back = undefined; b.title = titleFocused; }
+        if (b.active && !e.ctrlKey && !e.metaKey) {
+          switch (key) {
+            case "ArrowLeft": case "ArrowRight":
+              take(); b.title = (b.title + (key === "ArrowRight" ? 1 : n - 1)) % n; paintBar(); focus(tops.current[b.title]); return;
+            case "ArrowDown": case "Enter": case "NumpadEnter": case "Space":
+              take(); openBarMenu(b.title, true); return;
+            case "Escape": take(); leaveBar(); return;
+            case "Tab": b.active = false; b.title = -1; b.back = undefined; paintBar(); return; // the keyboard moves on: the bar lets go
+          }
+        }
         // the shortcuts work with the menus closed (the browser keeps a few for itself: Ctrl+N, Ctrl+W, Ctrl+T)
         const ctrl = KeyboardManager.IsControlPressed;
         const found = MENUS.flatMap((m) => m.Entries).find((x) => x.Text && x.Key === key && (x.Ctrl ?? true) === ctrl);
         if (found) { take(); run(found); }
         return;
       }
-      const count = b.items.length;
-      // a line in keyboard focus (an opening menu takes it, drawnui-cross 6ao): the keyboard moves it up and down and
-      // Enter / Space activate it; the highlight goes along
-      const line = b.items.findIndex((it) => it.View === focused);
-      if (line >= 0 && key !== "ArrowLeft" && key !== "ArrowRight" && key !== "Escape") {
-        const to = key === "ArrowDown" ? Math.min(line + 1, count - 1) : key === "ArrowUp" ? Math.max(line - 1, 0)
-          : key === "Home" ? 0 : key === "End" ? count - 1 : -1;
-        if (to >= 0) { b.highlighted = to; paintItems(); }
-        return;
-      }
+      if (!NAV.includes(key) || e.ctrlKey || e.metaKey) return;
+      take();
+      // a menu the mouse opened: the keyboard comes along
+      if (!b.active) enterBar(-1);
       switch (key) {
-        // on a title in keyboard focus the arrow also moves that focus to the next title
-        case "ArrowLeft": e.preventDefault(); openBarMenu((b.open - 1 + MENUS.length) % MENUS.length, true); break;
-        case "ArrowRight": e.preventDefault(); openBarMenu((b.open + 1) % MENUS.length, true); break;
-        case "ArrowDown": take(); b.highlighted = (b.highlighted + 1) % count; paintItems(); break;
-        case "ArrowUp": take(); b.highlighted = b.highlighted <= 0 ? count - 1 : b.highlighted - 1; paintItems(); break;
-        case "Enter": case "NumpadEnter": case "Space": take(); if (b.highlighted >= 0) run(b.items[b.highlighted].Entry); break;
-        case "Escape": take(); closeMenu(); break;
+        case "ArrowDown": case "ArrowUp": case "Home": case "End":
+          b.line = step(b.items.length, b.line, key); paintItems(); focus(b.items[b.line].View); break;
+        case "ArrowRight": openBarMenu((b.open + 1) % n, true); break;
+        case "ArrowLeft": openBarMenu((b.open - 1 + n) % n, true); break;
+        case "Enter": case "NumpadEnter": case "Space": if (b.line >= 0) run(b.items[b.line].Entry); break;
+        case "Escape": { const t = b.open; closeMenu(); b.title = t; paintBar(); focus(tops.current[t]); break; } // one level: back on its title
       }
     };
+    const onUp = (key: InputKey, e: KeyboardEvent) => {
+      const b = bar.current;
+      if ((key !== "AltLeft" && key !== "AltRight") || !b.altAlone) return;
+      b.altAlone = false;
+      const focused = canvasOf()?.AccessibilityManager.FocusedNode;
+      if (KeyboardManager.IsOwnedByElement(e) && !(focused && focused.Superview === canvasOf())) return; // a page field keeps its keys
+      e.preventDefault(); b.keyAt = performance.now();
+      if (b.active || barOpen()) leaveBar();
+      else { enterBar(0); paintBar(); focus(tops.current[0]); }
+    };
     const onChar = () => {};
-    KeyboardManager.Subscribe(onKey, onChar);
+    const onMove = () => { bar.current.mouseAt = performance.now(); };
+    KeyboardManager.Subscribe(onKey, onChar, onUp);
+    window.addEventListener("pointermove", onMove, true);
     return () => {
-      KeyboardManager.Unsubscribe(onKey, onChar);
+      KeyboardManager.Unsubscribe(onKey, onChar, onUp);
+      window.removeEventListener("pointermove", onMove, true);
       const b = bar.current;
       b.canvas?.PopupWindowClosed.delete(onClosed);
       b.canvas?.ClosePopupWindows();
@@ -234,13 +319,19 @@ export function MenusPage() {
           <SkiaLabel Text="A desktop menu bar, a context menu (right-click anywhere on the page) and a dropdown, then tooltips: rest the mouse on a control, move along a row and the next one shows at once; a click, the wheel or a key closes it."
             FontSize={14} TextColor="#D3D3D3" HorizontalOptions="Fill" HorizontalTextAlignment="Center" />
 
-          <Card title="Menu bar" note="Click a menu, or press Alt with its first letter (Alt+F, Alt+E, Alt+V, Alt+H). Left and Right open the next menu, Up and Down move through it, Enter picks, Escape closes. The shortcuts (Ctrl+S, Ctrl+O, F1...) work with the menus closed too.">
+          <Card title="Menu bar" note="Click a menu, press Alt with its first letter (Alt+F, Alt+E, Alt+V, Alt+H), or press Alt alone to put the keyboard on the bar: Left and Right go round the menus, Down or Enter opens one, Up and Down go round its lines, Enter picks, Escape closes one level, Alt again leaves. The shortcuts (Ctrl+S, Ctrl+O, F1...) work with the menus closed too.">
             <SkiaShape HorizontalOptions="Fill" CornerRadius={8} BackgroundColor={BUTTON} Padding={BAR_PADDING}>
               <SkiaRow Spacing={2} AccessibilityRole={Aria.RoleMenuBar} AccessibilityLabel="Menu bar">
                 {MENUS.map((m, index) => (
-                  <SkiaShape key={m.Title} CornerRadius={6} Padding={TITLE_PADDING} BackgroundColor={Colors.Transparent} AccessibilityRole={Aria.RoleMenuItem} AccessibilityLabel={m.Title}
+                  <SkiaShape key={m.Title} CornerRadius={6} Padding={TITLE_PADDING} BackgroundColor={Colors.Transparent} StrokeWidth={1.5} StrokeColor={Colors.Transparent}
+                    AccessibilityRole={Aria.RoleMenuItem} AccessibilityLabel={m.Title} AccessibilityExpanded={false}
                     ref={(v: SkiaShapeCtrl | null) => { if (v) tops.current[index] = v; }}
-                    HoverChanged={(_, on) => { if (on && barOpen() && bar.current.open !== index) openBarMenu(index, false); paintBar(index, on); }}
+                    HoverChanged={(_, on) => {
+                      if (!mouseMoved()) return; // a resting mouse under a menu that opened or closed moves nothing
+                      const b = bar.current;
+                      b.hoverTitle = on ? index : b.hoverTitle === index ? -1 : b.hoverTitle;
+                      if (on && barOpen() && b.open !== index) openBarMenu(index, false); else paintBar();
+                    }}
                     Tapped={(_, e) => { if (!primary(e)) return; if (barOpen() && bar.current.open === index) closeMenu(); else openBarMenu(index, false); }}>
                     {/* the accelerator letter (Alt + it opens the menu) is underlined, as in desktop menu bars */}
                     <SkiaLabel FontSize={14} TextColor={Colors.White} AccessibilityRole={Aria.RolePresentation}>

@@ -103,6 +103,12 @@ export class Canvas {
   ClosePopupWindows(): void { this.popups.CloseAll(true); this.AfterPopupsChanged(); }
   /** The popup window is still open. */
   IsPopupWindowOpen(id: PopupId): boolean { return this.popups.IsOpen(id); }
+  /**
+   * Moves the keyboard and screen-reader focus to `control` at the end of the next frame, for app code such as a custom
+   * menu that moves its highlight (C# DrawnView.SetAccessibilityFocus). A control not drawn yet gets it once it is, within
+   * 3 seconds; undefined gives the keys back to the app. The focus ring shows only if the keyboard is in use.
+   */
+  SetAccessibilityFocus(control?: SkiaControl): void { this.AccessibilityManager.SetAccessibilityFocus(control); this.Update(); }
   /** True while a popup window that takes input is open. */
   get HasPopupWindows(): boolean { return this.popups.HasInteractive; }
   /** The content of the top popup window that takes input. */

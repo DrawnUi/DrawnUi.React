@@ -614,6 +614,12 @@ export class SkiaControl {
     return this.accessibilityRole ?? (this.accessibilityModal ? Aria.RoleDialog : (this.constructor as typeof SkiaControl).DefaultAccessibilityRole);
   }
   set AccessibilityRole(v: string | undefined) { if (this.accessibilityRole !== v) { this.accessibilityRole = v; this.AccessibilityChanged(); } }
+  /**
+   * On an arrow-key group (a container with a composite role such as `Aria.RoleMenu` or `Aria.RoleList`): the arrows go
+   * round, from the last item to the first and back, instead of stopping at the ends, as in desktop menus. Home / End
+   * unchanged. Default false (C# KeyboardWrap, Rust keyboard_wrap).
+   */
+  KeyboardWrap = false;
   private accessibilityModal = false;
   /**
    * A modal overlay, such as a dialog drawn over the screen (C# AccessibilityModal, drawnui-cross 6av): while it shows,
@@ -681,6 +687,10 @@ export class SkiaControl {
   /** aria-pressed for toggles; undefined = not a toggle. */
   get AccessibilityIsPressed(): boolean | undefined { return this.accessibilityIsPressed; }
   set AccessibilityIsPressed(v: boolean | undefined) { if (this.accessibilityIsPressed !== v) { this.accessibilityIsPressed = v; this.AccessibilityChanged(); } }
+  private accessibilityExpanded?: boolean;
+  /** A control that opens something, such as a menu title: whether it is open now (aria-expanded). Unset: it opens nothing. */
+  get AccessibilityExpanded(): boolean | undefined { return this.accessibilityExpanded; }
+  set AccessibilityExpanded(v: boolean | undefined) { if (this.accessibilityExpanded !== v) { this.accessibilityExpanded = v; this.AccessibilityChanged(); } }
 
   /** aria-live: `Aria.LivePolite` / `Aria.LiveAssertive`; changes are announced immediately. */
   get AccessibilityLive(): string | undefined { return this.accessibilityLive; }

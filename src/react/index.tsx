@@ -254,14 +254,16 @@ function AccessibilityOverlay({ view }: { view: CanvasView }) {
     setNodes(mgr.Snapshot);
     const off = mgr.OnChanged(() => setNodes(mgr.Snapshot));
     const offLive = mgr.OnLiveRegionUpdated(() => { mgr.ForceRebuildOnNextFrame(); view.Update(); });
-    const offFocus = mgr.OnKeyboardFocusRequested((node) => { setNodes(mgr.Snapshot); setFocusRequest({ id: node.AccessibilityId }); });
+    const offFocus = mgr.OnKeyboardFocusRequested((node) => { setNodes(mgr.Snapshot); setFocusRequest({ id: node?.AccessibilityId ?? 0 }); });
     return () => { off(); offLive(); offFocus(); };
   }, [view]);
   const elementOf = (id: number) => overlayRef.current?.querySelector<HTMLElement>(`[data-a11y-id="${id}"]`) ?? undefined;
   useLayoutEffect(() => {
     if (!focusRequest) return;
     setFocusRequest(undefined);
-    elementOf(focusRequest.id)?.focus({ preventScroll: true });
+    // no node: the app took the focus away (SetAccessibilityFocus()), the DOM focus goes back to the canvas host
+    if (!focusRequest.id) overlayRef.current?.parentElement?.focus({ preventScroll: true });
+    else elementOf(focusRequest.id)?.focus({ preventScroll: true });
   }, [focusRequest]);
   // the focused node went away (its page or popup closed): no control keeps the focus and its ring goes with it, the keys
   // belong to the app again (as in the other engines); the DOM focus stays on the canvas host, so a screen reader is not
@@ -332,6 +334,7 @@ function AccessibilityOverlay({ view }: { view: CanvasView }) {
         return n.CanInteract ? (
           <div key={n.Id} data-a11y-id={n.Id} role={n.Role} aria-label={n.Label} title={n.Hint} {...valueAttributes(n)}
             aria-pressed={n.Role === "button" ? n.IsPressed : undefined}
+            aria-expanded={n.Expanded} aria-haspopup={n.Expanded !== undefined && n.Role === "menuitem" ? "menu" : undefined}
             aria-checked={n.Role === "switch" || n.Role === "checkbox" || n.Role === "radio" ? n.IsPressed : undefined}
             aria-live={n.Live as "polite" | "assertive" | undefined}
             tabIndex={view.AccessibilityManager.IsTabStop(n.Source) ? 0 : -1} className="drawnui-a11y-node" style={{ ...pos, fontSize: 0, userSelect: "none" }}
