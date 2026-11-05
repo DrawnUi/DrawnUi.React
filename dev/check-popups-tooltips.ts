@@ -376,6 +376,26 @@ const element = {
     check("screenshots give their surface's pixels back", grown < 30, `${grown.toFixed(0)} MB more`);
   }
 
+  // ---- a label's FillGradient goes to one place (C# 9637994b LabelGradientTargetTests): the background of a label that
+  // has one (its glyphs keep TextColor), else the glyphs ----
+  {
+    const whiteText = (background?: string) => {
+      const l = new SkiaLabel(); l.Text = "HHHH"; l.FontSize = 48; l.TextColor = "#FFFFFF"; l.Margin = new Thickness(10, 10, 0, 0);
+      if (background) l.BackgroundColor = background;
+      l.FillGradient = { Type: "Linear", Colors: ["#FF0000", "#0000FF"], StartXRatio: 0, StartYRatio: 0, EndXRatio: 1, EndYRatio: 0 };
+      const r = new SkiaLayer(); r.WidthRequest = W; r.HeightRequest = H; r.BackgroundColor = "#000000"; r.AddSubView(l);
+      canvas.Content = r; frame();
+      const px = pixels();
+      let white = 0;
+      for (let i = 0; i < px.length; i += 4) if (px[i] > 230 && px[i + 1] > 230 && px[i + 2] > 230) white++;
+      return white;
+    };
+    const withBackground = whiteText("#202020"), without = whiteText(), transparent = whiteText("#00000000");
+    check("a label with a background: the gradient fills it, the text keeps its white", withBackground > 50, `${withBackground} white pixels`);
+    check("a label without a background: the gradient colors the text", without < 5, `${without} white pixels`);
+    check("a transparent BackgroundColor is no background: the gradient colors the text", transparent < 5, `${transparent} white pixels`);
+  }
+
   // ---- span underline in the label's color ----
   {
     const l = new SkiaLabel(); l.FontSize = 40; l.TextColor = "#FF0000"; l.Margin = new Thickness(10, 20, 0, 0);

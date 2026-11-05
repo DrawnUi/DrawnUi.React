@@ -176,6 +176,8 @@ createRoot(document.getElementById("root")!).render(
 - Text: `CharacterSpacing` (1 = the font's own; each glyph gets (value - 1) points more), measured, wrapped and cut at
   the width it draws. Chinese and Japanese wrap between characters, never before closing punctuation or small kana
   (`SkiaLabel.CanBreakInsideWord`); Korean and Latin wrap at spaces, a Latin word wider than the line by characters.
+- A label's `FillGradient` colors its text (each line, or the whole block with `GradientByLines={false}`); on a label
+  with a `BackgroundColor` it fills that background instead and the text keeps `TextColor`.
 - `SkiaScroll.ScrollToIndex(index, animate, "Start" | "Center" | "End")` keeps aiming until the row's place is
   measured (a `MeasureVisible` list estimates rows it has not measured yet), so it lands on the row; a press, the
   wheel or another scroll cancels it, and `LoadMoreCommand` waits until it lands. It reaches any item of a templated

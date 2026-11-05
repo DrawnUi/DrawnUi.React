@@ -801,8 +801,14 @@ export class SkiaLabel extends SkiaControl {
     const sh = this.HasDropShadow() ? (this.DropShadowSize + this.DropShadowOffsetY) * scale : 0;
     return { W: stroke + sw, H: stroke + sh, Stroke: stroke };
   }
-  /** C# SkiaLabel.SetupBackgroundPaint: no BackgroundColor = no background, the gradient goes on the glyphs. */
-  protected override FillGradientPaintsBackground(): boolean { return !!this.BackgroundColor; }
+  /**
+   * FillGradient goes to one place (C# 9637994b, as DrawnUi.Rust): the background of a label that paints one (a
+   * BackgroundColor with alpha above 0), whose glyphs keep TextColor; else the glyphs.
+   */
+  protected override FillGradientPaintsBackground(): boolean { return this.HasBackground(); }
+  private HasBackground(): boolean { return !!this.BackgroundColor && Super.ParseColor(this.BackgroundColor)[3] > 0; }
+  /** The gradient the glyphs are painted with: none when the label's background takes FillGradient. */
+  protected get TextFillGradient(): SkiaGradient | undefined { return this.HasBackground() ? undefined : this.FillGradient; }
 
   protected override Paint(ctx: DrawingContext): void {
     if (this.lines.length === 0 || !this.mainFonts) return;
@@ -851,7 +857,7 @@ export class SkiaLabel extends SkiaControl {
       for (let k = 0, gx = 0; k < ids.length; k++) { positions[k * 2] = gx; gx += widths[k] + sp; }
       canvas.drawGlyphs(ids, positions, rx, ry, run.Font, paint);
     };
-    const gradient = this.FillGradient;
+    const gradient = this.TextFillGradient;
     const textRect = new SKRect(left, top, right, bottom);
     for (const line of this.lines) {
       y += this.ParagraphSpace(line);
