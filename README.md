@@ -49,6 +49,36 @@ property names, layout and drawing rules. What you learn here works there, and s
 
 DrawnUI is MIT licensed in every language and on every platform: desktop, mobile, web and embedded devices. Ship it in commercial products with no attribution badge, no about screen and no per-device royalty.
 
+## What's new in 0.1.0-preview.38
+
+- **Keys, one order everywhere:** the canvas keyboard navigation (activation, arrows in lists and menus, slider steps,
+  Escape closing a popup window) gets each key first, then your `KeyboardManager` handlers run with
+  `KeyboardManager.IsKeyHandled` telling whether navigation used it. Skip handled keys so one press does one thing.
+- **Desktop menu bars from the keyboard:** Alt alone puts the keyboard on the bar, the arrows go round the titles and
+  the lines, Escape closes one level. New for your own menus: `KeyboardWrap` (the arrows go round a group),
+  `canvas.SetAccessibilityFocus(control)` (it wins over the canvas' own focus move of the same frame; `undefined`
+  keeps the focus where it is), `canvas.KeyboardFocusNode`, `AccessibilityExpanded`.
+- **Frame players:** `SpeedRatio` is the real speed (0.5 plays at half speed, 2 at double) on `SkiaSprite`, `SkiaGif`
+  and `SkiaLottie`. `DefaultFrame` and `CurrentFrame` are frame indexes, -1 is the last frame.
+- **Images:** `Aspect="Tile"` repeats a `SkiaImage` or `SkiaSvg` at its natural size over the whole control, starting
+  from the copy its alignment places. `AddEffect="Grayscale"` uses the 0.21 / 0.72 / 0.07 luminance weights;
+  `BlackAndWhite` keeps 0.2989 / 0.587 / 0.114.
+- **Gradients:** a gradient's `Light` above 1 multiplies each color's lightness, below 1 its red, green and blue, as in
+  DrawnUI for .NET. A `SkiaLabel` with a `BackgroundColor` takes its `FillGradient` on the background and keeps its
+  `TextColor`; without one the gradient fills the text.
+- **Drawers:** `AutoClose` closes on a press outside the drawer's content, so a full-screen drawer with a smaller panel
+  closes from a press above the panel. A touch that lands on a drawer while it slides lets it finish the slide.
+- **Shell modals:** `ModalsCount`, `CanGoBack` and `Navigated` (Pop) follow a modal the moment its close starts,
+  whether by `PopModalAsync`, a swipe or `IsOpen = false`; the modal slides out after that.
+- **Carousels:** a second swipe during a shader carousel's transition raises `Stopped` once, at rest, and a move by
+  code takes over a queued swipe. `IsUserFocused` is false after every release, a tap included.
+- **Removed controls:** a control removed from the canvas pauses its animations until it is added back; a disposed
+  one stops them. A removed text field lets go of the keyboard, and a `DrawnGame` gets keys while it is on a canvas.
+- **Accessibility:** shell popups and modals read as dialogs, a live region's new text is read on the next frame, and
+  a menu or list whose items sit in several layouts is walked in reading order.
+- **Tools:** `Canvas.PopupWindowRoots` lists the open popup windows, `Canvas.WasDrawnListeners` runs handlers after
+  every drawn frame, and `DesignerSourceOf(control)` gives the React element that created a control in dev builds.
+
 ## Install
 
 ```
