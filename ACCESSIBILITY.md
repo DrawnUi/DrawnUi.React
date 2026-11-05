@@ -74,6 +74,8 @@ NVDA, JAWS and Narrator with Chrome or Edge, VoiceOver with Safari, TalkBack wit
   `OnAccessibilityKey`.
 - `AccessibilityLive="polite"` on status text that should be read when it changes.
 - `AccessibilityModal` on a dialog's root, with a backdrop that blocks taps behind it.
+- Say each thing once: a caption beside a control that repeats its name, or a page title that repeats the shell bar's
+  title, gets `Aria.RolePresentation`.
 - Check it: `npm run audit:a11y -- <url>` in this repo reads Chrome's accessibility tree of every demo page (every
   control named, every range valid); then listen with a screen reader.
 
@@ -92,5 +94,4 @@ No screen reader has been heard on DrawnUI for React yet; see "Not yet".
 - Screen readers by ear: NVDA and Narrator with Chrome and Edge, VoiceOver with Safari, TalkBack with Chrome.
 - Browsers have no scroll actions for screen readers: a reader moves through the overlay's elements and the focused
   one is scrolled into view, but a three-finger page swipe does not page a drawn scroll.
-- A page title in the shell bar and the page's own heading are both read.
 - System text size, high contrast and reduced motion are not read by the engine.
