@@ -242,6 +242,31 @@ createRoot(document.getElementById("root")!).render(
   (Enter on a focused control, a key handler such as Alt+F); Tab stays inside it while it is open; when it closes
   with the keyboard in it, the keyboard goes back to the control it opened from. A popup opened with the mouse leaves
   the keyboard where it is.
+- Desktop menu bar (a row of titles, `Aria.RoleMenuBar`, each opening its menu below it with `OpenPopupWindow(canvas,
+  menu, title)`; menus `Aria.RoleMenu`, items `Aria.RoleMenuItem`), the behavior desktop users expect:
+  - Mouse: a click opens a menu; while one is open, the mouse over another title opens that one.
+  - Alt alone puts the keyboard on the bar (the first title lit, no menu open); Alt with the underlined letter opens
+    that menu directly (Alt+F for File).
+  - On the bar: Left / Right go round all titles; Down, Enter or Space opens the lit title's menu on its first usable
+    item.
+  - In a menu: Up / Down / Home / End walk the usable items only (dimmed items and separators skipped) and go round;
+    Right opens a submenu or the next menu, Left closes the submenu or opens the previous menu; Enter / Space run the
+    item; Escape closes one level (submenu, menu, then the bar); Alt also leaves. Leaving gives the keyboard back to
+    where it was.
+  - Look: the keyboard's place (a title, the open menu's title, the lit item) shows the menus' selected look in the
+    accent color; the hover keeps its lighter look; a resting mouse does not take the highlight back while the keyboard
+    drives (count a hover only after a real `pointermove`).
+  - Screen readers: `AccessibilityExpanded` on each title (aria-expanded, read as a menu opener), and
+    `canvas.SetAccessibilityFocus(control)` on every line or title the keys light, so the reader follows it;
+    `canvas.SetAccessibilityFocus(undefined)` when the bar lets go.
+  - The keys: `KeyboardManager.Subscribe(down, char, up)` (Alt alone = an Alt key up with nothing pressed between),
+    `KeyboardManager.IsAltPressed` / `IsControlPressed`; call `preventDefault()` and `stopPropagation()` on the keys
+    the bar uses. Unselect the title on `canvas.PopupWindowClosed`. Shortcuts show at the right of each item and work
+    with the menus closed too. Let the menu walk its own items from the keys, so it works the same in a canvas popup and
+    in a popup window of its own.
+  - Reference: the HelloReact Tooltips & Menus page (`samples/demo/pages/MenusPage.tsx`).
+- `KeyboardWrap` on an arrow-key group (`Aria.RoleMenu`, `RoleList`...): the arrows go round, from the last item to
+  the first and back; Home / End unchanged. Default false.
 - A control that consumes a gesture keeps it until it stops consuming, so a drag survives the finger leaving the
   control. To drag inside a `SkiaScroll` (the scroll owns vertical pans), take `Down` on a handle with
   `ConsumeGestures`, set `scroll.RespondsToGestures = false` for the drag and restore it on `Up`, and count travel in

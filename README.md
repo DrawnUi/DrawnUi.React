@@ -120,6 +120,18 @@ with no handler the browser menu shows as before. `e` carries `Location` (points
 (pixels inside the handling control), `Source` (`"mouse"`, `"touch"` for a long press, `"keyboard"` for the Menu
 key) and `Native` (the DOM event, for modifiers). Web-only: DrawnUi.Net has no mouse buttons.
 
+## Menu bar
+
+A desktop menu bar is a row of titles (`Aria.RoleMenuBar`), each opening its menu below it with
+`OpenPopupWindow(canvas, menu, title)`. The demo's menu bar works the way desktop users expect, from the mouse and from
+the keyboard alone: a click opens a menu and the mouse over another title opens that one; Alt alone puts the keyboard
+on the bar and Alt+F opens File; Left / Right go round the titles, Down, Enter or Space open one on its first item; Up /
+Down / Home / End go round its lines, Right / Left move to the next / previous menu, Enter runs the line, Escape closes
+one level and Alt leaves, giving the keyboard back. The keyboard's place shows the selected look in the accent color,
+the hover keeps its lighter look. Screen readers hear menubar, menu and menu item roles, the titles' expanded state
+(`AccessibilityExpanded`) and every line the keys light (`canvas.SetAccessibilityFocus(control)`). Shortcuts (Ctrl+S,
+F1) work with the menus closed too. Code: `samples/demo/pages/MenusPage.tsx`.
+
 ## Accessibility
 
 Same model as DrawnUI for .NET in the browser: the `<canvas>` is `aria-hidden`, and an invisible ARIA layer mirrors
@@ -130,7 +142,8 @@ themselves) keeps readers and the keyboard inside it, and a live region's new te
 
 Per control (C# names): `AccessibilityRole` (enables the node; use `Aria.*`), `AccessibilityLabel`
 (defaults to the control's text), `AccessibilityHint`, `AccessibilityCanInteract` (defaults to "has a
-`Tapped` handler"), `AccessibilityIsPressed`, `AccessibilityLive`. `Aria.RolePresentation` hides a control that
+`Tapped` handler"), `AccessibilityIsPressed`, `AccessibilityExpanded`, `AccessibilityLive`, `KeyboardWrap` (the arrows
+go round a group); `canvas.SetAccessibilityFocus(control)` moves the keyboard and screen-reader focus from app code. `Aria.RolePresentation` hides a control that
 would otherwise get a default role.
 
 App-wide opt-in (React extension): `SkiaLabel.DefaultAccessibilityRole = Aria.RoleText` and

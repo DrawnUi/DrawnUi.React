@@ -39,6 +39,11 @@ NVDA, JAWS and Narrator with Chrome or Edge, VoiceOver with Safari, TalkBack wit
   in, then focused. The group role may sit on a wrapper: the items are the children of the layout inside it. A menu,
   menubar, list, listbox or radio group whose items sit in several layouts (a title, a divider and columns) walks all
   of them in reading order.
+- `KeyboardWrap` on a group: the arrows go round, from the last item to the first and back, as in desktop menus (Home /
+  End unchanged).
+- App code moves the keyboard and screen-reader focus with `canvas.SetAccessibilityFocus(control)` (at the end of the
+  next frame; a control not drawn yet gets it once drawn, within 3 seconds); `SetAccessibilityFocus(undefined)` gives
+  the keys back to the app. The focus ring shows only while the keyboard is in use.
 - The focused control gets the arrow keys first: a slider steps (what a screen reader's Increment / Decrement sends in
   the browser), an editor keeps them while editing.
 - The scrolls around the focused control bring it into view.
@@ -54,6 +59,13 @@ NVDA, JAWS and Narrator with Chrome or Edge, VoiceOver with Safari, TalkBack wit
 - Popup windows (`OpenPopupWindow`: menus, dropdowns) are read and walked first while open. Opened from the keyboard,
   a popup with a menu or list takes the keyboard on its checked item, else its first one; Tab goes round inside it;
   Escape closes it and the keyboard goes back to the control it opened from.
+- A desktop menu bar (`Aria.RoleMenuBar`, menus `RoleMenu`, items `RoleMenuItem`): Alt alone puts the keyboard on
+  the bar, Alt with the underlined letter opens that menu; on the bar Left / Right go round the titles and Down, Enter
+  or Space open the lit one on its first usable item; in a menu Up / Down / Home / End go round its usable items,
+  Right / Left open the next / previous menu (or a submenu), Enter / Space run the item, Escape closes one level, Alt
+  leaves and the keyboard goes back where it was. Each title carries `AccessibilityExpanded` (aria-expanded) and the
+  page moves the reader with `SetAccessibilityFocus` to every title and line the keys light. The Tooltips & Menus demo
+  page is the reference.
 - `AccessibilityModal` on a dialog's root: while it shows, screen readers and Tab reach only its controls (and popup
   windows over it). The overlay itself becomes the dialog (role, name, `aria-modal`) around the dialog's controls. The
   keyboard moves into it when it appears with the keyboard in use, and goes back where it was when it closes. A
@@ -69,7 +81,10 @@ NVDA, JAWS and Narrator with Chrome or Edge, VoiceOver with Safari, TalkBack wit
   `AccessibilityLabel="Wi-Fi"` on a switch, `"Volume"` on a slider, `"Download"` on a progress bar.
 - Give a tappable card, row or shape a role (`AccessibilityRole={Aria.RoleButton}`) and its inner labels
   `Aria.RolePresentation`, so it is one control with one name.
-- Give a list, toolbar or menu a group role: it becomes one Tab stop and the arrows walk it.
+- Give a list, toolbar or menu a group role: it becomes one Tab stop and the arrows walk it; `KeyboardWrap` makes the
+  arrows go round.
+- A control that opens something (a menu title) sets `AccessibilityExpanded`; app code that moves its own highlight
+  calls `canvas.SetAccessibilityFocus(control)` so screen readers follow.
 - A custom range control returns an `AccessibilityValue` (now, min, max, step, text) and steps in
   `OnAccessibilityKey`.
 - `AccessibilityLive="polite"` on status text that should be read when it changes.
