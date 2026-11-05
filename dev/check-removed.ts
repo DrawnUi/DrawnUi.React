@@ -1,7 +1,9 @@
 // A control removed from a live canvas WITHOUT Dispose is released by the canvas (`npm run check:removed`, Rust 44c718f):
 // a page whose grandchild runs a looping rotation (running, then paused), a page holding a focused SkiaEditor, a page
 // holding a DrawnGame. After RemoveSubView, a few frames and forced garbage collections, every removed object must be
-// collected; whatever still holds it is reported.
+// collected; whatever still holds it is reported. Then what runs for a removed or disposed control: a removed page's
+// animation pauses and goes on when it is added back, a disposed control's animator neither ticks nor asks for frames,
+// a removed focused editor loses the focus, a game gets keys only while it is on a canvas.
 import { readFileSync } from "node:fs";
 import v8 from "node:v8";
 import vm from "node:vm";
@@ -106,7 +108,77 @@ g.getComputedStyle = () => ({ overflowX: "visible", overflowY: "visible" });
   }
   for (const r of results) console.log(r);
   const alive = results.filter((r) => r.startsWith("ALIVE")).length;
+
+  // ---- what keeps running for a removed or disposed control ----
+  let updates = 0;
+  const update = canvas.Update.bind(canvas);
+  canvas.Update = () => { updates++; update(); };
+  const spinner = () => {
+    const page = new SkiaLayer(); page.WidthRequest = W; page.HeightRequest = H;
+    const child = new SkiaShape(); child.WidthRequest = 40; child.HeightRequest = 40; page.AddSubView(child);
+    const a = new SkiaValueAnimator(child); a.mMinValue = 0; a.mMaxValue = 360; a.Speed = 1000; a.Repeat = -1; a.OnUpdated = (v) => { child.Rotation = v; };
+    root.AddSubView(page); frame(); frame();
+    a.Start(); frame(); await0(); frame();
+    return { page, child, a };
+  };
+  const await0 = () => { const t = performance.now(); while (performance.now() - t < 20) { /* frames 20 ms apart */ } };
+  const ticks = (n: number) => { for (let i = 0; i < n; i++) { await0(); frame(); } };
+
+  {
+    const { page, child, a } = spinner();
+    root.RemoveSubView(page); frame();
+    const at = child.Rotation; updates = 0;
+    ticks(5);
+    check("a removed page's animation does not tick", child.Rotation === at, `${at} -> ${child.Rotation}`);
+    check("it asks for no frames", updates === 0, `${updates} updates`);
+    check("it leaves the canvas' animators", ![...canvas.AnimatingControls.values()].includes(a));
+    root.AddSubView(page); frame(); frame();
+    ticks(5);
+    check("added back, it goes on", child.Rotation !== at && a.IsRunning && !a.IsPaused, `${at} -> ${child.Rotation}`);
+    check("from where it was: the time off the canvas is not counted", Math.abs(child.Rotation - at) < 360 * 0.5, `${at} -> ${child.Rotation}`);
+    root.RemoveSubView(page); page.Dispose(); frame();
+    check("removed, then disposed: it stops", !a.IsRunning && ![...canvas.AnimatingControls.values()].includes(a));
+  }
+  {
+    const { page, child, a } = spinner();
+    child.Dispose(); frame();
+    const at = child.Rotation; updates = 0;
+    ticks(5);
+    check("a disposed control's animator does not tick", child.Rotation === at, `${at} -> ${child.Rotation}`);
+    check("it asks for no frames", updates === 0, `${updates} updates`);
+    check("it is stopped and gone from the canvas", !a.IsRunning && ![...canvas.AnimatingControls.values()].includes(a));
+    root.RemoveSubView(page); page.Dispose(); frame();
+  }
+  {
+    const page = new SkiaLayer(); page.WidthRequest = W; page.HeightRequest = H;
+    const editor = new SkiaEditor(); editor.WidthRequest = 200; editor.HeightRequest = 40; page.AddSubView(editor);
+    root.AddSubView(page); frame(); frame();
+    editor.IsFocused = true; frame();
+    root.RemoveSubView(page); frame();
+    check("a removed focused editor loses the focus", !editor.IsFocused && SkiaEditor.Focused !== editor);
+    page.Dispose();
+  }
+  {
+    let keys = 0;
+    class Game extends DrawnGame { override OnKeyDown(): void { keys++; } }
+    const key = () => win.fire("keydown", { code: "KeyA", key: "a", target: null, preventDefault() {}, stopPropagation() {} });
+    const game = new Game(); game.WidthRequest = 100; game.HeightRequest = 100;
+    key();
+    check("a game not on a canvas gets no keys", keys === 0, `${keys}`);
+    root.AddSubView(game); frame(); frame();
+    key();
+    check("on a canvas it gets them", keys === 1, `${keys}`);
+    root.RemoveSubView(game); frame();
+    key();
+    check("removed, it gets none", keys === 1, `${keys}`);
+    root.AddSubView(game); frame(); frame();
+    key();
+    check("added back, it gets them again", keys === 2, `${keys}`);
+    root.RemoveSubView(game); game.Dispose();
+  }
+
   canvas.Dispose();
   console.log(alive ? `FAIL: ${alive} of ${cases.length} removed pages stay in memory` : "OK: removed pages are released");
-  process.exit(alive ? 1 : 0);
+  console.log(failures ? `FAIL: ${failures} checks` : "OK: removed and disposed controls stop what they ran");
+  process.exit(alive || failures ? 1 : 0);
 })();

@@ -25,6 +25,7 @@ class FakeCanvas {
   DisposeObject(o: { Dispose(): void }): void { o.Dispose(); }
   RegisterAnimator(a: AnimatorBase): boolean { this.AnimatingControls.set(a.Uid, a); return true; }
   UnregisterAnimator(uid: number): void { this.AnimatingControls.delete(uid); }
+  ControlLeft(): void {}
 }
 
 (async () => {

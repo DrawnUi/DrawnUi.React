@@ -108,6 +108,12 @@ export class CachedObject {
  * Render(ctx) -> background + Paint(ctx),
  * ProcessGestures(args, apply) -> consumer or null.
  */
+/**
+ * Controls holding something outside the tree while they are on a canvas (a focused editor's keys and caret timer, a
+ * game's keys): the canvas calls their OnLeftCanvas when they leave it with a removed or disposed subtree.
+ */
+export const CanvasLeaveWatchers = new Set<SkiaControl>();
+
 export class SkiaControl {
   // ---- layout properties (points) ----
   HorizontalOptions: LayoutOptions = "Start";
@@ -812,6 +818,9 @@ export class SkiaControl {
   /** Called after DrawingRect changed; layouts arrange children here. */
   protected OnLayoutChanged(): void {}
 
+  /** A control in CanvasLeaveWatchers left its canvas (removed or disposed): it lets go of what it held there. */
+  OnLeftCanvas(): void {}
+
   /** Part of DrawingRect that can actually be seen: intersected with every ancestor (a scroll's box clips its content). */
   GetVisibleViewport(): SKRect {
     const r = this.DrawingRect;
@@ -1333,12 +1342,15 @@ export class SkiaControl {
    */
   Dispose(): void {
     if (this.IsDisposed) return;
+    // disposed while still on a canvas: its subtree's animators stop, once, from the top disposed control
+    if (!this.Parent?.IsDisposed) this.Superview?.ControlLeft(this, true);
     this.IsDisposed = true;
     if (this.accessibilityModal) AccessibilityModals.delete(this);
     this.OnDisposing();
     for (const c of this.ownAnimations.values()) c.abort();
     this.ownAnimations.clear();
     for (const e of [...this.PostAnimators]) (e as { Stop?: () => void }).Stop?.();
+    for (const a of [...(this.PendingUnattachedAnimators ?? [])]) a.Stop(); // waiting since it was removed: they end with it
     this.PendingUnattachedAnimators = undefined;
     this.PostAnimators.length = 0;
     this.DestroyRenderingObject();

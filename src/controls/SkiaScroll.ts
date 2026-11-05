@@ -47,10 +47,10 @@ export class SkiaScroll extends SkiaControl {
   private footer?: SkiaControl;
   /** A view before the content along the scroll axis; `Tag="Header"` on a JSX child sets it. */
   get Header(): SkiaControl | undefined { return this.header; }
-  set Header(v: SkiaControl | undefined) { if (this.header === v) return; if (this.header) this.header.Parent = undefined; this.header = v; if (v) { v.Parent = this; v.ZIndex = 1; } this.InvalidateMeasure(); }
+  set Header(v: SkiaControl | undefined) { if (this.header === v) return; if (this.header) { this.Superview?.ControlLeft(this.header, false); this.header.Parent = undefined; } this.header = v; if (v) { v.Parent = this; v.ZIndex = 1; } this.InvalidateMeasure(); }
   /** A view after the content along the scroll axis; `Tag="Footer"` on a JSX child sets it. */
   get Footer(): SkiaControl | undefined { return this.footer; }
-  set Footer(v: SkiaControl | undefined) { if (this.footer === v) return; if (this.footer) this.footer.Parent = undefined; this.footer = v; if (v) v.Parent = this; this.InvalidateMeasure(); }
+  set Footer(v: SkiaControl | undefined) { if (this.footer === v) return; if (this.footer) { this.Superview?.ControlLeft(this.footer, false); this.footer.Parent = undefined; } this.footer = v; if (v) v.Parent = this; this.InvalidateMeasure(); }
   /** The header stays at the viewport start while the content scrolls under it (drawn over the content unless HeaderBehind). */
   HeaderSticky = false;
   /** The header is drawn behind the content (the content covers it as it scrolls, parallax covers). */
@@ -132,7 +132,7 @@ export class SkiaScroll extends SkiaControl {
   private refreshIndicator?: IRefreshIndicator & SkiaControl;
   /** The pull-to-refresh view (IRefreshIndicator control); `Tag="RefreshIndicator"` on a JSX child sets it. */
   get RefreshIndicator(): (IRefreshIndicator & SkiaControl) | undefined { return this.refreshIndicator; }
-  set RefreshIndicator(v: (IRefreshIndicator & SkiaControl) | undefined) { if (this.refreshIndicator === v) return; if (this.refreshIndicator) this.refreshIndicator.Parent = undefined; this.refreshIndicator = v; if (v) v.Parent = this; this.InvalidateMeasure(); }
+  set RefreshIndicator(v: (IRefreshIndicator & SkiaControl) | undefined) { if (this.refreshIndicator === v) return; if (this.refreshIndicator) { this.Superview?.ControlLeft(this.refreshIndicator, false); this.refreshIndicator.Parent = undefined; } this.refreshIndicator = v; if (v) v.Parent = this; this.InvalidateMeasure(); }
   private isRefreshing = false;
   private wasRefreshing = false;
   private scrollLocked = false;
@@ -305,7 +305,7 @@ export class SkiaScroll extends SkiaControl {
   get Content(): SkiaControl | undefined { return this.content; }
   set Content(value: SkiaControl | undefined) {
     if (this.content === value) return;
-    if (this.content) { this.content.Parent = undefined; if (this.content instanceof SkiaLayout) this.content.ItemsInsertedAtStart = undefined; }
+    if (this.content) { this.Superview?.ControlLeft(this.content, false); this.content.Parent = undefined; if (this.content instanceof SkiaLayout) this.content.ItemsInsertedAtStart = undefined; }
     this.content = value;
     if (value) {
       value.Parent = this;

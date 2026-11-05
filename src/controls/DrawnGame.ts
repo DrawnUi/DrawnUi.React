@@ -1,6 +1,7 @@
 import { ActionOnTickAnimator } from "../core/Animators";
 import { type InputKey, KeyboardManager } from "../core/KeyboardManager";
 import { SkiaLayout } from "./SkiaLayout";
+import { CanvasLeaveWatchers } from "../core/SkiaControl";
 
 /**
  * Mirrors DrawnUi.Gaming DrawnGame (SharedGame/DrawnGame.cs + Game.Input.cs): a layout that runs a game loop.
@@ -18,13 +19,25 @@ export class DrawnGame extends SkiaLayout {
   private readonly onKeyChar = () => {};
   private readonly onKeyUp = (key: InputKey) => this.OnKeyUp(key);
 
-  constructor() {
-    super();
-    KeyboardManager.Subscribe(this.onKeyDown, this.onKeyChar, this.onKeyUp);
+  private keysOn = false;
+
+  /** The game gets keys while it is on a canvas: from its first layout there until it leaves it. */
+  private ListenToKeys(on: boolean): void {
+    if (on === this.keysOn) return;
+    this.keysOn = on;
+    if (on) { KeyboardManager.Subscribe(this.onKeyDown, this.onKeyChar, this.onKeyUp); CanvasLeaveWatchers.add(this); }
+    else { KeyboardManager.Unsubscribe(this.onKeyDown, this.onKeyChar, this.onKeyUp); CanvasLeaveWatchers.delete(this); }
   }
 
+  protected override OnLayoutChanged(): void {
+    super.OnLayoutChanged();
+    if (!this.keysOn && this.Superview) this.ListenToKeys(true);
+  }
+
+  override OnLeftCanvas(): void { this.ListenToKeys(false); }
+
   protected override OnDisposing(): void {
-    KeyboardManager.Unsubscribe(this.onKeyDown, this.onKeyChar, this.onKeyUp);
+    this.ListenToKeys(false);
     this.appLoop?.Dispose();
     this.appLoop = undefined;
     super.OnDisposing();

@@ -428,9 +428,11 @@ export class SkiaLayout extends SkiaControl {
     if (i < 0) return;
     this.views.splice(i, 1);
     this.orderedViews = undefined;
+    const canvas = this.Superview;
+    canvas?.ControlLeft(control, false);
     control.Parent = undefined;
     this.InvalidateMeasure();
-    this.Superview?.Hover?.RequestCheck();
+    canvas?.Hover?.RequestCheck();
   }
 
   // ---- measure ----

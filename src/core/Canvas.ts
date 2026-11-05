@@ -1,5 +1,5 @@
 import type { GrDirectContext, Surface, WebGLContextHandle } from "canvaskit-wasm";
-import type { CachedObject, DrawingContext, SkiaControl } from "./SkiaControl";
+import { type CachedObject, CanvasLeaveWatchers, type DrawingContext, type SkiaControl } from "./SkiaControl";
 import type { AnimatorBase } from "./Animators";
 import { Super } from "./Super";
 import { SkiaAccessibilityManager } from "./Accessibility";
@@ -135,7 +135,7 @@ export class Canvas {
   private content?: SkiaControl;
   get Content(): SkiaControl | undefined { return this.content; }
   set Content(value: SkiaControl | undefined) {
-    if (this.content) this.content._superview = undefined;
+    if (this.content && this.content !== value) { this.ControlLeft(this.content, false); this.content._superview = undefined; }
     this.content = value;
     if (value) { value.Parent = undefined; value._superview = this; }
     this.Hover.RequestCheck();
@@ -328,6 +328,28 @@ export class Canvas {
   }
 
   UnregisterAnimator(uid: number): void { this.AnimatingControls.delete(uid); }
+
+  /**
+   * `root` leaves this canvas (removed from its parent, replaced as content, disposed): what runs for its subtree stops,
+   * as DrawnUi.Rust 44c718f. Its animators leave the frame loop: disposed, they stop; only removed, they pause and wait on
+   * their control (PendingUnattachedAnimators), going on from there when it is arranged on a canvas again. A focused editor in it loses the
+   * focus, a game in it stops getting keys (CanvasLeaveWatchers). Runs once per removal, never per frame.
+   */
+  ControlLeft(root: SkiaControl, disposed: boolean): void {
+    const inside = (c: SkiaControl) => { for (let p: SkiaControl | undefined = c; p; p = p.Parent) if (p === root) return true; return false; };
+    for (const a of this.AnimatingControls.values()) {
+      const control = a.Parent;
+      if (!control || !inside(control)) continue;
+      this.AnimatingControls.delete(a.Uid);
+      if (disposed || control.IsDisposed) a.Stop();
+      else {
+        // paused as a hidden control's animator is: the time off the canvas is not counted when it goes on
+        if (!a.IsPaused) { a.Pause(); a.PausedWhileHidden = true; }
+        if (!control.PendingUnattachedAnimators?.includes(a)) (control.PendingUnattachedAnimators ??= []).push(a);
+      }
+    }
+    for (const c of [...CanvasLeaveWatchers]) if (inside(c)) c.OnLeftCanvas();
+  }
 
   /** Ticks every registered animator once; returns how many ran. */
   protected ExecuteAnimators(frameTimeNanos: number): number {

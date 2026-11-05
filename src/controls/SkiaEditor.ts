@@ -1,4 +1,4 @@
-import type { DrawingContext, SkiaControl } from "../core/SkiaControl";
+import { CanvasLeaveWatchers, type DrawingContext, type SkiaControl } from "../core/SkiaControl";
 import { type GestureEventProcessingInfo, SKPoint, type SkiaGesturesParameters } from "../core/Gestures";
 import { Super } from "../core/Super";
 import { DefaultAccent, type PrebuiltControlStyle, ResolveControlStyle } from "../core/ControlStyle";
@@ -573,9 +573,12 @@ export class SkiaEditor extends SkiaShape {
   private SetFocusNative(focus: boolean): void {
     if (focus === this.subscribed) return;
     this.subscribed = focus;
-    if (focus) { KeyboardManager.Subscribe(this.onKeyDown, this.onKeyChar); KeyboardManager.BlurExternalTextInput(); TextInputProxy.Attach(this); }
-    else { TextInputProxy.Detach(this); KeyboardManager.Unsubscribe(this.onKeyDown, this.onKeyChar); }
+    if (focus) { KeyboardManager.Subscribe(this.onKeyDown, this.onKeyChar); KeyboardManager.BlurExternalTextInput(); TextInputProxy.Attach(this); CanvasLeaveWatchers.add(this); }
+    else { TextInputProxy.Detach(this); KeyboardManager.Unsubscribe(this.onKeyDown, this.onKeyChar); CanvasLeaveWatchers.delete(this); }
   }
+
+  /** Removed from the canvas while focused: the editing ends (caret timer, keys, text proxy). */
+  override OnLeftCanvas(): void { this.IsFocused = false; }
 
   private OnKeyDown(key: InputKey, e: KeyboardEvent): void {
     const shift = KeyboardManager.IsShiftPressed, ctrl = KeyboardManager.IsControlPressed, alt = KeyboardManager.IsAltPressed;
