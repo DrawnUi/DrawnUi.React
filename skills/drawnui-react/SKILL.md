@@ -110,6 +110,8 @@ createRoot(document.getElementById("root")!).render(
   (it waits for attach), override `GameLoop(deltaSeconds)` and `OnKeyDown` / `OnKeyUp` (DOM `event.code` names), move
   cached sprites with `Left` / `Top`. Pause on `document.hidden` and `Resume()` on return, else the first frame back
   carries the whole hidden time as its delta. Reference: the demo's `#/pong` page (`samples/demo/pages/pong`).
+- A `SkiaScroll` sizes to its content on a side without a request that is not `Fill`, up to the space it is given
+  (as DrawnUI for .NET and Rust): give a page or list scroll `HorizontalOptions="Fill" VerticalOptions="Fill"`.
 - `SkiaScroll` extras are JSX children with a `Tag`: `Tag="Header"`, `"Footer"`, `"RefreshIndicator"`,
   `"ScrollBar"`, `"ScrollBarHorizontal"`; everything else is the single `Content`. Header modes: in the flow,
   `HeaderSticky`, `HeaderBehind` + `HeaderParallaxRatio`; `ScrollBarsVisibility`, or `<SkiaScrollBar Tag="ScrollBar" IsDraggable />`
@@ -270,6 +272,10 @@ createRoot(document.getElementById("root")!).render(
   - Reference: the HelloReact Tooltips & Menus page (`samples/demo/pages/MenusPage.tsx`).
 - `KeyboardWrap` on an arrow-key group (`Aria.RoleMenu`, `RoleList`...): the arrows go round, from the last item to
   the first and back; Home / End unchanged. Default false.
+- Multi-touch: a `Panning` while two or more fingers are down carries `e.Parameters.Event.Manipulation` (`Scale`: the
+  fingers' spread over the previous move minus 1, `Rotation`: degrees turned the short way, `Center` / `PreviousCenter`,
+  `ScaleTotal` / `RotationTotal`, `TouchesCount`); pinch to zoom with `zoom *= 1 + Scale`. A press that had a second
+  finger down is no tap.
 - A control that consumes a gesture keeps it until it stops consuming, so a drag survives the finger leaving the
   control. To drag inside a `SkiaScroll` (the scroll owns vertical pans), take `Down` on a handle with
   `ConsumeGestures`, set `scroll.RespondsToGestures = false` for the drag and restore it on `Up`, and count travel in
