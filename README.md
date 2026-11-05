@@ -1,5 +1,7 @@
 # DrawnUI for React
 
+![DrawnUI for React: the Hello app in desktop browsers, on iPhone and on Android](.github/images/banner.png)
+
 [![npm](https://img.shields.io/npm/v/drawnui-react/preview.svg)](https://www.npmjs.com/package/drawnui-react)
 ![License](https://img.shields.io/github/license/DrawnUi/DrawnUi.React.svg)
 
