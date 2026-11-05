@@ -77,7 +77,7 @@ export class SkiaSprite extends AnimatedFramesRenderer {
   get MaxFrames(): number { return this.maxFrames; }
   set MaxFrames(v: number) { if (this.maxFrames !== v) { this.maxFrames = v; this.RecalculateFrames(); this.Update(); } }
   get FramesPerSecond(): number { return this.framesPerSecond; }
-  set FramesPerSecond(v: number) { if (this.framesPerSecond !== v) { this.framesPerSecond = v; this.RecalculateFrames(); if (this.Animator) { this.OnAnimatorInitializing(); } } }
+  set FramesPerSecond(v: number) { if (this.framesPerSecond !== v) { this.framesPerSecond = v; this.RecalculateFrames(); } }
   /** Custom order of frames to play instead of 0..TotalFrames-1. */
   get FrameSequence(): number[] | undefined { return this.frameSequence; }
   set FrameSequence(v: number[] | undefined) { if (this.frameSequence !== v) { this.frameSequence = v; this.RecalculateFrames(); this.Update(); } }
@@ -148,20 +148,28 @@ export class SkiaSprite extends AnimatedFramesRenderer {
     this.FrameDurationMs = 1000 / (this.framesPerSecond || 24);
     this.DurationMs = this.TotalFrames * this.FrameDurationMs;
     this.lastColumns = this.columns; this.lastRows = this.rows;
+    if (this.Animator) {
+      // FramesPerSecond, FrameSequence, MaxFrames or the grid changed after loading: the animator range and the shown
+      // frame follow the new frames
+      this.ApplySpeed();
+      this.Animator.mMaxValue = this.DurationMs;
+      this.SetCurrentFrame(this.currentFrame);
+    }
   }
 
+  /** The frame index (position in FrameSequence when one is set) at a time in ms; negative counts back from the end. */
   protected GetFrameNumberFromTime(msTime: number): number {
     if (this.DurationMs <= 0) return 0;
-    if (msTime < 0) msTime = this.DurationMs + msTime;
     msTime %= this.DurationMs;
-    const frame = Math.floor(msTime / this.FrameDurationMs);
-    if (this.frameSequence && this.frameSequence.length > 0) return frame % this.frameSequence.length;
+    if (msTime < 0) msTime += this.DurationMs;
+    // the epsilon keeps the exact start time of a frame on that frame: k * d / d can come out a hair below k
+    const frame = Math.floor(msTime / this.FrameDurationMs + 1e-9);
     return Math.min(frame, this.TotalFrames - 1);
   }
 
   protected SetCurrentFrame(frameNumber: number): void {
     if (!this.SpriteSheet || this.TotalFrames === 0) return;
-    frameNumber = Math.max(0, Math.min(frameNumber, this.TotalFrames - 1));
+    if (frameNumber < 0 || frameNumber >= this.TotalFrames) frameNumber = this.TotalFrames - 1; // negative = the last frame
     const actual = this.frameSequence && this.frameSequence.length > 0 ? this.frameSequence[Math.min(frameNumber, this.frameSequence.length - 1)] : frameNumber;
     this.currentFrame = frameNumber;
     const framesX = Math.max(1, this.columns);
@@ -218,9 +226,11 @@ export class SkiaSprite extends AnimatedFramesRenderer {
   }
   protected override ApplySpeed(): void {
     if (!this.SpriteSheet || !this.Animator) return;
-    this.Animator.Speed = this.SpeedRatio < 1 ? this.DurationMs * (1 + this.SpeedRatio) : this.DurationMs / this.SpeedRatio;
+    this.Animator.Speed = this.GetPlaybackDurationMs(this.DurationMs);
   }
   protected override CheckCanStartAnimator(): boolean { return !!this.SpriteSheet && this.TotalFrames > 0; }
+  /** Shows DefaultFrame (a frame index, -1 = last) when not playing. */
+  protected override ApplyDefaultFrame(): void { if (!this.IsPlaying) this.SetCurrentFrame(this.DefaultFrame); }
   override Start(delayMs = 0): void { if (this.SpriteSheet && this.TotalFrames > 0) super.Start(delayMs); }
 
   // ---- measure / draw (C# SpriteFrameImage: AspectFit of the FRAME into the box, then the placement config) ----

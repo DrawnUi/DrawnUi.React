@@ -121,6 +121,8 @@ export class AnimatedFramesRenderer extends SkiaControl {
   protected OnFinished(): void { this.Finished?.(this); }
   protected OnStarted(): void { this.Started?.(this); }
   protected ApplySpeed(): void {}
+  /** Play time of `durationMs` at SpeedRatio: duration / SpeedRatio, 0 or below = normal speed (C# GetPlaybackDurationMs). */
+  protected GetPlaybackDurationMs(durationMs: number): number { return this.SpeedRatio > 0 ? durationMs / this.SpeedRatio : durationMs; }
   protected ApplyDefaultFrame(): void { if (!this.IsPlaying && this.Animator) this.Seek(this.defaultFrame); }
 
   protected override OnDisposing(): void {

@@ -124,10 +124,21 @@ export class SkiaGif extends AnimatedFramesRenderer {
   protected override ApplySpeed(): void {
     if (!this.Animation || !this.Animator) return;
     const d = this.Animation.DurationMs;
-    this.Animator.Speed = this.SpeedRatio < 1 ? d * (1 + this.SpeedRatio) : d / this.SpeedRatio;
+    this.Animator.Speed = this.GetPlaybackDurationMs(d);
   }
 
   protected override CheckCanStartAnimator(): boolean { return (this.Animation?.TotalFrames ?? 0) > 0; }
+
+  /** Shows a frame by index, negative = last frame (C# ShowFrame). */
+  protected ShowFrame(frame: number): void {
+    if (!this.Animation) return;
+    this.Animation.SeekFrame(frame);
+    this.InvalidateCache();
+    this.RepaintComposition();
+  }
+
+  /** Shows DefaultFrame (a frame index, -1 = last) when not playing. */
+  protected override ApplyDefaultFrame(): void { if (!this.IsPlaying && this.Animation) this.ShowFrame(this.DefaultFrame); }
 
   SetAnimation(animation: GifAnimation, disposePrevious: boolean): void {
     if (!animation || animation === this.Animation) return;
@@ -136,7 +147,7 @@ export class SkiaGif extends AnimatedFramesRenderer {
     if (wasPlaying) this.Stop();
     this.Animation = animation;
     this.InitializeAnimator();
-    this.OnAnimatorSeeking(this.DefaultFrame);
+    this.ShowFrame(this.DefaultFrame);
     if (wasPlaying && !this.IsPlaying) this.Start();
     if (kill && disposePrevious) kill.Dispose();
     this.Update();

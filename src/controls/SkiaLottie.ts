@@ -112,7 +112,7 @@ export class SkiaLottie extends AnimatedFramesRenderer {
   protected override ApplySpeed(): void {
     if (!this.Animation || !this.Animator) return;
     const durationMs = this.Animation.duration() * 1000;
-    this.Animator.Speed = this.SpeedRatio < 1 ? durationMs * (1 + this.SpeedRatio) : durationMs / this.SpeedRatio;
+    this.Animator.Speed = this.GetPlaybackDurationMs(durationMs);
   }
 
   protected override OnAnimatorInitializing(): void {
