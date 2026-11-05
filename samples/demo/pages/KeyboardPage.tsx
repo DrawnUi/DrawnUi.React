@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Colors, KeyboardManager, SkiaLabel, SkiaScroll, SkiaShape, SkiaStack, Thickness } from "drawnui-react";
+import { Aria, Colors, KeyboardManager, SkiaLabel, SkiaScroll, SkiaShape, SkiaStack, Thickness } from "drawnui-react";
 
 const WAITING = "Waiting for input";
 
@@ -28,7 +28,8 @@ export function KeyboardPage() {
   return (
     <SkiaScroll Orientation="Vertical">
       <SkiaStack Spacing={16} Padding={new Thickness(16)} HorizontalOptions="Center" MaximumWidthRequest={720}>
-        <SkiaLabel Text="Keyboard Input" FontSize={24} TextColor={Colors.White} HorizontalOptions="Center" />
+        {/* the shell bar says the page name: this title is presentation, so a screen reader reads the name once (hello-app rule) */}
+        <SkiaLabel Text="Keyboard Input" FontSize={24} TextColor={Colors.White} HorizontalOptions="Center" AccessibilityRole={Aria.RolePresentation} />
         <SkiaLabel Text="KeyboardManager attaches window-level keydown / keyup listeners like the DrawnUi.Blazor and Wasm heads (drawnui-keyboard.js): shortcuts, game input, drawn editors. Click the page, then press letters, arrows, modifiers or function keys." FontSize={13} TextColor="#ADB5BD" HorizontalOptions="Fill" HorizontalTextAlignment="Center" />
 
         {/* the Blazor probe canvas: cream card, blue banner, last key, modifiers, recent events */}

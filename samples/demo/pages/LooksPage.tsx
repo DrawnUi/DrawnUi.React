@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { SkiaButton, SkiaCheckbox, SkiaLabel, SkiaProgress, SkiaRadioButton, SkiaRow, SkiaScroll, SkiaShape, SkiaSlider, SkiaStack, SkiaSwitch, Thickness } from "drawnui-react";
+import { Aria, SkiaButton, SkiaCheckbox, SkiaLabel, SkiaProgress, SkiaRadioButton, SkiaRow, SkiaScroll, SkiaShape, SkiaSlider, SkiaStack, SkiaSwitch, Thickness } from "drawnui-react";
 import type { PrebuiltControlStyle } from "drawnui-react/core";
 
 /** Port of the Fiddle "Looks" preset: one card per prebuilt style, same controls, only ControlStyle changes. */
@@ -38,7 +38,8 @@ export function LooksPage() {
   return (
     <SkiaScroll Orientation="Vertical">
       <SkiaStack Spacing={16} Padding={new Thickness(16)} HorizontalOptions="Center" MaximumWidthRequest={720}>
-        <SkiaLabel Text="Common Controls" FontSize={24} TextColor="#FFFFFF" HorizontalOptions="Center" />
+        {/* the shell bar says the page name: this title is presentation, so a screen reader reads the name once (hello-app rule) */}
+        <SkiaLabel Text="Common Controls" FontSize={24} TextColor="#FFFFFF" HorizontalOptions="Center" AccessibilityRole={Aria.RolePresentation} />
         <SkiaLabel Text="SkiaSwitch, SkiaCheckbox, SkiaRadioButton, SkiaButton, SkiaProgress, SkiaSlider — the same tree per card, only ControlStyle changes (the Fiddle 'Looks' snippet)." FontSize={13} TextColor="#ADB5BD" HorizontalOptions="Fill" HorizontalTextAlignment="Center" />
         <SkiaLabel Text={`Last: ${last}`} FontSize={13} TextColor="#6EA8FE" HorizontalOptions="Center" />
         <SkiaButton Text={`Live card: ${STYLES[live]} — tap to switch style`} HorizontalOptions="Center" Tapped={() => setLive((i) => (i + 1) % STYLES.length)} />

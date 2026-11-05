@@ -229,7 +229,8 @@ export function MenusPage() {
       ContextMenu={(me, e) => { openMenu(me.Superview, "Edit", ["Cut", "Copy", "Paste", "Select all", "Settings…"], e.Location); return true; }}>
       <SkiaScroll Orientation="Vertical" HorizontalOptions="Fill" VerticalOptions="Fill">
         <SkiaStack Spacing={16} Padding={PAGE_PADDING} HorizontalOptions="Center" MaximumWidthRequest={720}>
-          <SkiaLabel Text="Tooltips & Menus" FontSize={24} TextColor={Colors.White} HorizontalOptions="Fill" HorizontalTextAlignment="Center" AccessibilityRole={Aria.RoleHeading} />
+          {/* the shell bar says the page name: this title is presentation, so a screen reader reads the name once (hello-app rule) */}
+          <SkiaLabel Text="Tooltips & Menus" FontSize={24} TextColor={Colors.White} HorizontalOptions="Fill" HorizontalTextAlignment="Center" AccessibilityRole={Aria.RolePresentation} />
           <SkiaLabel Text="A desktop menu bar, a context menu (right-click anywhere on the page) and a dropdown, then tooltips: rest the mouse on a control, move along a row and the next one shows at once; a click, the wheel or a key closes it."
             FontSize={14} TextColor="#D3D3D3" HorizontalOptions="Fill" HorizontalTextAlignment="Center" />
 

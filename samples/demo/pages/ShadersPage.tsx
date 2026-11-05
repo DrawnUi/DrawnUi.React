@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Colors, SkiaButton, SkiaImage, SkiaLabel, SkiaLayer, SkiaScroll, SkiaShaderCarousel, SkiaShape, SkiaStack, SkiaWrap, Thickness } from "drawnui-react";
+import { Aria, Colors, SkiaButton, SkiaImage, SkiaLabel, SkiaLayer, SkiaScroll, SkiaShaderCarousel, SkiaShape, SkiaStack, SkiaWrap, Thickness } from "drawnui-react";
 import { type GestureEventProcessingInfo, ShaderDoubleTexturesEffect, type ISkiaGestureProcessor, SkiaControl, SkiaImage as SkiaImageCtrl, SkiaLabel as SkiaLabelCtrl, SkiaLayer as SkiaLayerCtrl, SkiaShaderEffect, type SkiaGesturesParameters, SkiaValueAnimator } from "drawnui-react/core";
 import type { SkiaShaderCarousel as SkiaShaderCarouselCtrl } from "drawnui-react/core";
 
@@ -134,7 +134,8 @@ export function ShadersPage() {
   return (
     <SkiaScroll Orientation="Vertical">
       <SkiaStack Spacing={16} Padding={new Thickness(16)} HorizontalOptions="Center" MaximumWidthRequest={720}>
-        <SkiaLabel Text="Shaders" FontSize={24} TextColor={Colors.White} HorizontalOptions="Center" />
+        {/* the shell bar says the page name: this title is presentation, so a screen reader reads the name once (hello-app rule) */}
+        <SkiaLabel Text="Shaders" FontSize={24} TextColor={Colors.White} HorizontalOptions="Center" AccessibilityRole={Aria.RolePresentation} />
         {error ? <SkiaLabel Text={`Shader error: ${error}`} FontSize={12} TextColor="#FF6B6B" HorizontalOptions="Fill" /> : null}
 
         <Card title={`SkiaShaderCarousel — TransitionShader="shaders/transitions/${transition}.sksl" · IsLooped · LinearSpeedMs=750 ${fromTo}`}>

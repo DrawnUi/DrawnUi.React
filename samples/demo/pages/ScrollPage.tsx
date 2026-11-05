@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Colors, RefreshIndicator, SkiaImage, SkiaLabel, SkiaLayer, SkiaRow, SkiaScroll, SkiaScrollBar, SkiaShape, SkiaStack, Thickness } from "drawnui-react";
+import { Aria, Colors, RefreshIndicator, SkiaImage, SkiaLabel, SkiaLayer, SkiaRow, SkiaScroll, SkiaScrollBar, SkiaShape, SkiaStack, Thickness } from "drawnui-react";
 import { CornerRadius, type SkiaScroll as SkiaScrollCtrl } from "drawnui-react/core";
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
@@ -41,7 +41,8 @@ export function ScrollPage() {
   return (
     <SkiaScroll Orientation="Vertical">
       <SkiaStack Spacing={16} Padding={new Thickness(16)} HorizontalOptions="Center" MaximumWidthRequest={720} UseCache="Operations">
-        <SkiaLabel Text="SkiaScroll" FontSize={24} TextColor={Colors.White} HorizontalOptions="Center" />
+        {/* the shell bar says the page name: this title is presentation, so a screen reader reads the name once (hello-app rule) */}
+        <SkiaLabel Text="SkiaScroll" FontSize={24} TextColor={Colors.White} HorizontalOptions="Center" AccessibilityRole={Aria.RolePresentation} />
 
         <Card title='Header + Footer in the flow · Tag="Header" / Tag="Footer" children scroll with the content'>
           <SkiaScroll HeightRequest={240} BackgroundColor="#212529" IgnoreWrongDirection>

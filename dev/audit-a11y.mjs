@@ -7,6 +7,7 @@
 // - a focusable node that is neither named nor given a role;
 // - console errors or warnings.
 // - a caption that repeats the name of the control next to it (hello-app rule: the caption is presentation);
+// - a page heading or title text that says the shell bar's title again (hello-app rule: the page name is read once);
 // Reported, not failed: a name said twice by two other nodes in a row (a shell bar title and the page heading).
 import { readFileSync } from "node:fs";
 
@@ -75,16 +76,21 @@ try {
       // names said twice in a row, from the overlay's own order (its elements are in reading order; Chrome's AX list
       // leaves a text element unnamed): a caption next to the control it names fails, other repeats are reported
       const pairs = (await S("Runtime.evaluate", { returnByValue: true, expression: `(() => {
-        const out = []; let prev;
+        const out = []; let prev, bar;
         for (const e of document.querySelectorAll('.drawnui-a11y-overlay > *')) {
           const role = e.getAttribute('role') || '', name = (e.getAttribute('aria-label') || (role === 'text' ? e.textContent : '') || '').trim();
           if (!name) continue;
+          // the shell bar's title is the first heading; a page text or heading saying it again reads the page name twice
+          if (role === 'heading' && bar === undefined) bar = name;
+          else if (bar && name === bar && (role === 'heading' || role === 'text')) out.push([name, 'bar title', role]);
           if (prev && prev.name === name) out.push([name, prev.role, role]);
           prev = { name, role };
         }
         return out; })()` })).result.result.value ?? [];
       for (const [name, a, b] of pairs) {
-        if (CONTROL_ROLES.has(a) !== CONTROL_ROLES.has(b)) problems.add(`"${name}" is said by a caption and by the ${CONTROL_ROLES.has(a) ? a : b} next to it`);
+        if (route && a === 'bar title') problems.add(`the page name "${name}" is read twice: the shell bar title and a page ${b}`);
+        else if (a === 'bar title') continue;
+        else if (CONTROL_ROLES.has(a) !== CONTROL_ROLES.has(b)) problems.add(`"${name}" is said by a caption and by the ${CONTROL_ROLES.has(a) ? a : b} next to it`);
         else twice.add(name);
       }
       still = fresh === 0 ? still + 1 : 0;

@@ -160,7 +160,8 @@ export function TransformsPage() {
   return (
     <SkiaScroll Orientation="Vertical">
       <SkiaStack Spacing={16} Padding={new Thickness(16)} HorizontalOptions="Center" MaximumWidthRequest={720}>
-        <SkiaLabel Text="Transforms" FontSize={24} TextColor={Colors.White} HorizontalOptions="Center" />
+        {/* the shell bar says the page name: this title is presentation, so a screen reader reads the name once (hello-app rule) */}
+        <SkiaLabel Text="Transforms" FontSize={24} TextColor={Colors.White} HorizontalOptions="Center" AccessibilityRole={Aria.RolePresentation} />
         <SkiaLabel Text="Applied at render around the arranged box, so layout is untouched and caches stay valid. Same names as MAUI: TranslationX/Y, Rotation, RotationX/Y, ScaleX/Y, SkewX/Y, AnchorX/Y, Opacity, plus TranslationZ for 3D depth." FontSize={13} TextColor={Colors.LightGray} HorizontalOptions="Fill" HorizontalTextAlignment="Center" />
 
         <Card title="One property each">

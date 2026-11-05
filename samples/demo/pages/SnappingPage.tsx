@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import { Colors, CornerRadius, SkiaButton, SkiaCarousel, SkiaDrawer, SkiaLabel, SkiaLayer, SkiaRow, SkiaScroll, SkiaShape, SkiaStack, SkiaWrap, Thickness } from "drawnui-react";
+import { Aria, Colors, CornerRadius, SkiaButton, SkiaCarousel, SkiaDrawer, SkiaLabel, SkiaLayer, SkiaRow, SkiaScroll, SkiaShape, SkiaStack, SkiaWrap, Thickness } from "drawnui-react";
 import type { SkiaCarousel as SkiaCarouselCtrl, SkiaDrawer as SkiaDrawerCtrl } from "drawnui-react/core";
 import { SlideCell, type Slide } from "./SlideCell";
 
@@ -55,7 +55,8 @@ export function SnappingPage() {
     <SkiaLayer VerticalOptions="Fill">
     <SkiaScroll Orientation="Vertical">
       <SkiaStack Spacing={16} Padding={new Thickness(16, 16, 16, 260)} HorizontalOptions="Center" MaximumWidthRequest={720}>
-        <SkiaLabel Text="Carousel & Drawer" FontSize={24} TextColor={Colors.White} HorizontalOptions="Center" />
+        {/* the shell bar says the page name: this title is presentation, so a screen reader reads the name once (hello-app rule) */}
+        <SkiaLabel Text="Carousel & Drawer" FontSize={24} TextColor={Colors.White} HorizontalOptions="Center" AccessibilityRole={Aria.RolePresentation} />
 
         <Card title="SkiaCarousel playground (Sandbox MainPageCarousels)">
           <SkiaWrap Spacing={8}>

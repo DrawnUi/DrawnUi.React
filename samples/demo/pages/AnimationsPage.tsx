@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Colors, SkiaButton, SkiaGif, SkiaLabel, SkiaLottie, SkiaRow, SkiaScroll, SkiaShape, SkiaStack, SkiaWrap, Thickness } from "drawnui-react";
+import { Aria, Colors, SkiaButton, SkiaGif, SkiaLabel, SkiaLottie, SkiaRow, SkiaScroll, SkiaShape, SkiaStack, SkiaWrap, Thickness } from "drawnui-react";
 import type { SkiaLottie as SkiaLottieCtrl, SkiaGif as SkiaGifCtrl } from "drawnui-react/core";
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
@@ -25,7 +25,8 @@ export function AnimationsPage() {
   return (
     <SkiaScroll Orientation="Vertical">
       <SkiaStack Spacing={16} Padding={new Thickness(16)} HorizontalOptions="Center" MaximumWidthRequest={720}>
-        <SkiaLabel Text="Lottie & GIF" FontSize={24} TextColor={Colors.White} HorizontalOptions="Center" />
+        {/* the shell bar says the page name: this title is presentation, so a screen reader reads the name once (hello-app rule) */}
+        <SkiaLabel Text="Lottie & GIF" FontSize={24} TextColor={Colors.White} HorizontalOptions="Center" AccessibilityRole={Aria.RolePresentation} />
 
         <Card title={`SkiaLottie — Source="lottie/shield.json" Repeat={-1} · ${status}`}>
           <SkiaRow Spacing={16}>

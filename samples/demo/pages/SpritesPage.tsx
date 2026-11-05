@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Colors, Easing, KeyboardManager, SkiaButton, SkiaLabel, SkiaLayer, SkiaScroll, SkiaShape, SkiaSprite, SkiaStack, SkiaWrap, Thickness } from "drawnui-react";
+import { Aria, Colors, Easing, KeyboardManager, SkiaButton, SkiaLabel, SkiaLayer, SkiaScroll, SkiaShape, SkiaSprite, SkiaStack, SkiaWrap, Thickness } from "drawnui-react";
 import type { SkiaLayout as SkiaLayoutCtrl, SkiaSprite as SkiaSpriteCtrl } from "drawnui-react/core";
 import { WarriorSprite } from "./WarriorSprite";
 
@@ -78,7 +78,8 @@ export function SpritesPage() {
   return (
     <SkiaScroll Orientation="Vertical">
       <SkiaStack Spacing={16} Padding={new Thickness(16)} HorizontalOptions="Center" MaximumWidthRequest={720}>
-        <SkiaLabel Text="Sprites" FontSize={24} TextColor={Colors.White} HorizontalOptions="Center" />
+        {/* the shell bar says the page name: this title is presentation, so a screen reader reads the name once (hello-app rule) */}
+        <SkiaLabel Text="Sprites" FontSize={24} TextColor={Colors.White} HorizontalOptions="Center" AccessibilityRole={Aria.RolePresentation} />
 
         <Card title={`SkiaSprite — Source="anims/BlueWarrior/Warrior_Idle.png" Columns={8} Rows={1} · ${info}`}>
           {/* a wrap, not a row: a row measures its children with an unbounded width, so the controls column took one
