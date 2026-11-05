@@ -39,6 +39,24 @@ export class SkiaDrawer extends SnappingLayout {
     this.NotifyAccessibility();
     if (this.SnapPoints.length === 2) this.ScrollToOffset(v ? this.SnapPoints[0] : this.SnapPoints[1], SKPoint.Empty, this.Animated && this.wasDrawn);
   }
+  /**
+   * The drawer starts moving from open to closed (IsOpen = false, a swipe release, code): raised once the move is under
+   * way, before it ends (C# internal ClosingStarted; SkiaShell takes a modal out of its stack here).
+   */
+  ClosingStarted?: (sender: SkiaDrawer) => void;
+
+  // the state of the snap the drawer was last sent to; IsOpen catches up with it when the move ends (C# _headingOpen)
+  private headingOpen = false;
+
+  protected override ScrollToOffset(target: SKPoint, velocity: SKPoint, animate: boolean): boolean {
+    const wasHeadingOpen = this.headingOpen;
+    if (!super.ScrollToOffset(target, velocity, animate)) return false;
+    const hidden = this.SnapPoints[1];
+    this.headingOpen = this.SnapPoints.length < 2 || target.X !== hidden.X || target.Y !== hidden.Y;
+    if (wasHeadingOpen && !this.headingOpen) this.ClosingStarted?.(this);
+    return true;
+  }
+
   Open(): void { this.IsOpen = true; }
   Close(): void { this.IsOpen = false; }
 

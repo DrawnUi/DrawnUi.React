@@ -154,7 +154,7 @@ export const ShellDefaults = {
   TabColor: "#ADB5BD",
 };
 
-interface Overlay { id: number; node: ReactNode; ctrl?: SkiaControl; drawer?: SkiaDrawerCtrl; content?: SkiaControl; closing?: boolean; history?: boolean; animated?: boolean }
+interface Overlay { id: number; node: ReactNode; ctrl?: SkiaControl; drawer?: SkiaDrawerCtrl; content?: SkiaControl; closing?: boolean; history?: boolean; animated?: boolean; left?: boolean }
 type HistoryKind = "page" | "popup" | "modal";
 
 /** Canvas width in points for a control (page slide distance); falls back to the window. */
@@ -340,11 +340,25 @@ export const SkiaShell = forwardRef<ShellNavigation, SkiaShellProps>(function Sk
 
   // ---- modals ----
   const removeModal = useCallback((m: Overlay) => setModals((list) => list.filter((x) => x !== m)), []);
+  /**
+   * A modal leaves the modal stack the moment its close starts, whatever started it (PopModalAsync, a swipe, IsOpen =
+   * false): ModalsCount and CanGoBack drop it and Navigated Pop is raised; its drawer takes no more pans. It stays on
+   * screen until its slide ends (drawnui-cross 6s, C# SkiaShell.LeaveModalStack).
+   */
+  const [, setStackChanged] = useState(0);
+  const leaveModalStack = useCallback((m: Overlay) => {
+    if (m.left) return;
+    m.left = true;
+    if (m.drawer) m.drawer.RespondsToGestures = false;
+    setStackChanged((t) => t + 1);
+    navigated(live.current.stack[live.current.stack.length - 1] ?? "", "Pop");
+  }, [navigated]);
 
   const popModalNow = useCallback(async (top: Overlay, animated: boolean): Promise<boolean> => {
     if (top.closing) return false;
     if (!canNavigate(live.current.stack[live.current.stack.length - 1] ?? "", "Pop", top.drawer, top.drawer)) return false;
     top.closing = true;
+    leaveModalStack(top);
     if (top.drawer && top.drawer.IsOpen) {
       top.drawer.Animated = animated;
       const done = new Promise<void>((r) => { const prev = top.drawer!.StateTransitionComplete; top.drawer!.StateTransitionComplete = (d, o) => { prev?.(d, o); if (!o) r(); }; });
@@ -352,9 +366,8 @@ export const SkiaShell = forwardRef<ShellNavigation, SkiaShellProps>(function Sk
       if (animated) await AnimateWithTimeout(done);
     }
     removeModal(top);
-    navigated(live.current.stack[live.current.stack.length - 1] ?? "", "Pop");
     return true;
-  }, [removeModal, canNavigate, navigated]);
+  }, [removeModal, canNavigate, leaveModalStack]);
 
   const PushModalAsync = useCallback(async (content: ReactNode, options?: ModalOptions) => {
     const animated = options?.animated ?? true;
@@ -370,7 +383,7 @@ export const SkiaShell = forwardRef<ShellNavigation, SkiaShellProps>(function Sk
       <SkiaLayer key={entry.id} VerticalOptions="Fill" HorizontalOptions="Fill" ZIndex={ShellDefaults.ZIndexModals + entry.id} BlockGesturesBelow AccessibilityModal>
         {overlay && <SkiaBackdrop Blur={ShellDefaults.PopupsBackgroundBlur} BackgroundColor={overlay} InputTransparent />}
         <SkiaDrawer ref={(d: SkiaDrawerCtrl | null) => { if (d) entry.drawer = d; }} Direction="FromBottom" HeaderSize={0} HorizontalOptions="Fill" VerticalOptions="Fill"
-          RespondsToGestures={options?.useGestures ?? false} Animated={animated} Bounces={false} BlockGesturesBelow
+          RespondsToGestures={options?.useGestures ?? false} Animated={animated} Bounces={false} BlockGesturesBelow ClosingStarted={() => leaveModalStack(entry)}
           StateTransitionComplete={(d, isOpen) => { if (isOpen) opened(); else if (!d.IsOpen) userClosed(); }}
           IsOpenChanged={(_, isOpen) => { if (!isOpen && !animated) userClosed(); }}>
           {content}
@@ -385,10 +398,10 @@ export const SkiaShell = forwardRef<ShellNavigation, SkiaShellProps>(function Sk
     if (drawer) { drawer.IsOpen = true; if (!animated) opened(); }
     await AnimateWithTimeout(openedPromise);
     navigated(live.current.stack[live.current.stack.length - 1] ?? "", "Push", drawer);
-  }, [removeModal, pushHistory, backThroughHistory, canNavigate, navigated]);
+  }, [removeModal, pushHistory, backThroughHistory, canNavigate, navigated, leaveModalStack]);
 
   const PopModalAsync = useCallback(async (animated = true) => {
-    const list = live.current.modals; const top = list[list.length - 1];
+    const top = [...live.current.modals].reverse().find((m) => !m.left); // a modal sliding out has left the stack
     if (!top || top.closing) return;
     if (top.history && backThroughHistory("modal")) { top.history = false; return; }
     await popModalNow(top, animated);
@@ -435,7 +448,7 @@ export const SkiaShell = forwardRef<ShellNavigation, SkiaShellProps>(function Sk
   const GoBackAsync = useCallback(async (animated = true) => {
     const { popups: ps, modals: ms, stack: s } = live.current;
     if (ps.length) { await closePopup(ps[ps.length - 1], animated); return; }
-    if (ms.length) { await PopModalAsync(animated); return; }
+    if (ms.some((m) => !m.left)) { await PopModalAsync(animated); return; }
     if (!s.length) return;
     if (backThroughHistory("page")) { await WaitFor(() => live.current.stack.length < s.length, PagesAnimationSpeed + 800); return; }
     await popPage(animated);
@@ -519,12 +532,13 @@ export const SkiaShell = forwardRef<ShellNavigation, SkiaShellProps>(function Sk
     return () => window.removeEventListener("popstate", onPop);
   }, [historyOn, Routes, closePopupNow, popModalNow, popPage]);
 
+  const inStack = modals.filter((m) => !m.left).length; // modals sliding out have left the stack
   const nav = useMemo<ShellNavigation>(() => ({
-    GoToAsync, GoBackAsync, PopToRootAsync, NavigationStack: stack, CanGoBack: stack.length > 0 || popups.length > 0 || modals.length > 0, Route: route, Arguments: { ...SplitRoute(route).args, ...argsInMemory.current.get(route) },
+    GoToAsync, GoBackAsync, PopToRootAsync, NavigationStack: stack, CanGoBack: stack.length > 0 || popups.length > 0 || inStack > 0, Route: route, Arguments: { ...SplitRoute(route).args, ...argsInMemory.current.get(route) },
     OpenPopupAsync, ClosePopupAsync, CloseAllPopups, PushModalAsync, PopModalAsync, ShowToast, CloseAllToasts,
-    PopupsCount: popups.length, ModalsCount: modals.length, ToastsCount: toasts.length,
+    PopupsCount: popups.length, ModalsCount: inStack, ToastsCount: toasts.length,
     SelectedTab: selectedTab, SelectTabAsync, PopTabToRootAsync,
-  }), [GoToAsync, GoBackAsync, PopToRootAsync, stack, route, OpenPopupAsync, ClosePopupAsync, CloseAllPopups, PushModalAsync, PopModalAsync, ShowToast, CloseAllToasts, popups.length, modals.length, toasts.length, selectedTab, SelectTabAsync, PopTabToRootAsync]);
+  }), [GoToAsync, GoBackAsync, PopToRootAsync, stack, route, OpenPopupAsync, ClosePopupAsync, CloseAllPopups, PushModalAsync, PopModalAsync, ShowToast, CloseAllToasts, popups.length, inStack, toasts.length, selectedTab, SelectTabAsync, PopTabToRootAsync]);
   useImperativeHandle(ref, () => nav, [nav]);
 
   const visiblePages = leaving && !stack.includes(leaving) ? [...stack, leaving] : stack;
