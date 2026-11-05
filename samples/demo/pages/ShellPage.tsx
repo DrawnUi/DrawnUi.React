@@ -78,7 +78,7 @@ export function ShellPage() {
   const cancelNext = useRef(false);
   const [log, setLog] = useState("");
   return (
-    <SkiaScroll Orientation="Vertical">
+    <SkiaScroll HorizontalOptions="Fill" VerticalOptions="Fill" Orientation="Vertical">
       <SkiaStack Spacing={16} Padding={new Thickness(16)} HorizontalOptions="Center" MaximumWidthRequest={720}>
         <SkiaLabel Text="SkiaShell" FontSize={24} TextColor={Colors.White} HorizontalOptions="Center" />
         <SkiaLabel Text={`Route=${shell.Route || '""'} · NavigationStack=[${shell.NavigationStack.join(", ")}] · Popups=${shell.PopupsCount} · Modals=${shell.ModalsCount} · Toasts=${shell.ToastsCount} ${log}`} FontSize={12} TextColor="#ADB5BD" HorizontalOptions="Fill" />

@@ -42,7 +42,7 @@ export function ImagesPage() {
     void m.PreloadImages(PRELOAD, "Low").then(() => { clearInterval(tick); setQueue(`8 loaded in ${Math.round(performance.now() - started)} ms · peak in flight ${peak} (MaxParallelLoads=${SkiaImageManager.MaxParallelLoads})`); });
   };
   return (
-    <SkiaScroll Orientation="Vertical">
+    <SkiaScroll HorizontalOptions="Fill" VerticalOptions="Fill" Orientation="Vertical">
       <SkiaStack Spacing={16} Padding={new Thickness(16)}>
         <SkiaLabel Text="SkiaImage · Aspect" FontSize={24} TextColor={Colors.White} HorizontalOptions="Center" />
         <SkiaLabel Text="Same 512×512 photo in a 220×120 box. Overflow is clipped to the box." FontSize={13} TextColor={Colors.LightGray} HorizontalOptions="Center" />

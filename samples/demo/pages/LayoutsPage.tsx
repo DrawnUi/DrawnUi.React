@@ -117,7 +117,7 @@ export function LayoutsPage() {
     return () => clearInterval(id);
   }, []);
   return (
-    <SkiaScroll Orientation="Vertical">
+    <SkiaScroll HorizontalOptions="Fill" VerticalOptions="Fill" Orientation="Vertical">
       <SkiaStack Spacing={16} Padding={new Thickness(16)} HorizontalOptions="Center" MaximumWidthRequest={720}>
         <SkiaLabel Text="SkiaLayout types" FontSize={24} TextColor={Colors.White} HorizontalOptions="Center" />
         <SkiaLabel Text="One class, six Type values; the aliases preset Type (+ HorizontalOptions=Fill for SkiaStack / SkiaLayer / SkiaWrap / SkiaGrid / SkiaMasonry). Children position themselves with HorizontalOptions / VerticalOptions / Margin, the container adds Spacing and Padding." FontSize={13} TextColor={Colors.LightGray} HorizontalOptions="Fill" HorizontalTextAlignment="Center" />

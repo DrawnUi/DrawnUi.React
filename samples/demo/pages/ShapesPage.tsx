@@ -20,7 +20,7 @@ function Demo({ title, children }: { title: string; children: React.ReactNode })
 export function ShapesPage() {
   const shell = useShell();
   return (
-    <SkiaScroll Orientation="Vertical">
+    <SkiaScroll HorizontalOptions="Fill" VerticalOptions="Fill" Orientation="Vertical">
       <SkiaStack Spacing={20} Padding={new Thickness(16)}>
         <SkiaLabel Text="SkiaShape" FontSize={24} TextColor={Colors.White} HorizontalOptions="Center" />
         <SkiaLabel Text="Stroke is drawn inside the bounds; children are clipped to the shape." FontSize={13} TextColor={Colors.LightGray} HorizontalOptions="Center" />

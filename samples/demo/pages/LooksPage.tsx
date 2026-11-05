@@ -36,7 +36,7 @@ export function LooksPage() {
   // a live card: ControlStyle changes on an already built tree rebuild the default content (C# RebuildDefaultContent)
   const [live, setLive] = useState(0);
   return (
-    <SkiaScroll Orientation="Vertical">
+    <SkiaScroll HorizontalOptions="Fill" VerticalOptions="Fill" Orientation="Vertical">
       <SkiaStack Spacing={16} Padding={new Thickness(16)} HorizontalOptions="Center" MaximumWidthRequest={720}>
         {/* the shell bar says the page name: this title is presentation, so a screen reader reads the name once (hello-app rule) */}
         <SkiaLabel Text="Common Controls" FontSize={24} TextColor="#FFFFFF" HorizontalOptions="Center" AccessibilityRole={Aria.RolePresentation} />

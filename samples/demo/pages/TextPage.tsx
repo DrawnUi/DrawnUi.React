@@ -41,7 +41,7 @@ export function TextPage() {
   const [tapped, setTapped] = useState("nothing yet");
   const [link, setLink] = useState("none");
   return (
-    <SkiaScroll Orientation="Vertical">
+    <SkiaScroll HorizontalOptions="Fill" VerticalOptions="Fill" Orientation="Vertical">
       <SkiaStack Spacing={16} Padding={new Thickness(16)} HorizontalOptions="Center" MaximumWidthRequest={720} UseCache="Operations">
         <SkiaLabel Text="SkiaLabel" FontSize={24} TextColor={Colors.White} HorizontalOptions="Center" />
 

@@ -23,7 +23,7 @@ export function CellsPage() {
     <SkiaLayer VerticalOptions="Fill">
       <SkiaLabel Text={`100 000 recycled cells · last tapped: ${lastTapped || "-"}`} FontSize={13} TextColor={Colors.LightGray} HorizontalOptions="Center" Margin={new Thickness(0, 10, 0, 0)} />
 
-      <SkiaScroll ref={scroll} Orientation="Vertical" Margin={new Thickness(0, STATUS_HEIGHT, 0, 0)} Scrolled={() => setDebug(`${feed.current?.DebugString ?? ""} · ${view?.FrameTime.toFixed(1) ?? "?"} ms · ${view?.FPS ?? "?"} fps`)}>
+      <SkiaScroll HorizontalOptions="Fill" VerticalOptions="Fill" ref={scroll} Orientation="Vertical" Margin={new Thickness(0, STATUS_HEIGHT, 0, 0)} Scrolled={() => setDebug(`${feed.current?.DebugString ?? ""} · ${view?.FrameTime.toFixed(1) ?? "?"} ms · ${view?.FPS ?? "?"} fps`)}>
         <SkiaStack
           ref={feed}
           ItemsSource={ITEMS}

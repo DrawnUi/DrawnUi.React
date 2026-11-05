@@ -182,7 +182,7 @@ export function ReorderPage() {
         <SkiaLabel Text={status} FontSize={12} TextColor="#6EA8FE" HorizontalOptions="Center" />
       </SkiaStack>
 
-      <SkiaScroll ref={scroll} Orientation="Vertical" Margin={new Thickness(0, STATUS_HEIGHT, 0, 44)} Scrolled={() => report("scrolled")}>
+      <SkiaScroll HorizontalOptions="Fill" VerticalOptions="Fill" ref={scroll} Orientation="Vertical" Margin={new Thickness(0, STATUS_HEIGHT, 0, 44)} Scrolled={() => report("scrolled")}>
         <SkiaStack
           ref={rows}
           ItemsSource={items}

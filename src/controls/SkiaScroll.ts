@@ -435,10 +435,12 @@ export class SkiaScroll extends SkiaControl {
     this.headerSize = this.header && this.header.IsVisible ? this.header.Measure(widthConstraint, heightConstraint, scale) : ScaledSize.Default;
     this.footerSize = this.footer && this.footer.IsVisible ? this.footer.Measure(widthConstraint, heightConstraint, scale) : ScaledSize.Default;
     if (this.refreshIndicator) this.refreshIndicator.Measure(widthConstraint, heightConstraint, scale);
+    // C# SetMeasuredAdaptToContentSize: the scroll's own size is its content's, up to the space it is given; a side with
+    // a request or Fill takes its box in Measure (NeedAutoWidth / NeedAutoHeight)
     const extra = (this.HeaderExtentPts + this.FooterExtentPts) * scale;
-    const rw = isFinite(widthConstraint) ? widthConstraint : this.ContentSize.Pixels.Width + (this.Orientation === "Horizontal" ? extra : 0);
-    const rh = isFinite(heightConstraint) ? heightConstraint : this.ContentSize.Pixels.Height + (this.Orientation !== "Horizontal" ? extra : 0);
-    return ScaledSize.FromPixels(rw, rh, scale);
+    const cw = this.ContentSize.Pixels.Width + (this.Orientation === "Horizontal" ? extra : 0);
+    const ch = this.ContentSize.Pixels.Height + (this.Orientation !== "Horizontal" ? extra : 0);
+    return ScaledSize.FromPixels(Math.min(cw, widthConstraint), Math.min(ch, heightConstraint), scale);
   }
 
   protected override OnLayoutChanged(): void {

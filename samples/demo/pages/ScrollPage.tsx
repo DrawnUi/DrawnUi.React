@@ -39,13 +39,13 @@ export function ScrollPage() {
   };
 
   return (
-    <SkiaScroll Orientation="Vertical">
+    <SkiaScroll HorizontalOptions="Fill" VerticalOptions="Fill" Orientation="Vertical">
       <SkiaStack Spacing={16} Padding={new Thickness(16)} HorizontalOptions="Center" MaximumWidthRequest={720} UseCache="Operations">
         {/* the shell bar says the page name: this title is presentation, so a screen reader reads the name once (hello-app rule) */}
         <SkiaLabel Text="SkiaScroll" FontSize={24} TextColor={Colors.White} HorizontalOptions="Center" AccessibilityRole={Aria.RolePresentation} />
 
         <Card title='Header + Footer in the flow · Tag="Header" / Tag="Footer" children scroll with the content'>
-          <SkiaScroll HeightRequest={240} BackgroundColor="#212529" IgnoreWrongDirection>
+          <SkiaScroll HorizontalOptions="Fill" HeightRequest={240} BackgroundColor="#212529" IgnoreWrongDirection>
             <SkiaLayer Tag="Header" HeightRequest={70} BackgroundColor="#0F3460">
               <SkiaLabel Text="Header (70 pt) · scrolls away" FontSize={16} TextColor={Colors.White} HorizontalOptions="Center" VerticalOptions="Center" />
             </SkiaLayer>
@@ -57,7 +57,7 @@ export function ScrollPage() {
         </Card>
 
         <Card title="HeaderSticky · the header stays at the top, drawn over the content">
-          <SkiaScroll HeightRequest={220} BackgroundColor="#212529" HeaderSticky IgnoreWrongDirection>
+          <SkiaScroll HorizontalOptions="Fill" HeightRequest={220} BackgroundColor="#212529" HeaderSticky IgnoreWrongDirection>
             <SkiaLayer Tag="Header" HeightRequest={44} BackgroundColor="#0D6EFD">
               <SkiaLabel Text="Sticky header" FontSize={15} TextColor={Colors.White} HorizontalOptions="Center" VerticalOptions="Center" />
             </SkiaLayer>
@@ -66,7 +66,7 @@ export function ScrollPage() {
         </Card>
 
         <Card title="HeaderBehind + HeaderParallaxRatio=0.5 · the content covers the header, which moves at half speed">
-          <SkiaScroll HeightRequest={260} BackgroundColor="#212529" HeaderBehind HeaderParallaxRatio={0.5} ContentOffset={-24} IgnoreWrongDirection>
+          <SkiaScroll HorizontalOptions="Fill" HeightRequest={260} BackgroundColor="#212529" HeaderBehind HeaderParallaxRatio={0.5} ContentOffset={-24} IgnoreWrongDirection>
             <SkiaLayer Tag="Header" HeightRequest={160}>
               <SkiaImage Source="images/baboon.jpg" Aspect="AspectCover" HorizontalOptions="Fill" VerticalOptions="Fill" />
               <SkiaLabel Text="Parallax cover" FontSize={22} FontFamily="FontTextBold" TextColor={Colors.White} HorizontalOptions="Center" VerticalOptions="Center" DropShadowColor="#000000" DropShadowSize={4} />
@@ -78,11 +78,11 @@ export function ScrollPage() {
         </Card>
 
         <Card title='SkiaScrollBar Tag="ScrollBar" IsDraggable · drag the thumb or press the track, auto-hides 1 s after scrolling · horizontal: ScrollBarsVisibility="Horizontal"'>
-          <SkiaScroll HeightRequest={200} BackgroundColor="#212529" ScrollBarThumbColor="#6EA8FE" ScrollBarTrackColor="#FFFFFF22" IgnoreWrongDirection>
+          <SkiaScroll HorizontalOptions="Fill" HeightRequest={200} BackgroundColor="#212529" ScrollBarThumbColor="#6EA8FE" ScrollBarTrackColor="#FFFFFF22" IgnoreWrongDirection>
             <SkiaScrollBar Tag="ScrollBar" IsDraggable Thickness={8} />
             <Rows count={16} prefix="Scrollbar row" />
           </SkiaScroll>
-          <SkiaScroll Orientation="Horizontal" HeightRequest={70} BackgroundColor="#212529" ScrollBarsVisibility="Horizontal" ScrollBarThumbColor="#FFC107">
+          <SkiaScroll HorizontalOptions="Fill" Orientation="Horizontal" HeightRequest={70} BackgroundColor="#212529" ScrollBarsVisibility="Horizontal" ScrollBarThumbColor="#FFC107">
             <SkiaRow Spacing={8} Padding={new Thickness(8)}>
               {Array.from({ length: 14 }, (_, i) => <SkiaShape key={i} Type="Rectangle" CornerRadius={6} WidthRequest={120} HeightRequest={50} BackgroundColor={PALETTE[i % PALETTE.length]} UseCache="Operations"><SkiaLabel Text={`H ${i + 1}`} FontSize={13} TextColor={Colors.White} HorizontalOptions="Center" VerticalOptions="Center" /></SkiaShape>)}
             </SkiaRow>
@@ -90,7 +90,7 @@ export function ScrollPage() {
         </Card>
 
         <Card title={`RefreshEnabled + RefreshIndicator (Tag="RefreshIndicator") · RefreshDistanceLimit 60, RefreshShowDistance 50 · ${refreshState}`}>
-          <SkiaScroll ref={refreshScroll} HeightRequest={220} BackgroundColor="#212529" RefreshEnabled RefreshDistanceLimit={60} RefreshCommand={startRefresh} IgnoreWrongDirection>
+          <SkiaScroll HorizontalOptions="Fill" ref={refreshScroll} HeightRequest={220} BackgroundColor="#212529" RefreshEnabled RefreshDistanceLimit={60} RefreshCommand={startRefresh} IgnoreWrongDirection>
             <RefreshIndicator Tag="RefreshIndicator" HeightRequest={50}>
               <SkiaShape Type="Rectangle" CornerRadius={20} BackgroundColor="#0D6EFD" HorizontalOptions="Center" VerticalOptions="Center" WidthRequest={160} HeightRequest={36}>
                 <SkiaLabel Text="↻ refresh" FontFamilyFallback="FontSymbols,FontSymbols2" FontSize={14} TextColor={Colors.White} HorizontalOptions="Center" VerticalOptions="Center" />
@@ -101,7 +101,7 @@ export function ScrollPage() {
         </Card>
 
         <Card title={`SnapToChildren="Center" + TrackIndexPosition="Center" (horizontal) · CurrentIndex ${snapIndex}`}>
-          <SkiaScroll Orientation="Horizontal" HeightRequest={120} BackgroundColor="#212529" SnapToChildren="Center" TrackIndexPosition="Center" CurrentIndexChanged={(_, i) => setSnapIndex(i)}>
+          <SkiaScroll HorizontalOptions="Fill" Orientation="Horizontal" HeightRequest={120} BackgroundColor="#212529" SnapToChildren="Center" TrackIndexPosition="Center" CurrentIndexChanged={(_, i) => setSnapIndex(i)}>
             <SkiaRow Spacing={12} Padding={new Thickness(8)}>
               {Array.from({ length: 10 }, (_, i) => <SkiaShape key={i} Type="Rectangle" CornerRadius={10} WidthRequest={200} HeightRequest={100} BackgroundColor={PALETTE[i % PALETTE.length]} UseCache="Operations"><SkiaLabel Text={`Snap ${i}`} FontSize={18} TextColor={Colors.White} HorizontalOptions="Center" VerticalOptions="Center" /></SkiaShape>)}
             </SkiaRow>
@@ -109,7 +109,7 @@ export function ScrollPage() {
         </Card>
 
         <Card title={`TrackIndexPosition="Start" (vertical) · CurrentIndex ${trackIndex} · SnapToChildren="Side"`}>
-          <SkiaScroll HeightRequest={180} BackgroundColor="#212529" TrackIndexPosition="Start" SnapToChildren="Side" CurrentIndexChanged={(_, i) => setTrackIndex(i)} IgnoreWrongDirection>
+          <SkiaScroll HorizontalOptions="Fill" HeightRequest={180} BackgroundColor="#212529" TrackIndexPosition="Start" SnapToChildren="Side" CurrentIndexChanged={(_, i) => setTrackIndex(i)} IgnoreWrongDirection>
             <Rows count={16} prefix="Tracked" />
           </SkiaScroll>
         </Card>

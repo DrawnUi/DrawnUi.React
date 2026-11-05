@@ -26,7 +26,7 @@ export function KeyboardPage() {
   }, []);
 
   return (
-    <SkiaScroll Orientation="Vertical">
+    <SkiaScroll HorizontalOptions="Fill" VerticalOptions="Fill" Orientation="Vertical">
       <SkiaStack Spacing={16} Padding={new Thickness(16)} HorizontalOptions="Center" MaximumWidthRequest={720}>
         {/* the shell bar says the page name: this title is presentation, so a screen reader reads the name once (hello-app rule) */}
         <SkiaLabel Text="Keyboard Input" FontSize={24} TextColor={Colors.White} HorizontalOptions="Center" AccessibilityRole={Aria.RolePresentation} />

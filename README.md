@@ -51,6 +51,12 @@ DrawnUI is MIT licensed in every language and on every platform: desktop, mobile
 
 ## What's new in 0.1.0-preview.38
 
+- **SkiaScroll size, as in DrawnUI for .NET and Rust:** a `SkiaScroll` without a `WidthRequest` / `HeightRequest` that
+  is not `Fill` on that axis sizes to its content on that axis, up to the space it is given. Set `HorizontalOptions` /
+  `VerticalOptions` to `Fill` for a scroll that fills its space (a page scroll, a list).
+- **Multi-touch:** a `Panning` while two or more fingers are down carries `Manipulation`: `Scale` (pinch), `Rotation`
+  (turn, in degrees), `Center` / `PreviousCenter`, their totals and the finger count. A press that had a second finger
+  down is no tap.
 - **Keys, one order everywhere:** the canvas keyboard navigation (activation, arrows in lists and menus, slider steps,
   Escape closing a popup window) gets each key first, then your `KeyboardManager` handlers run with
   `KeyboardManager.IsKeyHandled` telling whether navigation used it. Skip handled keys so one press does one thing.

@@ -5,7 +5,7 @@ const STAR = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path 
 /** SkiaSvg: file source, inline SvgString, TintColor, LockRatio sizing. */
 export function SvgPage() {
   return (
-    <SkiaScroll Orientation="Vertical">
+    <SkiaScroll HorizontalOptions="Fill" VerticalOptions="Fill" Orientation="Vertical">
       <SkiaStack Spacing={16} Padding={new Thickness(16)}>
         <SkiaLabel Text="SkiaSvg" FontSize={24} TextColor={Colors.White} HorizontalOptions="Center" />
         <SkiaSvg Source="images/drawnui.svg" WidthRequest={200} LockRatio={1} HorizontalOptions="Center" />

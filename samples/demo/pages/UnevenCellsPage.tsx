@@ -45,7 +45,7 @@ export function UnevenCellsPage() {
     <SkiaLayer VerticalOptions="Fill">
       <SkiaLabel Text={`${items.length} uneven cells · MeasureVisible · LoadMore at both ends ${loading ? "· " + loading : ""}`} FontSize={13} TextColor={Colors.LightGray} HorizontalOptions="Center" Margin={new Thickness(0, 10, 0, 0)} />
 
-      <SkiaScroll ref={scroll} Orientation="Vertical" Margin={new Thickness(0, STATUS_HEIGHT, 0, 0)} Scrolled={refresh} LoadMoreCommand={loadMore} LoadMoreOffset={300} LoadMoreTopCommand={loadMoreTop} LoadMoreTopOffset={100}>
+      <SkiaScroll HorizontalOptions="Fill" VerticalOptions="Fill" ref={scroll} Orientation="Vertical" Margin={new Thickness(0, STATUS_HEIGHT, 0, 0)} Scrolled={refresh} LoadMoreCommand={loadMore} LoadMoreOffset={300} LoadMoreTopCommand={loadMoreTop} LoadMoreTopOffset={100}>
         <SkiaStack
           ref={feed}
           ItemsSource={items}

@@ -103,6 +103,7 @@
     "check:shader-carousel-interrupted": "node dev/check.mjs dev/check-shader-carousel-interrupted.ts",
     "check:shell-modal": "node dev/check.mjs dev/check-shell-modal.tsx",
     "check:multitouch": "node dev/check.mjs dev/check-multitouch.ts",
+    "check:scroll-size": "node dev/check.mjs dev/check-scroll-size.ts",
     "audit:a11y": "node dev/audit-a11y.mjs",
     "bench:relayout": "node dev/check.mjs dev/bench-relayout.ts",
     "site:extras": "node dev/site-extras.mjs dist/demo",

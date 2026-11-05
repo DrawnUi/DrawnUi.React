@@ -25,7 +25,7 @@ export function EditorPage() {
   const describe = (e: SkiaEditorCtrl) => setState(`cursor ${e.CursorPosition} · selection ${e.SelectionLength} · ${e.Text.length} chars`);
 
   return (
-    <SkiaScroll Orientation="Vertical">
+    <SkiaScroll HorizontalOptions="Fill" VerticalOptions="Fill" Orientation="Vertical">
       <SkiaStack Spacing={16} Padding={new Thickness(16, 16, 16, 120)} HorizontalOptions="Center" MaximumWidthRequest={720}>
         <SkiaLabel Text="SkiaEditor" FontSize={24} TextColor={Colors.White} HorizontalOptions="Center" />
 
