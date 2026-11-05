@@ -160,7 +160,7 @@ export class SkiaDrawer extends SnappingLayout {
       }
       case "Up": {
         this.hadDown = false;
-        if (this.childWasTapped || !this.IsUserPanning) break;
+        if (this.childWasTapped || !this.IsUserPanning) { this.FinishStoppedMove(); break; }
         const final = this.velocityAccumulator.CalculateFinalVelocity(3000);
         const v = this.Horizontal ? new SKPoint(final.X, 0) : new SKPoint(0, final.Y);
         this.CurrentSnap = this.CurrentPosition;
@@ -173,6 +173,19 @@ export class SkiaDrawer extends SnappingLayout {
     if (consumed || this.IsUserPanning) return consumed ?? (args.Type !== "Up" ? this : consumedDefault);
     if (!passed) return passToChildren();
     return consumedDefault;
+  }
+
+  /**
+   * A Down stops a running move to a snap, so a pan can take the drawer from where it is. When the touch ends without a
+   * pan, the drawer finishes that move to the snap it was sent to (IsOpen changed in code, or a released swipe), instead
+   * of staying between its snaps (C# FinishStoppedMove).
+   */
+  private FinishStoppedMove(): void {
+    const target = this.CurrentSnap, at = this.CurrentPosition;
+    if (this.IsSnapAnimating || !this.SnapPoints.some((p) => p.X === target.X && p.Y === target.Y)
+      || (Math.abs(at.X - target.X) <= 1 && Math.abs(at.Y - target.Y) <= 1)) return;
+    this.CurrentSnap = at;
+    this.ScrollToOffset(target, SKPoint.Empty, this.CanAnimate);
   }
 
   protected override DefaultAccessibilityLabel(): string | undefined { return this.isOpen ? "Drawer open" : "Drawer closed"; }

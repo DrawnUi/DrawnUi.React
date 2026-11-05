@@ -97,6 +97,7 @@
     "check:keyboard-wrap": "node dev/check.mjs dev/check-keyboard-wrap.ts",
     "check:removed": "node dev/check.mjs dev/check-removed.ts",
     "check:key-routing": "node dev/check.mjs dev/check-key-routing.ts",
+    "check:drawer-interrupted": "node dev/check.mjs dev/check-drawer-interrupted.ts",
     "audit:a11y": "node dev/audit-a11y.mjs",
     "bench:relayout": "node dev/check.mjs dev/bench-relayout.ts",
     "site:extras": "node dev/site-extras.mjs dist/demo",
