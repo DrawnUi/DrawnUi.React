@@ -21,6 +21,8 @@ export const SkiaImageEffects = {
   Darken(amount: number): ColorFilter { const a = -amount / 255; return SkiaImageEffects.Matrix([1, 0, 0, 0, a, 0, 1, 0, 0, a, 0, 0, 1, 0, a, 0, 0, 0, 1, 0]); },
   Lighten(amount: number): ColorFilter { const a = amount / 255; return SkiaImageEffects.Matrix([1, 0, 0, 0, a, 0, 1, 0, 0, a, 0, 0, 1, 0, a, 0, 0, 0, 1, 0]); },
   Grayscale(): ColorFilter { return SkiaImageEffects.Matrix([0.2989, 0.587, 0.114, 0, 0, 0.2989, 0.587, 0.114, 0, 0, 0.2989, 0.587, 0.114, 0, 0, 0, 0, 0, 1, 0]); },
+  /** C# Grayscale2: the luminance weights the Grayscale effect uses (BlackAndWhite keeps Grayscale's). */
+  Grayscale2(): ColorFilter { return SkiaImageEffects.Matrix([0.21, 0.72, 0.07, 0, 0, 0.21, 0.72, 0.07, 0, 0, 0.21, 0.72, 0.07, 0, 0, 0, 0, 0, 1, 0]); },
   Pastel(): ColorFilter { return SkiaImageEffects.Matrix([0.75, 0.25, 0.25, 0, 0, 0.25, 0.75, 0.25, 0, 0, 0.25, 0.25, 0.75, 0, 0, 0, 0, 0, 1, 0]); },
   Sepia(): ColorFilter { return SkiaImageEffects.Matrix([0.393, 0.769, 0.189, 0, 0, 0.349, 0.686, 0.168, 0, 0, 0.272, 0.534, 0.131, 0, 0, 0, 0, 0, 1, 0]); },
   InvertColors(): ColorFilter { return SkiaImageEffects.Matrix([-1, 0, 0, 0, 1, 0, -1, 0, 0, 1, 0, 0, -1, 0, 1, 0, 0, 0, 1, 0]); },

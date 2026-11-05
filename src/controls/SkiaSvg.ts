@@ -1,4 +1,4 @@
-import type { Image } from "canvaskit-wasm";
+import type { Image, Shader } from "canvaskit-wasm";
 import { type DrawingContext, SkiaControl } from "../core/SkiaControl";
 import { Super } from "../core/Super";
 import { type Color, Colors, type DrawImageAlignment, SKRect, ScaledSize, type TransformAspect } from "../core/Types";
@@ -73,9 +73,25 @@ export class SkiaSvg extends SkiaControl {
   protected override OnDisposing(): void { this.loadGeneration++; this.DropRaster(); }
 
   private DropRaster(): void {
+    this.tileShader?.delete();
+    this.tileShader = undefined;
     this.raster?.delete();
     this.raster = undefined;
     this.rasterKey = "";
+  }
+
+  private tileShader?: Shader;
+  private tileShaderAt = "";
+  /** Repeat shader of the raster placed at `display`, kept until the raster or its placement changes (C# picture shader). */
+  private TileShader(raster: Image, display: SKRect): Shader {
+    const at = `${display.Left},${display.Top},${display.Width},${display.Height}`;
+    if (this.tileShader && this.tileShaderAt === at) return this.tileShader;
+    this.tileShader?.delete();
+    const CK = Super.CK, M = CK.Matrix;
+    const local = M.multiply(M.translated(display.Left, display.Top), M.scaled(display.Width / raster.width(), display.Height / raster.height()));
+    this.tileShader = raster.makeShaderOptions(CK.TileMode.Repeat, CK.TileMode.Repeat, CK.FilterMode.Linear, CK.MipmapMode.None, local);
+    this.tileShaderAt = at;
+    return this.tileShader;
   }
 
   private async Decode(svg: string, sourceName: string, generation: number): Promise<void> {
@@ -145,7 +161,9 @@ export class SkiaSvg extends SkiaControl {
     const { Width, Height } = this.intrinsic;
     if (!this.element || Width <= 0 || Height <= 0) return;
     const dest = ctx.Destination;
-    const scaled = SkiaImage.RescaleAspect(Width, Height, dest, this.Aspect);
+    // Tile: the picture at its natural size (one SVG unit per point), repeated from the aligned copy (C# de5ba4bb)
+    const tile = this.Aspect === "Tile";
+    const scaled = tile ? { X: ctx.Scale, Y: ctx.Scale } : SkiaImage.RescaleAspect(Width, Height, dest, this.Aspect);
     const display = SkiaImage.CalculateDisplayRect(dest, Width * scaled.X, Height * scaled.Y, this.HorizontalAlignment, this.VerticalAlignment);
     this.DisplayRect = display;
     const raster = this.GetRaster(Math.round(display.Width), Math.round(display.Height));
@@ -155,7 +173,7 @@ export class SkiaSvg extends SkiaControl {
     const canvas = ctx.Context.Canvas;
     const overflows = display.Left < dest.Left || display.Top < dest.Top || display.Right > dest.Right || display.Bottom > dest.Bottom;
     const saved = canvas.save();
-    if (overflows) canvas.clipRect(CK.LTRBRect(dest.Left, dest.Top, dest.Right, dest.Bottom), CK.ClipOp.Intersect, true);
+    if (overflows || tile) canvas.clipRect(CK.LTRBRect(dest.Left, dest.Top, dest.Right, dest.Bottom), CK.ClipOp.Intersect, true);
     const paint = new CK.Paint();
     paint.setAntiAlias(true);
     const tint = Super.ParseColor(this.TintColor);
@@ -164,8 +182,13 @@ export class SkiaSvg extends SkiaControl {
       paint.setColorFilter(filter);
       filter.delete();
     }
-    canvas.drawImageRectOptions(raster, CK.LTRBRect(0, 0, raster.width(), raster.height()),
-      CK.LTRBRect(display.Left, display.Top, display.Right, display.Bottom), CK.FilterMode.Linear, CK.MipmapMode.None, paint);
+    if (tile) {
+      paint.setShader(this.TileShader(raster, display));
+      canvas.drawRect(CK.LTRBRect(dest.Left, dest.Top, dest.Right, dest.Bottom), paint);
+    } else {
+      canvas.drawImageRectOptions(raster, CK.LTRBRect(0, 0, raster.width(), raster.height()),
+        CK.LTRBRect(display.Left, display.Top, display.Right, display.Bottom), CK.FilterMode.Linear, CK.MipmapMode.None, paint);
+    }
     paint.delete();
     canvas.restoreToCount(saved);
   }

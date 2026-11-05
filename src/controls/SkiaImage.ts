@@ -1,4 +1,4 @@
-import type { ColorFilter, Image, ImageFilter } from "canvaskit-wasm";
+import type { ColorFilter, Image, ImageFilter, Shader } from "canvaskit-wasm";
 import { type DrawingContext, SkiaControl } from "../core/SkiaControl";
 import { type LoadPriority, SkiaImageManager } from "../core/SkiaImageManager";
 import { Super } from "../core/Super";
@@ -46,7 +46,8 @@ export class SkiaImage extends SkiaControl {
     switch (this.AddEffect) {
       case "Tint": return this.ColorTint !== Colors.Transparent ? SkiaImageEffects.Tint(this.ColorTint, this.EffectBlendMode) : null;
       case "Darken": return this.Darken !== 0 ? SkiaImageEffects.Darken(this.Darken) : null;
-      case "BlackAndWhite": case "Grayscale": return SkiaImageEffects.Grayscale();
+      case "BlackAndWhite": return SkiaImageEffects.Grayscale();
+      case "Grayscale": return SkiaImageEffects.Grayscale2();
       case "Pastel": return SkiaImageEffects.Pastel();
       case "Lighten": return this.Lighten !== 0 ? SkiaImageEffects.Lighten(this.Lighten) : null;
       case "Sepia": return SkiaImageEffects.Sepia();
@@ -133,7 +134,7 @@ export class SkiaImage extends SkiaControl {
         aspectX = aspectY = width < dest.Width ? Math.max(s1, s2) : 1;
         if (width * aspectX > dest.Width || height * aspectY > dest.Height) aspectX = aspectY = Math.min(s1, s2);
         break;
-      case "Tile": break; // C# too: tiling is SkiaImageTiles
+      case "Tile": break; // natural size, repeated over the destination when drawn
     }
     return { X: aspectX, Y: aspectY };
   }
@@ -196,15 +197,41 @@ export class SkiaImage extends SkiaControl {
     const blur = !this.PaintImageFilter && this.Blur > 0 ? CK.ImageFilter.MakeBlur(this.Blur * scale, this.Blur * scale, CK.TileMode.Mirror, null) : null;
     if (this.PaintImageFilter) paint.setImageFilter(this.PaintImageFilter); else if (blur) paint.setImageFilter(blur);
     if (this.PaintColorFilter) paint.setColorFilter(this.PaintColorFilter);
-    canvas.drawImageRectOptions(
-      img,
-      CK.LTRBRect(0, 0, img.width(), img.height()),
-      CK.LTRBRect(display.Left, display.Top, display.Right, display.Bottom),
-      CK.FilterMode.Linear, CK.MipmapMode.Linear, paint,
-    );
+    if (this.Aspect === "Tile") {
+      // C# DrawSourceRegion: the image at its natural size repeats over the whole destination from the aligned copy
+      if (!overflows) canvas.clipRect(CK.LTRBRect(dest.Left, dest.Top, dest.Right, dest.Bottom), CK.ClipOp.Intersect, true);
+      paint.setShader(this.TileShader(img, display));
+      canvas.drawRect(CK.LTRBRect(dest.Left, dest.Top, dest.Right, dest.Bottom), paint);
+    } else {
+      canvas.drawImageRectOptions(
+        img,
+        CK.LTRBRect(0, 0, img.width(), img.height()),
+        CK.LTRBRect(display.Left, display.Top, display.Right, display.Bottom),
+        CK.FilterMode.Linear, CK.MipmapMode.Linear, paint,
+      );
+    }
     colorFilter?.delete();
     blur?.delete();
     paint.delete();
     canvas.restoreToCount(saved);
+  }
+
+  private tileShader?: Shader;
+  private tileShaderKey?: { Image: Image; Left: number; Top: number; Width: number; Height: number };
+  /** Repeat shader of the image placed at `display`, kept until the image or its placement changes (C# cached fill shader). */
+  private TileShader(img: Image, display: SKRect): Shader {
+    const k = this.tileShaderKey;
+    if (this.tileShader && k && k.Image === img && k.Left === display.Left && k.Top === display.Top && k.Width === display.Width && k.Height === display.Height) return this.tileShader;
+    this.tileShader?.delete();
+    const CK = Super.CK, M = CK.Matrix;
+    const local = M.multiply(M.translated(display.Left, display.Top), M.scaled(display.Width / img.width(), display.Height / img.height()));
+    this.tileShader = img.makeShaderOptions(CK.TileMode.Repeat, CK.TileMode.Repeat, CK.FilterMode.Linear, CK.MipmapMode.None, local);
+    this.tileShaderKey = { Image: img, Left: display.Left, Top: display.Top, Width: display.Width, Height: display.Height };
+    return this.tileShader;
+  }
+
+  protected override OnDisposing(): void {
+    this.tileShader?.delete(); this.tileShader = undefined; this.tileShaderKey = undefined;
+    super.OnDisposing();
   }
 }
