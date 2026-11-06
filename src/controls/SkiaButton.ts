@@ -1,5 +1,5 @@
 import type { Path } from "canvaskit-wasm";
-import type { SkiaControl } from "../core/SkiaControl";
+import { SkiaControl } from "../core/SkiaControl";
 import { type Color, Colors, type CornerRadius, SKRect, ScaledSize, SkiaShadow, type SkiaTouchAnimation, Thickness } from "../core/Types";
 import { SKPoint, type GestureEventProcessingInfo, type SkiaGesturesParameters } from "../core/Gestures";
 import { SkiaLayout } from "./SkiaLayout";
@@ -137,8 +137,8 @@ export class SkiaButton extends SkiaLayout {
   override CreateClip(): Path { return this.frame.CreateClip(); }
 
   /** DrawnUi SkiaButton.OnDown: press feedback; true = consume Down. */
-  protected OnDown(_args: SkiaGesturesParameters, apply: GestureEventProcessingInfo): boolean {
-    if (this.ApplyEffect === "Ripple") {
+  protected OnDown(args: SkiaGesturesParameters, apply: GestureEventProcessingInfo): boolean {
+    if (this.ApplyEffect === "Ripple" && SkiaControl.IsPrimaryPointer(args)) {
       const pts = this.GetOffsetInsideControlInPoints(apply.MappedLocation, apply.ChildOffset);
       this.PlayRippleAnimation(this.TouchEffectColor, pts.X, pts.Y);
     }

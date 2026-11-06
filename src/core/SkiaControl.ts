@@ -1593,10 +1593,16 @@ export class SkiaControl {
     return consumed ?? consumedDefault;
   }
 
+  /**
+   * The gesture comes from a finger, a pen or the primary (left) mouse button (C# IsPrimaryPointer). Tap and press
+   * animations (Ripple) play only for those: a right or middle click raises its events but shows no tap feedback.
+   */
+  static IsPrimaryPointer(args: SkiaGesturesParameters): boolean { return (args.Event.Pointer?.Button ?? "Left") === "Left"; }
+
   /** Fires Tapped (after AnimationTapped feedback); true when a handler existed (= consumed), like DrawnUi SendTapped. */
   protected SendTapped(args: SkiaGesturesParameters, apply: GestureEventProcessingInfo): boolean {
     if (!this.Tapped) return false;
-    if (this.AnimationTapped === "Ripple") {
+    if (this.AnimationTapped === "Ripple" && SkiaControl.IsPrimaryPointer(args)) {
       const pts = this.GetOffsetInsideControlInPoints(apply.MappedLocation, apply.ChildOffset);
       this.PlayRippleAnimation(this.TouchEffectColor, pts.X, pts.Y, true, this.AnimationTappedSpeed);
     }

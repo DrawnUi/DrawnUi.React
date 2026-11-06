@@ -916,7 +916,7 @@ export class SkiaLabel extends SkiaControl {
       const y = apply.MappedLocation.Y + apply.ChildOffset.Y - this.DrawingRect.Top;
       for (const span of this.Spans) {
         if (span.HasTapHandler && span.HitIsInside(x, y)) {
-          this.PlayRippleAnimation(this.TouchEffectColor, x / this.RenderingScale, y / this.RenderingScale);
+          if (SkiaControl.IsPrimaryPointer(args)) this.PlayRippleAnimation(this.TouchEffectColor, x / this.RenderingScale, y / this.RenderingScale);
           return this.OnSpanTapped(span, args, apply);
         }
       }
