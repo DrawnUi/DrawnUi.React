@@ -1,6 +1,6 @@
 {
   "name": "drawnui-react",
-  "version": "0.1.0-preview.38",
+  "version": "0.1.0-preview.39",
   "description": "DrawnUi for React: the DrawnUi (.NET) drawn-UI engine in TypeScript on CanvasKit (Skia WASM). Same controls, same PascalCase API as DrawnUi.Net.",
   "license": "MIT",
   "author": "Nick Kovalsky (AppoMobi)",
@@ -104,6 +104,7 @@
     "check:shell-modal": "node dev/check.mjs dev/check-shell-modal.tsx",
     "check:multitouch": "node dev/check.mjs dev/check-multitouch.ts",
     "check:scroll-size": "node dev/check.mjs dev/check-scroll-size.ts",
+    "check:ripple-primary": "node dev/check.mjs dev/check-ripple-primary.ts",
     "audit:a11y": "node dev/audit-a11y.mjs",
     "bench:relayout": "node dev/check.mjs dev/bench-relayout.ts",
     "site:extras": "node dev/site-extras.mjs dist/demo",

@@ -49,6 +49,13 @@ property names, layout and drawing rules. What you learn here works there, and s
 
 DrawnUI is MIT licensed in every language and on every platform: desktop, mobile, web and embedded devices. Ship it in commercial products with no attribution badge, no about screen and no per-device royalty.
 
+## What's new in 0.1.0-preview.39
+
+- **Tap feedback for the primary pointer:** tap and press animations (`AnimationTapped="Ripple"`, `SkiaButton`'s press
+  ripple, a tappable span's ripple) play for a finger, a pen or the left mouse button. A right or middle click raises its
+  events as before (`Tapped` with `Button` `"Right"`, `ContextMenu`) with no ripple. `SkiaControl.IsPrimaryPointer(args)`
+  tells your own controls the same.
+
 ## What's new in 0.1.0-preview.38
 
 - **SkiaScroll size, as in DrawnUI for .NET and Rust:** a `SkiaScroll` without a `WidthRequest` / `HeightRequest` that
