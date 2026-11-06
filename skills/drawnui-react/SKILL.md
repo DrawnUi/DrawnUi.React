@@ -221,6 +221,8 @@ createRoot(document.getElementById("root")!).render(
   no handler = browser menu as usual. `e.Location` points, `e.Local` pixels in the control, `e.Source`
   mouse / touch / keyboard, `e.Native` the DOM event. Every mouse button still taps (`e.Parameters.Event.Pointer.Button`
   "Left" / "Right" / "Middle" / "XButton1"…, `DeviceType`, `PressedButtons`): a handler meant for the primary button only checks it.
+  Tap and press ripples (`AnimationTapped`, `SkiaButton`, tappable spans) play for a finger, a pen or the left button
+  only; `SkiaControl.IsPrimaryPointer(args)` gives custom controls the same test.
 - Focus follows a completed tap: it moves to the control that took the tap when it has `CanBeFocused`, a tap on
   nothing clears it (an editor stops editing), a tap taken by a control that cannot be focused (a Send button) leaves
   it alone, and `LockFocus` on the focused control keeps it. To end editing on a tap on a page's empty space, give the
