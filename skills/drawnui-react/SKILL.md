@@ -225,6 +225,8 @@ createRoot(document.getElementById("root")!).render(
   only; `SkiaControl.IsPrimaryPointer(args)` gives custom controls the same test.
   The Menu key / Shift+F10 on the control in keyboard focus open its context menu at its center (`e.Source` "keyboard"),
   from it or the first control above it with `ContextMenu`, then the `Canvas` one.
+- `Canvas.IsWindowActive` / `WindowActiveChanged`: the browser window has the keyboard. A focused `SkiaEditor` keeps its
+  focus while the window is inactive, its caret hidden and still, and shows it again when the window comes back.
 - Focus follows a completed tap: it moves to the control that took the tap when it has `CanBeFocused`, a tap on
   nothing clears it (an editor stops editing), a tap taken by a control that cannot be focused (a Send button) leaves
   it alone, and `LockFocus` on the focused control keeps it. To end editing on a tap on a page's empty space, give the

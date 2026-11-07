@@ -126,6 +126,18 @@ export class Canvas {
   get TopPopupWindow(): SkiaControl | undefined { return this.popups.TopInteractive; }
   /** The window stopped being active (blur): popup windows and the tooltip close, as native menus do. */
   OnWindowDeactivated(): void { this.ClosePopupWindows(); this.tooltip.CloseOnInput(); }
+  /**
+   * The browser window (tab) has the keyboard (C# DrawnView.IsWindowActive): false after its blur, true again after its
+   * focus. A focused editor hides its caret while it is false.
+   */
+  IsWindowActive = typeof document === "undefined" || typeof document.hasFocus !== "function" || document.hasFocus();
+  /** Raised when IsWindowActive changes (C# WindowActiveChanged). */
+  readonly WindowActiveChanged = new Set<(active: boolean) => void>();
+  private SetWindowActive(active: boolean): void {
+    if (this.IsWindowActive === active) return;
+    this.IsWindowActive = active;
+    for (const h of [...this.WindowActiveChanged]) h(active);
+  }
   RaisePopupWindowClosed(id: PopupId): void { for (const h of [...this.PopupWindowClosed]) h(id); }
 
   private AfterPopupsChanged(): void {
@@ -145,6 +157,9 @@ export class Canvas {
     else KeyboardManager.UnsubscribeNavigation(this.onPopupKey);
   }
   private readonly onWindowBlur = () => this.OnWindowDeactivated();
+  // IsWindowActive follows the window for the canvas' whole life, input on or off (a focused editor needs it)
+  private readonly onWindowInactive = () => this.SetWindowActive(false);
+  private readonly onWindowActive = () => this.SetWindowActive(true);
 
   private content?: SkiaControl;
   get Content(): SkiaControl | undefined { return this.content; }
@@ -177,6 +192,8 @@ export class Canvas {
     init?.(this);
     Element.addEventListener("webglcontextlost", this.onContextLost);
     Element.addEventListener("webglcontextrestored", this.onContextRestored);
+    window.addEventListener("blur", this.onWindowInactive);
+    window.addEventListener("focus", this.onWindowActive);
     this.Hover.RootAt = (x, y) => this.popupLayer?.At(x, y) ?? this.content;
     this.observer = new ResizeObserver(() => this.OnResized());
     this.observer.observe(Element);
@@ -449,6 +466,9 @@ export class Canvas {
     if (this.wakeTimer) { clearTimeout(this.wakeTimer); this.wakeTimer = 0; }
     this.Element.removeEventListener("webglcontextlost", this.onContextLost);
     this.Element.removeEventListener("webglcontextrestored", this.onContextRestored);
+    window.removeEventListener("blur", this.onWindowInactive);
+    window.removeEventListener("focus", this.onWindowActive);
+    this.WindowActiveChanged.clear();
     this.Gestures = "Disabled";
     this.ArrowsStartKeyboardNavigation = false;
     this.tooltipController?.Dispose();

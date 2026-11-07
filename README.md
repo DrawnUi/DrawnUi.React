@@ -55,6 +55,9 @@ DrawnUI is MIT licensed in every language and on every platform: desktop, mobile
   VO+Shift+M) open the context menu of the control in keyboard focus, at its center, from that control or the first one
   above it with a `ContextMenu` handler, then the `Canvas` one; `e.Source` is `"keyboard"`. Controls with a context
   menu are reachable without a mouse.
+- **Editor caret and the window:** a focused `SkiaEditor` keeps its focus while the browser window or tab is inactive,
+  its caret hidden and still (no redraws); when the window gets the keyboard back the caret shows again in the same
+  field. `Canvas.IsWindowActive` and `Canvas.WindowActiveChanged` tell your own controls the same.
 
 ## What's new in 0.1.0-preview.39
 

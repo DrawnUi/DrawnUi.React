@@ -109,6 +109,7 @@
     "check:fallback-single": "node dev/check.mjs dev/check-fallback-single.ts",
     "check:composite-effect": "node dev/check.mjs dev/check-composite-effect.ts",
     "check:keyboard-contextmenu": "node dev/check.mjs dev/check-keyboard-contextmenu.ts",
+    "check:editor-window": "node dev/check.mjs dev/check-editor-window.ts",
     "audit:a11y": "node dev/audit-a11y.mjs",
     "bench:relayout": "node dev/check.mjs dev/bench-relayout.ts",
     "site:extras": "node dev/site-extras.mjs dist/demo",

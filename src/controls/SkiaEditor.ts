@@ -169,10 +169,12 @@ export class SkiaEditor extends SkiaShape {
     this.selectionLength = l;
     this.OnCursorMoved();
   }
-  /** Shows the caret for a full half second, then blinks every 500 ms. */
+  /** Shows the caret for a full half second, then blinks every 500 ms; while the window is inactive no caret, no timer. */
   private StartBlink(): void {
     this.StopBlink();
-    this.caretVisible = true;
+    const canvas = this.Superview;
+    this.caretVisible = canvas?.IsWindowActive !== false;
+    if (!this.caretVisible) return;
     this.blinkTimer = window.setInterval(() => { this.caretVisible = !this.caretVisible; this.InvalidateCache(); this.RepaintComposition(); }, 500);
   }
   private StopBlink(): void { if (this.blinkTimer) { clearInterval(this.blinkTimer); this.blinkTimer = 0; } }
@@ -573,9 +575,23 @@ export class SkiaEditor extends SkiaShape {
   private SetFocusNative(focus: boolean): void {
     if (focus === this.subscribed) return;
     this.subscribed = focus;
-    if (focus) { KeyboardManager.Subscribe(this.onKeyDown, this.onKeyChar); KeyboardManager.BlurExternalTextInput(); TextInputProxy.Attach(this); CanvasLeaveWatchers.add(this); }
-    else { TextInputProxy.Detach(this); KeyboardManager.Unsubscribe(this.onKeyDown, this.onKeyChar); CanvasLeaveWatchers.delete(this); }
+    if (focus) {
+      KeyboardManager.Subscribe(this.onKeyDown, this.onKeyChar); KeyboardManager.BlurExternalTextInput(); TextInputProxy.Attach(this); CanvasLeaveWatchers.add(this);
+      this.windowCanvas = this.Superview; this.windowCanvas?.WindowActiveChanged?.add(this.onWindowActive);
+    } else {
+      TextInputProxy.Detach(this); KeyboardManager.Unsubscribe(this.onKeyDown, this.onKeyChar); CanvasLeaveWatchers.delete(this);
+      this.windowCanvas?.WindowActiveChanged?.delete(this.onWindowActive); this.windowCanvas = undefined;
+    }
   }
+
+  // the window the editor is focused in (C# WindowActiveChanged, subscribed only while focused)
+  private windowCanvas?: SkiaControl["Superview"];
+  /** The window lost the keyboard: the caret hides and stops blinking (no redraws); back: it shows again in this field. */
+  private readonly onWindowActive = (active: boolean) => {
+    if (!this.isFocused) return;
+    if (active) this.StartBlink(); else { this.StopBlink(); this.caretVisible = false; }
+    this.InvalidateCache(); this.RepaintComposition();
+  };
 
   /** Removed from the canvas while focused: the editing ends (caret timer, keys, text proxy). */
   override OnLeftCanvas(): void { this.IsFocused = false; }
