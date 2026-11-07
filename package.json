@@ -107,6 +107,7 @@
     "check:ripple-primary": "node dev/check.mjs dev/check-ripple-primary.ts",
     "check:stack-margins": "node dev/check.mjs dev/check-stack-margins.ts",
     "check:fallback-single": "node dev/check.mjs dev/check-fallback-single.ts",
+    "check:composite-effect": "node dev/check.mjs dev/check-composite-effect.ts",
     "audit:a11y": "node dev/audit-a11y.mjs",
     "bench:relayout": "node dev/check.mjs dev/bench-relayout.ts",
     "site:extras": "node dev/site-extras.mjs dist/demo",
