@@ -33,6 +33,8 @@ NVDA, JAWS and Narrator with Chrome or Edge, VoiceOver with Safari, TalkBack wit
 **Keyboard.** The browser's own Tab order and focus ring run through the overlay:
 
 - Tab / Shift+Tab walk the controls in reading order; Enter / Space activate (a tap at the control's center).
+- The Menu key, Shift+F10 or a screen reader's context-menu command open the focused control's context menu at its
+  center (its own `ContextMenu`, else the first control above it with one, else the `Canvas` one; Source `"keyboard"`).
 - A group (`Aria.RoleList`, `RoleListBox`, `RoleGrid`, `RoleToolbar`, `RoleRadioGroup`, `RoleTabList`, `RoleMenu`,
   `RoleMenuBar`) is one Tab stop that remembers its item; the arrows move by index (Up / Down in a column, Left /
   Right in a row, all four in a wrap or grid), Home / End, PageUp / PageDown by a viewport; recycled items are scrolled

@@ -49,6 +49,13 @@ property names, layout and drawing rules. What you learn here works there, and s
 
 DrawnUI is MIT licensed in every language and on every platform: desktop, mobile, web and embedded devices. Ship it in commercial products with no attribution badge, no about screen and no per-device royalty.
 
+## What's new in the next preview
+
+- **Context menus from the keyboard:** the Menu key, Shift+F10 and a screen reader's context-menu command (VoiceOver
+  VO+Shift+M) open the context menu of the control in keyboard focus, at its center, from that control or the first one
+  above it with a `ContextMenu` handler, then the `Canvas` one; `e.Source` is `"keyboard"`. Controls with a context
+  menu are reachable without a mouse.
+
 ## What's new in 0.1.0-preview.39
 
 - **Tap feedback for the primary pointer:** tap and press animations (`AnimationTapped="Ripple"`, `SkiaButton`'s press
@@ -161,7 +168,7 @@ The request is routed like a tap: deepest visible control under the point first 
 parents, then the `Canvas` prop. The first handler returning `true` takes it and the browser menu is suppressed;
 with no handler the browser menu shows as before. `e` carries `Location` (points on the canvas), `Pixels`, `Local`
 (pixels inside the handling control), `Source` (`"mouse"`, `"touch"` for a long press, `"keyboard"` for the Menu
-key) and `Native` (the DOM event, for modifiers). Web-only: DrawnUi.Net has no mouse buttons.
+key or Shift+F10 on the control in keyboard focus, opened at its center) and `Native` (the DOM event, for modifiers). Web-only: DrawnUi.Net has no mouse buttons.
 
 ## Menu bar
 

@@ -554,6 +554,26 @@ export class Canvas {
     if (handled) e.preventDefault();
   };
 
+  /**
+   * The Menu key, Shift+F10 or a screen reader's context-menu command on the control in keyboard focus (the DOM
+   * `contextmenu` of its overlay node): its context menu opens at its center, from it or the first control above it with
+   * a ContextMenu handler, then the Canvas' own (Source "keyboard", as every DrawnUI engine). True when one took it.
+   */
+  OpenContextMenuFromKeyboard(control: SkiaControl, native: MouseEvent): boolean {
+    const r = control.GetAccessibilityPixelRect(), scale = this.RenderingScale;
+    const pixels = new SKPoint((r.Left + r.Right) / 2, (r.Top + r.Bottom) / 2);
+    const args = new ContextMenuEventArgs(new SKPoint(pixels.X / scale, pixels.Y / scale), pixels, "keyboard", native);
+    this.tooltip.CloseOnInput();
+    for (let c: SkiaControl | undefined = control; c; c = c.Parent) {
+      if (!c.ContextMenu) continue;
+      args.Control = c;
+      args.Local = new SKPoint(pixels.X - c.DrawingRect.Left, pixels.Y - c.DrawingRect.Top);
+      if (c.ContextMenu(c, args) === true) return true;
+    }
+    args.Control = undefined;
+    return !!this.ContextMenu && this.ContextMenu(this, args) === true;
+  }
+
   private cursorPointer = false;
   /**
    * DrawnUi.Blazor shows `cursor: pointer` over interactive controls through its overlay elements; here the overlay

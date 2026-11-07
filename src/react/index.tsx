@@ -340,6 +340,7 @@ function AccessibilityOverlay({ view }: { view: CanvasView }) {
             aria-live={n.Live as "polite" | "assertive" | undefined}
             tabIndex={view.AccessibilityManager.IsTabStop(n.Source) ? 0 : -1} className="drawnui-a11y-node" style={{ ...pos, fontSize: 0, userSelect: "none" }}
             onClick={activate}
+            onContextMenu={(e) => { if (view.OpenContextMenuFromKeyboard(n.Source, e.nativeEvent)) e.preventDefault(); }}
             onKeyDown={(e) => {
               // the canvas navigation gets the key first; the app's KeyDown runs after it with IsKeyHandled (6az)
               if (e.key === "Enter" || e.key === " ") { e.preventDefault(); if (activate()) KeyboardManager.MarkKeyHandled(e.nativeEvent.code); }
