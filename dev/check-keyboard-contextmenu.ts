@@ -67,6 +67,12 @@ const element = {
   check("no control above has one: the Canvas' ContextMenu, with Source keyboard", lonely && canvasGot?.Source === "keyboard" && got === undefined);
   canvas.ContextMenu = undefined;
   check("nobody takes it: false, the browser keeps its menu", canvas.OpenContextMenuFromKeyboard(lone, native) === false);
+  // DrawnUi.Rust preview.36 / .NET HandleDesktopContextMenu: only a handler returning true counts as taken
+  let asked = 0;
+  card.ContextMenu = () => { asked++; };
+  inner.ContextMenu = undefined;
+  canvas.ContextMenu = () => { asked++; return false; };
+  check("handlers that return nothing or false: asked, not taken (false), the key goes on", canvas.OpenContextMenuFromKeyboard(inner, native) === false && asked === 2, `${asked} asked`);
 
   console.log(failures ? `FAIL: ${failures} checks` : "OK: context menu from the keyboard");
   process.exit(failures ? 1 : 0);
