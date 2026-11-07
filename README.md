@@ -49,7 +49,7 @@ property names, layout and drawing rules. What you learn here works there, and s
 
 DrawnUI is MIT licensed in every language and on every platform: desktop, mobile, web and embedded devices. Ship it in commercial products with no attribution badge, no about screen and no per-device royalty.
 
-## What's new in the next preview
+## What's new in 0.1.0-preview.40
 
 - **Context menus from the keyboard:** the Menu key, Shift+F10 and a screen reader's context-menu command (VoiceOver
   VO+Shift+M) open the context menu of the control in keyboard focus, at its center, from that control or the first one
