@@ -53,3 +53,4 @@ export * from "./controls/SkiaGif";
 export * from "./controls/SkiaScroll";
 export * from "./controls/SkiaDynamicDrawnCell";
 export * from "./core/ViewsAdapter";
+export * from "./core/DesignerActions";

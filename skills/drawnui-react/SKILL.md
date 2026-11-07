@@ -229,6 +229,9 @@ createRoot(document.getElementById("root")!).render(
   focus while the window is inactive, its caret hidden and still, and shows it again when the window comes back.
 - `Canvas.SystemTheme` ("Light" / "Dark") and `<Canvas SystemThemeChanged={(theme) => ...}>`: the system appearance,
   raised once at creation and once per change (a repeated value is not raised).
+- Designer actions (states the DrawnUI Designer can jump the app to): `designerAction("Levels/Level 3", fn)` (returns its
+  remover; works outside React), `useDesignerAction(path, fn, deps?)`, `<DesignerAction Name="Dialogs/Options" onRun={fn} />`;
+  `DesignerActions.Paths` / `Run(path)` / `Changed` for agents. Nothing runs without a designer attached.
 - Focus follows a completed tap: it moves to the control that took the tap when it has `CanBeFocused`, a tap on
   nothing clears it (an editor stops editing), a tap taken by a control that cannot be focused (a Send button) leaves
   it alone, and `LockFocus` on the focused control keeps it. To end editing on a tap on a page's empty space, give the

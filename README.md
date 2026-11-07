@@ -54,6 +54,11 @@ DrawnUI is MIT licensed in every language and on every platform: desktop, mobile
 - **System light / dark appearance:** `Canvas.SystemTheme` (`"Light"` / `"Dark"`, from `prefers-color-scheme`) and
   `SystemThemeChanged` (Canvas property or `<Canvas SystemThemeChanged>` prop): called once when the canvas learns the
   theme, then once per change; a repeated value is not raised and it asks for no frame, as in DrawnUI for Rust.
+- **Designer actions:** name the states the DrawnUI Designer can jump your app to (a level, a game state, a dialog):
+  `designerAction("Levels/Level 3", () => startLevel(3))` (returns its remover, works outside React),
+  `useDesignerAction(path, run, deps?)` while a component is mounted, or `<DesignerAction Name="Dialogs/Options"
+  onRun={...} />`. Paths are groups and a name, slash-separated. The designer lists them under the app's screens and runs
+  one on a click; nothing runs without a designer attached.
 
 ## What's new in 0.1.0-preview.40
 

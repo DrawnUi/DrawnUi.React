@@ -41,6 +41,29 @@ import type { Color, RenderingModeType } from "../core/Types";
 import type { GesturesMode } from "../core/Gestures";
 import { createDrawnRoot } from "./reconciler";
 export { DesignerSourceOf, type DesignerSource } from "./reconciler";
+import { DesignerActions, designerAction } from "../core/DesignerActions";
+export { DesignerActions, designerAction };
+
+/**
+ * A Designer action that exists while the component is mounted (DesignerActions): `path` is its groups and name,
+ * slash-separated ("Levels/Level 3"); `run` is called when the designer runs it (always the latest `run` passed). It is
+ * registered again when the path or one of `deps` changes. Nothing runs without a designer attached.
+ */
+export function useDesignerAction(path: string, run: () => void, deps: readonly unknown[] = []): void {
+  const latest = useRef(run);
+  latest.current = run;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => designerAction(path, () => latest.current()), [path, ...deps]);
+}
+
+/**
+ * A Designer action as an element (for JSX and NX): declared while it is mounted, `onRun` called when the designer runs
+ * it. Draws nothing. `<DesignerAction Name="Levels/Level 3" onRun={() => startLevel(3)} />`
+ */
+export function DesignerAction({ Name, onRun }: { Name: string; onRun: () => void }): null {
+  useDesignerAction(Name, onRun);
+  return null;
+}
 
 /**
  * Public settable properties of a control become its JSX props, same PascalCase names as C#.

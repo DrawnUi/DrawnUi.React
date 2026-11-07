@@ -111,6 +111,7 @@
     "check:keyboard-contextmenu": "node dev/check.mjs dev/check-keyboard-contextmenu.ts",
     "check:editor-window": "node dev/check.mjs dev/check-editor-window.ts",
     "check:system-theme": "node dev/check.mjs dev/check-system-theme.ts",
+    "check:designer-actions": "node dev/check.mjs dev/check-designer-actions.tsx",
     "audit:a11y": "node dev/audit-a11y.mjs",
     "bench:relayout": "node dev/check.mjs dev/bench-relayout.ts",
     "site:extras": "node dev/site-extras.mjs dist/demo",
