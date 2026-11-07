@@ -49,6 +49,12 @@ property names, layout and drawing rules. What you learn here works there, and s
 
 DrawnUI is MIT licensed in every language and on every platform: desktop, mobile, web and embedded devices. Ship it in commercial products with no attribution badge, no about screen and no per-device royalty.
 
+## What's new in the next preview
+
+- **System light / dark appearance:** `Canvas.SystemTheme` (`"Light"` / `"Dark"`, from `prefers-color-scheme`) and
+  `SystemThemeChanged` (Canvas property or `<Canvas SystemThemeChanged>` prop): called once when the canvas learns the
+  theme, then once per change; a repeated value is not raised and it asks for no frame, as in DrawnUI for Rust.
+
 ## What's new in 0.1.0-preview.40
 
 - **Context menus from the keyboard:** the Menu key, Shift+F10 and a screen reader's context-menu command (VoiceOver

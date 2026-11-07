@@ -132,6 +132,8 @@ export interface CanvasProps {
   WillFirstTimeDraw?: CanvasView["WillFirstTimeDraw"];
   /** DrawnView.WasDrawn: after every drawn frame. */
   WasDrawn?: CanvasView["WasDrawn"];
+  /** The system light / dark appearance: once when known (at creation), then once per change. */
+  SystemThemeChanged?: CanvasView["SystemThemeChanged"];
 }
 
 /**
@@ -172,7 +174,7 @@ export function OpenPopupWindow(canvas: CanvasView, content: ReactNode, anchor: 
  * Mirrors DrawnUi Canvas: the bridge between the DOM (react-dom) and the drawn tree (DrawnUi reconciler).
  * Requires Super.UseDrawnUi()...BuildAsync() to have completed.
  */
-export function Canvas({ BackgroundColor, RenderingMode, Gestures, ArrowsStartKeyboardNavigation, children, style, className, ref: viewRef, ContextMenu, WillFirstTimeDraw, WasDrawn }: CanvasProps) {
+export function Canvas({ BackgroundColor, RenderingMode, Gestures, ArrowsStartKeyboardNavigation, children, style, className, ref: viewRef, ContextMenu, WillFirstTimeDraw, WasDrawn, SystemThemeChanged }: CanvasProps) {
   const ref = useRef<HTMLCanvasElement>(null);
   const view = useRef<CanvasView>(null);
   const root = useRef<ReturnType<typeof createDrawnRoot>>(null);
@@ -184,6 +186,7 @@ export function Canvas({ BackgroundColor, RenderingMode, Gestures, ArrowsStartKe
       if (RenderingMode) c.RenderingMode = RenderingMode;
       c.WillFirstTimeDraw = WillFirstTimeDraw;
       c.WasDrawn = WasDrawn;
+      c.SystemThemeChanged = SystemThemeChanged;
     });
     view.current = v;
     root.current = createDrawnRoot(v);
@@ -204,6 +207,7 @@ export function Canvas({ BackgroundColor, RenderingMode, Gestures, ArrowsStartKe
     v.ContextMenu = ContextMenu;
     v.WillFirstTimeDraw = WillFirstTimeDraw;
     v.WasDrawn = WasDrawn;
+    v.SystemThemeChanged = SystemThemeChanged;
     root.current!.render(children);
   });
 

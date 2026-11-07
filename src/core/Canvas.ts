@@ -20,6 +20,9 @@ import {
  * Frames are drawn only after Update() (invalidation), never continuously.
  * Gestures are accumulated and processed in order at the START of the next frame, like DrawnUi.
  */
+/** The system's light / dark appearance (DrawnUi.Rust SystemTheme). */
+export type SystemTheme = "Light" | "Dark";
+
 export class Canvas {
   /** Points a pointer may travel between Down and Up and still count as a tap (AppoMobi TouchEffect default). */
   static TappedCancelMoveThresholdPoints = 16;
@@ -51,6 +54,25 @@ export class Canvas {
   WillFirstTimeDraw?: (sender: Canvas, context: DrawingContext["Context"]) => void;
   /** DrawnView.WasDrawn: raised after every frame has been drawn (the C# event passes no context). */
   WasDrawn?: (sender: Canvas) => void;
+
+  /**
+   * The system's light / dark appearance (DrawnUi.Rust `system_theme`): undefined until the host learns it, which it
+   * does when the canvas is created (`prefers-color-scheme`), then it follows every change.
+   */
+  get SystemTheme(): SystemTheme | undefined { return this.systemTheme; }
+  /**
+   * Raised once when the host learns the system theme (set it in the Canvas init / the `<Canvas>` prop to get that first
+   * value), then once per change; a repeated value is not raised. No handler, no call; it never asks for a frame.
+   */
+  SystemThemeChanged?: (theme: SystemTheme) => void;
+  private systemTheme?: SystemTheme;
+  private themeQuery?: MediaQueryList;
+  private readonly onThemeQuery = () => this.SetSystemTheme(this.themeQuery!.matches ? "Dark" : "Light");
+  private SetSystemTheme(theme: SystemTheme): void {
+    if (theme === this.systemTheme) return;
+    this.systemTheme = theme;
+    this.SystemThemeChanged?.(theme);
+  }
   /** Registry + rate-limited snapshot of accessible controls, rendered by the DOM overlay (DrawnUi AccessibilityManager). */
   readonly AccessibilityManager = new SkiaAccessibilityManager();
   /** Mouse hover of the controls (drawnui-cross 6m): ReceivesHover / IsHovered / HoverChanged. */
@@ -190,6 +212,11 @@ export class Canvas {
   constructor(readonly Element: HTMLCanvasElement, init?: (canvas: Canvas) => void) {
     if (!Super.CK) throw new Error("DrawnUi: call Super.UseDrawnUi()...BuildAsync() before creating a Canvas");
     init?.(this);
+    if (typeof window.matchMedia === "function") {
+      this.themeQuery = window.matchMedia("(prefers-color-scheme: dark)");
+      this.themeQuery.addEventListener?.("change", this.onThemeQuery);
+      this.onThemeQuery();
+    }
     Element.addEventListener("webglcontextlost", this.onContextLost);
     Element.addEventListener("webglcontextrestored", this.onContextRestored);
     window.addEventListener("blur", this.onWindowInactive);
@@ -466,6 +493,8 @@ export class Canvas {
     if (this.wakeTimer) { clearTimeout(this.wakeTimer); this.wakeTimer = 0; }
     this.Element.removeEventListener("webglcontextlost", this.onContextLost);
     this.Element.removeEventListener("webglcontextrestored", this.onContextRestored);
+    this.themeQuery?.removeEventListener?.("change", this.onThemeQuery);
+    this.SystemThemeChanged = undefined;
     window.removeEventListener("blur", this.onWindowInactive);
     window.removeEventListener("focus", this.onWindowActive);
     this.WindowActiveChanged.clear();
