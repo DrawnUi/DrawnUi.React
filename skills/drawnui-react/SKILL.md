@@ -162,6 +162,8 @@ createRoot(document.getElementById("root")!).render(
   `ScaleToAsync`, `TranslateToAsync`, `FadeToAsync`, or any property with
   `AnimateRangeAsync((v) => { card.RotationY = v; }, from, to, ms, easing)`; set a transform from code, outside an
   animation, then call `RepaintComposition()`.
+  A new `*ToAsync` of the same kind replaces the running one: awaiting code gets an AbortError, a fire-and-forget call
+  stays silent. An animation callback that throws is logged once; the other animations and the frame go on.
 - 3D, perspective built in (no shader, no matrix of your own): `RotationY` turns around the vertical axis (a flip; a
   200 x 200 card at 50 draws 131 wide, the left edge nearer: 231 vs 177 tall), `RotationX` around the horizontal one
   (at 40: 155 tall, the bottom edge nearer: 225 vs 180 wide), `RotationZ` around the axis facing you; all combine

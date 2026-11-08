@@ -114,6 +114,7 @@
     "check:designer-actions": "node dev/check.mjs dev/check-designer-actions.tsx",
     "check:label-span-effects": "node dev/check.mjs dev/check-label-span-effects.ts",
     "check:animator-isolation": "node dev/check.mjs dev/check-animator-isolation.ts",
+    "check:quiet-animations": "node dev/check.mjs dev/check-quiet-animations.ts",
     "audit:a11y": "node dev/audit-a11y.mjs",
     "bench:relayout": "node dev/check.mjs dev/bench-relayout.ts",
     "site:extras": "node dev/site-extras.mjs dist/demo",

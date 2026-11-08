@@ -1647,13 +1647,19 @@ export class SkiaControl {
     return this.AnimateAsync((v) => callback(start + (end - start) * v), undefined, ms, easing, cancel);
   }
 
-  /** One running animation per kind, like the per-property CancellationTokenSources in C#. */
+  /**
+   * One running animation per kind, like the per-property CancellationTokenSources in C#. A replaced animation rejects
+   * with an AbortError for code that awaits it, and is quiet otherwise (as a cancelled, unobserved Task in .NET): no
+   * "Uncaught (in promise)" in the console for fire-and-forget calls.
+   */
   private RunOwnAnimation(kind: string, run: (signal: AbortSignal) => Promise<void>, cancel?: AbortSignal): Promise<void> {
     this.ownAnimations.get(kind)?.abort();
     const controller = new AbortController();
     this.ownAnimations.set(kind, controller);
     cancel?.addEventListener("abort", () => controller.abort(), { once: true });
-    return run(controller.signal).finally(() => { if (this.ownAnimations.get(kind) === controller) this.ownAnimations.delete(kind); });
+    const done = run(controller.signal).finally(() => { if (this.ownAnimations.get(kind) === controller) this.ownAnimations.delete(kind); });
+    done.catch((e) => { if ((e as { name?: string })?.name !== "AbortError") throw e; }); // only the abort is quiet
+    return done;
   }
 
   FadeToAsync(end: number, ms = 250, easing: Easing = Easing.Linear, cancel?: AbortSignal): Promise<void> {
