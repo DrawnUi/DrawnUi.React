@@ -59,6 +59,8 @@ DrawnUI is MIT licensed in every language and on every platform: desktop, mobile
   `useDesignerAction(path, run, deps?)` while a component is mounted, or `<DesignerAction Name="Dialogs/Options"
   onRun={...} />`. Paths are groups and a name, slash-separated. The designer lists them under the app's screens and runs
   one on a click; nothing runs without a designer attached.
+- **Animations keep running:** an animator whose callback throws is reported once on the console; the other animators
+  of the frame and the frames after it go on.
 
 ## What's new in 0.1.0-preview.40
 

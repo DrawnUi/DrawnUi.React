@@ -409,6 +409,14 @@ export class Canvas {
     for (const c of [...CanvasLeaveWatchers]) if (inside(c)) c.OnLeftCanvas();
   }
 
+  private static readonly reportedAnimators = new WeakSet<AnimatorBase>();
+  /** An animator's callback threw: logged once for that animator, the frame goes on. */
+  private static ReportAnimatorError(a: AnimatorBase, e: unknown): void {
+    if (Canvas.reportedAnimators.has(a)) return;
+    Canvas.reportedAnimators.add(a);
+    console.error("DrawnUi: an animator's callback threw; the other animators and the frame go on", e);
+  }
+
   /** Ticks every registered animator once; returns how many ran. */
   protected ExecuteAnimators(frameTimeNanos: number): number {
     let executed = 0, wake = Infinity;
@@ -419,7 +427,8 @@ export class Canvas {
       if (a.PausedWhileHidden) { a.PausedWhileHidden = false; a.Resume(); }
       if (a.IsPaused) continue; // a paused animator neither ticks nor keeps frames coming (C# DrawnView)
       if (a.SleepUntilNanos > frameTimeNanos) { wake = Math.min(wake, a.SleepUntilNanos); continue; } // nothing changes yet
-      a.TickFrame(frameTimeNanos);
+      // one animator whose callback throws must not stop the others or the frame (DrawnUi.Net catches the pass, Super.Log)
+      try { a.TickFrame(frameTimeNanos); } catch (e) { Canvas.ReportAnimatorError(a, e); }
       executed++;
       if (a.SleepUntilNanos > frameTimeNanos) wake = Math.min(wake, a.SleepUntilNanos);
     }
