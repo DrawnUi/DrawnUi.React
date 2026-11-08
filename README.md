@@ -49,18 +49,15 @@ property names, layout and drawing rules. What you learn here works there, and s
 
 DrawnUI is MIT licensed in every language and on every platform: desktop, mobile, web and embedded devices. Ship it in commercial products with no attribution badge, no about screen and no per-device royalty.
 
-## What's new in the next preview
+## What's new in 0.1.0-preview.41
 
-- **System light / dark appearance:** `Canvas.SystemTheme` (`"Light"` / `"Dark"`, from `prefers-color-scheme`) and
-  `SystemThemeChanged` (Canvas property or `<Canvas SystemThemeChanged>` prop): called once when the canvas learns the
-  theme, then once per change; a repeated value is not raised and it asks for no frame, as in DrawnUI for Rust.
-- **Designer actions:** name the states the DrawnUI Designer can jump your app to (a level, a game state, a dialog):
-  `designerAction("Levels/Level 3", () => startLevel(3))` (returns its remover, works outside React),
-  `useDesignerAction(path, run, deps?)` while a component is mounted, or `<DesignerAction Name="Dialogs/Options"
-  onRun={...} />`. Paths are groups and a name, slash-separated. The designer lists them under the app's screens and runs
-  one on a click; nothing runs without a designer attached.
-- **Animations keep running:** an animator whose callback throws is reported once on the console; the other animators
-  of the frame and the frames after it go on.
+- **System light and dark:** `Canvas.SystemTheme` and `SystemThemeChanged` report the browser's light or dark appearance
+  at start and on every change.
+- **Designer actions:** `designerAction`, `useDesignerAction` and `<DesignerAction>` name app states the DrawnUI Designer
+  can jump to.
+- **Animations never stop each other:** an animation whose code fails is logged once, and the other animations and the
+  frame keep going.
+- **Quiet replaced animations:** a fade or move replaced by a new one is silent unless your code waits on it.
 
 ## What's new in 0.1.0-preview.40
 
