@@ -283,8 +283,14 @@ export class SkiaControl {
     return canvas.quickReject(q);
   }
   /** Drawn bounds in canvas pixels including transforms and effects margins (C# GetTransformedDirtyBounds). */
-  GetTransformedDirtyBounds(): SKRect {
-    const r = this.ExpandedCacheRect(this.RenderingScale), m = this.RenderTransformMatrix;
+  GetTransformedDirtyBounds(): SKRect { return this.MapBounds(this.RenderTransformMatrix); }
+  /**
+   * Where the control will be drawn next, from its current transform values: a translation set since the last render is
+   * already in (a composite parent erases and clips to this area before the child renders again).
+   */
+  GetCurrentDirtyBounds(): SKRect { return this.MapBounds(this.CurrentMatrix(this.RenderingScale)); }
+  private MapBounds(m: number[] | undefined): SKRect {
+    const r = this.ExpandedCacheRect(this.RenderingScale);
     if (!m) return r;
     const pts = Super.CK.Matrix.mapPoints(m, [r.Left, r.Top, r.Right, r.Top, r.Right, r.Bottom, r.Left, r.Bottom]);
     const xs = [pts[0], pts[2], pts[4], pts[6]], ys = [pts[1], pts[3], pts[5], pts[7]];
@@ -1116,7 +1122,7 @@ export class SkiaControl {
       const dirty = new Set<SkiaControl>();
       const rects: SKRect[] = [...areas];
       const boundsOf = (c: SkiaControl): SKRect[] => {
-        const out = [c.GetTransformedDirtyBounds()];
+        const out = [c.GetCurrentDirtyBounds()]; // where it goes, from its current values, and where it was
         if (c.lastCompositeBounds) out.push(new SKRect(c.lastCompositeBounds.Left + offset.X, c.lastCompositeBounds.Top + offset.Y, c.lastCompositeBounds.Right + offset.X, c.lastCompositeBounds.Bottom + offset.Y));
         return out;
       };

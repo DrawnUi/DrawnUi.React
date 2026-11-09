@@ -49,6 +49,11 @@ property names, layout and drawing rules. What you learn here works there, and s
 
 DrawnUI is MIT licensed in every language and on every platform: desktop, mobile, web and embedded devices. Ship it in commercial products with no attribution badge, no about screen and no per-device royalty.
 
+## What's new in the next preview
+
+- **Moving inside a composite cache:** a control moved by its translation inside an `ImageComposite` layer draws at its
+  new place right away.
+
 ## What's new in 0.1.0-preview.41
 
 - **System light and dark:** `Canvas.SystemTheme` and `SystemThemeChanged` report the browser's light or dark appearance
