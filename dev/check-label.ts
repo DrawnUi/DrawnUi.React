@@ -55,7 +55,7 @@ const WORDS = "The quick brown fox jumps over the lazy dog again and again";
   // paragraphs and line separators (Rust paragraphs_spacing_and_line_height)
   const one = measure((l) => { l.Text = "a"; });
   const line = one.MeasuredLineHeight;
-  const two = measure((l) => { l.Text = "a\nb"; });
+  const two = measure((l) => { l.Text = "a\nb"; l.ParagraphSpacing = 0; });
   check("two paragraphs, no ParagraphSpacing: two lines high", two.MeasuredSize.Pixels.Height === Math.ceil(line * 2), `${two.MeasuredSize.Pixels.Height} vs ${Math.ceil(line * 2)}`);
   const spaced = measure((l) => { l.Text = "a\nb"; l.LineSpacing = 1.5; l.ParagraphSpacing = 1; });
   check("LineSpacing 1.5 + ParagraphSpacing 1", spaced.MeasuredSize.Pixels.Height === Math.ceil(line * 2 + line * 0.5 + line * 1.5), `${spaced.MeasuredSize.Pixels.Height} vs ${Math.ceil(line * 4)}`);

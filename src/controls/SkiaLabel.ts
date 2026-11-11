@@ -53,7 +53,7 @@ export class SkiaLabel extends SkiaControl {
   private verticalTextAlignment: TextAlignment = "Start";
   private lineSpacing = 1;
   private lineHeight = 1;
-  private paragraphSpacing = 0;
+  private paragraphSpacing = 0.25;
   private lineHeightUniform = false;
   /** The height every line takes under LineHeightUniform: the tallest laid-out line's (C# MeasuredLineHeight). */
   private uniformLineHeight = 0;
@@ -118,7 +118,7 @@ export class SkiaLabel extends SkiaControl {
   get LineHeight(): number { return this.lineHeight; }
   set LineHeight(v: number) { this.Set("lineHeight" as keyof this, v as this[keyof this]); }
   /**
-   * Space above every paragraph after the first, in lines (C# ParagraphSpacing; 0 here as DrawnUi.Rust, C# 0.25). A
+   * Space above every paragraph after the first, in lines of the label's font (C# ParagraphSpacing, default 0.25). A
    * paragraph starts after "\n"; U+2028 breaks the line inside a paragraph.
    */
   get ParagraphSpacing(): number { return this.paragraphSpacing; }
@@ -617,10 +617,10 @@ export class SkiaLabel extends SkiaControl {
    */
   private BaselineIn(line: TextLine, lh: number): number { return lh - (lh - lh / this.lineHeight) / 2 - line.Descent; }
 
-  /** ParagraphSpacing above a line that starts a paragraph (after the first): that many of its lines, with their gap. */
+  /** ParagraphSpacing above a line that starts a paragraph (after the first): that many lines of the label's font, with their gap. */
   private ParagraphSpace(line: TextLine): number {
     if (!line.Para || !this.paragraphSpacing) return 0;
-    const lh = this.LineHeightPx(line);
+    const f = this.mainFonts!, lh = Math.round((f.Ascent + f.Descent) * this.lineHeight);
     return (lh + this.LineGap(lh)) * this.paragraphSpacing;
   }
 

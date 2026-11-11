@@ -88,11 +88,19 @@ class FakeCanvas {
   const refGame = draw((l) => { l.FontSize = 14; l.ParagraphSpacing = 0; l.AddSubView(span("OVER\n")); l.AddSubView(span("GAME", 40)); }, 18, H).rows;
   check('a 14 px line and a 40 px line: 18 + 50 = 68 high, "OVER" rows 5-14, "GAME" rows 29-57, as .NET', ref.label.MeasuredSize.Pixels.Height === 68 && asNet(refOver, "5-14") && asNet(refGame, "29-57"), `height ${ref.label.MeasuredSize.Pixels.Height}, OVER ${refOver}, GAME ${refGame}`);
 
+  // ParagraphSpacing: 0.25 by default (as .NET), lines of the label's font (as .NET and Rust), not of the paragraph's line
+  const paras = draw((l) => { l.Text = "GAME\nOVER"; });
+  check("two paragraphs, default ParagraphSpacing 0.25: 48 + 12 + 48 = 108", paras.label.ParagraphSpacing === 0.25 && paras.label.MeasuredSize.Pixels.Height === 108, `${paras.label.MeasuredSize.Pixels.Height}`);
+  const lines2 = draw((l) => { l.Text = "GAME OVER"; });
+  check("a line break inside a paragraph (U+2028) adds no paragraph space: 96", lines2.label.MeasuredSize.Pixels.Height === 96, `${lines2.label.MeasuredSize.Pixels.Height}`);
+  const bigPara = draw((l) => { l.FontSize = 14; l.AddSubView(span("OVER\n")); l.AddSubView(span("GAME", 40)); });
+  check("a 40 px paragraph after a 14 px label line: a quarter of the label's 18 px line above it, 18 + 4.5 + 50 -> 73", bigPara.label.MeasuredSize.Pixels.Height === 73, `${bigPara.label.MeasuredSize.Pixels.Height}`);
+
   // a 20 px line and a 38 px line: their own heights by default; LineHeightUniform: both 48 px, the first line's baseline
   // at its bottom minus its descent
   const m20 = metrics(face, 20);
-  const mixed = (uniform: boolean) => draw((l) => { l.FontSize = 20; l.LineHeightUniform = uniform; l.AddSubView(span("OVER\n")); l.AddSubView(span("GAME", 38)); }, 0, 48);
-  const uni = mixed(true), own = draw((l) => { l.FontSize = 20; l.AddSubView(span("OVER\n")); l.AddSubView(span("GAME", 38)); }, 0, 48);
+  const mixed = (uniform: boolean) => draw((l) => { l.FontSize = 20; l.ParagraphSpacing = 0; l.LineHeightUniform = uniform; l.AddSubView(span("OVER\n")); l.AddSubView(span("GAME", 38)); }, 0, 48);
+  const uni = mixed(true), own = draw((l) => { l.FontSize = 20; l.ParagraphSpacing = 0; l.AddSubView(span("OVER\n")); l.AddSubView(span("GAME", 38)); }, 0, 48);
   const b1 = 48 - m20.d, low = uni.rows.split("-").map(Number)[1];
   check("LineHeightUniform: a 20 px line and a 38 px line, both 48 px high", uni.label.MeasuredSize.Pixels.Height === 96 && uni.label.MeasuredLineHeight === 48, `${uni.label.MeasuredSize.Pixels.Height}, line ${uni.label.MeasuredLineHeight}`);
   check(`LineHeightUniform: the 20 px line sits on the bottom of its 48 px line (baseline ${b1.toFixed(2)})`, low >= Math.floor(b1) - 1 && low <= Math.floor(b1), `rows ${uni.rows}`);
@@ -111,11 +119,11 @@ class FakeCanvas {
 
   // a font with Leading: Leading * LineSpacing between lines
   const g = metrics(leadFace, 38), glh = Math.round(g.a + g.d);
-  const gap1 = draw((l) => { l.FontFamily = "OrbitronGap"; l.Text = "GAME\nOVER"; });
+  const gap1 = draw((l) => { l.FontFamily = "OrbitronGap"; l.ParagraphSpacing = 0; l.Text = "GAME\nOVER"; });
   check(`a font with Leading ${g.lead.toFixed(2)}: two lines are ${glh} + ${g.lead.toFixed(2)} + ${glh}`, g.lead > 0 && gap1.label.MeasuredSize.Pixels.Height === Math.ceil(2 * glh + g.lead), `${gap1.label.MeasuredSize.Pixels.Height}`);
-  const gap15 = draw((l) => { l.FontFamily = "OrbitronGap"; l.Text = "GAME\nOVER"; l.LineSpacing = 1.5; });
+  const gap15 = draw((l) => { l.FontFamily = "OrbitronGap"; l.ParagraphSpacing = 0; l.Text = "GAME\nOVER"; l.LineSpacing = 1.5; });
   check("Leading with LineSpacing 1.5: 1.5 x Leading between the lines", gap15.label.MeasuredSize.Pixels.Height === Math.ceil(2 * glh + g.lead * 1.5), `${gap15.label.MeasuredSize.Pixels.Height}`);
-  const plain15 = draw((l) => { l.Text = "GAME\nOVER"; l.LineSpacing = 1.5; });
+  const plain15 = draw((l) => { l.ParagraphSpacing = 0; l.Text = "GAME\nOVER"; l.LineSpacing = 1.5; });
   check("no Leading, LineSpacing 1.5: half a line between the lines", plain15.label.MeasuredSize.Pixels.Height === 48 * 2 + 24, `${plain15.label.MeasuredSize.Pixels.Height}`);
 
   console.log(failures ? `FAIL: ${failures} checks` : "OK: label lines and baselines as .NET");

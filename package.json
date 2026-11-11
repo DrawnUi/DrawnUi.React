@@ -86,6 +86,7 @@
     "check:masonry-keys": "node dev/check.mjs dev/check-masonry-keys.ts",
     "check:carousel-swipe": "node dev/check.mjs dev/check-carousel-swipe.ts",
     "check:editor-focus": "node dev/check.mjs dev/check-editor-focus.ts",
+    "check:editor-lines": "node dev/check.mjs dev/check-editor-lines.ts",
     "check:shaping": "node dev/check.mjs dev/check-shaping.ts",
     "check:editor-rtl": "node dev/check.mjs dev/check-editor-rtl.ts",
     "check:label-direction": "node dev/check.mjs dev/check-label-direction.ts",

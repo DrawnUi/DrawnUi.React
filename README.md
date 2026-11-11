@@ -51,6 +51,8 @@ DrawnUI is MIT licensed in every language and on every platform: desktop, mobile
 
 ## What's new in the next preview
 
+- **Paragraph spacing:** text with line breaks gets a quarter line between paragraphs by default (`ParagraphSpacing`
+  0.25), as in DrawnUi .NET, and a growing editor (`AutoHeight`) fits each of its lines at its own height.
 - **Line spacing from the font:** fonts with built-in leading keep it between lines (times `LineSpacing`), and
   `LineHeightUniform` gives every line of a label the tallest line's height.
 - **Text placed as in DrawnUi .NET:** label lines are whole pixels high and text sits on the same baseline as in

@@ -281,9 +281,13 @@ export class SkiaEditor extends SkiaShape {
     const labelSize = this.Label.Measure(this.IsMultiline ? innerW : Infinity, Infinity, scale);
     if (this.placeholder.IsVisible) this.placeholder.Measure(innerW, Infinity, scale);
     const lineH = this.Label.MeasuredLineHeight || this.placeholder.MeasuredLineHeight || this.GetSingleLineHeightPts() * scale;
-    let lines = this.maxLines > 0 ? this.maxLines : 1;
-    if (this.AutoHeight && this.IsMultiline) { const actual = Math.max(1, this.Label.LinesCount); lines = this.maxLines > 0 ? Math.min(actual, this.maxLines) : actual; }
-    const contentH = lineH * lines;
+    let contentH = lineH * (this.maxLines > 0 ? this.maxLines : 1);
+    if (this.AutoHeight && this.IsMultiline) {
+      // the visible lines as the label lays them out: each its own height, with line and paragraph spacing between
+      const boxes = this.Label.GetLineBoxes();
+      const k = this.maxLines > 0 ? Math.min(boxes.length, this.maxLines) : boxes.length;
+      contentH = k > 0 ? boxes[k - 1].Top + boxes[k - 1].Height - boxes[0].Top : lineH;
+    }
     const width = isFinite(w) ? w : labelSize.Pixels.Width + px;
     return ScaledSize.FromPixels(width, Math.ceil(contentH) + py, scale);
   }
