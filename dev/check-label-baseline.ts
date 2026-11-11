@@ -68,15 +68,25 @@ class FakeCanvas {
     return { rows: `${first}-${last}`, label };
   };
 
+  // DrawnUi.Net reference rows (DrawnUi 296a144c, drawnui-cross 6bm): bottom rows (the baselines) and heights exact, the top
+  // row within one (SkiaSharp and CanvasKit antialias the cap edge differently: .NET row 43 has coverage 162 here under 128)
+  const asNet = (rows: string, net: string) => { const [t, b] = rows.split("-").map(Number), [nt, nb] = net.split("-").map(Number); return b === nb && Math.abs(t - nt) <= 1; };
   const over = draw((l) => { l.Text = "GAME OVER"; l.VerticalOptions = "Center"; }, 0, 80);
-  check('"GAME OVER" centered in 256 x 160: "GAME" on rows 44-70, as .NET', over.rows === "44-70", over.rows);
+  check('"GAME OVER" centered in 256 x 160: "GAME" on rows 44-70 (.NET 43-70)', over.rows === "44-70" && asNet(over.rows, "43-70"), over.rows);
   check("two lines of 48 px", over.label.MeasuredSize.Pixels.Height === 96 && over.label.MeasuredLineHeight === 48, `${over.label.MeasuredSize.Pixels.Height}, line ${over.label.MeasuredLineHeight}`);
   const top = draw((l) => { l.Text = "GAME"; });
   check("one line at the top: baseline 48 - 9.234 = 38.766, rows 12-38", top.rows === "12-38", top.rows);
   check("one line is 48 px high (rounded)", top.label.MeasuredSize.Pixels.Height === 48, `${top.label.MeasuredSize.Pixels.Height}`);
   const tall = draw((l) => { l.Text = "GAME"; l.LineHeight = 1.5; });
   // a line of round(47.652 * 1.5) = 71 px; the text's own 47.33 px centered in it: baseline 71 - 11.83 - 9.234 = 49.93
-  check("LineHeight 1.5: the extra space split above and below, rows 23-49", tall.rows === "23-49" && tall.label.MeasuredSize.Pixels.Height === 71, `${tall.rows}, height ${tall.label.MeasuredSize.Pixels.Height}`);
+  check("LineHeight 1.5: the extra space split above and below, rows 23-49 (.NET 22-49)", tall.rows === "23-49" && asNet(tall.rows, "22-49") && tall.label.MeasuredSize.Pixels.Height === 71, `${tall.rows}, height ${tall.label.MeasuredSize.Pixels.Height}`);
+
+  // .NET reference: label 14 px, spans "OVER" + line break (14) and "GAME" (40), ParagraphSpacing 0: lines 18 + 50, height 68,
+  // "OVER" rows 5-14, "GAME" rows 29-57
+  const ref = draw((l) => { l.FontSize = 14; l.ParagraphSpacing = 0; l.AddSubView(span("OVER\n")); l.AddSubView(span("GAME", 40)); });
+  const refOver = draw((l) => { l.FontSize = 14; l.ParagraphSpacing = 0; l.AddSubView(span("OVER\n")); l.AddSubView(span("GAME", 40)); }, 0, 18).rows;
+  const refGame = draw((l) => { l.FontSize = 14; l.ParagraphSpacing = 0; l.AddSubView(span("OVER\n")); l.AddSubView(span("GAME", 40)); }, 18, H).rows;
+  check('a 14 px line and a 40 px line: 18 + 50 = 68 high, "OVER" rows 5-14, "GAME" rows 29-57, as .NET', ref.label.MeasuredSize.Pixels.Height === 68 && asNet(refOver, "5-14") && asNet(refGame, "29-57"), `height ${ref.label.MeasuredSize.Pixels.Height}, OVER ${refOver}, GAME ${refGame}`);
 
   // a 20 px line and a 38 px line: their own heights by default; LineHeightUniform: both 48 px, the first line's baseline
   // at its bottom minus its descent
