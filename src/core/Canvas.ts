@@ -200,6 +200,12 @@ export class Canvas {
   private frameId = 0;
   private disposed = false;
   private readonly observer: ResizeObserver;
+  /**
+   * The device pixels the element covers, as the browser reports them (ResizeObserver device-pixel-content-box). At a
+   * fractional display scale the rounded CSS size can be a pixel off (701.3 x 333.3 CSS px at 1.25 cover 877 x 416 device
+   * px), and the browser would then resample the whole canvas, softening every glyph.
+   */
+  private devicePixels?: [number, number];
   /** The WebGL context is lost: no frames until the browser restores it. */
   private contextLost = false;
   /**
@@ -222,8 +228,13 @@ export class Canvas {
     window.addEventListener("blur", this.onWindowInactive);
     window.addEventListener("focus", this.onWindowActive);
     this.Hover.RootAt = (x, y) => this.popupLayer?.At(x, y) ?? this.content;
-    this.observer = new ResizeObserver(() => this.OnResized());
-    this.observer.observe(Element);
+    this.observer = new ResizeObserver((entries) => {
+      const box = entries[entries.length - 1]?.devicePixelContentBoxSize?.[0];
+      if (box) this.devicePixels = [box.inlineSize, box.blockSize];
+      this.OnResized();
+    });
+    // browsers without the device-pixel box (Safari) take the rounded size
+    try { this.observer.observe(Element, { box: "device-pixel-content-box" }); } catch { this.observer.observe(Element); }
     this.OnResized();
   }
 
@@ -268,8 +279,8 @@ export class Canvas {
    */
   private OnResized(): void {
     const dpr = window.devicePixelRatio || 1;
-    const w = Math.max(1, Math.round(this.Element.clientWidth * dpr));
-    const h = Math.max(1, Math.round(this.Element.clientHeight * dpr));
+    const w = Math.max(1, this.devicePixels?.[0] ?? Math.round(this.Element.clientWidth * dpr));
+    const h = Math.max(1, this.devicePixels?.[1] ?? Math.round(this.Element.clientHeight * dpr));
     if (this.surface && this.Element.width === w && this.Element.height === h && this.RenderingScale === dpr) return;
     this.RenderingScale = dpr;
     this.Element.width = w;

@@ -51,6 +51,8 @@ DrawnUI is MIT licensed in every language and on every platform: desktop, mobile
 
 ## What's new in the next preview
 
+- **Sharp at any display scale:** the canvas matches the screen's device pixels exactly at fractional display scales,
+  so text and lines stay crisp.
 - **Moving inside a composite cache:** a control moved by its translation inside an `ImageComposite` layer draws at its
   new place right away.
 
