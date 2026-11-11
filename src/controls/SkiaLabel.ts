@@ -594,7 +594,14 @@ export class SkiaLabel extends SkiaControl {
     for (const k of order) { runs[k].X = x; x += runs[k].Width; }
   }
 
-  private LineHeightPx(line: TextLine): number { return (line.Ascent + line.Descent) * this.lineHeight; }
+  /** C# LineHeightPixels: the natural line height times LineHeight, rounded to whole pixels. */
+  private LineHeightPx(line: TextLine): number { return Math.round((line.Ascent + line.Descent) * this.lineHeight); }
+
+  /**
+   * C# draw: the baseline sits at the line's bottom minus the descent, the extra space of LineHeight split above and below
+   * the text (a line of lh pixels holds lh / LineHeight of text).
+   */
+  private BaselineIn(line: TextLine, lh: number): number { return lh - (lh - lh / this.lineHeight) / 2 - line.Descent; }
 
   /** ParagraphSpacing above a line that starts a paragraph (after the first): that many of its lines, with their spacing. */
   private ParagraphSpace(line: TextLine): number { return line.Para && this.paragraphSpacing ? this.LineHeightPx(line) * this.lineSpacing * this.paragraphSpacing : 0; }
@@ -865,7 +872,7 @@ export class SkiaLabel extends SkiaControl {
       const lineW = line.Width + extra.W;
       let x = this.LineX(line, left, right, lineW);
       x += extra.Stroke / 2;
-      const baseline = y + line.Ascent;
+      const baseline = y + this.BaselineIn(line, lh);
       // C# paintDefault gets the gradient over rectDraw, or over line.Bounds per line (GradientByLines)
       const gradientRect = gradient ? (this.GradientByLines ? new SKRect(x, y, x + line.Width, y + lh) : textRect) : undefined;
       if (strokePaint && this.StrokeGradient) this.SetupGradient(strokePaint, this.StrokeGradient, gradientRect ?? new SKRect(x, y, x + line.Width, y + lh));

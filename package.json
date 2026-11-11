@@ -65,6 +65,7 @@
     "check:animation": "node dev/check.mjs dev/check-animation.ts",
     "check:shape": "node dev/check.mjs dev/check-shape.ts",
     "check:label": "node dev/check.mjs dev/check-label.ts",
+    "check:label-baseline": "node dev/check.mjs dev/check-label-baseline.ts",
     "check:image": "node dev/check.mjs dev/check-image.ts",
     "check:longpress": "node dev/check.mjs dev/check-longpress.ts",
     "check:hidden": "node dev/check.mjs dev/check-hidden.ts",

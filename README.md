@@ -51,6 +51,8 @@ DrawnUI is MIT licensed in every language and on every platform: desktop, mobile
 
 ## What's new in the next preview
 
+- **Text placed as in DrawnUi .NET:** label lines are whole pixels high and text sits on the same baseline as in
+  DrawnUi .NET; with `LineHeight` the extra space is shared above and below the text.
 - **Sharp at any display scale:** the canvas matches the screen's device pixels exactly at fractional display scales,
   so text and lines stay crisp.
 - **Moving inside a composite cache:** a control moved by its translation inside an `ImageComposite` layer draws at its
