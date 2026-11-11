@@ -206,6 +206,8 @@ export class Canvas {
    * px), and the browser would then resample the whole canvas, softening every glyph.
    */
   private devicePixels?: [number, number];
+  /** The element's CSS width when the device-pixel box was reported. */
+  private devicePixelsCss = 0;
   /** The WebGL context is lost: no frames until the browser restores it. */
   private contextLost = false;
   /**
@@ -229,8 +231,9 @@ export class Canvas {
     window.addEventListener("focus", this.onWindowActive);
     this.Hover.RootAt = (x, y) => this.popupLayer?.At(x, y) ?? this.content;
     this.observer = new ResizeObserver((entries) => {
-      const box = entries[entries.length - 1]?.devicePixelContentBoxSize?.[0];
-      if (box) this.devicePixels = [box.inlineSize, box.blockSize];
+      const entry = entries[entries.length - 1];
+      const box = entry?.devicePixelContentBoxSize?.[0];
+      if (box) { this.devicePixels = [box.inlineSize, box.blockSize]; this.devicePixelsCss = entry.contentBoxSize?.[0]?.inlineSize ?? entry.contentRect.width; }
       this.OnResized();
     });
     // browsers without the device-pixel box (Safari) take the rounded size
@@ -278,7 +281,13 @@ export class Canvas {
    * redrawn content lands in the same paint and no blank frame is ever shown while dragging.
    */
   private OnResized(): void {
-    const dpr = window.devicePixelRatio || 1;
+    let dpr = window.devicePixelRatio || 1;
+    // the device-pixel box can disagree with devicePixelRatio (DPR emulation in DevTools or Playwright, some zoom cases):
+    // past 2% the scale follows the box, so the layout keeps the element's CSS size (DrawnUi.Rust e7ff239)
+    if (this.devicePixels && this.devicePixelsCss > 0) {
+      const boxScale = this.devicePixels[0] / this.devicePixelsCss;
+      if (Math.abs(boxScale - dpr) > dpr * 0.02) dpr = boxScale;
+    }
     const w = Math.max(1, this.devicePixels?.[0] ?? Math.round(this.Element.clientWidth * dpr));
     const h = Math.max(1, this.devicePixels?.[1] ?? Math.round(this.Element.clientHeight * dpr));
     if (this.surface && this.Element.width === w && this.Element.height === h && this.RenderingScale === dpr) return;
