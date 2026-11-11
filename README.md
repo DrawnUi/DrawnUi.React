@@ -51,6 +51,8 @@ DrawnUI is MIT licensed in every language and on every platform: desktop, mobile
 
 ## What's new in the next preview
 
+- **Line spacing from the font:** fonts with built-in leading keep it between lines (times `LineSpacing`), and
+  `LineHeightUniform` gives every line of a label the tallest line's height.
 - **Text placed as in DrawnUi .NET:** label lines are whole pixels high and text sits on the same baseline as in
   DrawnUi .NET; with `LineHeight` the extra space is shared above and below the text.
 - **Sharp at any display scale:** the canvas matches the screen's device pixels exactly at fractional display scales,

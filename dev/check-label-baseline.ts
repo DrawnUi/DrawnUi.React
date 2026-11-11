@@ -2,9 +2,11 @@
 // (`npm run check:label-baseline`): a line is round((ascent + descent) * LineHeight) pixels high and its baseline sits at
 // the line's bottom minus the descent, LineHeight's extra space split above and below the text. Pinned with Orbitron
 // Black 38 (ascent 38.418, descent 9.234: lines of 48 px): "GAME OVER" in a 256 x 160 layout, centered vertically,
-// draws "GAME" on rows 44-70 (baseline 70.766, as .NET).
+// draws "GAME" on rows 44-70 (baseline 70.766, as .NET). The line rule of every engine (drawnui-cross 6bm, Nick): each line
+// its own height by default (LineHeightUniform true = every line as tall as the tallest); a line's height is its spans'
+// largest ascent + largest descent, rounded once; a font with Leading puts Leading * LineSpacing between lines.
 import { readFileSync } from "node:fs";
-import { Super, SKRect, SkiaAccessibilityManager, HoverManager, SkiaLabel, SkiaLayer, type AnimatorBase, type Canvas } from "../src/index.ts";
+import { Super, SKRect, SkiaAccessibilityManager, HoverManager, SkiaLabel, SkiaLayer, TextSpan, type AnimatorBase, type Canvas } from "../src/index.ts";
 
 declare const CanvasKitInit: (o: { locateFile: () => string }) => Promise<any>;
 const ROOT = process.cwd();
@@ -29,6 +31,21 @@ class FakeCanvas {
   (Super as unknown as { CK: unknown }).CK = CK;
   const face = CK.Typeface.MakeFreeTypeFaceFromData(readFileSync(`${ROOT}/dev/fonts/Orbitron-Black.ttf`).buffer);
   Super.Fonts.set("Orbitron", new Map([[400, face]])); Super.DefaultTypeface = face; Super.DefaultFontAlias = "Orbitron";
+  const sans = CK.Typeface.MakeFreeTypeFaceFromData(readFileSync(`${ROOT}/samples/public/fonts/OpenSans-Regular.ttf`).buffer);
+  Super.Fonts.set("OpenSans", new Map([[400, sans]]));
+  // the same Orbitron with a line gap of 0.2 em (hhea, and OS/2 sTypoLineGap: the font sets USE_TYPO_METRICS): a font with Leading
+  const gapped = new Uint8Array(readFileSync(`${ROOT}/dev/fonts/Orbitron-Black.ttf`));
+  const dv = new DataView(gapped.buffer);
+  for (let i = 0, n = dv.getUint16(4); i < n; i++) {
+    const rec = 12 + i * 16;
+    const tag = String.fromCharCode(...gapped.subarray(rec, rec + 4));
+    if (tag === "hhea") dv.setInt16(dv.getUint32(rec + 8) + 8, 200);
+    if (tag === "OS/2") dv.setInt16(dv.getUint32(rec + 8) + 72, 200);
+  }
+  const leadFace = CK.Typeface.MakeFreeTypeFaceFromData(gapped.buffer);
+  Super.Fonts.set("OrbitronGap", new Map([[400, leadFace]]));
+  const metrics = (tf: unknown, size: number) => { const m = new CK.Font(tf, size).getMetrics(); return { a: -m.ascent, d: m.descent, lead: m.leading as number }; };
+  const span = (text: string, size?: number, family?: string) => { const t = new TextSpan(); t.Text = text; if (size) t.FontSize = size; if (family) t.FontFamily = family; return t; };
 
   /** Lit rows (white text on black, red > 128) between y0 and y1, as "first-last", and the label. */
   const draw = (setup: (l: SkiaLabel) => void, y0 = 0, y1 = H) => {
@@ -60,6 +77,36 @@ class FakeCanvas {
   const tall = draw((l) => { l.Text = "GAME"; l.LineHeight = 1.5; });
   // a line of round(47.652 * 1.5) = 71 px; the text's own 47.33 px centered in it: baseline 71 - 11.83 - 9.234 = 49.93
   check("LineHeight 1.5: the extra space split above and below, rows 23-49", tall.rows === "23-49" && tall.label.MeasuredSize.Pixels.Height === 71, `${tall.rows}, height ${tall.label.MeasuredSize.Pixels.Height}`);
+
+  // a 20 px line and a 38 px line: their own heights by default; LineHeightUniform: both 48 px, the first line's baseline
+  // at its bottom minus its descent
+  const m20 = metrics(face, 20);
+  const mixed = (uniform: boolean) => draw((l) => { l.FontSize = 20; l.LineHeightUniform = uniform; l.AddSubView(span("OVER\n")); l.AddSubView(span("GAME", 38)); }, 0, 48);
+  const uni = mixed(true), own = draw((l) => { l.FontSize = 20; l.AddSubView(span("OVER\n")); l.AddSubView(span("GAME", 38)); }, 0, 48);
+  const b1 = 48 - m20.d, low = uni.rows.split("-").map(Number)[1];
+  check("LineHeightUniform: a 20 px line and a 38 px line, both 48 px high", uni.label.MeasuredSize.Pixels.Height === 96 && uni.label.MeasuredLineHeight === 48, `${uni.label.MeasuredSize.Pixels.Height}, line ${uni.label.MeasuredLineHeight}`);
+  check(`LineHeightUniform: the 20 px line sits on the bottom of its 48 px line (baseline ${b1.toFixed(2)})`, low >= Math.floor(b1) - 1 && low <= Math.floor(b1), `rows ${uni.rows}`);
+  const own20 = Math.round(m20.a + m20.d);
+  check(`by default each line its own height (${own20} + 48)`, own.label.MeasuredSize.Pixels.Height === own20 + 48, `${own.label.MeasuredSize.Pixels.Height}`);
+
+  // a line of two fonts: the larger ascent plus the larger descent, rounded once (not the larger of their rounded heights)
+  const o44 = metrics(face, 44), s40 = metrics(sans, 40);
+  const perSpan = Math.max(Math.round(o44.a + o44.d), Math.round(s40.a + s40.d)), summed = Math.round(Math.max(o44.a, s40.a) + Math.max(o44.d, s40.d));
+  const two = draw((l) => { l.FontSize = 10; l.AddSubView(span("GAME", 44)); l.AddSubView(span("go", 40, "OpenSans")); });
+  check(`two fonts on a line: ${summed} high (not ${perSpan})`, perSpan !== summed && two.label.MeasuredSize.Pixels.Height === summed, `${two.label.MeasuredSize.Pixels.Height}`);
+  // a line of a small span takes that span's height, not the label font's
+  const m12 = metrics(face, 12), h12 = Math.round(m12.a + m12.d);
+  const small = draw((l) => { l.FontSize = 38; l.AddSubView(span("go", 12)); });
+  check(`a line of a 12 px span is ${h12} px high`, small.label.MeasuredSize.Pixels.Height === h12, `${small.label.MeasuredSize.Pixels.Height}`);
+
+  // a font with Leading: Leading * LineSpacing between lines
+  const g = metrics(leadFace, 38), glh = Math.round(g.a + g.d);
+  const gap1 = draw((l) => { l.FontFamily = "OrbitronGap"; l.Text = "GAME\nOVER"; });
+  check(`a font with Leading ${g.lead.toFixed(2)}: two lines are ${glh} + ${g.lead.toFixed(2)} + ${glh}`, g.lead > 0 && gap1.label.MeasuredSize.Pixels.Height === Math.ceil(2 * glh + g.lead), `${gap1.label.MeasuredSize.Pixels.Height}`);
+  const gap15 = draw((l) => { l.FontFamily = "OrbitronGap"; l.Text = "GAME\nOVER"; l.LineSpacing = 1.5; });
+  check("Leading with LineSpacing 1.5: 1.5 x Leading between the lines", gap15.label.MeasuredSize.Pixels.Height === Math.ceil(2 * glh + g.lead * 1.5), `${gap15.label.MeasuredSize.Pixels.Height}`);
+  const plain15 = draw((l) => { l.Text = "GAME\nOVER"; l.LineSpacing = 1.5; });
+  check("no Leading, LineSpacing 1.5: half a line between the lines", plain15.label.MeasuredSize.Pixels.Height === 48 * 2 + 24, `${plain15.label.MeasuredSize.Pixels.Height}`);
 
   console.log(failures ? `FAIL: ${failures} checks` : "OK: label lines and baselines as .NET");
   process.exit(failures ? 1 : 0);

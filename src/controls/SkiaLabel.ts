@@ -10,7 +10,7 @@ import { TextSpan } from "./TextSpan";
 import { BidiRuns, type BidiMap, HasCodePoint, IsRtl, JoinsPrevious, NeedsShaping, Shape, type Shaped } from "../core/Shaping";
 
 /** Resolved faces for one style (the label itself or one span): main font + FontFamilyFallback chain + metrics. */
-interface SpanFonts { Key: string; Main: Font; Fallbacks: Font[]; Ascent: number; Descent: number; SizePx: number }
+interface SpanFonts { Key: string; Main: Font; Fallbacks: Font[]; Ascent: number; Descent: number; Leading: number; SizePx: number }
 /**
  * A run of text drawn with one font (main, or a fallback for glyphs the main font lacks) and one span style. After the
  * layout, a run that needs shaping carries its shaped glyphs, and on a line with right-to-left text its bidirectional
@@ -54,6 +54,9 @@ export class SkiaLabel extends SkiaControl {
   private lineSpacing = 1;
   private lineHeight = 1;
   private paragraphSpacing = 0;
+  private lineHeightUniform = false;
+  /** The height every line takes under LineHeightUniform: the tallest laid-out line's (C# MeasuredLineHeight). */
+  private uniformLineHeight = 0;
   private characterSpacing = 1;
   private textTransform: TextTransform = "None";
   private padding: Thickness = Thickness.Zero;
@@ -120,6 +123,9 @@ export class SkiaLabel extends SkiaControl {
    */
   get ParagraphSpacing(): number { return this.paragraphSpacing; }
   set ParagraphSpacing(v: number) { this.Set("paragraphSpacing" as keyof this, v as this[keyof this]); }
+  /** LineHeightUniform: true = every line as tall as the tallest one; false (default in every engine) = each line its own height. */
+  get LineHeightUniform(): boolean { return this.lineHeightUniform; }
+  set LineHeightUniform(v: boolean) { this.Set("lineHeightUniform" as keyof this, v as this[keyof this]); }
   /**
    * C# CharacterSpacing: 1 = the font's own spacing; every glyph is followed by (CharacterSpacing - 1) points more
    * (less below 1), the line measures and wraps at the width it draws (C# 7cf1007c, DrawnUi.Rust label).
@@ -174,7 +180,7 @@ export class SkiaLabel extends SkiaControl {
     const main = Super.GetFont(family, weight, italic, sizePx);
     const m = main.getMetrics();
     f = {
-      Key: key, Main: main, SizePx: sizePx, Ascent: -m.ascent, Descent: m.descent,
+      Key: key, Main: main, SizePx: sizePx, Ascent: -m.ascent, Descent: m.descent, Leading: m.leading,
       Fallbacks: this.fontFamilyFallback
         ? this.fontFamilyFallback.split(",").map((a) => a.trim()).filter(Boolean).map((a) => Super.GetFont(a, weight, italic, sizePx))
         : [],
@@ -475,12 +481,12 @@ export class SkiaLabel extends SkiaControl {
     if (isFinite(maxHeight)) {
       let used = 0, fit = 0;
       for (let i = 0; i < out.length; i++) {
-        const lh = this.LineHeightPx(out[i]);
+        const lh = this.OwnLineHeight(out[i]);
         // the block height of the first i + 1 lines: spacing after every line but the last, paragraph space above
         const total = used + lh + (i > 0 ? this.ParagraphSpace(out[i]) : 0);
         if (total > maxHeight && fit > 0) break;
         fit++;
-        used = total - lh + lh * this.lineSpacing;
+        used = total + this.LineGap(lh);
       }
       kept = Math.min(kept, fit);
     }
@@ -594,23 +600,35 @@ export class SkiaLabel extends SkiaControl {
     for (const k of order) { runs[k].X = x; x += runs[k].Width; }
   }
 
-  /** C# LineHeightPixels: the natural line height times LineHeight, rounded to whole pixels. */
-  private LineHeightPx(line: TextLine): number { return Math.round((line.Ascent + line.Descent) * this.lineHeight); }
+  /** A line's own height: its spans' largest ascent plus largest descent, times LineHeight, rounded once to whole pixels. */
+  private OwnLineHeight(line: TextLine): number { return Math.round((line.Ascent + line.Descent) * this.lineHeight); }
+
+  private LineHeightPx(line: TextLine): number { return this.lineHeightUniform ? this.uniformLineHeight : this.OwnLineHeight(line); }
+
+  /** C# GetSpaceBetweenLines: the label font's Leading times LineSpacing when it has one, else (LineSpacing - 1) lines. */
+  private LineGap(lh: number): number {
+    const leading = this.mainFonts?.Leading ?? 0;
+    return leading > 0 ? leading * this.lineSpacing : lh * (this.lineSpacing - 1);
+  }
 
   /**
-   * C# draw: the baseline sits at the line's bottom minus the descent, the extra space of LineHeight split above and below
-   * the text (a line of lh pixels holds lh / LineHeight of text).
+   * As DrawnUi.Net: the baseline sits at the line's bottom minus its descent, the extra space of LineHeight split above and
+   * below the text (a line of lh pixels holds lh / LineHeight of text).
    */
   private BaselineIn(line: TextLine, lh: number): number { return lh - (lh - lh / this.lineHeight) / 2 - line.Descent; }
 
-  /** ParagraphSpacing above a line that starts a paragraph (after the first): that many of its lines, with their spacing. */
-  private ParagraphSpace(line: TextLine): number { return line.Para && this.paragraphSpacing ? this.LineHeightPx(line) * this.lineSpacing * this.paragraphSpacing : 0; }
+  /** ParagraphSpacing above a line that starts a paragraph (after the first): that many of its lines, with their gap. */
+  private ParagraphSpace(line: TextLine): number {
+    if (!line.Para || !this.paragraphSpacing) return 0;
+    const lh = this.LineHeightPx(line);
+    return (lh + this.LineGap(lh)) * this.paragraphSpacing;
+  }
 
   private BlockHeight(): number {
     let h = 0;
     for (let i = 0; i < this.lines.length; i++) {
       const lh = this.LineHeightPx(this.lines[i]);
-      h += (i < this.lines.length - 1 ? lh * this.lineSpacing : lh) + this.ParagraphSpace(this.lines[i]);
+      h += lh + (i < this.lines.length - 1 ? this.LineGap(lh) : 0) + this.ParagraphSpace(this.lines[i]);
     }
     return h;
   }
@@ -685,6 +703,8 @@ export class SkiaLabel extends SkiaControl {
     const r = this.reusable;
     if (this.NeedMeasure || !r || r.Scale !== scale || r.Spacing !== glyphSpacing || roomW < r.Width - 0.01 || roomH < r.Height - 0.01) {
       this.lines = this.text || this.Spans.length > 0 ? this.LayoutLines(roomW, scale, roomH) : [];
+      this.uniformLineHeight = 0;
+      for (const l of this.lines) this.uniformLineHeight = Math.max(this.uniformLineHeight, this.OwnLineHeight(l));
       this.ShapeLines(this.lines);
       // ink past the lines' ends (a "j" hook, an italic slant) is drawing room for caches; widths unchanged
       const [inkLeft, inkRight] = this.MeasureInkOverhang();
@@ -731,7 +751,7 @@ export class SkiaLabel extends SkiaControl {
       let x = this.LineX(line, left, right, lineW);
       x += extra.Stroke / 2;
       out.push({ x, y, w: line.Width, h: lh, text: line.Runs.map((r) => r.Text).join("") });
-      y += lh * this.lineSpacing;
+      y += lh + this.LineGap(lh);
     }
     return out;
   }
@@ -910,7 +930,7 @@ export class SkiaLabel extends SkiaControl {
         }
         x += run.Width;
       }
-      y += lh * this.lineSpacing;
+      y += lh + this.LineGap(lh);
     }
     for (const paint of paints.values()) paint.delete();
     strokePaint?.delete(); shadowPaint?.delete();
