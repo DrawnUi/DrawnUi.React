@@ -62,10 +62,43 @@
       /* 100dvh: the part of the screen the browser's own bars leave free. With 100vh, Safari on an
          iPhone puts the bottom of the canvas under its toolbar. */
       #root { width: 100vw; height: 100vh; height: 100dvh; touch-action: none; }
+      /* The loader: the game's title over a torch-lit glow, and the real download progress (src/loader.ts sets
+         --load-pct from the bytes of the engine and its fonts), faded out when the game draws its first frame. */
+      .loader { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+                gap: 22px; background: radial-gradient(ellipse at 50% 55%, #2a1406 0%, #000 65%); transition: opacity 0.3s; }
+      .loader.done { opacity: 0; pointer-events: none; }
+      .loader-title { font: 44px "Orbitron Black", system-ui, sans-serif; letter-spacing: 2px; text-align: center;
+                      background: linear-gradient(#fff4d0, #ffc050 55%, #d06810); -webkit-background-clip: text;
+                      background-clip: text; color: transparent; animation: torch 1.6s ease-in-out infinite; }
+      .loader-bar { width: min(260px, 60vw); height: 4px; border-radius: 2px; background: #2a1d10; overflow: hidden; }
+      .loader-fill { height: 100%; width: var(--load-pct, 0%); transition: width 0.2s;
+                     background: linear-gradient(90deg, #d06810, #ffc050); box-shadow: 0 0 10px #ff8a20; }
+      .loader-text { font: 12px "Orbitron Black", system-ui, sans-serif; letter-spacing: 3px; color: #8a7a66; }
+      .loader-text::after { content: " " var(--load-pct-text, ""); }
+      @keyframes torch {
+        0%, 100% { filter: drop-shadow(0 0 10px rgba(255, 138, 32, 0.45)); }
+        35% { filter: drop-shadow(0 0 22px rgba(255, 138, 32, 0.8)); }
+        60% { filter: drop-shadow(0 0 14px rgba(255, 110, 20, 0.55)); }
+      }
+      @media (prefers-reduced-motion: reduce) { .loader-title { animation: none; } }
     </style>
+    <script>
+      // The loader's font, from the same stamped address the game loads it from (a CSS url() gets no stamp).
+      {
+        const v = (globalThis.DrawnUiAssetStamps || {})["fonts/Orbitron-Black.ttf"];
+        const face = new FontFace("Orbitron Black", `url(fonts/Orbitron-Black.ttf${v ? "?v=" + v : ""})`, { display: "block" });
+        document.fonts.add(face);
+        face.load().catch(() => {});
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
+    <div class="loader" id="loader" role="progressbar" aria-label="Loading Dungeon Run">
+      <div class="loader-title">DUNGEON RUN</div>
+      <div class="loader-bar"><div class="loader-fill"></div></div>
+      <div class="loader-text">LOADING</div>
+    </div>
     <noscript>
       <h1>Dungeon Run</h1>
       <p>

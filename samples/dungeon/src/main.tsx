@@ -4,6 +4,9 @@ import { createRoot } from "react-dom/client";
 import { Canvas, SkiaLayer, Super } from "drawnui-react";
 import { Aria, SkiaLabel, type SkiaLayout } from "drawnui-react/core";
 import { DungeonApp } from "./app/DungeonApp";
+import { HideLoader, TrackDownloads } from "./loader";
+
+TrackDownloads();
 
 await Super.UseDrawnUi()
   .ConfigureFonts((fonts) => fonts
@@ -28,6 +31,7 @@ function Game() {
       RenderingMode="Accelerated"
       Gestures="Lock" // a game: every touch is its own, no pull-down or rubber band of the page takes a drag
       BackgroundColor="#000000"
+      WasDrawn={HideLoader}
       style={{ width: "100%", height: "100%" }}
     >
       <SkiaLayer HorizontalOptions="Fill" VerticalOptions="Fill" ref={(layer: SkiaLayout | null) => { if (layer && !layer.Children.includes(game)) layer.AddSubView(game); }} />
