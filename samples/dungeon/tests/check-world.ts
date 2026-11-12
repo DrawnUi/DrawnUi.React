@@ -90,7 +90,7 @@ for (const [a, div, rem] of [[-1, -1, 4], [-5, -1, 0], [-6, -2, 4], [7, 1, 2]]) 
     const floats = scene.Build(world, rect);
     const triangles = floats / (3 * FLOATS);
     check(`builder: ${what}`, triangles > 0 && Number.isInteger(triangles),
-      `z ${world.Z.toFixed(4)}, ${triangles} triangles, bounds ${scene.Left.toFixed(3)} ${scene.Top.toFixed(3)} ${scene.Right.toFixed(3)} ${scene.Bottom.toFixed(3)}`);
+      `z ${world.Z.toFixed(4)}, ${triangles} triangles, bounds ${scene.MeshLeft.toFixed(3)} ${scene.MeshTop.toFixed(3)} ${scene.MeshRight.toFixed(3)} ${scene.MeshBottom.toFixed(3)}`);
     return triangles;
   };
   report("title, first frame", scene.World);

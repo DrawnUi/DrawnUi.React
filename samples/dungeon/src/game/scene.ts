@@ -46,7 +46,8 @@ export class Scene extends SkiaControl {
   private _bendX = 0; private _bendY = 0;
   private _rollSin = 0; private _rollCos = 0;
   private _centerX = 0; private _centerY = 0; private _focal = 0;
-  Left = 0; Top = 0; Right = 0; Bottom = 0;
+  /** The mesh bounds of the last build (not Left / Top: those are the control's own offset). */
+  MeshLeft = 0; MeshTop = 0; MeshRight = 0; MeshBottom = 0;
   // Per corner: view xyz, world xyz, uv, glow; and the near-clipped polygon (at most 6 corners).
   private readonly _view = new Float32Array(4 * 9);
   private readonly _polygon = new Float32Array(6 * 9);
@@ -100,7 +101,7 @@ export class Scene extends SkiaControl {
     u[8] = p[3]; u[9] = p[4]; u[10] = p[5]; u[11] = exitLight;
     u[12] = p[6]; u[13] = p[7]; u[14] = p[8]; u[15] = F(F(F(0.028) * F(1.0 - F(F(0.4) * ramp))) + F(F(0.08) * world.Dread));
     u[16] = world.Glare; u[17] = 0.0; u[18] = 0.0; u[19] = 0.0;
-    drawDungeonMesh(canvas, this.vertices, floats, u, this.Left, this.Top, this.Right, this.Bottom, rect);
+    drawDungeonMesh(canvas, this.vertices, floats, u, this.MeshLeft, this.MeshTop, this.MeshRight, this.MeshBottom, rect);
   }
 
   /** Builds the frame's triangles for `rect` into `vertices` (no canvas needed); returns the float count. */
@@ -127,7 +128,7 @@ export class Scene extends SkiaControl {
     this._centerX = F(left + F(width / 2));
     this._centerY = F(top + F(height / 2));
     this._focal = Math.min(F(height * 0.5), F(width * 0.75));
-    this.Left = FLOAT_MAX; this.Top = FLOAT_MAX; this.Right = -FLOAT_MAX; this.Bottom = -FLOAT_MAX;
+    this.MeshLeft = FLOAT_MAX; this.MeshTop = FLOAT_MAX; this.MeshRight = -FLOAT_MAX; this.MeshBottom = -FLOAT_MAX;
     this.Corridor(world, baseZ);
     return this._floats;
   }
@@ -201,10 +202,10 @@ export class Scene extends SkiaControl {
     const p = this._polygon, o = this._projected;
     const w = F(1.0 / p[at + 2]);
     const x = F(this._centerX + F(F(this._focal * p[at]) * w)), y = F(this._centerY - F(F(this._focal * p[at + 1]) * w));
-    if (x < this.Left) this.Left = x;
-    if (y < this.Top) this.Top = y;
-    if (x > this.Right) this.Right = x;
-    if (y > this.Bottom) this.Bottom = y;
+    if (x < this.MeshLeft) this.MeshLeft = x;
+    if (y < this.MeshTop) this.MeshTop = y;
+    if (x > this.MeshRight) this.MeshRight = x;
+    if (y > this.MeshBottom) this.MeshBottom = y;
     o[to] = x;
     o[to + 1] = y;
     o[to + 2] = p[at + 3] * w;
