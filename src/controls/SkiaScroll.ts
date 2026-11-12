@@ -827,6 +827,7 @@ export class SkiaScroll extends SkiaControl {
         if (this.IgnoreWrongDirection && wrongDirection) { this.IsUserFocused = false; return consumedDefault; }
         const v = this.Orientation === "Vertical" ? this.velocityY : this.Orientation === "Horizontal" ? this.velocityX : Math.max(Math.abs(this.velocityX), Math.abs(this.velocityY));
         if (Math.abs(v) <= SkiaScroll.ScrollVelocityThreshold) return consumedDefault;
+        if (this.LeavesDragToOuter(e.Distance.Total)) return null; // not used: the scroll around it takes the whole drag
       }
       if (!this.IsUserFocused) this.ResetPan();
       this.IsUserPanning = true;
@@ -920,6 +921,24 @@ export class SkiaScroll extends SkiaControl {
    * aaa871c3); an event under half a notch moves the content at once (no glide). Events arriving while the previous one is still animating add onto its target, so a fast wheel spin
    * travels N steps instead of restarting from the barely-moved current offset.
    */
+  /**
+   * drawnui-cross 6bo (DrawnUi.Rust leaves_drag_to_outer), asked once, when this scroll would take a drag: already at its
+   * end in the drag's direction (at its start dragged back, at its end dragged on) with a scroll around it moving on the
+   * same axis, the outer scroll takes the whole drag. Never toward the start with pull to refresh on; a scroll with nothing
+   * around it keeps its edge bounce. Otherwise this scroll keeps the drag to its end.
+   */
+  private LeavesDragToOuter(total: SKPoint): boolean {
+    const vertical = this.Orientation === "Vertical" || (this.Orientation === "Both" && Math.abs(total.Y) >= Math.abs(total.X));
+    const d = vertical ? total.Y : total.X; // finger down / right = toward the start (offset grows to 0)
+    if (d === 0 || (d > 0 && this.RefreshEnabled)) return false;
+    const b = this.ContentOffsetBounds;
+    const offset = vertical ? this.offsetY : this.offsetX;
+    if (d > 0 ? offset < (vertical ? b.Bottom : b.Right) : offset > (vertical ? b.Top : b.Left)) return false;
+    for (let p = this.Parent; p; p = p.Parent)
+      if (p instanceof SkiaScroll && p.RespondsToGestures && p.Orientation !== "Neither" && p.Orientation !== (vertical ? "Horizontal" : "Vertical")) return true;
+    return false;
+  }
+
   private ApplyWheelScroll(delta: number): boolean {
     const perNotch = this.Superview?.WheelDeltaPerNotch ?? 0;
     const lines = perNotch > 0 ? delta / perNotch : Math.sign(delta);

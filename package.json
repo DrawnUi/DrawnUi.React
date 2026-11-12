@@ -73,6 +73,7 @@
     "check:wheel-routing": "node dev/check.mjs dev/check-wheel-routing.ts",
     "check:velocity": "node dev/check.mjs dev/check-velocity.ts",
     "check:scroll-index": "node dev/check.mjs dev/check-scroll-index.ts",
+    "check:scroll-chaining": "node dev/check.mjs dev/check-scroll-chaining.ts",
     "check:culling": "node dev/check.mjs dev/check-culling.ts",
     "check:responds": "node dev/check.mjs dev/check-responds.ts",
     "check:3d": "node dev/check.mjs dev/check-3d.ts",
