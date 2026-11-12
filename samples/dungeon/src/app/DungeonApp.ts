@@ -52,14 +52,9 @@ function SetUniform(effect: SkiaShaderEffect, name: string, values: number[]): v
   effect.UpdateUniforms();
 }
 
-/**
- * The opacity of a control that also says whether screen readers find it: at 0 it is out of their tree, as in C#
- * (the React engine leaves out the children of a control at opacity 0, not the control itself). `role` is its role
- * while it shows; undefined = its class default.
- */
-function SetOpacity(control: SkiaControl, opacity: number, role?: string): void {
+/** Opacity changed from code: the React engine needs the redraw asked for (its properties are plain fields). */
+function SetOpacity(control: SkiaControl, opacity: number): void {
   control.Opacity = opacity;
-  control.AccessibilityRole = opacity > 0 ? role : Aria.RolePresentation;
   control.RepaintComposition();
 }
 
@@ -436,8 +431,8 @@ export class DungeonApp {
               Opacity: 0,
               InputTransparent: true,
               UseCache: "GPU",
-              // Read as one value, said again when it changes (status once it shows: SetOpacity).
-              AccessibilityRole: Aria.RolePresentation,
+              // Read as one value, said again when it changes.
+              AccessibilityRole: Aria.RoleStatus,
               AccessibilityLabel: "Health 100 percent",
               AccessibilityLive: "polite",
               Children: [
@@ -497,7 +492,6 @@ export class DungeonApp {
               TextColor: C(0xFFC9_8BFF),
               Margin: new Thickness(23, 52, 0, 0),
               Opacity: 0,
-              AccessibilityRole: Aria.RolePresentation,
               InputTransparent: true,
             }),
 
@@ -607,7 +601,6 @@ export class DungeonApp {
               Margin: new Thickness(0, 110, 0, 0),
               TranslationY: -GAME_OVER_LIFT,
               Opacity: 0,
-              AccessibilityRole: Aria.RolePresentation,
               InputTransparent: true,
             }),
 
@@ -783,7 +776,7 @@ export class DungeonApp {
       this._fps.IsVisible = onTitle;
       this._fps.Update();
       const opacity = onTitle ? 0.0 : 1.0;
-      SetOpacity(this._hud, opacity, Aria.RoleStatus);
+      SetOpacity(this._hud, opacity);
       this._scoreBox.Opacity = opacity;
       this._scoreBox.RepaintComposition();
     }
