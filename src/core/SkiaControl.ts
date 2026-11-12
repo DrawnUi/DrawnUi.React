@@ -566,6 +566,7 @@ export class SkiaControl {
 
   /** Places MeasuredSize inside destination per Margin + Horizontal/VerticalOptions -> DrawingRect. */
   Arrange(destination: SKRect, _widthRequest: number, _heightRequest: number, scale: number): void {
+    this.arrangedIn = destination;
     const m = this.Margin;
     const availL = destination.Left + m.Left * scale;
     const availT = destination.Top + m.Top * scale;
@@ -890,6 +891,13 @@ export class SkiaControl {
 
   Render(ctx: DrawingContext): void {
     if (!this.IsVisible || this.Opacity <= 0 || this.IsDisposed) return;
+    // parent-independent: its own change stopped at it (the parent does not lay out again), so it measures itself again
+    // in the slot it was given, before it draws (C# IsParentIndependent)
+    const slot = this.arrangedIn;
+    if (this.IsParentIndependent && this.NeedMeasure && slot) {
+      this.Measure(slot.Width, slot.Height, ctx.Scale);
+      this.Arrange(slot, this.WidthRequest, this.HeightRequest, ctx.Scale);
+    }
     const canvas = ctx.Context.Canvas;
     const applyOpacity = this.Opacity < 1;
     // C# Left/Top: a cached control is blitted at an offset, no matrix and no save/restore around the subtree
@@ -1061,6 +1069,9 @@ export class SkiaControl {
     // includes what shadows/effects paint outside the box; image caches on whole pixels
     const r = cacheType === "Operations" ? this.ExpandedCacheRect(ctx.Scale) : this.AlignedCacheRect(ctx.Scale);
     const w = Math.max(1, Math.round(r.Width)), h = Math.max(1, Math.round(r.Height));
+    // clean from here on: a change made while the content records (a child shows a sibling as it paints, an event raised
+    // as a control draws) leaves the cache stale, and the next frame records it again
+    this.cacheDirty = false;
     if (cacheType === "ImageDoubleBuffered") {
       // keep the previous frame as the fallback until the new cache exists
       if (this.RenderObject) { this.DisposePrevious(); this.RenderObjectPrevious = this.RenderObject; this.RenderObject = undefined; }
@@ -1083,9 +1094,9 @@ export class SkiaControl {
       this.CreateCompositeRenderingObject(ctx, r, w, h);
     } else {
       const main = ctx.Context.Surface;
-      if (!main) { this.PaintContent(ctx); return; } // no surface to derive from (e.g. recording): draw live
+      if (!main) { this.cacheDirty = true; this.PaintContent(ctx); return; } // no surface to derive from (e.g. recording): draw live
       const offscreen = main.makeSurface({ ...main.imageInfo(), width: w, height: h });
-      if (!offscreen) { if (!this.RenderObjectPrevious) this.PaintContent(ctx); return; }
+      if (!offscreen) { this.cacheDirty = true; if (!this.RenderObjectPrevious) this.PaintContent(ctx); return; }
       const canvas = offscreen.getCanvas();
       canvas.clear(CK.TRANSPARENT);
       canvas.translate(-r.Left, -r.Top);
@@ -1095,7 +1106,6 @@ export class SkiaControl {
       this.RenderObject = new CachedObject(cacheType, r, ctx.Scale, undefined, image);
       this.RenderObject.Epoch = this.Superview?.GpuEpoch ?? 0;
     }
-    this.cacheDirty = false;
   }
 
   /**
@@ -1502,10 +1512,12 @@ export class SkiaControl {
 
   /**
    * DrawnUi IsParentIndependent: this control's size never changes the layout around it, so its own invalidation
-   * stops here (ancestors composite again, nothing above re-measures). The parent re-measures it on draw when
-   * NeedMeasure is set. Used by SkiaScroll for its scroll bars.
+   * stops here (ancestors composite again, nothing above re-measures). It measures itself again in its last slot when it
+   * draws with NeedMeasure set. Used by SkiaScroll for its scroll bars and by SkiaLabelFps.
    */
   IsParentIndependent = false;
+  /** The slot its parent last arranged it in (a parent-independent control measures itself again there). */
+  private arrangedIn?: SKRect;
 
   /** Size or content may have changed: this control and all ancestors remeasure and re-record. */
   InvalidateMeasure(): void {
