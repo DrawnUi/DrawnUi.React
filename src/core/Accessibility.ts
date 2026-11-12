@@ -478,7 +478,8 @@ export class SkiaAccessibilityManager {
     const modal = this.ActiveModal;
     for (const n of this.nodes) {
       if (!n.Superview) { this.nodes.delete(n); n.OnAccessibilityUnregistered(); continue; } // detached from the tree
-      if (!n.IsVisible || !n.IsAccessibilityElement || n.AccessibilityRole === Aria.RolePresentation) continue;
+      // at opacity 0 a control is not seen, so it is not read either (DrawnUi.Net 4bd759e8)
+      if (!n.IsVisible || n.Opacity <= 0 || !n.IsAccessibilityElement || n.AccessibilityRole === Aria.RolePresentation) continue;
       if (modal && this.IsOutsideModal(n)) continue; // a modal is shown: only its nodes, and those of popup windows over it
       if (AccessibilityManagerHiddenByAncestor(n)) continue; // e.g. the root page kept mounted under a pushed shell page
       const px = n.GetAccessibilityPixelRect();

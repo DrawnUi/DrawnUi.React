@@ -117,6 +117,7 @@
     "check:designer-actions": "node dev/check.mjs dev/check-designer-actions.tsx",
     "check:label-span-effects": "node dev/check.mjs dev/check-label-span-effects.ts",
     "check:animator-isolation": "node dev/check.mjs dev/check-animator-isolation.ts",
+    "check:a11y-opacity": "node dev/check.mjs dev/check-a11y-opacity.ts",
     "check:quiet-animations": "node dev/check.mjs dev/check-quiet-animations.ts",
     "check:skew-sign": "node dev/check.mjs dev/check-skew-sign.ts",
     "check:styles-code": "node dev/check.mjs dev/check-styles-code.ts",
