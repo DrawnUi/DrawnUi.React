@@ -37,9 +37,8 @@ export class Prefetch3D {
     if (waiting.size === 0) return;
     const renderer = Renderer3D.Of(canvas);
     if (!renderer) return;
-    // the program compiles in the GPU process while the next frames go on: nothing is rendered ahead in the frame that
-    // starts it, which would wait for the compile
-    if (renderer.StartProgram()) { canvas.Update(); return; }
+    // the program compiles in the GPU process while the next frames go on: nothing is rendered ahead before it is done
+    if (!renderer.ProgramReady) { canvas.Update(); return; }
     const screen = canvas.Element.height;
     if (screen <= 0) return;
     for (const ref of waiting) {

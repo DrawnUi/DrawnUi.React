@@ -194,6 +194,8 @@ export class Renderer3D {
   StartProgram(): boolean {
     if (this.program) return false;
     const gl = this.gl;
+    // the compile runs in the GPU process; with this extension the page asks whether it is done without waiting
+    this.parallel = gl.getExtension("KHR_parallel_shader_compile");
     this.vs = this.Shader(gl.VERTEX_SHADER, VS);
     this.fs = this.Shader(gl.FRAGMENT_SHADER, FS);
     this.program = gl.createProgram();
@@ -203,6 +205,22 @@ export class Renderer3D {
     gl.linkProgram(this.program);
     return true;
   }
+
+  private parallel: { COMPLETION_STATUS_KHR: number } | null = null;
+
+  /**
+   * The program is compiled and linked: a 3D view draws its first frame only then, so no frame waits for the GPU's
+   * compile (drawnui-cross 6bn). Starts the compile when it has not started. Without KHR_parallel_shader_compile the
+   * browser cannot say: true (the first draw then collects it).
+   */
+  get ProgramReady(): boolean {
+    this.StartProgram();
+    if (this.ready || !this.program || !this.parallel) return true;
+    return this.gl.getProgramParameter(this.program, this.parallel.COMPLETION_STATUS_KHR) === true;
+  }
+
+  /** Starts the 3D program on a canvas's context as early as a 3D control is there (it compiles while the app loads). */
+  static Warm(canvas: Canvas | undefined): void { Renderer3D.Of(canvas)?.StartProgram(); }
 
   /** The program's status and uniform places, read at the first draw. */
   private FinishProgram(): void {

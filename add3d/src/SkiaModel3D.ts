@@ -622,6 +622,8 @@ export class SkiaModel3D extends SkiaControl implements IPrefetch3D {
     }
     const renderer = Renderer3D.Of(this.Superview);
     if (!renderer) return;
+    // the 3D program still compiling (it started as the control was laid out): nothing drawn yet, no frame waits for it
+    if (!renderer.ProgramReady) { this.Superview?.Update(); return; }
     // nothing changed since the last render (a parent redraws): its image again, no 3D pass
     let image = !this.stale && this.target.Owner === renderer && this.target.Width === w && this.target.Height === h ? this.target.Image : undefined;
     image ??= this.Render3D(renderer, w, h, ctx.Scale);
@@ -646,6 +648,8 @@ export class SkiaModel3D extends SkiaControl implements IPrefetch3D {
 
   override Measure(widthConstraint: number, heightConstraint: number, scale: number) {
     const measured = super.Measure(widthConstraint, heightConstraint, scale);
+    // the 3D program compiles from the first layout on, before anything 3D draws (drawnui-cross 6bn)
+    Renderer3D.Warm(this.Superview);
     // rendered ahead once it comes near the screen (Prefetch3D)
     if (!this.queued && !this.gpuReady) this.queued = Prefetch3D.Add(this);
     return measured;
