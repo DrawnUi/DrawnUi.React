@@ -122,7 +122,7 @@ createRoot(document.getElementById("root")!).render(
   included: wrapping text needs all the room it has, short text only its own width, an empty Fill divider adds nothing;
   the Fill children are then laid out at that width. A Row does the same on its height. Give the stack `Fill` or a
   `WidthRequest` to make it take the whole width.
-- `SkiaShell` (React-level): `Routes` (page factories receive the navigation arguments), `GoToAsync("detail?id=7")`
+- `SkiaShell` (JSX `<SkiaShell>` from `drawnui-react`; the same shell as a control, `new SkiaShell()` with controls as pages, from `drawnui-react/core`): `Routes` (page factories receive the navigation arguments), `GoToAsync("detail?id=7")`
   or `GoToAsync("detail", true, { id: 7 })`, `useShell()` inside pages (`GoBackAsync`, `OpenPopupAsync`,
   `PushModalAsync`, `ShowToast`, tabs), `Navigating` (set `e.Cancel`) / `Navigated` / `RouteChanged`, browser
   history + deep links (`UseBrowserHistory`), safe-area `Insets`.

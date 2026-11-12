@@ -70,6 +70,7 @@
     "check:longpress": "node dev/check.mjs dev/check-longpress.ts",
     "check:hidden": "node dev/check.mjs dev/check-hidden.ts",
     "check:shell": "node dev/check.mjs dev/check-shell.tsx",
+    "check:shell-core": "node dev/check.mjs dev/check-shell-core.ts",
     "check:wheel-routing": "node dev/check.mjs dev/check-wheel-routing.ts",
     "check:velocity": "node dev/check.mjs dev/check-velocity.ts",
     "check:scroll-index": "node dev/check.mjs dev/check-scroll-index.ts",

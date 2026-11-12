@@ -421,5 +421,6 @@ export type { SkiaControl };
 // The engine `Canvas` class is shadowed by the React <Canvas> above; reach it via "drawnui-react/core".
 export * from "../index";
 
-// React-level SkiaShell (routes, back nav bar, useShell())
+// SkiaShell with JSX pages, popups and modals (useShell()); the engine SkiaShell is in "drawnui-react/core"
 export * from "./SkiaShell";
+export { SkiaShell } from "./SkiaShell";

@@ -3,6 +3,7 @@ import Reconciler from "react-reconciler";
 import { ConcurrentRoot, DefaultEventPriority } from "react-reconciler/constants";
 import type { Canvas } from "../core/Canvas";
 import { SkiaControl } from "../core/SkiaControl";
+import { ApplyProps as applyProps, type ControlProps } from "../core/Props";
 import { SkiaLabel } from "../controls/SkiaLabel";
 import { TextSpan } from "../controls/TextSpan";
 import { SkiaRichLabel } from "../controls/SkiaRichLabel";
@@ -42,33 +43,7 @@ export const Registry: Record<string, new () => HostInstance> = {
   SkiaSwitch, SkiaCheckbox, SkiaRadioButton, SkiaProgress, SkiaSlider, SkiaCarousel, SkiaShaderCarousel, SkiaDrawer,
 };
 
-type Props = Record<string, unknown>;
-const SKIP = new Set(["children", "key", "ref"]);
-/** Props that change how the subtree is composited, not what it contains: repaint, keep caches (DrawnUi RedrawCanvas). */
-const REPAINT_ONLY = new Set(["TranslationX", "TranslationY", "TranslationZ", "Rotation", "RotationX", "RotationY", "RotationZ", "ScaleX", "ScaleY", "Scale", "SkewX", "SkewY", "AnchorX", "AnchorY", "Opacity"]);
-/** Props that change only how a control looks, never its size (C# NeedDraw): an ImageComposite above redraws only its area. */
-const isDrawOnly = (k: string) => k.endsWith("Color") || k === "FillGradient" || k === "StrokeGradient";
-
-/**
- * Assigns changed props straight onto the control (same names as the C# properties).
- * Handler props (functions) are swapped without invalidating: inline arrows change identity every render.
- */
-function applyProps(inst: HostInstance, prev: Props | null, next: Props): void {
-  let changed = false, repaint = false, layout = false;
-  for (const k in next) {
-    if (SKIP.has(k) || (prev && prev[k] === next[k])) continue;
-    (inst as unknown as Props)[k] = next[k];
-    if (typeof next[k] === "function") continue;
-    if (REPAINT_ONLY.has(k)) repaint = true;
-    else { changed = true; if (!isDrawOnly(k)) layout = true; }
-  }
-  if (prev) for (const k in prev) if (!SKIP.has(k) && !(k in next)) {
-    (inst as unknown as Props)[k] = (new (inst.constructor as new () => HostInstance)() as unknown as Props)[k];
-    changed = layout = true;
-  }
-  if (changed && prev) { if (layout || !(inst instanceof SkiaControl)) inst.Update(); else inst.UpdateDraw(); }
-  else if (repaint && prev) (inst as SkiaControl).RepaintComposition?.();
-}
+type Props = ControlProps;
 
 // DrawnUI Designer, dev builds only: the React fiber that created each control (DesignerSourceOf). Vite replaces
 // import.meta.env.DEV, false in production builds, so the map and its use compile away; without Vite it is undefined
@@ -122,7 +97,20 @@ function appendChild(parent: SkiaControl, child: SkiaControl): void {
   parent.AddSubView(child);
 }
 
-type Cfg = Reconciler.HostConfig<string, Props, Canvas, SkiaControl, never, never, never, never, SkiaControl, HostContext, null, number, -1, null>;
+/**
+ * A portal target other than the canvas: JSX rendered into a place an engine control made for it (the shell's pages,
+ * popups, modals). Its top-level controls are handed to it in order.
+ */
+export interface DrawnContainer {
+  appendChild(child: SkiaControl): void;
+  insertBefore(child: SkiaControl, before: SkiaControl): void;
+  removeChild(child: SkiaControl): void;
+  clear(): void;
+}
+type Container = Canvas | DrawnContainer;
+const IsDrawnContainer = (c: Container): c is DrawnContainer => typeof (c as DrawnContainer).appendChild === "function";
+
+type Cfg = Reconciler.HostConfig<string, Props, Container, SkiaControl, never, never, never, never, SkiaControl, HostContext, null, number, -1, null>;
 
 // Record<string, unknown> absorbs members that react-reconciler 0.33 reads but @types 0.32 does not declare yet.
 const hostConfig: Cfg & Record<string, unknown> = {
@@ -160,10 +148,10 @@ const hostConfig: Cfg & Record<string, unknown> = {
     parent.InsertSubView(parent instanceof SkiaLabel ? parent.Spans.indexOf(before as unknown as TextSpan) : 0, child);
   },
   removeChild: (parent: SkiaControl, child: SkiaControl) => parent.RemoveSubView(child),
-  appendChildToContainer: (canvas: Canvas, child: SkiaControl) => { canvas.Content = child; },
-  insertInContainerBefore: (canvas: Canvas, child: SkiaControl) => { canvas.Content = child; },
-  removeChildFromContainer: (canvas: Canvas, child: SkiaControl) => { if (canvas.Content === child) canvas.Content = undefined; },
-  clearContainer: (canvas: Canvas) => { canvas.Content = undefined; },
+  appendChildToContainer: (c: Container, child: SkiaControl) => { if (IsDrawnContainer(c)) c.appendChild(child); else c.Content = child; },
+  insertInContainerBefore: (c: Container, child: SkiaControl, before: SkiaControl) => { if (IsDrawnContainer(c)) c.insertBefore(child, before); else c.Content = child; },
+  removeChildFromContainer: (c: Container, child: SkiaControl) => { if (IsDrawnContainer(c)) c.removeChild(child); else if (c.Content === child) c.Content = undefined; },
+  clearContainer: (c: Container) => { if (IsDrawnContainer(c)) c.clear(); else c.Content = undefined; },
 
   commitUpdate: (inst: SkiaControl, _type: string, prev: Props, next: Props) => applyProps(inst, prev, next),
   commitTextUpdate: noop,
@@ -215,6 +203,11 @@ const hostConfig: Cfg & Record<string, unknown> = {
 const reconciler = Reconciler(hostConfig);
 
 const onError = (e: unknown) => console.error("DrawnUi.React:", e);
+
+/** Renders `children` into `container` from inside another React tree (contexts reach it), as react-dom createPortal. */
+export function createDrawnPortal(children: ReactNode, container: DrawnContainer, key?: string): ReactNode {
+  return reconciler.createPortal(children, container, null, key) as unknown as ReactNode;
+}
 
 /** Creates a React root whose container is an engine Canvas. */
 export function createDrawnRoot(canvas: Canvas) {

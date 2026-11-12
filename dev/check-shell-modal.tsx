@@ -55,7 +55,10 @@ class FakeCanvas {
     Navigated={(e: SkiaShellNavigatedArgs) => { if (e.Source === "Pop") pops.push(e.Route); }} />);
   await frames(4);
   const sheet = () => <SkiaShape HorizontalOptions="Fill" VerticalOptions="Fill" BackgroundColor="#808080" />;
-  const push = async () => { const done = shell.PushModalAsync(sheet(), { useGestures: true }); for (let i = 0; i < 60 && shell.ModalsCount === 0; i++) await frames(1); await Promise.race([done, frames(40)]); await frames(2); };
+  const push = async () => { const done = shell.PushModalAsync(sheet(), { useGestures: true }); for (let i = 0; i < 60 && shell.ModalsCount === 0; i++) await frames(1); let pushed = false; void done.then(() => { pushed = true; });
+    // frames until the push is reported, never a second frame loop left running alongside the next steps
+    for (let i = 0; i < 40 && !pushed; i++) await frames(1);
+    await frames(2); };
 
   await push();
   const drawer = drawers()[0];

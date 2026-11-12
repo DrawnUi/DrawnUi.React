@@ -35,6 +35,7 @@ export * from "./controls/RefreshIndicator";
 export * from "./core/TextInputProxy";
 export * from "./core/SkiaEffect";
 export * from "./controls/SkiaDrawer";
+export * from "./controls/SkiaShell";
 export * from "./controls/SkiaHotspot";
 export * from "./controls/SkiaShape";
 export * from "./controls/SkiaButton";
