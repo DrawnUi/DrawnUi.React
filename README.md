@@ -51,6 +51,7 @@ DrawnUI is MIT licensed in every language and on every platform: desktop, mobile
 
 ## What's new in the next preview
 
+- **Quiet console:** WebGL starts and comes back after a lost context without browser warnings, in Chromium and WebKit.
 - **Dialogs for keyboard and screen readers:** an open dialog reads as one named dialog, the keyboard goes into it
   and comes back to the control that opened it when it closes.
 - **`Super.OpenLink` and `UpdateNonStop()`:** open an address in a new tab, and keep a self-animating control (a

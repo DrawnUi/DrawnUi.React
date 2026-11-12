@@ -264,7 +264,7 @@ export class Canvas {
     const CK = Super.CK;
     if (this.RenderingMode === "Accelerated") {
       if (!this.grContext) {
-        this.glHandle = CK.GetWebGLContext(this.Element);
+        this.glHandle = Canvas.WithoutPolygonMode(() => CK.GetWebGLContext(this.Element));
         this.grContext = (this.glHandle ? CK.MakeWebGLContext(this.glHandle) : null) ?? undefined;
       }
       if (this.grContext) {
@@ -301,24 +301,48 @@ export class Canvas {
     this.DrawNow();
   }
 
-  /** WebGL context lost: keep the browser restoring it (preventDefault) and stop the frames. */
+  /**
+   * Registers the WebGL context without `WEBGL_polygon_mode` (drawnui-cross 6bt): Emscripten turns on every extension it
+   * knows while it registers a context, nothing here draws with that one, and WebKit warns "non-portable extension
+   * enabled" for it. The lookup is hidden only for this synchronous call (creating the context here first would change
+   * the attributes CanvasKit asks for).
+   */
+  private static WithoutPolygonMode<T>(make: () => T): T {
+    type GetExtension = (this: unknown, name: string) => unknown;
+    const prototypes = [globalThis.WebGL2RenderingContext?.prototype, globalThis.WebGLRenderingContext?.prototype]
+      .filter((p): p is WebGL2RenderingContext & WebGLRenderingContext => !!p) as unknown as { getExtension: GetExtension }[];
+    const originals = prototypes.map((p) => p.getExtension);
+    prototypes.forEach((p, i) => { p.getExtension = function (name: string) { return name === "WEBGL_polygon_mode" ? null : originals[i].call(this, name); }; });
+    try { return make(); } finally { prototypes.forEach((p, i) => { p.getExtension = originals[i]; }); }
+  }
+
+  /**
+   * WebGL context lost: keep the browser restoring it (preventDefault) and stop the frames. The old Skia context is
+   * abandoned here, while the context is lost: WebGL ignores every call on a lost context without a word, so the GL
+   * deletes Skia makes while it lets go of its objects stay silent (done after the restore, they reach the new
+   * generation and every one logs "object does not belong to this context"). CanvasKit has no `abandonContext`;
+   * `releaseResourcesAndAbandonContext` is its only way, and after it freeing an old image or surface makes no GL call.
+   */
   private readonly onContextLost = (e: Event) => {
     e.preventDefault();
     this.contextLost = true;
     if (this.frameId) { cancelAnimationFrame(this.frameId); this.frameId = 0; }
+    if (this.grContext) this.grContext.releaseResourcesAndAbandonContext();
+    this.surface?.dispose();
+    this.surface = undefined;
+    this.grContext?.delete();
+    this.grContext = undefined;
   };
 
   /**
    * WebGL context restored (as DrawnUi.Rust and the C# Wasm / Blazor heads): every GL object of the lost generation is
-   * gone. The old Skia context is abandoned first, while its own GL handle is current and before the new context makes
-   * any object, so its GL calls reach only lost-generation objects. CanvasKit exposes no `abandonContext`;
-   * `releaseResourcesAndAbandonContext` is its only way to abandon, and after it freeing an old image or surface makes no
-   * GL call. Then the same WebGL object is registered again (the old handle deleted first, which clears the canvas'
-   * context object) with a new GrContext and surface; GpuEpoch makes the old generation's GPU objects remake themselves.
+   * gone, and the old Skia context was abandoned when it was lost. The same WebGL object is registered again (the old
+   * handle deleted first, which clears the canvas' context object) with a new GrContext and surface; GpuEpoch makes the
+   * old generation's GPU objects remake themselves.
    */
   private readonly onContextRestored = () => {
     if (this.disposed) return;
-    if (this.grContext) this.grContext.releaseResourcesAndAbandonContext();
+    if (this.grContext) this.grContext.releaseResourcesAndAbandonContext(); // lost before this Canvas listened
     this.surface?.dispose();
     this.surface = undefined;
     this.grContext?.delete();
