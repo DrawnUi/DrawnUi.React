@@ -263,7 +263,17 @@ export class SkiaAccessibilityManager {
   private focusAnyInside = false;
 
   /** The keyboard goes to this control at the end of the next frame (a popup closed: back to what opened it). */
-  RequestKeyboardFocus(control: SkiaControl): void { if (!this.appFocusThisFrame) this.focusRequest = control; }
+  RequestKeyboardFocus(control: SkiaControl): void {
+    if (this.appFocusThisFrame) return;
+    this.focusRequest = control;
+    this.focusRequestDeadline = performance.now() + SkiaAccessibilityManager.FocusRequestWaitMs;
+  }
+  /**
+   * How long a keyboard focus request waits for its control to take input again (drawnui-cross 6bs): an app that shows
+   * the opener of a dialog again only once the dialog is gone (a HUD hidden under it) still gets the keyboard back there.
+   */
+  static FocusRequestWaitMs = 1000;
+  private focusRequestDeadline = 0;
 
   private appFocus?: SkiaControl;
   private appFocusDeadline = 0;
@@ -312,6 +322,18 @@ export class SkiaAccessibilityManager {
 
   /** The modal that accessibility is limited to: the topmost `AccessibilityModal` control that shows. Undefined when none. */
   ActiveModal?: SkiaControl;
+
+  /**
+   * The node the overlay names the active modal after (drawnui-cross 6bs): the modal's own when it has a name, else the
+   * first named dialog inside it, so a nameless popup host around a dialog reads as that one dialog, not as two.
+   */
+  get ActiveModalNode(): AccessibilityNode | undefined {
+    const modal = this.ActiveModal;
+    if (!modal) return undefined;
+    const own = this.Snapshot.find((n) => n.Source === modal);
+    if (own?.Label) return own;
+    return this.Snapshot.find((n) => (n.Role === Aria.RoleDialog || n.Role === Aria.RoleAlertDialog) && !!n.Label && n.Source !== modal && IsInside(n.Source, modal)) ?? own;
+  }
   // where the keyboard was when each modal became active, to go back there when it goes
   private readonly modalReturns = new Map<SkiaControl, SkiaControl>();
 
@@ -363,7 +385,7 @@ export class SkiaAccessibilityManager {
    */
   FocusOpenedPopup(root: SkiaControl): void { this.popupFocusRoot = root; this.focusAnyInside = false; }
 
-  private ProcessFocusRequests(scale: number, w: number, h: number): void {
+  private ProcessFocusRequests(scale: number, w: number, h: number, requestFrame: () => void): void {
     const request = this.focusRequest, root = this.popupFocusRoot;
     this.focusRequest = this.popupFocusRoot = undefined;
     if (root && !root.IsDisposed && root.Superview) {
@@ -375,7 +397,10 @@ export class SkiaAccessibilityManager {
       const target = items.find((n) => n.IsPressed === true && choice(n.Role)) ?? items[0];
       if (target) { this.FocusFromKeyboard(target.Source, scale, w, h); return; }
     }
-    if (request && !request.IsDisposed && request.Superview && request.AccessibilityCanInteract) this.FocusFromKeyboard(request, scale, w, h);
+    if (!request || request.IsDisposed || !request.Superview) return;
+    if (request.AccessibilityCanInteract) this.FocusFromKeyboard(request, scale, w, h);
+    // not taking input yet (shown again only after a dialog closed): asked again on the next frames, for a moment
+    else if (performance.now() < this.focusRequestDeadline) { this.focusRequest = request; requestFrame(); }
   }
 
   /** Frame end: focus the requested item once it is drawn, skipping items that cannot take input. */
@@ -455,7 +480,7 @@ export class SkiaAccessibilityManager {
       for (const cb of this.keyboardFocusRequested) cb(undefined);
     }
     if (this.appFocus) this.ProcessAppFocus(scale, canvasWidthPx, canvasHeightPx, requestFrame);
-    if (this.focusRequest || this.popupFocusRoot) this.ProcessFocusRequests(scale, canvasWidthPx, canvasHeightPx);
+    if (this.focusRequest || this.popupFocusRoot) this.ProcessFocusRequests(scale, canvasWidthPx, canvasHeightPx, requestFrame);
     this.appFocusThisFrame = false;
     if (this.nodes.size === 0 && this.Snapshot.length === 0) return;
     const now = performance.now();

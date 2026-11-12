@@ -118,6 +118,7 @@
     "check:editor-window": "node dev/check.mjs dev/check-editor-window.ts",
     "check:system-theme": "node dev/check.mjs dev/check-system-theme.ts",
     "check:designer-actions": "node dev/check.mjs dev/check-designer-actions.tsx",
+    "check:dialog-a11y": "node dev/check.mjs dev/check-dialog-a11y.ts",
     "check:label-span-effects": "node dev/check.mjs dev/check-label-span-effects.ts",
     "check:animator-isolation": "node dev/check.mjs dev/check-animator-isolation.ts",
     "check:a11y-opacity": "node dev/check.mjs dev/check-a11y-opacity.ts",

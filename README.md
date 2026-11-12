@@ -51,6 +51,8 @@ DrawnUI is MIT licensed in every language and on every platform: desktop, mobile
 
 ## What's new in the next preview
 
+- **Dialogs for keyboard and screen readers:** an open dialog reads as one named dialog, the keyboard goes into it
+  and comes back to the control that opened it when it closes.
 - **`Super.OpenLink` and `UpdateNonStop()`:** open an address in a new tab, and keep a self-animating control (a
   time-driven shader, a clock) drawing every frame while it is shown, as in DrawnUi .NET.
 - **Layout rules as in DrawnUI for .NET and Rust:** a Fill control with a size request keeps the requested size; a

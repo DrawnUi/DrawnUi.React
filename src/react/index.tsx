@@ -348,15 +348,16 @@ function AccessibilityOverlay({ view }: { view: CanvasView }) {
   // the browser scrolls an overflow:hidden container to reveal a focused child; the overlay must stay pinned to the canvas
   const pin = (e: React.SyntheticEvent<HTMLDivElement>) => { e.currentTarget.scrollTop = 0; e.currentTarget.scrollLeft = 0; };
   // an active modal (drawnui-cross 6av): the overlay itself is the dialog (role, name, aria-modal) around the dialog's
-  // controls, which are its elements; aria-modal on a separate element of this flat overlay would hide them
+  // controls, which are its elements; aria-modal on a separate element of this flat overlay would hide them. A nameless
+  // modal (a popup host) takes the role and name of the dialog inside it: one dialog for readers (6bs)
   const modal = view.AccessibilityManager.ActiveModal;
-  const modalNode = modal ? nodes.find((n) => n.Source === modal) : undefined;
+  const modalNode = modal ? view.AccessibilityManager.ActiveModalNode : undefined;
   return (
     <div className="drawnui-a11y-overlay" onScroll={pin} ref={overlayRef}
       role={modal ? modalNode?.Role ?? "dialog" : undefined} aria-label={modalNode?.Label} aria-modal={modal ? true : undefined}>
       <style>{A11Y_CSS}</style>
       {nodes.map((n) => {
-        if (n === modalNode) return null;
+        if (n === modalNode || (modal && n.Source === modal)) return null;
         const pos: CSSProperties = { left: n.Rect.Left, top: n.Rect.Top, width: n.Rect.Width, height: n.Rect.Height };
         const activate = () => SkiaAccessibilityManager.Activate(n.Source);
         return n.CanInteract ? (
