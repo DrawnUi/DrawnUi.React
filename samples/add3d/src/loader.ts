@@ -1,5 +1,5 @@
-// The page's loader (index.html): the real download progress of what the gallery waits for (the engine's CanvasKit wasm
-// and the fonts), and its fade when the gallery draws its first frame.
+// The page's loader (index.html): the real download progress of what the gallery waits for (the engine's CanvasKit wasm,
+// the fonts, the models and images), and its fade when the gallery draws its first frame.
 declare const __ADD3D_BYTES__: number;
 
 const loader = document.getElementById("loader");
@@ -18,7 +18,7 @@ export function TrackDownloads(): void {
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const res = await fetchBefore(input, init);
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-    if (!/\.(wasm|ttf)(\?|$)/.test(url) || !res.body) return res;
+    if (!/\.(wasm|ttf|glb|jpg)(\?|$)/.test(url) || !res.body) return res;
     const reader = res.body.getReader();
     const counted = new ReadableStream<Uint8Array>({
       async pull(controller) {
