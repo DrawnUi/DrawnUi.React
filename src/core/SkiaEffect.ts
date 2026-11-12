@@ -82,6 +82,19 @@ interface UniformSlot { slot: number; count: number }
  * skipped, declared texture children that are not supplied sample transparent.
  */
 export class SkiaShaderEffect extends SkiaEffect implements IPostRendererEffect {
+  /**
+   * The clock origin of every shader's iTime: the page time (ms) of the first shader frame, one for all effects so
+   * they stay in step (C# ShaderTimeOriginNanos). iTime is a float32 on the GPU: counted from the page load, a tab open
+   * for days would move it in visible steps (0.125 s after 18 days).
+   */
+  static ShaderTimeOrigin?: number;
+
+  /** Seconds since the first shader frame for a page time in ms, taken in double before the GPU's float (C# GetShaderTime). */
+  static GetShaderTime(nowMs: number): number {
+    SkiaShaderEffect.ShaderTimeOrigin ??= nowMs;
+    return (nowMs - SkiaShaderEffect.ShaderTimeOrigin) / 1000;
+  }
+
   /** Url of the .sksl file (fetched once, compiled once per text). */
   get ShaderSource(): string { return this.shaderSource; }
   set ShaderSource(v: string) { if (this.shaderSource !== v) { this.shaderSource = v; this.ApplyShaderSource(); } }
@@ -102,7 +115,7 @@ export class SkiaShaderEffect extends SkiaEffect implements IPostRendererEffect 
   MipmapMode: SkiaMipmapMode = "None";
   /** Tile mode of the input textures. */
   TileMode: ShaderTileMode = "Clamp";
-  /** Set every Render from the frame time (seconds); can be driven manually. */
+  /** Set every Render: seconds since the first shader frame (GetShaderTime); can be driven manually. */
   TimeSeconds = 0;
   /** Shadertoy iMouse.xy, pixels relative to the control. */
   MouseCurrent = { X: 0, Y: 0 };
@@ -373,7 +386,7 @@ export class SkiaShaderEffect extends SkiaEffect implements IPostRendererEffect 
 
   /** IPostRendererEffect: draws the shader over ctx.Destination (C# Render). */
   Render(ctx: DrawingContext): void {
-    this.TimeSeconds = performance.now() / 1000;
+    this.TimeSeconds = SkiaShaderEffect.GetShaderTime(performance.now());
     const texture = this.GetPrimaryTexture(ctx, ctx.Destination);
     const built = this.CreateShader(ctx, texture);
     if (!built) return;

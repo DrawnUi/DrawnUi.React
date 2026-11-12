@@ -51,6 +51,8 @@ DrawnUI is MIT licensed in every language and on every platform: desktop, mobile
 
 ## What's new in the next preview
 
+- **Shader time:** `iTime` counts from the first shader frame, shared by every effect, so animated shaders stay smooth
+  however long the page has been open.
 - **Screen readers and opacity:** a control faded to opacity 0 is left out of the screen-reader tree, like a hidden one,
   and is read again when it shows.
 - **Styles with code-behind:** a control built in code keeps every property the code set; a registered style fills in

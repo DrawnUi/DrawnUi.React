@@ -80,6 +80,7 @@
     "check:gesture-owner": "node dev/check.mjs dev/check-gesture-owner.ts",
     "check:shader-cache": "node dev/check.mjs dev/check-shader-cache.ts",
     "check:shader-content": "node dev/check.mjs dev/check-shader-content.ts",
+    "check:shader-time": "node dev/check.mjs dev/check-shader-time.ts",
     "check:backdrop": "node dev/check.mjs dev/check-backdrop.ts",
     "check:masonry": "node dev/check.mjs dev/check-masonry.ts",
     "check:thickness": "node dev/check.mjs dev/check-thickness.ts",
