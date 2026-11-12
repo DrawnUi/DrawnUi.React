@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://add3dreact.drawnui.net/sitemap.xml

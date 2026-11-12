@@ -1,6 +1,6 @@
 // Plays a scene's animations: one main animation (looped, once and back, or held on its last frame), a cross-fade from
 // the one before, and animations layered on top for other objects. Port of DrawnUi.Add3d Player3D.
-import { QuatSlerp } from "./math";
+import { SlerpInto } from "./math";
 import { LOCAL, type Scene3D, type Track } from "./scene";
 
 export class Player3D {
@@ -95,9 +95,11 @@ export class Player3D {
         const w = Math.min(Math.max(this.fadeElapsed / this.Fade, 0), 1);
         for (let i = 0; i < n; i++) {
           const at = i * LOCAL;
-          for (const k of [0, 1, 2, 7, 8, 9]) local[at + k] = old[at + k] + (local[at + k] - old[at + k]) * w;
-          const q = QuatSlerp([old[at + 3], old[at + 4], old[at + 5], old[at + 6]], [local[at + 3], local[at + 4], local[at + 5], local[at + 6]], w);
-          local[at + 3] = q[0]; local[at + 4] = q[1]; local[at + 5] = q[2]; local[at + 6] = q[3];
+          for (let k = 0; k < 3; k++) {
+            local[at + k] = old[at + k] + (local[at + k] - old[at + k]) * w;
+            local[at + 7 + k] = old[at + 7 + k] + (local[at + 7 + k] - old[at + 7 + k]) * w;
+          }
+          SlerpInto(local, at + 3, old, at + 3, local, at + 3, w);
         }
       } else scene.Apply(this.Main, local);
     }

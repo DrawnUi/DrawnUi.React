@@ -3,7 +3,7 @@
 // ponytail: base color factor and texture only (no normal, metallic-roughness or emissive maps), no morph targets, no
 // sparse accessors, vertex colors ignored, CUBICSPLINE samplers read as linear. Add them when a model needs them.
 import { Super } from "drawnui-react/core";
-import { Invert, LookAt, Mat4Identity, Mul, PerspectiveGl, Project, QuatAxisAngle, QuatNormalize, QuatSlerp, Radians, Rotate, TransformDir, TransformPoint, Decompose, type Mat4, type Quat, type Vec3 } from "./math";
+import { Invert, LookAt, Mat4Identity, Mul, PerspectiveGl, Project, QuatAxisAngle, QuatNormalize, Radians, SlerpInto, Rotate, TransformDir, TransformPoint, Decompose, type Mat4, type Quat, type Vec3 } from "./math";
 
 export interface Node3D { Name: string; Parent: number; Mesh: number; Skin: number; /** t3 r4 s3 */ Rest: Float32Array }
 
@@ -379,8 +379,7 @@ export function Sample(c: Channel3D, t: number, width: number, out: Float32Array
   const f = Math.min(Math.max((t - c.Times[k0]) / span, 0), 1);
   const a0 = k0 * width, b0 = k1 * width;
   if (width === 4) {
-    const q = QuatSlerp([values[a0], values[a0 + 1], values[a0 + 2], values[a0 + 3]], [values[b0], values[b0 + 1], values[b0 + 2], values[b0 + 3]], f);
-    out[at] = q[0]; out[at + 1] = q[1]; out[at + 2] = q[2]; out[at + 3] = q[3];
+    SlerpInto(out, at, values, a0, values, b0, f);
     return;
   }
   for (let i = 0; i < width; i++) out[at + i] = values[a0 + i] + (values[b0 + i] - values[a0 + i]) * f;

@@ -132,8 +132,9 @@ export class RenderTarget {
  * Where the light's highlight is seen from, for the shader: the eye as a point (w = 1) for a perspective camera, else
  * the direction toward the viewer (w = 0, orthographic: SkiaScene3D). The same rule as DrawnUI for Rust.
  */
+const eyeInverse = new Float32Array(16);
 export function Eye(viewProj: Mat4): [number, number, number, number] {
-  const inverse = new Float32Array(16);
+  const inverse = eyeInverse;
   if (!Invert(inverse, viewProj)) return [0, 0, 1, 0];
   const e = Transform4(inverse, 0, 0, 1, 0);
   if (Math.abs(e[3]) > 1e-6) return [e[0] / e[3], e[1] / e[3], e[2] / e[3], 1];

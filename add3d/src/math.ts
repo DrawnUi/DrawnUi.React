@@ -141,6 +141,21 @@ export function QuatSlerp(a: Quat, b: Quat, t: number): Quat {
   return [a[0] * k0 + bx * k1, a[1] * k0 + by * k1, a[2] * k0 + bz * k1, a[3] * k0 + bw * k1];
 }
 
+/**
+ * The shortest-arc blend of quaternions a (at `ai` in `av`) and b (at `bi` in `bv`) written into `out` at `oi`, without
+ * allocating: the per-frame path of animations (100 animated objects sample thousands of rotations a frame).
+ */
+export function SlerpInto(out: Float32Array, oi: number, av: ArrayLike<number>, ai: number, bv: ArrayLike<number>, bi: number, t: number): void {
+  const ax = av[ai], ay = av[ai + 1], az = av[ai + 2], aw = av[ai + 3];
+  let bx = bv[bi], by = bv[bi + 1], bz = bv[bi + 2], bw = bv[bi + 3];
+  let cos = ax * bx + ay * by + az * bz + aw * bw;
+  if (cos < 0) { cos = -cos; bx = -bx; by = -by; bz = -bz; bw = -bw; }
+  let k0: number, k1: number;
+  if (cos > 1 - 1e-6) { k0 = 1 - t; k1 = t; }
+  else { const angle = Math.acos(cos), sin = Math.sin(angle); k0 = Math.sin((1 - t) * angle) / sin; k1 = Math.sin(t * angle) / sin; }
+  out[oi] = ax * k0 + bx * k1; out[oi + 1] = ay * k0 + by * k1; out[oi + 2] = az * k0 + bz * k1; out[oi + 3] = aw * k0 + bw * k1;
+}
+
 /** Rotations around x, y, z in degrees, as glam's EulerRot::XYZ (x * y * z). */
 export function Euler(x: number, y: number, z: number): Quat {
   return QuatMul(QuatMul(QuatAxisAngle([1, 0, 0], Radians(x)), QuatAxisAngle([0, 1, 0], Radians(y))), QuatAxisAngle([0, 0, 1], Radians(z)));

@@ -3,12 +3,98 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>DrawnUI 3D Demo</title>
-    <link rel="icon" href="/favicon.ico" />
-    <style>html, body, #root { margin: 0; height: 100%; background: #F4F1EC; overflow: hidden; }</style>
+    <title>DrawnUI 3D: real 3D models inside a drawn UI, in React</title>
+    <meta
+      name="description"
+      content="Real 3D models inside a drawn UI, right in your browser: a product viewer, a shop list with live 3D thumbnails, cards, a globe with pins, a form with a 3D mascot and a field of 100 animated characters, in a 3D or hand-drawn look. Made with DrawnUI for React."
+    />
+    <meta name="keywords" content="DrawnUI, React, 3D, glTF, GLB, 3D model viewer, product viewer, Skia, CanvasKit, WebGL 2, toon shading, game characters" />
+    <meta name="author" content="DrawnUI" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <meta name="theme-color" content="#121218" />
+    <link rel="canonical" href="https://add3dreact.drawnui.net/" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="DrawnUI 3D" />
+    <meta property="og:url" content="https://add3dreact.drawnui.net/" />
+    <meta property="og:title" content="Real 3D inside a drawn UI, with DrawnUI for React" />
+    <meta
+      property="og:description"
+      content="A product viewer, a shop list, cards, a globe, a form and a field of 100 animated characters: real glTF models inside a Skia-drawn UI, running in your browser."
+    />
+    <meta property="og:locale" content="en_US" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Real 3D inside a drawn UI, with DrawnUI for React" />
+    <meta
+      name="twitter:description"
+      content="A product viewer, a shop list, cards, a globe, a form and a field of 100 animated characters: real glTF models inside a Skia-drawn UI, running in your browser."
+    />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "DrawnUI 3D",
+        "url": "https://add3dreact.drawnui.net/",
+        "description": "Real 3D models inside a drawn UI, in the browser: a product viewer, a shop list with live 3D thumbnails, cards, a globe with pins, a form with a 3D mascot and a field of 100 animated characters, in a 3D or hand-drawn look. Made with DrawnUI for React.",
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "Any",
+        "browserRequirements": "Requires JavaScript and WebGL 2",
+        "inLanguage": "en",
+        "author": { "@type": "Organization", "name": "DrawnUI", "url": "https://drawnui.net/" }
+      }
+    </script>
+
+    <link rel="icon" href="favicon.ico" />
+    <style>
+      html, body { margin: 0; height: 100%; background: #121218; overflow: hidden; }
+      /* 100dvh: the part of the screen the browser's own bars leave free (Safari on an iPhone). */
+      #root { width: 100vw; height: 100vh; height: 100dvh; touch-action: none; }
+      /* The loader (drawnui-cross 6bw) in the gallery's colors: the title over a violet glow, the real download progress
+         (src/loader.ts sets --load-pct from the bytes of the engine and its fonts), faded out on the first drawn frame. */
+      .loader { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+                gap: 22px; background: radial-gradient(ellipse at 50% 55%, #241f45 0%, #0e1018 65%); transition: opacity 0.3s; }
+      .loader.done { opacity: 0; pointer-events: none; }
+      .loader-title { font: 40px "Gallery Title", system-ui, sans-serif; letter-spacing: 1px; text-align: center;
+                      background: linear-gradient(#ffffff, #c9c0ff 55%, #7c6cf2); -webkit-background-clip: text;
+                      background-clip: text; color: transparent; animation: glow 1.6s ease-in-out infinite; }
+      .loader-bar { width: min(260px, 60vw); height: 4px; border-radius: 2px; background: #221f3a; overflow: hidden; }
+      .loader-fill { height: 100%; width: var(--load-pct, 0%); transition: width 0.2s;
+                     background: linear-gradient(90deg, #7c6cf2, #c9c0ff); box-shadow: 0 0 10px #7c6cf2; }
+      .loader-text { font: 12px "Gallery Title", system-ui, sans-serif; letter-spacing: 3px; color: #8b86a8; }
+      .loader-text::after { content: " " var(--load-pct-text, ""); }
+      @keyframes glow {
+        0%, 100% { filter: drop-shadow(0 0 10px rgba(124, 108, 242, 0.45)); }
+        50% { filter: drop-shadow(0 0 22px rgba(124, 108, 242, 0.8)); }
+      }
+      @media (prefers-reduced-motion: reduce) { .loader-title { animation: none; } }
+    </style>
+    <script>
+      // The loader's font, from the same stamped address the app loads it from (a CSS url() gets no stamp).
+      {
+        const v = (globalThis.DrawnUiAssetStamps || {})["fonts/OpenSans-Semibold.ttf"];
+        const face = new FontFace("Gallery Title", `url(fonts/OpenSans-Semibold.ttf${v ? "?v=" + v : ""})`, { display: "block" });
+        document.fonts.add(face);
+        face.load().catch(() => {});
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
+    <div class="loader" id="loader" role="progressbar" aria-label="Loading DrawnUI 3D Demo">
+      <div class="loader-title">DrawnUI 3D Demo</div>
+      <div class="loader-bar"><div class="loader-fill"></div></div>
+      <div class="loader-text">LOADING</div>
+    </div>
+    <noscript>
+      <h1>DrawnUI 3D</h1>
+      <p>
+        Real 3D models inside a drawn UI: a product viewer, a shop list with live 3D thumbnails, cards, a globe with pins,
+        a form with a 3D mascot and a field of 100 animated characters. Made with DrawnUI for React. The gallery needs
+        JavaScript and WebGL 2 to run.
+      </p>
+      <p><a href="https://drawnui.net/">DrawnUI</a> · <a href="https://helloreact.drawnui.net/">DrawnUI for React demo</a></p>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
