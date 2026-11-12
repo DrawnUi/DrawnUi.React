@@ -11,7 +11,7 @@
 // transform or the opacity. Label texts, sizes and colors and shape shadows invalidate by themselves.
 
 import {
-  ActionOnTickAnimator, Aria, type Color, type InputKey, KeyboardManager, type SkiaControl, type SkiaGesturesParameters, type SkiaGradient, type ScaledSize,
+  ActionOnTickAnimator, Aria, type Color, type InputKey, KeyboardManager, type SkiaControl, type SkiaGesturesParameters, type SkiaGradient,
   SkiaBackdrop, SkiaLabel, SkiaLabelFps, SkiaLayer, SkiaLayout, SkiaRow, SkiaScroll, SkiaShaderEffect, SkiaShadow,
   SkiaShape, SkiaStack, SkiaWrap, Super, TextSpan, Thickness,
 } from "drawnui-react/core";
@@ -56,22 +56,6 @@ function SetUniform(effect: SkiaShaderEffect, name: string, values: number[]): v
 function SetOpacity(control: SkiaControl, opacity: number): void {
   control.Opacity = opacity;
   control.RepaintComposition();
-}
-
-/**
- * The panel under a dialog's content, as big as that content (drawn under it). C# measures the Fill children of an
- * auto-sized layer at the size its other children take; the React engine measures them at the whole space it is
- * given, so the panel takes the measured size of the content itself (the content comes first in the layer).
- */
-class DialogPanel extends SkiaLayer {
-  constructor(private readonly _content: SkiaControl) { super(); this.ZIndex = -1; }
-  override Measure(widthConstraint: number, heightConstraint: number, scale: number): ScaledSize {
-    this.NeedMeasure = true; // follows the content, measured just before it
-    return super.Measure(widthConstraint, heightConstraint, scale);
-  }
-  protected override MeasureAbsolute(_widthConstraint: number, _heightConstraint: number, _scale: number): ScaledSize {
-    return this._content.MeasuredSize;
-  }
 }
 
 // ---- DungeonApp.cs: the app's state and the tree ----
@@ -1134,7 +1118,8 @@ export class DungeonApp {
         ...content,
       ],
     });
-    const panel = Make(new DialogPanel(stack), {
+    const panel = Make(new SkiaLayer(), {
+      VerticalOptions: "Fill",
       VisualEffects: [
         Make(new SkiaShaderEffect(), {
           ShaderCode: DIALOG,
@@ -1153,8 +1138,7 @@ export class DungeonApp {
       Margin: DungeonApp.SafeInsets,
       AccessibilityRole: Aria.RoleDialog,
       AccessibilityLabel: title,
-      // the content first: the panel takes its size (DialogPanel), drawn under it (ZIndex -1)
-      Children: [stack, panel],
+      Children: [panel, stack],
     });
   }
 
@@ -1182,8 +1166,6 @@ export class DungeonApp {
     const children: SkiaControl[] = [
       Make(new SkiaLayer(), {
         WidthRequest: 26,
-        // C# places a Fill layer with a width request at the start; the React engine stretches it over the row
-        HorizontalOptions: "Start",
         VerticalOptions: "Fill",
         Children: [Make(swatch, { HorizontalOptions: "Center", VerticalOptions: "Center" })],
       }),
