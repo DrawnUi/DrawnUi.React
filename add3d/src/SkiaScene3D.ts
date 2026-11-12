@@ -8,7 +8,7 @@ import { Look, type SceneAnimationEnded, type SceneHit, type Texture3D } from ".
 import type { Model3D } from "./shapes";
 import { Prefetch3D, type IPrefetch3D } from "./prefetch";
 import { ColorLinear, ColorSrgb } from "./colors";
-import { DrawFlipped } from "./SkiaModel3D";
+import { DrawFlipped, RedrawAfterFrame } from "./SkiaModel3D";
 
 /** A model the layer can place: its scene, the point it stands on and its height at rest. */
 interface ModelEntry { Name: string; Scene: Scene3D; Anchor: Vec3; Height: number }
@@ -42,6 +42,8 @@ export class SkiaScene3D extends SkiaControl implements IPrefetch3D {
   private loop?: ActionOnTickAnimator;
   private lastNanos = 0;
   private painted = false;
+  /** Drawn on screen once: it renders there, warming ahead is no longer needed. */
+  private drawn = false;
   private tilt = 15;
   private outlineWidth = 0;
   private playing = true;
@@ -337,10 +339,11 @@ export class SkiaScene3D extends SkiaControl implements IPrefetch3D {
     const w = Math.round(dest.Width), h = Math.round(dest.Height);
     if (w <= 0 || h <= 0 || this.objects.length === 0) return;
     this.painted = true;
+    this.drawn = true;
     if (this.WantsFrames && !this.loop?.IsRunning) this.UpdateTicking();
     const renderer = Renderer3D.Of(this.Superview);
     if (!renderer) return;
-    if (!renderer.ProgramReady) { this.Superview?.Update(); return; }
+    if (!renderer.ProgramReady) { RedrawAfterFrame(this); return; }
     const image = this.Render3D(renderer, w, h, ctx.Scale);
     if (image) DrawFlipped(ctx, image, dest.Left, dest.Top, w, h);
   }
@@ -362,7 +365,7 @@ export class SkiaScene3D extends SkiaControl implements IPrefetch3D {
 
   Prefetch(renderer: Renderer3D): void {
     const w = Math.round(this.MeasuredSize.Pixels.Width), h = Math.round(this.MeasuredSize.Pixels.Height);
-    if (this.objects.length > 0 && !this.gpuReady && w > 0 && h > 0 && Number.isFinite(w) && Number.isFinite(h)) this.Render3D(renderer, w, h, this.RenderingScale);
+    if (this.objects.length > 0 && !this.gpuReady && !this.drawn && w > 0 && h > 0 && Number.isFinite(w) && Number.isFinite(h)) this.Render3D(renderer, w, h, this.RenderingScale);
   }
 
   override Measure(widthConstraint: number, heightConstraint: number, scale: number) {

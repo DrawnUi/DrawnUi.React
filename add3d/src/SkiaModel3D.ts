@@ -623,7 +623,7 @@ export class SkiaModel3D extends SkiaControl implements IPrefetch3D {
     const renderer = Renderer3D.Of(this.Superview);
     if (!renderer) return;
     // the 3D program still compiling (it started as the control was laid out): nothing drawn yet, no frame waits for it
-    if (!renderer.ProgramReady) { this.Superview?.Update(); return; }
+    if (!renderer.ProgramReady) { RedrawAfterFrame(this); return; }
     // nothing changed since the last render (a parent redraws): its image again, no 3D pass
     let image = !this.stale && this.target.Owner === renderer && this.target.Width === w && this.target.Height === h ? this.target.Image : undefined;
     image ??= this.Render3D(renderer, w, h, ctx.Scale);
@@ -643,7 +643,8 @@ export class SkiaModel3D extends SkiaControl implements IPrefetch3D {
   /** Renders once off screen at its measured size: uploads its model and images, makes its target (warming, 6bn). */
   Prefetch(renderer: Renderer3D): void {
     const w = Math.round(this.MeasuredSize.Pixels.Width), h = Math.round(this.MeasuredSize.Pixels.Height);
-    if (this.scene && !this.gpuReady && w > 0 && h > 0 && Number.isFinite(w) && Number.isFinite(h)) this.Render3D(renderer, w, h, this.RenderingScale);
+    // a control already drawn on screen renders there (its cached parents record it then)
+    if (this.scene && !this.gpuReady && !this.drawn && w > 0 && h > 0 && Number.isFinite(w) && Number.isFinite(h)) this.Render3D(renderer, w, h, this.RenderingScale);
   }
 
   override Measure(widthConstraint: number, heightConstraint: number, scale: number) {
@@ -671,6 +672,18 @@ export class SkiaModel3D extends SkiaControl implements IPrefetch3D {
     Renderer3D.Release(this.target);
     super.OnDisposing();
   }
+}
+
+/**
+ * Drawn nothing this frame (its 3D program still compiling): once the frame is over, the control and every cached parent
+ * that recorded it empty draw again. Asked from inside the frame, a parent's cache recording would end with the request
+ * forgotten and keep the empty picture.
+ */
+export function RedrawAfterFrame(control: SkiaControl): void {
+  const canvas = control.Superview;
+  if (!canvas) return;
+  const once = () => { canvas.WasDrawnListeners.delete(once); if (!control.IsDisposed) control.Update(); };
+  canvas.WasDrawnListeners.add(once);
 }
 
 const IDENTITY = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
