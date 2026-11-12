@@ -51,6 +51,9 @@ DrawnUI is MIT licensed in every language and on every platform: desktop, mobile
 
 ## What's new in the next preview
 
+- **Layout rules as in DrawnUI for .NET and Rust:** a Fill control with a size request keeps the requested size; a
+  layer without a size of its own fits its sized children, and an empty Fill background takes that size; Center with
+  unequal margins moves by the full margin difference.
 - **Shader time:** `iTime` counts from the first shader frame, shared by every effect, so animated shaders stay smooth
   however long the page has been open.
 - **Screen readers and opacity:** a control faded to opacity 0 is left out of the screen-reader tree, like a hidden one,

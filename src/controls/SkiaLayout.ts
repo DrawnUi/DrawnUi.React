@@ -478,6 +478,27 @@ export class SkiaLayout extends SkiaControl {
         ch = size; cw = 0;
         for (const v of visible) cw += (v.VerticalOptions === "Fill" && v.HeightRequest < 0 ? v.Measure(Infinity, size, scale) : v.MeasuredSize).Pixels.Width;
       }
+    } else if (this.Type !== "Column" && this.Type !== "Row" && this.LockRatio === 0) {
+      // a layer without its own size on an axis is as big as its children there, where a Fill child with no content of
+      // its own (a background shape, a backdrop) counts only with its requests: it takes the layer's size, measured again
+      // at it (as DrawnUI for Rust and .NET). A Fill child with content still sizes the layer as before.
+      const autoW = (this.HorizontalOptions !== "Fill" || !isFinite(w)) && this.WidthRequest < 0;
+      const autoH = (this.VerticalOptions !== "Fill" || !isFinite(h)) && this.HeightRequest < 0;
+      if (autoW || autoH) {
+        const emptyX = (v: LayoutChild) => v.HorizontalOptions === "Fill" && v.WidthRequest < 0 && v.FitPixels.Width - v.Margin.HorizontalThickness * scale <= 0;
+        const emptyY = (v: LayoutChild) => v.VerticalOptions === "Fill" && v.HeightRequest < 0 && v.FitPixels.Height - v.Margin.VerticalThickness * scale <= 0;
+        let sw = 0, sh = 0;
+        for (const v of visible) {
+          sw = Math.max(sw, emptyX(v) ? v.FitPixels.Width : v.MeasuredSize.Pixels.Width);
+          sh = Math.max(sh, emptyY(v) ? v.FitPixels.Height : v.MeasuredSize.Pixels.Height);
+        }
+        if (!autoW) sw = cw;
+        if (!autoH) sh = ch;
+        if (sw !== cw || sh !== ch) {
+          cw = sw; ch = sh;
+          for (const v of visible) if ((autoW && emptyX(v)) || (autoH && emptyY(v))) v.Measure(autoW ? sw : w, autoH ? sh : h, scale);
+        }
+      }
     }
     const gaps = Math.max(0, n - 1) * gap;
     if (this.Type === "Column") ch += gaps;

@@ -570,13 +570,21 @@ export class SkiaControl {
     if (this.HorizontalFillRatio !== 1) availW = Math.ceil(availW * this.HorizontalFillRatio);
     if (this.VerticalFillRatio !== 1) availH = Math.ceil(availH * this.VerticalFillRatio);
 
-    const w = this.HorizontalOptions === "Fill" ? availW : Math.min(availW, this.MeasuredSize.Pixels.Width - m.HorizontalThickness * scale);
-    const h = this.VerticalOptions === "Fill" ? availH : Math.min(availH, this.MeasuredSize.Pixels.Height - m.VerticalThickness * scale);
+    // Fill stretches only an axis without a size request: with one, the requested size stays at the start (as DrawnUI for
+    // Rust and .NET; with LockRatio a single request sizes both axes)
+    const fillX = this.HorizontalOptions === "Fill" && this.WidthRequest < 0 && !(this.LockRatio !== 0 && this.HeightRequest >= 0);
+    const fillY = this.VerticalOptions === "Fill" && this.HeightRequest < 0 && !(this.LockRatio !== 0 && this.WidthRequest >= 0);
+    const w = fillX ? availW : Math.min(availW, this.MeasuredSize.Pixels.Width - m.HorizontalThickness * scale);
+    const h = fillY ? availH : Math.min(availH, this.MeasuredSize.Pixels.Height - m.VerticalThickness * scale);
 
     // Alignment happens inside the ORIGINAL box (Center/End of a capped control still center/end in the parent).
     const fullW = destination.Width - m.HorizontalThickness * scale, fullH = destination.Height - m.VerticalThickness * scale;
-    const x = availL + SkiaControl.Align(this.HorizontalOptions, fullW, w);
-    const y = availT + SkiaControl.Align(this.VerticalOptions, fullH, h);
+    const x = this.HorizontalOptions === "Center"
+      ? SkiaControl.Centered(destination.Left, destination.Width, w, (m.Left - m.Right) * scale)
+      : availL + SkiaControl.Align(this.HorizontalOptions, fullW, w);
+    const y = this.VerticalOptions === "Center"
+      ? SkiaControl.Centered(destination.Top, destination.Height, h, (m.Top - m.Bottom) * scale)
+      : availT + SkiaControl.Align(this.VerticalOptions, fullH, h);
     const old = this.DrawingRect;
     this.DrawingRect = SKRect.Create(x, y, w, h);
     this.FollowMatrix(old);
@@ -813,6 +821,16 @@ export class SkiaControl {
   protected static SmartMin(a: number, b: number): number {
     if (!isFinite(a) || (isFinite(b) && b < a)) return b;
     return a;
+  }
+
+  /**
+   * Center (as DrawnUI for Rust and .NET): the box centered in the whole space, then moved by the full margin difference
+   * (start minus end), kept inside the space when it fits.
+   */
+  private static Centered(start: number, space: number, size: number, shift: number): number {
+    let at = start + (space - size) / 2 + shift;
+    if (size <= space) at = Math.min(Math.max(at, start), start + space - size);
+    return at;
   }
 
   private static Align(o: LayoutOptions, avail: number, size: number): number {

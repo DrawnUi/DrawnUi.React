@@ -94,6 +94,7 @@
     "check:label-direction": "node dev/check.mjs dev/check-label-direction.ts",
     "check:stack-fit": "node dev/check.mjs dev/check-stack-fit.ts",
     "check:label-reuse": "node dev/check.mjs dev/check-label-reuse.ts",
+    "check:layout-rules": "node dev/check.mjs dev/check-layout-rules.ts",
     "check:popups-tooltips": "node dev/check.mjs dev/check-popups-tooltips.ts",
     "check:carousel-loop": "node dev/check.mjs dev/check-carousel-loop.ts",
     "check:release": "node dev/check.mjs dev/check-release.tsx",
