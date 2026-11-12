@@ -11,7 +11,7 @@
 // transform or the opacity. Label texts, sizes and colors and shape shadows invalidate by themselves.
 
 import {
-  ActionOnTickAnimator, Aria, type Color, type InputKey, KeyboardManager, type SkiaControl, type SkiaGesturesParameters, type SkiaGradient,
+  Aria, type Color, type InputKey, KeyboardManager, type SkiaControl, type SkiaGesturesParameters, type SkiaGradient,
   SkiaBackdrop, SkiaLabel, SkiaLabelFps, SkiaLayer, SkiaLayout, SkiaRow, SkiaScroll, SkiaShaderEffect, SkiaShadow,
   SkiaShape, SkiaStack, SkiaWrap, Super, TextSpan, Thickness,
 } from "drawnui-react/core";
@@ -1101,6 +1101,9 @@ export class DungeonApp {
     // As wide as it likes on a desktop, as wide as the screen lets it on a phone.
     const width = Math.max(Math.min(DIALOG_WIDTH, this._canvasWidth - 4.0), 280.0);
     const stack = Make(new SkiaStack(), {
+      // the texts and their glows do not change while the panel's shader runs under them every frame:
+      // one image, made again only when a button or a link in it changes
+      UseCache: "GPU",
       Spacing: 9,
       Margin: new Thickness(DIALOG_GLOW),
       Padding: new Thickness(this._narrow ? 14 : 24),
@@ -1129,8 +1132,7 @@ export class DungeonApp {
         }).SetUniform("uWidth", width),
       ],
     });
-    // its time runs while it is open (C# UpdateNonStop: frames keep coming until the panel leaves the canvas)
-    new ActionOnTickAnimator(panel, () => {}).Start();
+    panel.UpdateNonStop(); // its time runs while it is open
     return Make(new SkiaLayer(), {
       WidthRequest: width,
       HorizontalOptions: "Center",
@@ -1217,8 +1219,7 @@ export class DungeonApp {
       HoverChanged: (_, on) => { hovered = on; look(on); },
       Tapped: () => {
         look(true);
-        // a new tab (C# Super.OpenLink on the web heads)
-        window.open(url, "_blank", "noopener");
+        Super.OpenLink(url);
         setTimeout(settle, 300);
         window.addEventListener("focus", settle, { once: true });
       },
