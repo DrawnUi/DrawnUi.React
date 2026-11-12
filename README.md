@@ -51,6 +51,8 @@ DrawnUI is MIT licensed in every language and on every platform: desktop, mobile
 
 ## What's new in the next preview
 
+- **Styles with code-behind:** a control built in code keeps every property the code set; a registered style fills in
+  only the rest.
 - **Nested scrolls:** a drag that starts on an inner list already at its end scrolls the page around it, so a page full
   of lists drags all the way to its end.
 - **Paragraph spacing:** text with line breaks gets a quarter line between paragraphs by default (`ParagraphSpacing`

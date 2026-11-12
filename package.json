@@ -119,6 +119,7 @@
     "check:animator-isolation": "node dev/check.mjs dev/check-animator-isolation.ts",
     "check:quiet-animations": "node dev/check.mjs dev/check-quiet-animations.ts",
     "check:skew-sign": "node dev/check.mjs dev/check-skew-sign.ts",
+    "check:styles-code": "node dev/check.mjs dev/check-styles-code.ts",
     "check:composite-removed": "node dev/check.mjs dev/check-composite-removed.ts",
     "audit:a11y": "node dev/audit-a11y.mjs",
     "bench:relayout": "node dev/check.mjs dev/bench-relayout.ts",

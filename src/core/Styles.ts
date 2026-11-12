@@ -100,10 +100,16 @@ export class SkiaStyles {
     const keys = Object.keys(resolved.Setters);
     const target = control as unknown as Record<string, unknown>;
     if (atConstruction) SkiaStyles.SnapshotDefaults(type, control, keys);
+    else if (!SkiaStyles.defaults.has(type)) {
+      // a control built in code before any of its class went through the reconciler: the class defaults come from a
+      // fresh instance (once per class), so what the code already set still wins
+      const fresh = new (type as new () => SkiaControl)();
+      SkiaStyles.SnapshotDefaults(type, fresh, keys);
+      fresh.Dispose();
+    }
 
     const defaults = atConstruction ? undefined : SkiaStyles.defaults.get(type);
     for (const key of keys) {
-      // no snapshot for this class (nothing of it ever went through the reconciler): apply as a plain default
       if (!defaults || Object.is(target[key], defaults[key])) target[key] = resolved.Setters[key];
     }
   }
