@@ -1206,19 +1206,21 @@ export class DungeonApp {
    */
   private static Link(text: string, url: string): SkiaLabel {
     const span = Make(new TextSpan(), { Text: text });
+    let hovered = false;
+    const look = (on: boolean) => { label.TextColor = C(on ? LINK_HOVER : LINK); span.Underline = on; label.Update(); };
+    // a tap lights the link; a finger has no hover to end, so it goes back after a moment, and when the page is back
+    const settle = () => { if (!hovered) look(false); };
     const label = Make(new SkiaLabel(), {
       FontSize: 11,
       TextColor: C(LINK),
       AccessibilityRole: Aria.RoleLink,
-      HoverChanged: (_, on) => {
-        label.TextColor = C(on ? LINK_HOVER : LINK);
-        span.Underline = on;
-      },
+      HoverChanged: (_, on) => { hovered = on; look(on); },
       Tapped: () => {
-        label.TextColor = C(LINK_HOVER);
-        span.Underline = true;
+        look(true);
         // a new tab (C# Super.OpenLink on the web heads)
         window.open(url, "_blank", "noopener");
+        setTimeout(settle, 300);
+        window.addEventListener("focus", settle, { once: true });
       },
     });
     label.AddSubView(span);

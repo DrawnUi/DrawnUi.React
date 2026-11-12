@@ -307,6 +307,11 @@ export class World {
   private _lane = 0;
   Speed = 12.0;
   Time = 0.0;
+  /**
+   * Seconds since this run (or the title's own run) began, a JS double: Time is its float32, so the animations and
+   * shaders get a few minutes of exact float, never hours.
+   */
+  private _clock = 0.0;
   private _orbs = 0;
   /** 1 = unhurt; a pillar takes two tenths, a beam one, lava a half; the run ends at 0. */
   Health = 1.0;
@@ -438,6 +443,7 @@ export class World {
     this.Escaped = false; this.RunTime = 0.0; this.Escape = 0.0; this.Glare = F(0.3);
     this.Shield = 0.0; this.ShieldBurst = 0.0;
     this.Streak = 0; this._lastOrb = -10; this.OrbPulse = 0.0;
+    this._clock = 0.0; this.Time = 0.0;
     this.Phase = phase;
   }
 
@@ -472,7 +478,7 @@ export class World {
   /** One step of dt seconds; input is read and cleared (C# `ref Input`). */
   Step(dt: number, input: Input): void {
     dt = F(dt);
-    this.Time = F(this.Time + dt);
+    this._clock += dt; this.Time = F(this._clock);
     this.Flash = Math.max(F(this.Flash - F(dt * F(1.6))), 0.0);
     this.Warp = Math.max(F(this.Warp - F(dt * F(1.1))), 0.0);
     this.Shake = Math.max(F(this.Shake - F(dt * 2.5)), 0.0);
