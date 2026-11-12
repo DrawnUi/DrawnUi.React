@@ -51,6 +51,8 @@ DrawnUI is MIT licensed in every language and on every platform: desktop, mobile
 
 ## What's new in the next preview
 
+- **`Super.OpenLink` and `UpdateNonStop()`:** open an address in a new tab, and keep a self-animating control (a
+  time-driven shader, a clock) drawing every frame while it is shown, as in DrawnUi .NET.
 - **Layout rules as in DrawnUI for .NET and Rust:** a Fill control with a size request keeps the requested size; a
   layer without a size of its own fits its sized children, and an empty Fill background takes that size; Center with
   unequal margins moves by the full margin difference.

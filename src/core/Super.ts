@@ -148,6 +148,9 @@ export class Super {
 
   static UseDrawnUi(): DrawnUiBuilder { return new DrawnUiBuilder(); }
 
+  /** C# Super.OpenLink: opens an address in a new browser tab (noopener: the opened page gets no handle on this one). */
+  static OpenLink(url: string): void { window.open(url, "_blank", "noopener"); }
+
   /** Master switch: false makes every control render uncached (DrawnUi Super.CacheEnabled). */
   static CacheEnabled = true;
 

@@ -2,7 +2,7 @@ import type { Canvas as SkCanvas, Image, Paint, Path, SkPicture, Surface } from 
 import { Super } from "./Super";
 import { SkiaStyles } from "./Styles";
 import { type Color, Colors, type LayoutOptions, SKRect, ScaledSize, type SkiaCacheType, type SkiaGradient, type SkiaTouchAnimation, Thickness, type ThicknessValue } from "./Types";
-import { type AnimatorBase, type IOverlayEffect, RippleAnimator, SkiaValueAnimator } from "./Animators";
+import { ActionOnTickAnimator, type AnimatorBase, type IOverlayEffect, RippleAnimator, SkiaValueAnimator } from "./Animators";
 import { Easing } from "./Easing";
 import type { Canvas } from "./Canvas";
 import type { InputKey } from "./KeyboardManager";
@@ -462,6 +462,13 @@ export class SkiaControl {
    * `Children` list drops only these, so a control's own parts keep their place.
    */
   IsChildrenItem = false;
+
+  /**
+   * C# UpdateNonStop (fluent): keeps frames coming while this control is on a canvas, for visuals that change by
+   * themselves (a time-driven shader, a clock drawn in code). An endless no-op animator, as C#; it waits for the canvas
+   * when the control is not on one yet and stops when the control is disposed. It holds the canvas at full frame rate.
+   */
+  UpdateNonStop(): this { new ActionOnTickAnimator(this, () => {}).Start(); return this; }
 
   AddSubView(_control: SkiaControl): void { throw new Error(`DrawnUi: ${this.constructor.name} cannot host children`); }
   InsertSubView(_index: number, control: SkiaControl): void { this.AddSubView(control); }

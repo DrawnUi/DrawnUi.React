@@ -108,6 +108,7 @@
     "check:shader-carousel-interrupted": "node dev/check.mjs dev/check-shader-carousel-interrupted.ts",
     "check:shell-modal": "node dev/check.mjs dev/check-shell-modal.tsx",
     "check:multitouch": "node dev/check.mjs dev/check-multitouch.ts",
+    "check:openlink-nonstop": "node dev/check.mjs dev/check-openlink-nonstop.ts",
     "check:scroll-size": "node dev/check.mjs dev/check-scroll-size.ts",
     "check:ripple-primary": "node dev/check.mjs dev/check-ripple-primary.ts",
     "check:stack-margins": "node dev/check.mjs dev/check-stack-margins.ts",
