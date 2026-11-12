@@ -56,8 +56,8 @@ class FakeCanvas {
 
   // the opener has the keyboard (as when Tab reached it and Enter was pressed)
   mgr.NotifyFocused(opener);
-  const open = () => {
-    const dialog = new SkiaStack(); dialog.AccessibilityRole = Aria.RoleDialog; dialog.AccessibilityLabel = "HOW TO PLAY";
+  const open = (title = "HOW TO PLAY") => {
+    const dialog = new SkiaStack(); dialog.AccessibilityRole = Aria.RoleDialog; dialog.AccessibilityLabel = title;
     dialog.HorizontalOptions = "Center"; dialog.VerticalOptions = "Center";
     dialog.AddSubView(button("OK")); dialog.AddSubView(button("Close"));
     const host = new SkiaLayer(); host.HorizontalOptions = "Fill"; host.VerticalOptions = "Fill"; host.AccessibilityModal = true;
@@ -90,6 +90,37 @@ class FakeCanvas {
     if (hideOpener) { frame(); lost(); opener.IsVisible = true; opener.Update(); } // shown again a frame after the close
     for (let i = 0; i < 3; i++) { frame(); lost(); }
     check(`${closing}: on close the keyboard is back on the control that opened it`, mgr.FocusedNode === opener, name(mgr.FocusedNode));
+  }
+
+  // a dialog that hands over to another (How to play, then Paused, the opener hidden under both): closing the second
+  // gives the keyboard back to the first opener (drawnui-cross 6bs)
+  for (const gap of ["in the same frame", "a frame later"]) {
+    mgr.NotifyFocused(opener);
+    const first = open(); opener.IsVisible = false; opener.Update(); frames(3);
+    root.RemoveSubView(first); first.Dispose();
+    if (gap === "a frame later") { frame(); lost(); }
+    const second = open("PAUSED");
+    for (let i = 0; i < 3; i++) { frame(); lost(); }
+    check(`hand-over ${gap}: the second dialog takes the keyboard`, mgr.FocusedNode?.Parent === second.Views[0], name(mgr.FocusedNode));
+    root.RemoveSubView(second); second.Dispose();
+    frame(); lost(); opener.IsVisible = true; opener.Update();
+    for (let i = 0; i < 3; i++) { frame(); lost(); }
+    check(`hand-over ${gap}: closing it gives the keyboard back to the first opener`, mgr.FocusedNode === opener, name(mgr.FocusedNode));
+  }
+
+  // a dialog whose buttons show a moment after it opens takes the keyboard once they show (6bs, up to 1 s)
+  {
+    mgr.NotifyFocused(opener);
+    const late = open("LATE");
+    const content = late.Views[0] as SkiaStack;
+    const buttons = [...content.Views]; for (const b of buttons) b.IsVisible = false;
+    for (let i = 0; i < 3; i++) { frame(); lost(); }
+    for (const b of buttons) { b.IsVisible = true; b.Update(); }
+    for (let i = 0; i < 3; i++) { frame(); lost(); }
+    check("buttons shown after the dialog opened: the keyboard goes to its first one", mgr.FocusedNode?.AccessibilityLabel === "OK", name(mgr.FocusedNode));
+    root.RemoveSubView(late); late.Dispose();
+    for (let i = 0; i < 3; i++) { frame(); lost(); }
+    check("buttons shown after the dialog opened: on close the keyboard is back on the opener", mgr.FocusedNode === opener, name(mgr.FocusedNode));
   }
   surface.delete();
 

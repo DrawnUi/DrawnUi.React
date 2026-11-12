@@ -55,7 +55,8 @@ DrawnUI is MIT licensed in every language and on every platform: desktop, mobile
   controls as pages, popups, modals and toasts. The JSX `<SkiaShell>` works as before on top of it.
 - **Quiet console:** WebGL starts and comes back after a lost context without browser warnings, in Chromium and WebKit.
 - **Dialogs for keyboard and screen readers:** an open dialog reads as one named dialog, the keyboard goes into it
-  and comes back to the control that opened it when it closes.
+  (also when its buttons show a moment later) and comes back to the control that opened it when it closes, also
+  after one dialog hands over to another.
 - **`Super.OpenLink` and `UpdateNonStop()`:** open an address in a new tab, and keep a self-animating control (a
   time-driven shader, a clock) drawing every frame while it is shown, as in DrawnUi .NET.
 - **Layout rules as in DrawnUI for .NET and Rust:** a Fill control with a size request keeps the requested size; a

@@ -261,6 +261,7 @@ export class SkiaAccessibilityManager {
   private focusRequest?: SkiaControl;
   private popupFocusRoot?: SkiaControl;
   private focusAnyInside = false;
+  private popupFocusDeadline = 0;
 
   /** The keyboard goes to this control at the end of the next frame (a popup closed: back to what opened it). */
   RequestKeyboardFocus(control: SkiaControl): void {
@@ -356,16 +357,23 @@ export class SkiaAccessibilityManager {
     this.ActiveModal = next;
     this.ForceRebuildOnNextFrame(); // readers and Tab switch to the new scope in this frame
     const keyboard = this.FocusedNode;
-    if (next && keyboard && !IsInside(keyboard, next)) {
-      // the keyboard is in use: into the modal, and back here when it goes
-      this.modalReturns.set(next, keyboard);
-      this.popupFocusRoot = next; this.focusAnyInside = true;
-    }
     const back = previous && this.modalReturns.get(previous);
     if (previous) this.modalReturns.delete(previous);
     // back unless the keyboard went elsewhere meanwhile; a keyboard node that left with the modal (disposed, detached) was in it
     const leftWithIt = !!keyboard && (keyboard.IsDisposed || !keyboard.Superview);
-    if (back && (!keyboard || leftWithIt || IsInside(keyboard, previous!)) && (!next || IsInside(back, next))) this.RequestKeyboardFocus(back);
+    const fromPrevious = !!back && (!keyboard || leftWithIt || IsInside(keyboard, previous!));
+    if (next) {
+      // the keyboard is in use: into the modal, and back to `from` when it goes. A dialog handing over to another (How to
+      // play, then Paused) passes its own return on, in the same frame or while that return is still waiting (6bs).
+      const waiting = this.focusRequest && !this.focusRequest.IsDisposed && !IsInside(this.focusRequest, next) ? this.focusRequest : undefined;
+      const from = fromPrevious ? back : waiting ?? (keyboard && !leftWithIt && !IsInside(keyboard, next) ? keyboard : undefined);
+      if (from) {
+        this.modalReturns.set(next, from);
+        this.popupFocusRoot = next; this.focusAnyInside = true; this.popupFocusDeadline = performance.now() + SkiaAccessibilityManager.FocusRequestWaitMs;
+        if (from === this.focusRequest) this.focusRequest = undefined;
+      }
+    }
+    if (fromPrevious && (!next || IsInside(back!, next))) this.RequestKeyboardFocus(back!);
   }
 
   /** The Tab stop after (or before) `from` in reading order; inside a KeyboardScope it goes round, never leaving. */
@@ -383,7 +391,7 @@ export class SkiaAccessibilityManager {
    * A popup window just opened: at the end of the frame that draws it, the keyboard goes to its arrow-key group's current
    * choice (a checked radio, menuitemradio, option or tab), else to its first interactive item, however it was opened.
    */
-  FocusOpenedPopup(root: SkiaControl): void { this.popupFocusRoot = root; this.focusAnyInside = false; }
+  FocusOpenedPopup(root: SkiaControl): void { this.popupFocusRoot = root; this.focusAnyInside = false; this.popupFocusDeadline = performance.now() + SkiaAccessibilityManager.FocusRequestWaitMs; }
 
   private ProcessFocusRequests(scale: number, w: number, h: number, requestFrame: () => void): void {
     const request = this.focusRequest, root = this.popupFocusRoot;
@@ -396,6 +404,8 @@ export class SkiaAccessibilityManager {
       const items = this.Snapshot.filter((n) => n.CanInteract && inside(n.Source) && (this.focusAnyInside || SkiaAccessibilityManager.TryFindGroup(n.Source)));
       const target = items.find((n) => n.IsPressed === true && choice(n.Role)) ?? items[0];
       if (target) { this.FocusFromKeyboard(target.Source, scale, w, h); return; }
+      // a modal with nothing to take input yet (its buttons show a moment later): looked at again on the next frames, for a moment
+      if (this.focusAnyInside && performance.now() < this.popupFocusDeadline) { this.popupFocusRoot = root; this.focusRequest ??= request; requestFrame(); return; }
     }
     if (!request || request.IsDisposed || !request.Superview) return;
     if (request.AccessibilityCanInteract) this.FocusFromKeyboard(request, scale, w, h);
