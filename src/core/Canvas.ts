@@ -714,7 +714,8 @@ export class Canvas {
     // horizontal events alone (C# ba03cb20)
     const factor = e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? 800 : 1;
     const horizontal = Math.abs(e.deltaX) > Math.abs(e.deltaY);
-    args.Wheel = { Delta: (horizontal ? e.deltaX : e.deltaY) * factor, IsHorizontal: horizontal };
+    // IsZoom: Ctrl / Cmd + wheel, or a touchpad pinch (browsers send it as a Ctrl wheel), as AppoMobi WheelEventArgs.IsZoom
+    args.Wheel = { Delta: (horizontal ? e.deltaX : e.deltaY) * factor, IsHorizontal: horizontal, IsZoom: e.ctrlKey || e.metaKey };
     this.tooltip.CloseOnInput();
     if (this.gestures === "Lock") {
       e.preventDefault();

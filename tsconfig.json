@@ -14,8 +14,10 @@
     "baseUrl": ".",
     "paths": {
       "drawnui-react": ["src/react/index.tsx"],
-      "drawnui-react/core": ["src/index.ts"]
+      "drawnui-react/core": ["src/index.ts"],
+      "drawnui-react-add3d": ["add3d/src/react.tsx"],
+      "drawnui-react-add3d/core": ["add3d/src/index.ts"]
     }
   },
-  "include": ["src", "samples"]
+  "include": ["src", "samples", "add3d"]
 }

@@ -23,6 +23,8 @@ export function defineSample(configFileUrl: string) {
     plugins: [react(), drawnUiAssetStamps()],
     resolve: {
       alias: [
+        { find: "drawnui-react-add3d/core", replacement: fileURLToPath(new URL("./add3d/src/index.ts", new URL("../", import.meta.url))) },
+        { find: "drawnui-react-add3d", replacement: fileURLToPath(new URL("./add3d/src/react.tsx", new URL("../", import.meta.url))) },
         { find: "drawnui-react/core", replacement: fileURLToPath(new URL("./src/index.ts", new URL("../", import.meta.url))) },
         { find: "drawnui-react", replacement: fileURLToPath(new URL("./src/react/index.tsx", new URL("../", import.meta.url))) },
       ],

@@ -41,6 +41,8 @@ import type { Color, RenderingModeType } from "../core/Types";
 import type { GesturesMode } from "../core/Gestures";
 import { createDrawnRoot } from "./reconciler";
 export { DesignerSourceOf, type DesignerSource } from "./reconciler";
+/** JSX tag name -> engine class: add-on packages register their controls here (drawnui-react-add3d). */
+export { Registry } from "./reconciler";
 import { DesignerActions, designerAction } from "../core/DesignerActions";
 export { DesignerActions, designerAction };
 
@@ -78,6 +80,9 @@ type PropsOf<T> = Partial<{
   // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
   [K in keyof T as T[K] extends Function ? (undefined extends T[K] ? K : never) : K extends "Children" | "Views" | "Parent" | "Spans" | "GridStructure" | "AccessibilityId" | "IsAccessibilityElement" | "HasTransform" | "RenderTransformMatrix" | "RenderObjectPrevious" | "LastMeasuredIndex" | "ItemsInsertedAtStart" | "UsingControlStyle" | "Track" | "Thumb" | "FrameOn" | "FrameOff" | "ViewCheckOn" | "ViewOn" | "ViewText" | "Ratio" | "StartThumbX" | "EndThumbX" | "SnapPoints" | "CurrentPosition" | "CurrentSnap" | "ContentOffsetBounds" | "InTransition" | "CanAnimate" | "MaxIndex" | "ChildrenTotal" | "IsAtStart" | "IsAtEnd" | "ScrollProgress" | "ScrollAmount" | "TransitionProgress" | "LastIndex" | "ChildrenCount" | "Horizontal" | "Animator" | "Animation" | "IsPlaying" | "PlayWhenAvailable" | "TotalFrames" | "HasEffects" | "IsDisposed" | "Label" | "IsMultiline" | "HasSelection" | "LayoutVersion" | "LinesCount" | "MeasuredLineHeight" | "Focused" | "SpriteSheet" | "FrameWidth" | "FrameHeight" | "DurationMs" | "FrameDurationMs" | "CurrentSprite" | "Rects" | "HasTapHandler" | "HasDecorations" | "LinesCount" | "Superview" | "DrawingRect" | "MeasuredSize" | "RenderingScale" | "NeedMeasure" | "_superview" | "HitBoxAuto" | "TotalDown" | "TotalTapped" | "TouchDown" | "PostAnimators" | "LoadedSource" | "IsLoading" | "DisplayRect" | "AspectScale" | "Content" | "ContentSize" | "ContentOffsetBounds" | "OverscrollDistance" | "OverScrolled" | "IsUserPanning" | "IsUserFocused" | "IsScrolling" | "IsTemplated" | "FirstVisibleIndex" | "LastVisibleIndex" | "DebugString" | "ChildrenFactory" | "ContextIndex" | "RenderObject" | "UsingCacheType" | "TransitionEffect" | "TransitionFromIndex" | "TransitionToIndex" | "EffectPostRenderers" | "CachedImage" | "ImageBitmap" | "ShouldSubmitOnEnter" | "Header" | "Footer" | "RefreshIndicator" | "ScrollBar" | "ScrollBarHorizontal" | "IsRunning" | "VisibleRatio" | "CurrentIndex" | "LastCompositeRecord" | "DirtyChildrenInternal" | "IsRenderingWithComposition" | "IsHovered" ? never : K]: T[K] extends Thickness ? ThicknessValue : T[K];
 }>;
+
+/** The JSX props of an engine control class (for add-on packages that declare their own tags). */
+export type DrawnProps<T> = PropsOf<T>;
 
 /** `ref` receives the engine control instance (react-reconciler getPublicInstance). */
 type LeafProps<T> = PropsOf<T> & { ref?: Ref<T> };
