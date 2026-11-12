@@ -20,6 +20,11 @@ export interface ScaledPoint { Units: SKPoint; Pixels: SKPoint }
  */
 export class SkiaScroll extends SkiaControl {
   static WheelLineSize = 150;
+  /**
+   * Wheel events closer than this (ms) are one wheel gesture: they keep the scroll they started on, as browsers latch a
+   * scroller (C# SkiaScroll.WheelGestureGapMs, drawnui-cross 6bo).
+   */
+  static WheelGestureGapMs = 300;
   static ThesholdSwipeOnUp = 20;
   static ScrollVelocityThreshold = 5;
 
@@ -801,13 +806,22 @@ export class SkiaScroll extends SkiaControl {
     }
 
     if (args.Type === "Wheel") {
+      // one wheel gesture keeps the scroll it started on (6bo): a scroll inside this one that took it keeps it, also at
+      // its end (the page waits for the next gesture); one this scroll took is not given to a list that comes under the pointer
+      const now = performance.now(), latch = SkiaScroll.wheelLatch;
+      const latched = latch && now - latch.At < SkiaScroll.WheelGestureGapMs && !latch.Scroll.IsDisposed && latch.Scroll.Superview ? latch.Scroll : undefined;
+      if (latched && latched !== this && SkiaScroll.Contains(this, latched)) {
+        latch!.At = now;
+        if (latched.WheelUsable(e.Wheel.IsHorizontal)) latched.ApplyWheelScroll(e.Wheel.Delta);
+        e.Handled = true;
+        return latched;
+      }
       // a nested scroll under the pointer takes the wheel first; the outer one scrolls when the inner is at its edge
-      const child = super.ProcessGestures(args, apply);
+      const child = latched === this ? null : super.ProcessGestures(args, apply);
       if (child && child !== this) return child;
-      if (!this.RespondsToGestures || this.Orientation === "Neither") return child ?? consumedDefault; // Neither: not used, a parent scroll may take it
-      // a vertical scroll leaves horizontal events (the sideways part of a diagonal swipe) to whatever is around it
-      if (e.Wheel.IsHorizontal && this.Orientation === "Vertical") return child ?? consumedDefault;
+      if (!this.WheelUsable(e.Wheel.IsHorizontal)) return child ?? consumedDefault; // not used, a parent scroll may take it
       if (!this.ApplyWheelScroll(e.Wheel.Delta)) return consumedDefault; // at its edge: not used, the page may take it
+      SkiaScroll.wheelLatch = { Scroll: this, At: now };
       e.Handled = true;
       return this;
     }
@@ -937,6 +951,16 @@ export class SkiaScroll extends SkiaControl {
     for (let p = this.Parent; p; p = p.Parent)
       if (p instanceof SkiaScroll && p.RespondsToGestures && p.Orientation !== "Neither" && p.Orientation !== (vertical ? "Horizontal" : "Vertical")) return true;
     return false;
+  }
+
+  private static Contains(root: SkiaControl, c: SkiaControl): boolean { for (let p = c.Parent; p; p = p.Parent) if (p === root) return true; return false; }
+
+  /** The scroll the current wheel gesture belongs to, and its last event time. */
+  private static wheelLatch?: { Scroll: SkiaScroll; At: number };
+
+  /** It scrolls with the wheel on this axis (a vertical scroll leaves the sideways part of a diagonal swipe to what is around it). */
+  private WheelUsable(horizontal?: boolean): boolean {
+    return this.RespondsToGestures && this.Orientation !== "Neither" && !(horizontal && this.Orientation === "Vertical");
   }
 
   private ApplyWheelScroll(delta: number): boolean {

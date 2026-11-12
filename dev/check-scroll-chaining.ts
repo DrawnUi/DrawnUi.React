@@ -20,6 +20,7 @@ class FakeCanvas {
   readonly AnimatingControls = new Map<number, AnimatorBase>();
   RenderingScale = 1;
   GpuEpoch = 0;
+  WheelDeltaPerNotch = 100; // events under half a notch move at once (no glide to tick)
   Update(): void {}
   DisposeObject(o: { Dispose(): void }): void { o.Dispose(); }
   RegisterAnimator(a: AnimatorBase): boolean { this.AnimatingControls.set(a.Uid, a); return true; }
@@ -57,8 +58,20 @@ function robot(root: SkiaControl) {
     send("Released", x, y + dy);
     return { page: page1, list: list1, listEnd: list.ViewportOffsetY };
   };
-  return { layout, drag };
+  /** Wheel events (40 = 0.4 notch = 60 points each, wheel down positive) at (x, y), one right after the other. */
+  const wheel = (x: number, y: number, delta: number, events = 1) => {
+    for (let i = 0; i < events; i++) {
+      const a = new TouchActionEventArgs(); a.Id = -1; a.Type = "Wheel"; a.Location = new SKPoint(x, y); a.StartingLocation = a.Location; a.Scale = 1;
+      a.Wheel = { Delta: delta, IsHorizontal: false };
+      (canvas as unknown as { OnGestureEvent(a: TouchActionEventArgs, t: string): void }).OnGestureEvent(a, "Wheel");
+      canvas.ProcessPendingGestures();
+      layout();
+    }
+  };
+  return { layout, drag, wheel };
 }
+/** Wheel events further apart than the wheel gesture gap: a new wheel gesture. */
+const newWheelGesture = () => new Promise((r) => setTimeout(r, SkiaScroll.WheelGestureGapMs + 80));
 
 /** A page scroll (vertical, the window) holding, 200 points down, a vertical list 300 tall of 30 rows of 60, then more page. */
 function scene() {
@@ -119,6 +132,41 @@ function scene() {
     check("a scroll with nothing around it keeps its edge bounce", m.list > 5, `pulled ${m.list.toFixed(1)} past its end`);
   }
 
-  console.log(failures ? `FAIL: ${failures} checks` : "OK: drag chaining decided at the start");
+  // the wheel (6bo, DrawnUi.Net NestedScrollWheelTests): the inner scroll while it can, then the outer one, decided once
+  // per wheel gesture (events under WheelGestureGapMs apart keep the scroll they started on)
+  {
+    const { page, list, r } = scene();
+    list.ViewportOffsetY = -600; r.layout();
+    await newWheelGesture(); r.wheel(200, 400, 40, 2);
+    check("wheel over a list midway: the list moves, the page stays", list.ViewportOffsetY < -700 && page.ViewportOffsetY === 0, `list ${list.ViewportOffsetY}, page ${page.ViewportOffsetY}`);
+  }
+  {
+    const { page, list, r, listEnd } = scene();
+    list.ViewportOffsetY = listEnd(); r.layout();
+    await newWheelGesture(); r.wheel(200, 400, 40, 2);
+    check("wheel over a list at its end: the page moves", page.ViewportOffsetY < -100 && list.ViewportOffsetY === listEnd(), `page ${page.ViewportOffsetY}, list ${list.ViewportOffsetY}`);
+  }
+  {
+    const { page, list, r, listEnd } = scene();
+    list.ViewportOffsetY = listEnd() + 60; r.layout();
+    await newWheelGesture(); r.wheel(200, 400, 40, 4); // one spin: 60 to the end, the rest held by the list
+    check("one wheel gesture stays on the list past its end", list.ViewportOffsetY === listEnd() && page.ViewportOffsetY === 0, `list ${list.ViewportOffsetY} (end ${listEnd()}), page ${page.ViewportOffsetY}`);
+    await newWheelGesture(); r.wheel(200, 400, 40, 1);
+    check("the next wheel gesture moves the page", page.ViewportOffsetY < -50, `page ${page.ViewportOffsetY}`);
+  }
+  {
+    const { page, list, r } = scene();
+    page.ViewportOffsetY = -50; r.layout();
+    await newWheelGesture(); r.wheel(200, 160, -40, 1); // the list (now 150-450 on screen) at its start, wheel up
+    check("wheel up over a list at its start: the page moves", page.ViewportOffsetY === 0 && list.ViewportOffsetY === 0, `page ${page.ViewportOffsetY}, list ${list.ViewportOffsetY}`);
+  }
+  {
+    const { page, list, r } = scene();
+    await newWheelGesture(); r.wheel(200, 100, 40, 1); // above the list: the page moves 60, the list comes under the pointer
+    r.wheel(200, 300, 40, 2); // the same spin, now over the list
+    check("a wheel gesture started on the page stays on the page over a list", page.ViewportOffsetY <= -170 && list.ViewportOffsetY === 0, `page ${page.ViewportOffsetY}, list ${list.ViewportOffsetY}`);
+  }
+
+  console.log(failures ? `FAIL: ${failures} checks` : "OK: drag and wheel chaining decided at the start");
   process.exit(failures ? 1 : 0);
 })();
