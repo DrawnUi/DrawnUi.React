@@ -137,6 +137,23 @@ export class DungeonApp {
 
   // ---- the tree ----
   private _scene!: Scene;
+  /** The scene with its post effect, drawn at most MaxDensity pixels per point and scaled back up (StageUnderCap). */
+  private _stage!: SkiaLayer;
+  /** The size and scale the stage was last given. */
+  private _shownStage: [number, number, number] = [-1, -1, -1];
+
+  /**
+   * The scene's density cap, pixels per point (DrawnUI for Rust 22d0092 / 5a22ab2 / 26219c9): the 3D scene and its post
+   * effect draw into a picture of the scene's size in points times at most this many pixels per point, keeping the
+   * aspect, scaled up to the screen with linear filtering; within the cap they draw 1:1, straight to the canvas. The
+   * HUD, the texts and the dialogs always stay at full resolution. 1.33 on the web (a desktop at a density up to 1.33
+   * is untouched, phones and high-density screens are capped); `?maxdensity=D` changes it for tries (0 = off).
+   */
+  static readonly MaxDensity: number = (() => {
+    const v = typeof location === "undefined" ? null : new URLSearchParams(location.search).get("maxdensity");
+    const d = v === null ? NaN : Number(v.trim());
+    return Number.isFinite(d) && d >= 0 ? d : 1.33;
+  })();
   private _post!: SkiaShaderEffect;
   private _title!: SkiaLayout;
   private _score!: SkiaLabel;
@@ -391,11 +408,20 @@ export class DungeonApp {
         // The game takes every press that lands on it, so what is tapped lies over it, not in it.
         this._game = Make(new DungeonGame(this), {
           Children: [
-            // Draws every frame: no cache. The post effect reads what it drew.
-            this._scene = Make(new Scene(), {
+            // Draws every frame: no cache. The post effect reads what it drew. The stage around them is their density
+            // cap (StageUnderCap).
+            this._stage = Make(new SkiaLayer(), {
               HorizontalOptions: "Fill",
               VerticalOptions: "Fill",
-              VisualEffects: [this._post],
+              AnchorX: 0,
+              AnchorY: 0,
+              Children: [
+                this._scene = Make(new Scene(), {
+                  HorizontalOptions: "Fill",
+                  VerticalOptions: "Fill",
+                  VisualEffects: [this._post],
+                }),
+              ],
             }),
           ],
         }),
@@ -638,6 +664,28 @@ export class DungeonApp {
   }
 
   /** One frame: the world moves, the scene draws again, the HUD follows. */
+  /**
+   * The stage under the density cap: within it the stage fills the screen and is drawn directly; past it the stage has
+   * the cap's pixels per point, cached on the GPU (the scene and its post effect render into it at that resolution) and
+   * scaled back up to fill the screen (a scaled GPU cache is drawn with linear filtering).
+   */
+  private StageUnderCap(width: number, height: number, pixels: number): void {
+    const cap = DungeonApp.MaxDensity;
+    const s = cap <= 0 || pixels <= cap ? 1 : cap / pixels;
+    const shown = this._shownStage;
+    if (width <= 0 || height <= 0 || (shown[0] === width && shown[1] === height && shown[2] === s)) return;
+    this._shownStage = [width, height, s];
+    console.log(`dungeon: scene ${Math.round(width * pixels * s)}x${Math.round(height * pixels * s)} px for a ${Math.round(width * pixels)}x${Math.round(height * pixels)} px screen (cap ${cap <= 0 ? "off" : `${cap} px per point`})`);
+    const stage = this._stage, full = s >= 1;
+    stage.HorizontalOptions = full ? "Fill" : "Start";
+    stage.VerticalOptions = full ? "Fill" : "Start";
+    stage.WidthRequest = full ? -1 : width * s;
+    stage.HeightRequest = full ? -1 : height * s;
+    stage.ScaleX = stage.ScaleY = 1 / s;
+    stage.UseCache = full ? "None" : "GPU";
+    stage.Update();
+  }
+
   Tick(delta: number): void {
     // On a narrow screen (a phone held upright) the health does not fit between the score and the buttons:
     // it goes under them.
@@ -646,6 +694,7 @@ export class DungeonApp {
     const canvasWidth = game.DrawingRect.Width / scale - this._safe.Margin.HorizontalThickness;
     const canvasHeight = game.DrawingRect.Height / scale - this._safe.Margin.VerticalThickness;
     this._canvasHeight = canvasHeight;
+    this.StageUnderCap(game.DrawingRect.Width / scale, game.DrawingRect.Height / scale, scale);
     if (canvasWidth !== this._canvasWidth) {
       this._canvasWidth = canvasWidth;
       // The big texts fit the width they have.
