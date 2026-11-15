@@ -1,4 +1,4 @@
-import { CanvasLeaveWatchers, type DrawingContext, type SkiaControl } from "../core/SkiaControl";
+import { CanvasLeaveWatchers, type DrawingContext, SkiaControl } from "../core/SkiaControl";
 import { type GestureEventProcessingInfo, SKPoint, type SkiaGesturesParameters } from "../core/Gestures";
 import { Super } from "../core/Super";
 import { DefaultAccent, type PrebuiltControlStyle, ResolveControlStyle } from "../core/ControlStyle";
@@ -469,7 +469,16 @@ export class SkiaEditor extends SkiaShape {
   }
 
   // ---- gestures (C# ProcessGestures: tap places the caret, drag selects, long press selects the word) ----
+  /** The press now down is not the main button's. */
+  private otherButtonPress = false;
   override ProcessGestures(args: SkiaGesturesParameters, apply: GestureEventProcessingInfo): SkiaControl | null {
+    // a press with another mouse button (a right click for the context menu) leaves the caret and the selection as they
+    // are, also as it drags or is held; it still focuses the field (DrawnUi.Net b6d65b8b)
+    if (args.Type === "Down") this.otherButtonPress = !SkiaControl.IsPrimaryPointer(args);
+    if (this.otherButtonPress && (args.Type === "Down" || args.Type === "Panning" || args.Type === "LongPressing")) {
+      if (args.Type === "Down") { this.dragSelecting = false; if (!this.isFocused) this.IsFocused = true; }
+      return this;
+    }
     switch (args.Type) {
       case "Down": {
         const p = this.LabelPoint(args, apply);
@@ -511,7 +520,7 @@ export class SkiaEditor extends SkiaShape {
         if (!this.isFocused) this.IsFocused = true;
         return this;
       }
-      case "Up": this.dragSelecting = false; return this;
+      case "Up": this.dragSelecting = false; this.otherButtonPress = false; return this;
       case "Tapped": return this;
       // the field scrolls its text only to follow the caret: the wheel is the page's, over the field too
       case "Wheel": return null;
