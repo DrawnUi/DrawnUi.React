@@ -49,6 +49,16 @@ property names, layout and drawing rules. What you learn here works there, and s
 
 DrawnUI is MIT licensed in every language and on every platform: desktop, mobile, web and embedded devices. Ship it in commercial products with no attribution badge, no about screen and no per-device royalty.
 
+## What's new in 0.1.0-preview.43
+
+- **Mouse wheel over text fields:** a focused text field no longer stops the mouse wheel: the page scrolls over the field
+  and around it.
+- **Tab at typing speed:** Tab moves on at typing speed when focus scrolls the page.
+- **Reading and Tab order:** the reading and Tab order of a page stays the same while it scrolls: Tab after the last
+  control comes back to the top.
+- **`FillBlendMode`** on controls and shapes.
+- **Image loads:** a cancelled image load reports a cancel, as in DrawnUi.Net.
+
 ## What's new in 0.1.0-preview.42
 
 - **Images:** images that show the same file or URL share one decoded copy; image memory stays within a budget
