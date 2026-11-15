@@ -351,6 +351,8 @@ function AccessibilityOverlay({ view }: { view: CanvasView }) {
   }, [view]);
   // selectable text spans take pointer events: the wheel over them is re-dispatched to the canvas so drawn scrolls keep working
   const overlayRef = useRef<HTMLDivElement>(null);
+  // the canvas drives mouse text selection over the overlay's selectable text from presses on itself (6cc)
+  useLayoutEffect(() => { view.OverlayElement = overlayRef.current ?? undefined; return () => { if (view.OverlayElement === overlayRef.current) view.OverlayElement = undefined; }; });
   const hasNodes = nodes.length > 0;
   useEffect(() => {
     const el = overlayRef.current;
@@ -433,7 +435,7 @@ function AccessibilityOverlay({ view }: { view: CanvasView }) {
           <div key={n.Id} role={n.Role} title={n.Hint} aria-disabled={n.Disabled || undefined} aria-live={n.Live as "polite" | "assertive" | undefined} className="drawnui-a11y-node drawnui-a11y-text" style={pos}
             // a long press on touch raises the context menu once (6cb): the browser's contextmenu (Android) or the press's own timer (iOS)
             onPointerDown={(e) => {
-              if (e.pointerType === "mouse") return;
+              if (e.pointerType === "mouse") { view.FollowTextSelection(e.nativeEvent); return; }
               view.StartTouchPress();
               const x = e.clientX, y = e.clientY;
               clearTimeout(textPress.current.Timer);

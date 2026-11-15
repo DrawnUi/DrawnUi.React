@@ -1,5 +1,5 @@
 import type { GrDirectContext, Surface, WebGLContextHandle } from "canvaskit-wasm";
-import { type CachedObject, CanvasLeaveWatchers, type DrawingContext, type SkiaControl } from "./SkiaControl";
+import { type CachedObject, CanvasLeaveWatchers, type DrawingContext, SkiaControl } from "./SkiaControl";
 import type { AnimatorBase } from "./Animators";
 import { Super } from "./Super";
 import { SkiaAccessibilityManager } from "./Accessibility";
@@ -7,6 +7,7 @@ import { HoverManager } from "./Hover";
 import { TooltipController, type TooltipStyleLike } from "./Tooltips";
 import { PopupAnchor, PopupLayer, type PopupId, type PopupWindowOptions } from "./PopupWindows";
 import { KeyboardManager, type InputKey } from "./KeyboardManager";
+import { CopyOverlaySelection, TextSelectionDrag, type TextSelectionHost } from "./TextSelectionDrag";
 import { type Color, Colors, type RenderingModeType, SKRect } from "./Types";
 import {
   ContextMenuEventArgs, type ContextMenuSource,
@@ -589,6 +590,51 @@ export class Canvas {
   private readonly previousTouchArgs = new Map<number, TouchActionEventArgs>();
   private readonly pendingGestures: SkiaGesturesParameters[] = [];
 
+  // ---- mouse text selection from presses on the canvas (drawnui-cross 6cc) ----
+  /** The accessibility overlay's element (set by the React overlay): its selectable text is real DOM text. */
+  OverlayElement?: HTMLElement;
+  private readonly textSelection = new TextSelectionDrag(this as unknown as TextSelectionHost);
+  /** A press the control under it does not keep (none took it, or a plain layout, or a scroll holding selectable text) may select text. */
+  MaySelectFrom(owner: unknown): boolean {
+    if (!owner) return true;
+    const c = owner as SkiaControl;
+    if (c.AccessibilityCanInteract) return false; // a button, a tappable card, a field keeps its press
+    if ("ScrollTo" in c && "ViewportOffsetY" in c) return this.ScrollHoldsText(c);
+    // a control with gesture logic of its own (a 3D viewer, a slider, a game field) keeps its drag
+    return c.ProcessGestures === SkiaControl.prototype.ProcessGestures;
+  }
+  private ScrollHoldsText(scroll: SkiaControl): boolean {
+    return this.AccessibilityManager.Snapshot.some((n) => { if (!n.TextLines) return false; for (let p = n.Source.Parent; p; p = p.Parent) if (p === scroll) return true; return false; });
+  }
+  /** The innermost scroll under the mouse whose content holds selectable text (moved while a selection drag is held past its edge). */
+  TextScrollAt(clientX: number, clientY: number): { Rect: DOMRect; ScrollBy(dy: number): void } | undefined {
+    // from the selectable text under the point (the canvas gets no hover over the overlay's text), else the hover path
+    const b = this.Element.getBoundingClientRect(), x = clientX - b.left, y = clientY - b.top;
+    const text = this.AccessibilityManager.Snapshot.find((n) => n.TextLines && x >= n.Rect.Left && x <= n.Rect.Right && y >= n.Rect.Top && y <= n.Rect.Bottom)?.Source;
+    const path: SkiaControl[] = [];
+    if (text) for (let p: SkiaControl | undefined = text; p; p = p.Parent) path.unshift(p);
+    else path.push(...this.Hover.Path);
+    for (let i = path.length - 1; i >= 0; i--) {
+      const c = path[i] as SkiaControl & { ScrollTo?(x: number, y: number, t: number): void; ViewportOffsetX?: number; ViewportOffsetY?: number; IsScrolling?: boolean };
+      if (!c.ScrollTo || c.ViewportOffsetY === undefined || !this.ScrollHoldsText(c)) continue;
+      const scroll = c;
+      return {
+        get Rect() {
+          const b = scroll.Superview!.Element.getBoundingClientRect(), k = scroll.RenderingScale, d = scroll.DrawingRect;
+          return new DOMRect(b.left + d.Left / k, b.top + d.Top / k, d.Width / k, d.Height / k);
+        },
+        ScrollBy: (dy: number) => {
+          scroll.ScrollTo!(scroll.ViewportOffsetX!, scroll.ViewportOffsetY! + dy, 0);
+          this.AccessibilityManager.FollowScroll([{ IsScrolling: false }]); // the overlay follows the text it moves
+        },
+      };
+    }
+    return undefined;
+  }
+  private readonly onCopy = (e: ClipboardEvent) => { CopyOverlaySelection(e, this.OverlayElement); };
+  /** A mouse press on the overlay's selectable text (the React overlay calls it): its drag may scroll the text's scroll. */
+  FollowTextSelection(e: PointerEvent): void { this.textSelection.FollowNative(e); }
+
   private readonly onPointer = (e: PointerEvent) => {
     const type: TouchActionType | undefined =
       e.type === "pointerdown" ? "Pressed" :
@@ -596,6 +642,18 @@ export class Canvas {
       e.type === "pointerup" ? "Released" :
       e.type === "pointercancel" ? "Cancelled" : undefined;
     if (!type) return;
+    // a mouse drag from the canvas that selects text: its moves and release are the selection's (6cc)
+    // (the pointercancel it sends the engine when it starts is untrusted and goes through)
+    if (type === "Pressed") this.textSelection.Down(e);
+    else if (e.isTrusted && this.textSelection.IsSelecting(e.pointerId)) {
+      if (type === "Moved") this.textSelection.Move(e, () => null); else this.textSelection.Up(e);
+      return;
+    } else if (type === "Moved" && e.pointerType === "mouse" && this.activeTouchIds.has(e.pointerId)
+      && this.textSelection.Move(e, () => { this.ProcessPendingGestures(); return this.gestureOwner; })) {
+      // the press becomes a text selection: the gesture it started ends here, as if the pointer were cancelled
+      this.onPointer(new PointerEvent("pointercancel", { pointerId: e.pointerId, pointerType: "mouse", clientX: e.clientX, clientY: e.clientY }));
+      return;
+    }
     if (type === "Moved" && !this.activeTouchIds.has(e.pointerId)) {
       if (e.pointerType === "touch") return; // touch never hovers
       const hx = e.offsetX * this.RenderingScale, hy = e.offsetY * this.RenderingScale;
@@ -823,6 +881,7 @@ export class Canvas {
     for (const t of ["pointerdown", "pointermove", "pointerup", "pointercancel"]) el.addEventListener(t, this.onPointer as EventListener);
     el.addEventListener("pointerleave", this.onPointerLeave);
     el.addEventListener("contextmenu", this.onContextMenu);
+    document.addEventListener?.("copy", this.onCopy);
     el.addEventListener("wheel", this.onWheel, { passive: false });
     window.addEventListener("blur", this.onWindowBlur);
     if (this.gestures === "Lock") {
@@ -849,6 +908,8 @@ export class Canvas {
     for (const t of ["pointerdown", "pointermove", "pointerup", "pointercancel"]) el.removeEventListener(t, this.onPointer as EventListener);
     el.removeEventListener("pointerleave", this.onPointerLeave);
     el.removeEventListener("contextmenu", this.onContextMenu);
+    document.removeEventListener?.("copy", this.onCopy);
+    this.textSelection.Stop();
     el.removeEventListener("wheel", this.onWheel);
     window.removeEventListener("blur", this.onWindowBlur);
     el.removeEventListener("touchmove", this.preventTouch);
