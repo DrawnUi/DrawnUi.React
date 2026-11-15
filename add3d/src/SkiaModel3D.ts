@@ -244,15 +244,15 @@ export class SkiaModel3D extends SkiaControl implements IPrefetch3D {
 
   /** The view's turn around the vertical axis, degrees (20 by default). */
   get Yaw(): number { return this.yaw; }
-  set Yaw(value: number) { this.yaw = this.homeYaw = value; this.Update(); }
+  set Yaw(value: number) { this.yaw = this.homeYaw = value; this.Redraw(); }
 
   /** The view's tilt, degrees (10 by default). */
   get Pitch(): number { return this.pitch; }
-  set Pitch(value: number) { this.pitch = this.homePitch = value; this.Update(); }
+  set Pitch(value: number) { this.pitch = this.homePitch = value; this.Redraw(); }
 
   /** Distance as a factor of the one that fits the scene (1 = fits, below 1: closer). */
   get Zoom(): number { return this.zoom; }
-  set Zoom(value: number) { this.zoom = this.homeZoom = Math.max(0.05, value); this.Update(); }
+  set Zoom(value: number) { this.zoom = this.homeZoom = Math.max(0.05, value); this.Redraw(); }
 
   /** The nearest a pinch or the wheel brings the view, as a Zoom factor (0.5 by default). */
   get MinZoom(): number { return this.minZoom; }
@@ -263,22 +263,22 @@ export class SkiaModel3D extends SkiaControl implements IPrefetch3D {
 
   /** How it is drawn: Lit (default), Toon or Flat. */
   get Look(): Look { return this.look; }
-  set Look(value: Look) { this.look = value; this.Update(); }
+  set Look(value: Look) { this.look = value; this.Redraw(); }
 
   /**
    * Smooth 3D edges (4x multisampling, or the most the GPU offers), off by default. On, the control's GPU frame takes about
    * four times the memory; off, nothing extra is allocated. Can be switched at any time.
    */
   get Antialias(): boolean { return this.antialias; }
-  set Antialias(value: boolean) { if (this.antialias === value) return; this.antialias = value; this.Update(); }
+  set Antialias(value: boolean) { if (this.antialias === value) return; this.antialias = value; this.Redraw(); }
 
   /** An outline around every shape, in points, like an illustration's stroke (0 = none). */
   get OutlineWidth(): number { return this.outlineWidth; }
-  set OutlineWidth(value: number) { this.outlineWidth = Math.max(0, value); this.Update(); }
+  set OutlineWidth(value: number) { this.outlineWidth = Math.max(0, value); this.Redraw(); }
 
   /** The outline's color (black by default). */
   get OutlineColor(): string { return this.outlineColor; }
-  set OutlineColor(value: string | undefined) { this.outlineColor = value ?? "#000000"; this.Update(); }
+  set OutlineColor(value: string | undefined) { this.outlineColor = value ?? "#000000"; this.Redraw(); }
 
   /** Whether the control asks for frames now (it moves). */
   get IsAnimating(): boolean { return this.WantsFrames; }
@@ -336,35 +336,35 @@ export class SkiaModel3D extends SkiaControl implements IPrefetch3D {
   SetNodeVisible(name: string, visible: boolean): boolean {
     const i = this.NodeIndex(name);
     if (i < 0) return false;
-    this.nodes[i].Hidden = !visible; this.hiddenDirty = true; this.Update();
+    this.nodes[i].Hidden = !visible; this.hiddenDirty = true; this.Redraw();
     return true;
   }
   /** Moves a node by name: its own position, in its parent's units. It replaces what the file and the animations give it. */
   SetNodeTranslation(name: string, x: number, y: number, z: number): boolean {
     const i = this.NodeIndex(name);
     if (i < 0) return false;
-    this.nodes[i].T = [x, y, z]; this.Update();
+    this.nodes[i].T = [x, y, z]; this.Redraw();
     return true;
   }
   /** Turns a node by name: rotations around x, y, z in degrees (applied in that order). */
   SetNodeRotation(name: string, x: number, y: number, z: number): boolean {
     const i = this.NodeIndex(name);
     if (i < 0) return false;
-    this.nodes[i].R = Euler(x, y, z); this.Update();
+    this.nodes[i].R = Euler(x, y, z); this.Redraw();
     return true;
   }
   /** Scales a node by name. */
   SetNodeScale(name: string, x: number, y: number, z: number): boolean {
     const i = this.NodeIndex(name);
     if (i < 0) return false;
-    this.nodes[i].S = [x, y, z]; this.Update();
+    this.nodes[i].S = [x, y, z]; this.Redraw();
     return true;
   }
   /** Gives a node back what the file and the animations say: position, turn, scale, shown. */
   ResetNode(name: string): boolean {
     const i = this.NodeIndex(name);
     if (i < 0) return false;
-    this.nodes[i] = {}; this.hiddenDirty = true; this.Update();
+    this.nodes[i] = {}; this.hiddenDirty = true; this.Redraw();
     return true;
   }
 
@@ -375,7 +375,7 @@ export class SkiaModel3D extends SkiaControl implements IPrefetch3D {
   SetMaterialColor(name: string, color: string | undefined): boolean {
     const i = this.Material(name);
     if (i < 0) return false;
-    this.Override(i).Color = color ? ColorLinear(color) : undefined; this.Update();
+    this.Override(i).Color = color ? ColorLinear(color) : undefined; this.Redraw();
     return true;
   }
   /**
@@ -385,21 +385,21 @@ export class SkiaModel3D extends SkiaControl implements IPrefetch3D {
   SetMaterialImage(name: string, image: Texture3D | undefined): boolean {
     const i = this.Material(name);
     if (i < 0) return false;
-    this.Override(i).Image = image?.Pixels; this.Update();
+    this.Override(i).Image = image?.Pixels; this.Redraw();
     return true;
   }
   /** How matte a material is, 0 (glossy) to 1 (matte, no highlight); undefined = the file's own. Lit look only. */
   SetMaterialRoughness(name: string, roughness: number | undefined): boolean {
     const i = this.Material(name);
     if (i < 0) return false;
-    this.Override(i).Roughness = roughness === undefined ? undefined : Math.min(Math.max(roughness, 0), 1); this.Update();
+    this.Override(i).Roughness = roughness === undefined ? undefined : Math.min(Math.max(roughness, 0), 1); this.Redraw();
     return true;
   }
   /** Shows or hides every surface with this material. False when there is none such. */
   SetMaterialVisible(name: string, visible: boolean): boolean {
     const i = this.Material(name);
     if (i < 0) return false;
-    this.Override(i).Hidden = !visible; this.Update();
+    this.Override(i).Hidden = !visible; this.Redraw();
     return true;
   }
 
@@ -420,7 +420,7 @@ export class SkiaModel3D extends SkiaControl implements IPrefetch3D {
   private NodeIndex(name: string): number { return this.scene?.NodeNamed(name) ?? -1; }
 
   /** Something that may start or stop the motion changed: frames on or off, and one redraw. */
-  private Changed(): void { this.UpdateTicking(); this.Update(); }
+  private Changed(): void { this.UpdateTicking(); this.Redraw(); }
 
   private get WantsFrames(): boolean { return !!this.scene && (this.autoRotate !== 0 || this.reset < 1 || this.player.Busy || this.TiltMoving); }
 
@@ -449,7 +449,7 @@ export class SkiaModel3D extends SkiaControl implements IPrefetch3D {
     const delta = this.lastNanos === 0 ? 0 : (nanos - this.lastNanos) / 1e9;
     this.lastNanos = nanos;
     this.Advance(delta);
-    this.Update();
+    this.Redraw();
     if (!this.WantsFrames) this.loop?.Stop();
   }
 
@@ -569,7 +569,7 @@ export class SkiaModel3D extends SkiaControl implements IPrefetch3D {
         if (this.pinch <= 0) { this.pinch = 1; this.pinchFrom = this.zoom; }
         this.pinch *= Math.max(0.2, 1 + args.Event.Manipulation.Scale);
         this.zoom = Math.min(Math.max(this.pinchFrom / this.pinch, this.minZoom), this.maxZoom);
-        this.Update();
+        this.Redraw();
         return this;
       } else if (type === "Panning" && this.Orbit) {
         if (this.multiTouch) return this;
@@ -581,7 +581,7 @@ export class SkiaModel3D extends SkiaControl implements IPrefetch3D {
         // the surface follows the finger: a drag to the right turns the near side to the right, in points whatever the density
         this.yaw -= (args.Event.Distance.Delta.X / scale) * 0.5;
         if (!this.LockPitch) this.pitch = Math.min(Math.max(this.pitch + (args.Event.Distance.Delta.Y / scale) * 0.3, -60), 80);
-        this.Update();
+        this.Redraw();
         return this;
       } else if (type === "Wheel" && this.PinchZoom && args.Event.Wheel.IsZoom) {
         // a plain wheel scrolls the page; Ctrl (Cmd) + wheel or a touchpad pinch zooms (6bp)
@@ -590,7 +590,7 @@ export class SkiaModel3D extends SkiaControl implements IPrefetch3D {
         this.reset = 1;
         this.zoom = Math.min(Math.max(this.zoom * Math.pow(0.88, -notches), this.minZoom), this.maxZoom);
         args.Event.Handled = true;
-        this.Update();
+        this.Redraw();
         return this;
       } else if (type === "Tapped" && this.ResetOnDoubleTap && performance.now() - this.lastTapMs < 300) {
         this.lastTapMs = 0;
@@ -615,6 +615,7 @@ export class SkiaModel3D extends SkiaControl implements IPrefetch3D {
     if (w <= 0 || h <= 0) return;
     this.drawn = true;
     this.painted = true;
+    this.redrawFrame = -1;
     if (this.WantsFrames && !this.loop?.IsRunning) this.UpdateTicking();
     if (this.yaw !== this.shownYaw || this.pitch !== this.shownPitch || this.zoom !== this.shownZoom) {
       this.shownYaw = this.yaw; this.shownPitch = this.pitch; this.shownZoom = this.zoom;
@@ -665,6 +666,24 @@ export class SkiaModel3D extends SkiaControl implements IPrefetch3D {
     this.stale = true;
     super.Update();
   }
+
+  /**
+   * What it shows changed, not its size (a frame of an animation, the view turned, a material): drawn again, cached
+   * parents composite again, nothing is measured or laid out again (as SkiaLottie). Update() would re-measure up to the
+   * root on every frame of an animation.
+   */
+  private Redraw(): void {
+    this.stale = true;
+    // once per frame: the later changes of the same frame are drawn by the same redraw
+    const frame = this.Superview?.FrameTimeNanos ?? -1;
+    if (frame === this.redrawFrame) return;
+    this.redrawFrame = frame;
+    this.InvalidateCache();
+    this.RepaintComposition();
+  }
+
+  /** The frame Redraw last asked for a redraw in, until it is painted (-1: painted since). */
+  private redrawFrame = -1;
 
   protected override OnDisposing(): void {
     this.loop?.Dispose();

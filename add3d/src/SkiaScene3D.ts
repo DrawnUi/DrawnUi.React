@@ -61,23 +61,23 @@ export class SkiaScene3D extends SkiaControl implements IPrefetch3D {
 
   /** Forward tilt of every object, degrees (15 by default): how much of its top the player sees. */
   get Tilt(): number { return this.tilt; }
-  set Tilt(value: number) { this.tilt = value; this.Update(); }
+  set Tilt(value: number) { this.tilt = value; this.Redraw(); }
 
   /** How objects are drawn: Lit (default), Toon or Flat. */
   get Look(): Look { return this.look; }
-  set Look(value: Look) { this.look = value; this.Update(); }
+  set Look(value: Look) { this.look = value; this.Redraw(); }
 
   /** Smooth 3D edges (4x multisampling, or the most the GPU offers), off by default. */
   get Antialias(): boolean { return this.antialias; }
-  set Antialias(value: boolean) { if (this.antialias === value) return; this.antialias = value; this.Update(); }
+  set Antialias(value: boolean) { if (this.antialias === value) return; this.antialias = value; this.Redraw(); }
 
   /** An outline around every shape, in points, like an illustration's stroke (0 = none). */
   get OutlineWidth(): number { return this.outlineWidth; }
-  set OutlineWidth(value: number) { this.outlineWidth = Math.max(0, value); this.Update(); }
+  set OutlineWidth(value: number) { this.outlineWidth = Math.max(0, value); this.Redraw(); }
 
   /** The outline's color (black by default). */
   get OutlineColor(): string { return this.outlineColor; }
-  set OutlineColor(value: string | undefined) { this.outlineColor = value ?? "#000000"; this.Update(); }
+  set OutlineColor(value: string | undefined) { this.outlineColor = value ?? "#000000"; this.Redraw(); }
 
   /** Plays every animation of the layer (on by default); off stops them where they are. */
   get IsPlaying(): boolean { return this.playing; }
@@ -161,7 +161,7 @@ export class SkiaScene3D extends SkiaControl implements IPrefetch3D {
   SetPosition(name: string, x: number, y: number): boolean {
     const o = this.byName.get(name);
     if (!o) return false;
-    o.X = x; o.Y = y; this.Update();
+    o.X = x; o.Y = y; this.Redraw();
     return true;
   }
 
@@ -169,7 +169,7 @@ export class SkiaScene3D extends SkiaControl implements IPrefetch3D {
   SetFacing(name: string, degrees: number): boolean {
     const o = this.byName.get(name);
     if (!o) return false;
-    o.Facing = degrees; this.Update();
+    o.Facing = degrees; this.Redraw();
     return true;
   }
 
@@ -177,7 +177,7 @@ export class SkiaScene3D extends SkiaControl implements IPrefetch3D {
   SetSize(name: string, size: number): boolean {
     const o = this.byName.get(name);
     if (!o) return false;
-    o.Size = size; this.Update();
+    o.Size = size; this.Redraw();
     return true;
   }
 
@@ -210,7 +210,7 @@ export class SkiaScene3D extends SkiaControl implements IPrefetch3D {
     const i = o?.Model.Scene.MaterialNamed(material) ?? -1;
     if (!o || i < 0) return false;
     (o.Materials[i] ??= {}).Color = color ? ColorLinear(color) : undefined;
-    this.Update();
+    this.Redraw();
     return true;
   }
 
@@ -220,7 +220,7 @@ export class SkiaScene3D extends SkiaControl implements IPrefetch3D {
     const i = o?.Model.Scene.MaterialNamed(material) ?? -1;
     if (!o || i < 0) return false;
     (o.Materials[i] ??= {}).Image = image?.Pixels;
-    this.Update();
+    this.Redraw();
     return true;
   }
 
@@ -238,7 +238,23 @@ export class SkiaScene3D extends SkiaControl implements IPrefetch3D {
 
   // ---- frames ----
 
-  private Changed(): void { this.UpdateTicking(); this.Update(); }
+  private Changed(): void { this.UpdateTicking(); this.Redraw(); }
+
+  /**
+   * What it shows changed, not its size (objects moved or turned, a frame of their animations, a material): drawn
+   * again, cached parents composite again, nothing is measured or laid out again (as SkiaLottie).
+   */
+  private Redraw(): void {
+    // once per frame: a game moving a hundred objects asks for one redraw, not two hundred
+    const frame = this.Superview?.FrameTimeNanos ?? -1;
+    if (frame === this.redrawFrame) return;
+    this.redrawFrame = frame;
+    this.InvalidateCache();
+    this.RepaintComposition();
+  }
+
+  /** The frame Redraw last asked for a redraw in, until it is painted (-1: painted since). */
+  private redrawFrame = -1;
 
   private get WantsFrames(): boolean {
     if (!this.playing) return false;
@@ -260,7 +276,7 @@ export class SkiaScene3D extends SkiaControl implements IPrefetch3D {
     const delta = this.lastNanos === 0 ? 0 : (nanos - this.lastNanos) / 1e9;
     this.lastNanos = nanos;
     this.Advance(delta);
-    this.Update();
+    this.Redraw();
     if (!this.WantsFrames) this.loop?.Stop();
   }
 
@@ -340,6 +356,7 @@ export class SkiaScene3D extends SkiaControl implements IPrefetch3D {
     if (w <= 0 || h <= 0 || this.objects.length === 0) return;
     this.painted = true;
     this.drawn = true;
+    this.redrawFrame = -1;
     if (this.WantsFrames && !this.loop?.IsRunning) this.UpdateTicking();
     const renderer = Renderer3D.Of(this.Superview);
     if (!renderer) return;
