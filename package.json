@@ -139,7 +139,8 @@
     "check:image-cache": "node dev/check.mjs dev/check-image-cache.ts",
     "browser:canvas-contexts": "node dev/check-canvas-contexts.mjs",
     "check:editor-wheel": "node dev/check.mjs dev/check-editor-wheel.ts",
-    "check:reading-order": "node dev/check.mjs dev/check-reading-order.ts"
+    "check:reading-order": "node dev/check.mjs dev/check-reading-order.ts",
+    "check:editor-rightpress": "node dev/check.mjs dev/check-editor-rightpress.ts"
   },
   "peerDependencies": {
     "playwright-core": ">=1.40",
