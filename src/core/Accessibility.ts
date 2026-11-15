@@ -465,6 +465,15 @@ export class SkiaAccessibilityManager {
 
   ForceRebuildOnNextFrame(): void { this.lastRebuild = -Infinity; this.dirty = true; }
 
+  /** Until when every drawn frame rebuilds the overlay (FollowScroll). */
+  private followUntil = 0;
+  /**
+   * A scroll is bringing the keyboard's control into view for `ms`: every frame it draws rebuilds the overlay, so the
+   * controls it brings near are there for the next Tab (the timed rebuild could come a second later, and Tab would fall
+   * out of the canvas).
+   */
+  FollowScroll(ms: number): void { this.followUntil = performance.now() + ms; this.dirty = true; }
+
   Unregister(node: SkiaControl): void {
     if (this.nodes.delete(node)) { node.OnAccessibilityUnregistered(); this.dirty = true; }
   }
@@ -494,6 +503,7 @@ export class SkiaAccessibilityManager {
     this.appFocusThisFrame = false;
     if (this.nodes.size === 0 && this.Snapshot.length === 0) return;
     const now = performance.now();
+    if (now < this.followUntil) { this.Rebuild(scale, canvasWidthPx, canvasHeightPx); return; }
     const wait = this.MinUpdateIntervalMs - (now - this.lastRebuild);
     // a live region whose text changed is read on the next frame, not at the next timed rebuild (accessibility-plan B2)
     if (wait > 0 && this.liveSaid.size > 0 && this.LiveChanged()) { this.Rebuild(scale, canvasWidthPx, canvasHeightPx); return; }
