@@ -55,6 +55,8 @@ export class BossPage extends SkiaLayer {
   private _rageButton!: UiButton;
   private _turnButton!: UiButton;
   private _looping = "Idle";
+  /** The one-shot move playing now (lit until it ends), else undefined. */
+  private _once?: string;
   private _skin = "Ember";
   private _rage = false;
   private _turning = false;
@@ -96,10 +98,14 @@ export class BossPage extends SkiaLayer {
             Row: 1,
             Tapped3D: (me, hit) => {
               // A hit plays once and goes back to the loop; a dead dragon does not react.
-              if (this._looping !== "Death") me.PlayOnce(Hit);
+              // the hit replaces a one-shot move: the looping move lights again
+              if (this._looping !== "Death") { me.PlayOnce(Hit); this._once = undefined; this.UpdateButtons(); }
               this._news.Text = `Hit on ${hit.Material.replaceAll("_", " ")}`;
             },
-            AnimationEnded: (_, name) => { this._news.Text = `${BossPage.CaptionOf(name)} finished`; },
+            AnimationEnded: (_, name) => {
+              this._news.Text = `${BossPage.CaptionOf(name)} finished`;
+              if (this._once && BossPage.CaptionOf(name) === this._once) { this._once = undefined; this.UpdateButtons(); }
+            },
           }),
           this._news = Make(new SkiaLabel(), {
             Text: "Tap the dragon to hit it.", FontSize: 15, TextColor: "#FFFFFF", HorizontalOptions: "Center",
@@ -155,6 +161,7 @@ export class BossPage extends SkiaLayer {
   }
 
   private Move(caption: string, animation: string, kind: Kind): void {
+    this._once = kind === Kind.Once ? caption : undefined;
     switch (kind) {
       case Kind.Loop:
         this._boss.Play(animation);
@@ -191,7 +198,12 @@ export class BossPage extends SkiaLayer {
   }
 
   private UpdateButtons(): void {
-    Moves.forEach(([caption], i) => { this._moveButtons[i].Fill = this._looping === caption ? MovesAccent : ButtonColor; });
+    // the one-shot move while it plays, else the looping (or held) one
+    const lit = this._once ?? this._looping;
+    Moves.forEach(([caption], i) => {
+      this._moveButtons[i].Fill = lit === caption ? MovesAccent : ButtonColor;
+      this._moveButtons[i].AccessibilityIsPressed = lit === caption;
+    });
     Skins.forEach(([caption, color], i) => {
       const on = this._skin === caption;
       this._skinButtons[i].Fill = on ? color ?? Ember : ButtonColor;
