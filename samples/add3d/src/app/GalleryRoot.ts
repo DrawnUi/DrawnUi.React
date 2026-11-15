@@ -2,7 +2,7 @@
 import { Aria, ScaledSize, SkiaControl, SkiaGrid, SkiaLabel, SkiaLabelFps, SkiaLayer, SkiaRow, SkiaShape, SkiaStack, Thickness, type SkiaLayout } from "drawnui-react/core";
 import { BossPage } from "./BossPage";
 import { GalleryPage } from "./GalleryPage";
-import { Make, Theme, UiButton } from "./Theme";
+import { Button3D, Copyable, Make, Theme } from "./Theme";
 
 /** Narrower canvases put the tabs under the app's name. */
 const HeaderOneLine = 620;
@@ -12,7 +12,7 @@ const HeaderOneLine = 620;
  * in a corner.
  */
 export class GalleryRoot extends SkiaLayer {
-  private readonly _tabs: UiButton[] = [];
+  private readonly _tabs: Button3D[] = [];
   private readonly _pages: SkiaControl[] = [];
   private _header!: SkiaLayout;
   private _oneLine?: boolean;
@@ -23,6 +23,8 @@ export class GalleryRoot extends SkiaLayer {
   /** `subtitle`: the line under the app name, naming the head. */
   constructor(subtitle: string) {
     super();
+    // titles and descriptions can be selected and copied: their selection in the gallery's gold
+    SkiaLabel.TextSelectionColor = "rgba(242,179,61,0.4)";
     this.VerticalOptions = "Fill";
     this.BackgroundColor = Theme.Page;
     this.Children = [
@@ -57,8 +59,8 @@ export class GalleryRoot extends SkiaLayer {
                     HorizontalOptions: "Start",
                     VerticalOptions: "Center",
                     Children: [
-                      Make(new SkiaLabel(), { Text: "DrawnUI 3D Demo", FontSize: 17, FontFamily: Theme.Title, TextColor: Theme.Ink, AccessibilityRole: Aria.RoleHeading }),
-                      Make(new SkiaLabel(), { Text: subtitle, FontSize: 12, TextColor: Theme.Muted }),
+                      Make(new Copyable("DrawnUI 3D Demo"), { FontSize: 17, FontFamily: Theme.Title, TextColor: Theme.Ink, AccessibilityRole: Aria.RoleHeading }),
+                      Make(new Copyable(subtitle), { FontSize: 12, TextColor: Theme.Muted }),
                     ],
                   }),
                 ],
@@ -70,8 +72,8 @@ export class GalleryRoot extends SkiaLayer {
                 AccessibilityRole: Aria.RoleTabList,
                 AccessibilityLabel: "Screens",
                 Children: [
-                  this._tabs[0] = Make(new UiButton("Gallery", Theme.Accent, 120), { AccessibilityRole: Aria.RoleTab, Tapped: () => this.Show(0) }),
-                  this._tabs[1] = Make(new UiButton("Boss fight", Theme.Quiet, 120), { AccessibilityRole: Aria.RoleTab, Tapped: () => this.Show(1) }),
+                  this._tabs[0] = Make(new Button3D("Gallery", Theme.Accent, 120), { AccessibilityRole: Aria.RoleTab, Tapped: () => this.Show(0) }),
+                  this._tabs[1] = Make(new Button3D("Boss fight", Theme.Quiet, 120), { AccessibilityRole: Aria.RoleTab, Tapped: () => this.Show(1) }),
                 ],
               }),
             ],

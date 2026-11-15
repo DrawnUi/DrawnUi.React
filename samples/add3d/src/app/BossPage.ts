@@ -1,7 +1,7 @@
 // Port of Add3dGallery.Shared Pages/BossPage.cs.
 import { Aria, SkiaGrid, SkiaLabel, SkiaLayer, SkiaShape, SkiaStack, SkiaWrap, Thickness, type Color } from "drawnui-react/core";
 import { SkiaModel3D } from "drawnui-react-add3d/core";
-import { Make, Theme, UiButton } from "./Theme";
+import { Button3D, Copyable, Make, Theme, View3D } from "./Theme";
 
 const Idle = "CharacterArmature|Flying_Idle";
 const Hit = "CharacterArmature|HitReact";
@@ -48,12 +48,12 @@ const Muted = "#BEB4C8";
  * a tap on the boss that hits it, its skin and eyes recolored by material name. Drag the dragon to turn it.
  */
 export class BossPage extends SkiaLayer {
-  private readonly _moveButtons: UiButton[] = [];
-  private readonly _skinButtons: UiButton[] = [];
+  private readonly _moveButtons: Button3D[] = [];
+  private readonly _skinButtons: Button3D[] = [];
   private _boss!: SkiaModel3D;
   private _news!: SkiaLabel;
-  private _rageButton!: UiButton;
-  private _turnButton!: UiButton;
+  private _rageButton!: Button3D;
+  private _turnButton!: Button3D;
   private _looping = "Idle";
   /** The one-shot move playing now (lit until it ends), else undefined. */
   private _once?: string;
@@ -85,15 +85,15 @@ export class BossPage extends SkiaLayer {
             UseCache: "Image",
             Row: 0,
             Children: [
-              Make(new SkiaLabel(), { Text: "BOSS FIGHT", FontSize: 30, FontFamily: Theme.Title, TextColor: "#FFFFFF", HorizontalOptions: "Center", AccessibilityRole: Aria.RoleHeading }),
-              Make(new SkiaLabel(), {
-                Text: "A glTF model drawn in 3D inside DrawnUI, driven by the app. Drag it to turn it, tap it to hit it.",
+              Make(new Copyable("BOSS FIGHT"), { FontSize: 30, FontFamily: Theme.Title, TextColor: "#FFFFFF", HorizontalOptions: "Center", AccessibilityRole: Aria.RoleHeading }),
+              Make(new Copyable("A glTF model drawn in 3D inside DrawnUI, driven by the app. Drag it to turn it, tap it to hit it."), {
                 FontSize: 15, TextColor: Muted, HorizontalOptions: "Center", HorizontalTextAlignment: "Center",
               }),
             ],
           }),
           this._boss = Make(new SkiaModel3D(Theme.Dragon), {
-            Animation: Idle, Yaw: 30, Pitch: 8, Zoom: 0.75,
+            ...View3D("Boss dragon"),
+            Animation: Idle, Yaw: 30, Pitch: 8,
             HorizontalOptions: "Fill", VerticalOptions: "Fill",
             Row: 1,
             Tapped3D: (me, hit) => {
@@ -107,8 +107,8 @@ export class BossPage extends SkiaLayer {
               if (this._once && BossPage.CaptionOf(name) === this._once) { this._once = undefined; this.UpdateButtons(); }
             },
           }),
-          this._news = Make(new SkiaLabel(), {
-            Text: "Tap the dragon to hit it.", FontSize: 15, TextColor: "#FFFFFF", HorizontalOptions: "Center",
+          this._news = Make(new Copyable("Tap the dragon to hit it."), {
+            FontSize: 15, TextColor: "#FFFFFF", HorizontalOptions: "Center",
             AccessibilityLive: Aria.LivePolite,
             Row: 2,
           }),
@@ -123,7 +123,7 @@ export class BossPage extends SkiaLayer {
                 HorizontalOptions: "Center",
                 AccessibilityRole: Aria.RoleToolbar,
                 AccessibilityLabel: "Moves",
-                Children: Moves.map(([caption, animation, kind], i) => this._moveButtons[i] = Make(new UiButton(caption, ButtonColor, 100), {
+                Children: Moves.map(([caption, animation, kind], i) => this._moveButtons[i] = Make(new Button3D(caption, ButtonColor, 100), {
                   Tapped: () => this.Move(caption, animation, kind),
                 })),
               }),
@@ -134,13 +134,13 @@ export class BossPage extends SkiaLayer {
                 AccessibilityRole: Aria.RoleToolbar,
                 AccessibilityLabel: "Skin and eyes",
                 Children: [
-                  ...Skins.map(([caption, color], i) => this._skinButtons[i] = Make(new UiButton(caption, ButtonColor, 100), {
+                  ...Skins.map(([caption, color], i) => this._skinButtons[i] = Make(new Button3D(caption, ButtonColor, 100), {
                     StrokeColor: color ?? Ember, StrokeWidth: 2,
                     AccessibilityRole: Aria.RoleRadio,
                     Tapped: () => this.Skin(caption, color),
                   })),
-                  this._rageButton = Make(new UiButton("Rage: off", ToggleColor, 124), { Tapped: () => this.ToggleRage() }),
-                  this._turnButton = Make(new UiButton("Turn: off", ToggleColor, 124), { Tapped: () => this.ToggleTurn() }),
+                  this._rageButton = Make(new Button3D("Rage: off", ToggleColor, 124), { Tapped: () => this.ToggleRage() }),
+                  this._turnButton = Make(new Button3D("Turn: off", ToggleColor, 124), { Tapped: () => this.ToggleTurn() }),
                 ],
               }),
             ],

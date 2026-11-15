@@ -14,7 +14,7 @@ import {
 import { LoadState3D, Look, Mesh3D, Model3D, SkiaModel3D, SkiaScene3D, Texture3D } from "drawnui-react-add3d/core";
 import { RescalingLayout } from "./RescalingLayout";
 import { Scenery } from "./Scenery";
-import { Make, Theme, UiButton, WasInLastFrame } from "./Theme";
+import { Button3D, Copyable, Make, Switch3D, Theme, View3D, WasInLastFrame } from "./Theme";
 
 type Vec3 = [number, number, number];
 
@@ -397,6 +397,112 @@ const Paper = () => new Model3D().Part("piece", Mesh3D.Cuboid(1, 0.45, 0.06), "#
 
 const ConfettiStar = () => new Model3D().Part("piece", Extruded(Star(5, 0.6, 0.26), 0.12), "#FFFFFF");
 
+// ---- GalleryPage.Dice.cs: helpers ----
+
+const DiceHeight = 280;
+/** The turn (x, z) that puts a face on top: 1 starts on top, 6 under it, 2 in front, 5 behind, 3 right, 4 left. */
+const FaceUp: [number, number][] = [[0, 0], [-90, 0], [0, 90], [0, -90], [90, 0], [180, 0]];
+/** A die's faces in one image, one 256 px cell each, in the order RoundedCuboid lays an atlas. */
+const AtlasFaces = [3, 4, 1, 6, 2, 5]; // +X, -X, +Y on top; -Y, +Z, -Z below
+const DieRounding = 0.14;
+const DieX = [-0.8, 0.8];
+/** A die's shadow, a little toward the viewer and right: away from the key light, up and to the left. */
+const ShadowShift: [number, number] = [0.12, 0.15];
+const RollMs = 1700;
+/** The part of a roll spent tumbling; the rest is the die settling on the face it landed on, on a spring. */
+const Tumbling = 0.8;
+
+const DieFaces = () => Painted(768, 512, (c) => {
+  c.clear(Rgb(250, 246, 236));
+  for (let f = 0; f < AtlasFaces.length; f++) {
+    c.save();
+    c.translate((f % 3) * 256, Math.floor(f / 3) * 256);
+    Pips(c, AtlasFaces[f]);
+    c.restore();
+  }
+});
+
+/** One face's pips on a 256 px square: drilled into the face, darker inside, a light lip at the lower edge. */
+function Pips(c: SkCanvas, value: number): void {
+  // where the pips go on a 3 x 3 grid, as on a real die
+  const cells = value === 1 ? [4] : value === 2 ? [0, 8] : value === 3 ? [0, 4, 8] : value === 4 ? [0, 2, 6, 8] : value === 5 ? [0, 2, 4, 6, 8] : [0, 2, 3, 5, 6, 8];
+  const radius = value === 1 ? 34 : 22;
+  const pip = value === 1 ? Rgb(196, 30, 58) : Rgb(28, 28, 38);
+  for (const cell of cells) {
+    const x = 128 + ((cell % 3) - 1) * 64, y = 128 + (Math.floor(cell / 3) - 1) * 64;
+    c.drawCircle(x, y + 2.5, radius, Fill(Rgb(255, 255, 255, 200)));
+    c.drawCircle(x, y, radius, Fill(pip));
+    c.drawCircle(x, y - radius * 0.25, radius * 0.75, Fill(Rgb(0, 0, 0, 70)));
+  }
+}
+
+/**
+ * Two dice, each a holder that turns it around the vertical and lifts it, a rounded cube wearing its faces, and a soft
+ * shadow on the table under it (it stays on the table while the die hops).
+ */
+function TwoDice(): Model3D {
+  const model = new Model3D();
+  for (let d = 0; d < 2; d++) {
+    model.Part(`shadow${d}`, Mesh3D.Cuboid(1.45, 0.001, 1.45), "#FCFFFFFF").At(DieX[d] + ShadowShift[0], -0.505, ShadowShift[1])
+      .Part(`holder${d}`, Mesh3D.Cuboid(0.01, 0.01, 0.01), "#FFFFFF").At(DieX[d], 0, 0)
+      .Part(`die${d}`, Mesh3D.RoundedCuboid(1, 1, 1, DieRounding, true), "#FFFFFF").Inside(`holder${d}`);
+  }
+  return model;
+}
+
+/** A soft dark spot that fades to nothing at its edge: a die's shadow on the table. */
+const ShadowSpot = () => Painted(128, 128, (c, w, h) => {
+  const CK = Super.CK;
+  const paint = Fill(CK.WHITE);
+  const shader = CK.Shader.MakeRadialGradient([w / 2, h / 2], w / 2, [Rgb(0, 0, 0, 255), Rgb(0, 0, 0, 215), Rgb(0, 0, 0, 90), Rgb(0, 0, 0, 0)], [0, 0.35, 0.7, 1], CK.TileMode.Clamp);
+  paints.push(shader);
+  paint.setShader(shader);
+  c.drawRect(CK.LTRBRect(0, 0, w, h), paint);
+});
+
+/** How high a die's center must be for its lowest point to touch the table, turned by (x, z) degrees. */
+function RestingLift(x: number, z: number): number {
+  const rx = (x * Math.PI) / 180, rz = (z * Math.PI) / 180, core = 0.5 - DieRounding;
+  let lowest = 0;
+  for (let i = 0; i < 8; i++) {
+    const cx = i & 1 ? core : -core, cy = i & 2 ? core : -core, cz = i & 4 ? core : -core;
+    // the turn X then Z (as Quaternion X * Z applied to the corner: Z first, then X)
+    const y1 = cx * Math.sin(rz) + cy * Math.cos(rz);
+    const y2 = y1 * Math.cos(rx) - cz * Math.sin(rx);
+    lowest = Math.min(lowest, y2);
+  }
+  return -lowest + DieRounding - 0.5;
+}
+
+/**
+ * A die's angle during a roll: it keeps turning fast, loses speed to friction but never crawls (its last turn is still at
+ * 40% of its average speed), hits its face and settles on it like a damped spring: it rocks back off the face and in
+ * again, each swing smaller, and stops.
+ */
+function Tumble(from: number, to: number, t: number): number {
+  const d = to - from;
+  if (t < Tumbling) { const u = t / Tumbling; return from + d * u * (1.6 - 0.6 * u); }
+  // a damped spring started by the impact: x(s) = A e^(-zeta w s) sin(w_d s), back off the face first
+  const s = (t - Tumbling) / (1 - Tumbling);
+  const zeta = 0.28, cycles = 2.2, wd = 2 * Math.PI * cycles, w = wd / Math.sqrt(1 - zeta * zeta);
+  const amplitude = Math.min(Math.abs(d), 7);
+  return to - Math.sign(d) * amplitude * Math.exp(-zeta * w * s) * Math.sin(wd * s);
+}
+
+/** Hops off the table: three falls under gravity, each lower and shorter, done before the die lands. */
+function Bounces(t: number): number {
+  const heights = [0.32, 0.12, 0.04];
+  // time of a hop grows with the square root of its height, as for a falling body
+  const total = heights.reduce((s, h) => s + Math.sqrt(h), 0);
+  let at = (t / (Tumbling * 0.95)) * total;
+  for (const h of heights) {
+    const span = Math.sqrt(h);
+    if (at < span) { const u = at / span; return 4 * h * u * (1 - u); }
+    at -= span;
+  }
+  return 0;
+}
+
 // ---- GalleryPage.Loop.cs: types ----
 
 /** A small random number generator: the same confetti and crowd every run (as the Rust gallery). */
@@ -451,9 +557,9 @@ export class GalleryPage extends DrawnGame {
   private _rain!: SkiaScene3D;
   private _field!: SkiaScene3D;
   private _scenery!: Scenery;
-  private _chestButton!: UiButton;
-  private readonly _mobButtons: UiButton[] = [];
-  private readonly _lookButtons: UiButton[] = [];
+  private _chestButton!: Button3D;
+  private readonly _mobButtons: Button3D[] = [];
+  private _drawnSwitch!: Switch3D;
   private _drawnMobs = false;
   private _started = false;
 
@@ -478,9 +584,8 @@ export class GalleryPage extends DrawnGame {
               Spacing: 20,
               UseCache: "Image",
               Children: [
-                Make(new SkiaLabel(), { Text: "3D, made in the app", FontSize: 30, FontFamily: Theme.Title, TextColor: Theme.Ink, HorizontalOptions: "Center", AccessibilityRole: Aria.RoleHeading }),
-                Make(new SkiaLabel(), {
-                  Text: "Where 3D earns its place in an app: products, lists, cards, maps and forms first, then the fun.",
+                Make(new Copyable("3D, made in the app"), { FontSize: 30, FontFamily: Theme.Title, TextColor: Theme.Ink, HorizontalOptions: "Center", AccessibilityRole: Aria.RoleHeading }),
+                Make(new Copyable("Where 3D earns its place in an app: products, lists, cards, maps and forms first, then the fun."), {
                   FontSize: 15, TextColor: Theme.Muted, HorizontalOptions: "Center", HorizontalTextAlignment: "Center",
                 }),
                 Make(new SkiaRow(), {
@@ -505,24 +610,26 @@ export class GalleryPage extends DrawnGame {
               HorizontalOptions: "Center",
               Children: [
                 GalleryPage.Tile("Celebration", "Confetti and stars falling: one 3D layer, many pieces.",
-                  this._rain = Make(new SkiaScene3D(), { Tilt: 20, HorizontalOptions: "Fill", VerticalOptions: "Fill" })
+                  this._rain = Make(new SkiaScene3D(), { Tilt: 20, HorizontalOptions: "Fill", VerticalOptions: "Fill", ...View3D("Confetti and stars") })
                     .Model("paper", Paper())
                     .Model("star", ConfettiStar()),
-                  Make(new UiButton("Hooray", Theme.Accent), { Tapped: () => this.Hooray() })),
+                  Make(new Button3D("Hooray", Theme.Accent), { Tapped: () => this.Hooray() })),
                 this.ProductBoxTile(),
                 GalleryPage.Tile("Reward", "A chest that opens and closes.",
                   this._chest = Make(new SkiaModel3D(Theme.Chest), {
                     Animation: "Chest_Open", IsPlaying: false, Yaw: 30, Pitch: 20, Orbit: false,
                     HorizontalOptions: "Fill", VerticalOptions: "Fill",
+                    ...View3D("Reward chest"),
                   }),
-                  this._chestButton = Make(new UiButton("Open", Theme.Accent), { Tapped: () => this.ToggleChest() })),
+                  this._chestButton = Make(new Button3D("Open", Theme.Accent), { Tapped: () => this.ToggleChest() })),
               ],
             }),
 
             this.FormCard(),
 
-            Theme.Section("Games", "Many 3D characters on one field, moved like sprites and drawn by one layer in one pass."),
+            Theme.Section("Games", "Many 3D characters on one field, moved like sprites, and dice made in code."),
             this.MobsCard(),
+            this.DiceCard(),
 
             GalleryPage.Footer(),
           ],
@@ -556,7 +663,7 @@ export class GalleryPage extends DrawnGame {
             Theme.Link("Same demo in .NET", Theme.NetDemoUrl),
           ],
         }),
-        Make(new SkiaLabel(), { Text: "Drawn with DrawnUI: every pixel of this page, the 3D included.", FontSize: 12, TextColor: Theme.Muted, HorizontalOptions: "Center" }),
+        Make(new Copyable("Drawn with DrawnUI: every pixel of this page, 3D and context menus included."), { FontSize: 12, TextColor: Theme.Muted, HorizontalOptions: "Center" }),
       ],
     });
   }
@@ -570,8 +677,9 @@ export class GalleryPage extends DrawnGame {
       UseCache: "None",
       CornerRadius: 16,
       BackgroundColor: Theme.Card,
-      StrokeColor: Theme.Line,
-      StrokeWidth: 1,
+      // raised from the page: lit top edge, shaded bottom edge
+      BevelType: "Bevel",
+      Bevel: Theme.CardBevel(),
       Padding: new Thickness(16),
       Children: [
         Make(new SkiaStack(), {
@@ -581,8 +689,8 @@ export class GalleryPage extends DrawnGame {
               Spacing: 4,
               UseCache: "Image",
               Children: [
-                Make(new SkiaLabel(), { Text: title, FontSize: 18, FontFamily: Theme.Title, TextColor: Theme.Ink, AccessibilityRole: Aria.RoleHeading }),
-                Make(new SkiaLabel(), { Text: caption, FontSize: 13, TextColor: Theme.Muted, HeightRequest: 36 }),
+                Make(new Copyable(title), { FontSize: 18, FontFamily: Theme.Title, TextColor: Theme.Ink, AccessibilityRole: Aria.RoleHeading }),
+                Make(new Copyable(caption), { FontSize: 13, TextColor: Theme.Muted, HeightRequest: 36 }),
               ],
             }),
             Make(GalleryPage.Stage(piece), { HeightRequest: RainHeight }),
@@ -599,6 +707,9 @@ export class GalleryPage extends DrawnGame {
       CornerRadius: 14,
       UseCache: "None",
       BackgroundColor: Theme.Stage,
+      // sunk into the card
+      BevelType: "Emboss",
+      Bevel: Theme.CardBevel(),
       HorizontalOptions: "Fill",
       Children: [piece],
     });
@@ -648,8 +759,9 @@ export class GalleryPage extends DrawnGame {
       UseCache: still ? "GPU" : "None",
       CornerRadius: 16,
       BackgroundColor: Theme.Card,
-      StrokeColor: Theme.Line,
-      StrokeWidth: 1,
+      // raised from the page: lit top edge, shaded bottom edge
+      BevelType: "Bevel",
+      Bevel: Theme.CardBevel(),
       Padding: new Thickness(20),
       HorizontalOptions: "Center",
       WidthRequest: WideWidth + 42,
@@ -662,8 +774,8 @@ export class GalleryPage extends DrawnGame {
               // Static text over a card that may redraw every frame: one blit (the still card's GPU cache holds it anyway).
               UseCache: still ? "None" : "Image",
               Children: [
-                Make(new SkiaLabel(), { Text: title, FontSize: 20, FontFamily: Theme.Title, TextColor: Theme.Ink, AccessibilityRole: Aria.RoleHeading }),
-                Make(new SkiaLabel(), { Text: caption, FontSize: 14, TextColor: Theme.Muted }),
+                Make(new Copyable(title), { FontSize: 20, FontFamily: Theme.Title, TextColor: Theme.Ink, AccessibilityRole: Aria.RoleHeading }),
+                Make(new Copyable(caption), { FontSize: 14, TextColor: Theme.Muted }),
               ],
             }),
             content,
@@ -700,6 +812,7 @@ export class GalleryPage extends DrawnGame {
             this._scenery = Make(new Scenery(), { HorizontalOptions: "Fill", VerticalOptions: "Fill" }),
             this._field = Make(new SkiaScene3D(), {
               Tilt: 30,
+              ...View3D("3D mobs on a 2D field"),
               HorizontalOptions: "Fill", VerticalOptions: "Fill",
               Tapped3D: (me, hit) => { me.PlayOnce(hit.Object, "CharacterArmature|HitRecieve"); },
             }).Model("slime", Theme.Mob),
@@ -716,29 +829,25 @@ export class GalleryPage extends DrawnGame {
           field,
           Make(new SkiaWrap(), {
             Spacing: 8,
-            AccessibilityRole: Aria.RoleRadioGroup,
-            AccessibilityLabel: "Mobs on the field",
             Children: [
-              ...MobCounts.map((n, i) => this._mobButtons[i] = Make(new UiButton(`${n} mobs`, Theme.Quiet, 110), {
-                AccessibilityRole: Aria.RoleRadio,
-                Tapped: () => this.SetMobs(n),
-              })),
-              // How they look, switched in place: a segmented 3D | Drawn on a plate (as DrawnUI for Rust).
-              Make(new SkiaShape(), {
-                CornerRadius: 12,
-                BackgroundColor: Theme.Stage,
-                Padding: new Thickness(3),
-                Margin: new Thickness(8, 0, 0, 0),
+              // how many: one radio group, its own Tab stop walked with the arrows
+              Make(new SkiaRow(), {
+                Spacing: 8,
                 AccessibilityRole: Aria.RoleRadioGroup,
-                AccessibilityLabel: "Look",
+                AccessibilityLabel: "Mobs on the field",
+                Children: MobCounts.map((n, i) => this._mobButtons[i] = Make(new Button3D(`${n} mobs`, Theme.Quiet, 110), {
+                  AccessibilityRole: Aria.RoleRadio,
+                  Tapped: () => this.SetMobs(n),
+                })),
+              }),
+              // How they look, switched in place: lit 3D, or drawn as a cartoon. A Tab stop of its own.
+              Make(new SkiaRow(), {
+                Spacing: 10,
+                Margin: new Thickness(8, 0, 0, 0),
+                VerticalOptions: "Center",
                 Children: [
-                  Make(new SkiaRow(), {
-                    Spacing: 3,
-                    Children: [
-                      this._lookButtons[0] = Make(new UiButton("3D", Theme.Quiet, 90), { AccessibilityRole: Aria.RoleRadio, Tapped: () => this.SetDrawnMobs(false) }),
-                      this._lookButtons[1] = Make(new UiButton("Drawn", Theme.Quiet, 90), { AccessibilityRole: Aria.RoleRadio, Tapped: () => this.SetDrawnMobs(true) }),
-                    ],
-                  }),
+                  Make(new SkiaLabel(), { Text: "Drawn", FontSize: 14, FontFamily: Theme.Title, TextColor: Theme.Ink, VerticalOptions: "Center" }),
+                  this._drawnSwitch = Make(new Switch3D(), { VerticalOptions: "Center", AccessibilityLabel: "Drawn look", Toggled: (_, on) => this.SetDrawnMobs(on) }),
                 ],
               }),
             ],
@@ -811,11 +920,7 @@ export class GalleryPage extends DrawnGame {
       this._mobButtons[i].Fill = on ? Theme.Accent : Theme.Quiet;
       this._mobButtons[i].AccessibilityIsPressed = on;
     });
-    this._lookButtons.forEach((button, i) => {
-      const on = (i === 1) === this._drawnMobs;
-      button.Fill = on ? Theme.Accent : Theme.Quiet;
-      button.AccessibilityIsPressed = on;
-    });
+    this._drawnSwitch.IsToggled = this._drawnMobs;
   }
 
   /** The mobs as lit 3D models, or drawn as a cartoon. */
@@ -848,7 +953,7 @@ export class GalleryPage extends DrawnGame {
   private _noteTitle!: SkiaLabel;
   private _noteText!: SkiaLabel;
   private readonly _pins: SkiaShape[] = [];
-  private readonly _sourceButtons: UiButton[] = [];
+  private readonly _sourceButtons: Button3D[] = [];
   private readonly _swatches: SkiaShape[] = [];
   private _fabric = -1;
   private _openSpot = -1;
@@ -866,6 +971,8 @@ export class GalleryPage extends DrawnGame {
           // note draws it again.
           UseCache: "GPU",
           BackgroundColor: Theme.Stage,
+          BevelType: "Emboss",
+          Bevel: Theme.CardBevel(),
           WidthRequest: ViewerWidth,
           HeightRequest: ViewerHeight,
           Children: [
@@ -875,8 +982,7 @@ export class GalleryPage extends DrawnGame {
               VerticalOptions: "Fill",
               Children: [...Hotspots.map(([name], i) => this.Pin(i, name)), this.Note()],
             }),
-            Make(new SkiaLabel(), {
-              Text: "Drag to turn  ·  pinch or Ctrl+scroll to zoom  ·  double-tap to reset",
+            Make(new Copyable("Drag to turn  ·  pinch or Ctrl+scroll to zoom  ·  double-tap to reset"), {
               FontSize: 12, TextColor: Theme.Muted, Margin: new Thickness(0, 0, 0, 12),
               HorizontalOptions: "Center", VerticalOptions: "End", InputTransparent: true,
             }),
@@ -892,10 +998,9 @@ export class GalleryPage extends DrawnGame {
             Make(new SkiaStack(), {
               Spacing: 2,
               Children: [
-                Make(new SkiaLabel(), { Text: "Walnut sofa", FontSize: 24, FontFamily: Theme.Title, TextColor: Theme.Ink, AccessibilityRole: Aria.RoleHeading }),
-                Make(new SkiaLabel(), { Text: "Three-seater, carved walnut frame", FontSize: 13, TextColor: Theme.Muted }),
-                this._price = Make(new SkiaLabel(), {
-                  Text: Dollars(this._fabrics[0][4]),
+                Make(new Copyable("Walnut sofa"), { FontSize: 24, FontFamily: Theme.Title, TextColor: Theme.Ink, AccessibilityRole: Aria.RoleHeading }),
+                Make(new Copyable("Three-seater, carved walnut frame"), { FontSize: 13, TextColor: Theme.Muted }),
+                this._price = Make(new Copyable(Dollars(this._fabrics[0][4])), {
                   FontSize: 18, FontFamily: Theme.Title, TextColor: Theme.Gold, Margin: new Thickness(0, 6, 0, 0),
                   HorizontalOptions: "Fill", AccessibilityRole: Aria.RoleText, AccessibilityLive: Aria.LivePolite,
                 }),
@@ -916,7 +1021,7 @@ export class GalleryPage extends DrawnGame {
                     WidthRequest: 60,
                     Children: [
                       this._swatches[i] = Make(GalleryPage.Swatch(`${name}, ${Dollars(price)}`, swatch), { Tapped: () => this.SetFabric(i) }),
-                      Make(new SkiaLabel(), { Text: name, FontSize: 12, TextColor: Theme.Muted, HorizontalOptions: "Center", AccessibilityRole: Aria.RolePresentation }),
+                      Make(new Copyable(name), { FontSize: 12, TextColor: Theme.Muted, HorizontalOptions: "Center" }),
                     ],
                   })),
                 }),
@@ -925,12 +1030,12 @@ export class GalleryPage extends DrawnGame {
                   Spacing: 8,
                   AccessibilityRole: Aria.RoleRadioGroup,
                   AccessibilityLabel: "Load the model",
-                  Children: Sources.map(([source, caption], i) => this._sourceButtons[i] = Make(new UiButton(caption, Theme.Quiet, -1), {
+                  Children: Sources.map(([source, caption], i) => this._sourceButtons[i] = Make(new Button3D(caption, Theme.Quiet, -1), {
                     AccessibilityRole: Aria.RoleRadio,
                     Tapped: () => this.LoadViewer(source),
                   })),
                 }),
-                Make(new UiButton("Reset view", Theme.Quiet, 140), {
+                Make(new Button3D("Reset view", Theme.Quiet, 140), {
                   AccessibilityHint: "Turns the sofa back to the front",
                   Tapped: () => this._viewer?.ResetView(),
                 }),
@@ -943,7 +1048,7 @@ export class GalleryPage extends DrawnGame {
   }
 
   private static PanelLabel(text: string): SkiaLabel {
-    return Make(new SkiaLabel(), { Text: text, FontSize: 12, FontFamily: Theme.Title, TextColor: Theme.Muted, Margin: new Thickness(0, 8, 0, -6), CharacterSpacing: 1.5 });
+    return Make(new Copyable(text), { FontSize: 12, FontFamily: Theme.Title, TextColor: Theme.Muted, Margin: new Thickness(0, 8, 0, -6), CharacterSpacing: 1.5 });
   }
 
   /** A dot on a part of the model: tap it for the part's note. */
@@ -963,7 +1068,7 @@ export class GalleryPage extends DrawnGame {
       Shadows: [new SkiaShadow({ Blur: 4, Y: 2, Opacity: 0.35, Color: "#000000" })],
       Children: [
         Make(new SkiaLabel(), {
-          Text: `${index + 1}`, FontSize: 12, FontFamily: Theme.Title, TextColor: Theme.Accent,
+          Text: `${index + 1}`, FontSize: 12, FontFamily: Theme.Title, TextColor: Theme.Darker(Theme.Accent, 0.4),
           HorizontalOptions: "Center", VerticalOptions: "Center", AccessibilityRole: Aria.RolePresentation,
         }),
       ],
@@ -1052,7 +1157,7 @@ export class GalleryPage extends DrawnGame {
               AccessibilityRole: Aria.RoleText, AccessibilityLive: Aria.LivePolite,
             }),
             this._failedText = Make(new SkiaLabel(), { FontSize: 13, TextColor: Theme.Muted, HorizontalOptions: "Center", HorizontalTextAlignment: "Center" }),
-            Make(new UiButton("Use the app's copy", Theme.Accent, 180), {
+            Make(new Button3D("Use the app's copy", Theme.Accent, 180), {
               Margin: new Thickness(0, 6, 0, 0),
               HorizontalOptions: "Center",
               Tapped: () => this.LoadViewer(Source.App),
@@ -1130,9 +1235,9 @@ export class GalleryPage extends DrawnGame {
       this._sourceButtons[i].AccessibilityIsPressed = on;
     });
     const sofa = Make(new SkiaModel3D(source === Source.App ? Theme.Sofa : undefined), {
+      ...View3D("Walnut sofa"),
       Yaw: 28,
       Pitch: 14,
-      Zoom: 0.95,
       PinchZoom: true,
       MinZoom: 0.55,
       MaxZoom: 1.8,
@@ -1210,7 +1315,7 @@ export class GalleryPage extends DrawnGame {
     const header = Make(new SkiaRow(), {
       HorizontalOptions: "Fill",
       Children: [
-        Make(new SkiaLabel(), { Text: "Shop", FontSize: 18, FontFamily: Theme.Title, TextColor: Theme.Ink, AccessibilityRole: Aria.RoleHeading }),
+        Make(new Copyable("Shop"), { FontSize: 18, FontFamily: Theme.Title, TextColor: Theme.Ink, AccessibilityRole: Aria.RoleHeading }),
         // Changes while the list scrolls: a fixed box that never lays the card out again (as C#)
         this._listCount = Make(new SkiaLabel(), {
           FontSize: 13, TextColor: Theme.Muted, HorizontalOptions: "End", VerticalOptions: "Center",
@@ -1236,6 +1341,8 @@ export class GalleryPage extends DrawnGame {
           CornerRadius: 12,
           UseCache: "None",
           BackgroundColor: Theme.Page,
+          BevelType: "Emboss",
+          Bevel: Theme.CardBevel(),
           HeightRequest: ListHeight,
           HorizontalOptions: "Fill",
           Children: [
@@ -1302,19 +1409,19 @@ export class GalleryPage extends DrawnGame {
           Spacing: 2,
           VerticalOptions: "Center",
           Children: [
-            Make(new SkiaLabel(), { Text: name, FontSize: 15, TextColor: Theme.Ink }),
-            Make(new SkiaLabel(), { Text: large ? `${detail} · large` : detail, FontSize: 12, TextColor: Theme.Muted }),
-            Make(new SkiaLabel(), { Text: Dollars(price), FontSize: 14, TextColor: Theme.Gold }),
+            Make(new Copyable(name), { FontSize: 15, TextColor: Theme.Ink }),
+            Make(new Copyable(large ? `${detail} · large` : detail), { FontSize: 12, TextColor: Theme.Muted }),
+            Make(new Copyable(Dollars(price)), { FontSize: 14, TextColor: Theme.Gold }),
           ],
         }),
-        Make(new UiButton("Add", Theme.Accent, 120), {
+        Make(new Button3D("+ Add", Theme.Quiet, 120), {
           AccessibilityLabel: `Add ${name} to the cart`, HorizontalOptions: "End", VerticalOptions: "Center",
           Tapped: (me) => {
-            const button = me as UiButton;
+            const button = me as Button3D;
             added = !added;
-            button.Text = added ? "In the cart" : "Add";
+            button.Text = added ? "In the cart" : "+ Add";
             button.AccessibilityLabel = added ? `Remove ${name} from the cart` : `Add ${name} to the cart`;
-            button.Fill = added ? Theme.Stage : Theme.Accent;
+            button.Fill = added ? Theme.Accent : Theme.Quiet;
           },
         }),
       ],
@@ -1348,7 +1455,7 @@ export class GalleryPage extends DrawnGame {
   // finger) and turns over with a smooth half turn on a tap or the Flip button.
 
   private _card!: SkiaModel3D;
-  private _flipButton!: UiButton;
+  private _flipButton!: Button3D;
   private _flipped = false;
   /** The half turn: where it is and where it goes (0 = front, 180 = back), degrees. */
   private _cardTurn = 0;
@@ -1356,10 +1463,10 @@ export class GalleryPage extends DrawnGame {
 
   private FlipCard(): SkiaControl {
     this._card = Make(new SkiaModel3D(CardModel()), {
+      ...View3D("Drawn Rewards Gold card"),
       Orbit: false,
       Yaw: 0,
       Pitch: 0,
-      Zoom: 0.74,
       // Leans toward the mouse or the finger, up to 14 degrees at the stage's edge.
       TiltToPointer: 14,
       Antialias: true,
@@ -1385,12 +1492,12 @@ export class GalleryPage extends DrawnGame {
               Spacing: 4,
               UseCache: "Image",
               Children: [
-                Make(new SkiaLabel(), { Text: "Drawn Rewards Gold", FontSize: 24, FontFamily: Theme.Title, TextColor: Theme.Ink, AccessibilityRole: Aria.RoleHeading }),
-                Make(new SkiaLabel(), { Text: "12,480 points · member since 2021", FontSize: 14, TextColor: Theme.Muted }),
-                Make(new SkiaLabel(), { Text: "Both faces are images drawn in code with Skia and put on the card's two halves.", FontSize: 13, TextColor: Theme.Muted, Margin: new Thickness(0, 10, 0, 0) }),
+                Make(new Copyable("Drawn Rewards Gold"), { FontSize: 24, FontFamily: Theme.Title, TextColor: Theme.Ink, AccessibilityRole: Aria.RoleHeading }),
+                Make(new Copyable("12,480 points · member since 2021"), { FontSize: 14, TextColor: Theme.Muted }),
+                Make(new Copyable("Both faces are images drawn in code with Skia and put on the card's two halves."), { FontSize: 13, TextColor: Theme.Muted, Margin: new Thickness(0, 10, 0, 0) }),
               ],
             }),
-            this._flipButton = Make(new UiButton("Show the back", Theme.Accent, 160), {
+            this._flipButton = Make(new Button3D("Show the back", Theme.Accent, 160), {
               AccessibilityHint: "Turns the card over",
               Tapped: () => this.Flip(),
             }),
@@ -1423,11 +1530,11 @@ export class GalleryPage extends DrawnGame {
   // globe to it. The same look and numbers as the .NET gallery.
 
   private _globe!: SkiaModel3D;
-  private _spinButton!: UiButton;
+  private _spinSwitch!: Switch3D;
   private readonly _cityPins: SkiaLayer[] = [];
   private readonly _pulses: SkiaLayer[] = [];
   private readonly _cityLabels: SkiaLayer[] = [];
-  private readonly _cityButtons: UiButton[] = [];
+  private readonly _cityButtons: Button3D[] = [];
   private _openCity = -1;
   private _spinning = true;
   /** A glide to a city: 0 to 1 while it runs, and the turn it goes from and to. */
@@ -1439,13 +1546,17 @@ export class GalleryPage extends DrawnGame {
 
   private GlobeCard(): SkiaControl {
     this._globe = Make(new SkiaModel3D(new Model3D().Part("earth", Mesh3D.Sphere(1), "#FFFFFF")), {
+      ...View3D("Globe with office pins"),
       Yaw: -20,
       Pitch: 15,
-      Zoom: 0.9,
+      // a little away from the tight fit: the globe sits in space with room around it
+      Zoom: 1.15,
+      // a swipe keeps the Earth turning, slowing as a scroll does
+      Fling: true,
       AutoRotate: 10,
       PinchZoom: true,
       MinZoom: 0.6,
-      MaxZoom: 1.6,
+      MaxZoom: 2.2,
       ResetOnDoubleTap: true,
       Antialias: true,
       HorizontalOptions: "Fill",
@@ -1462,6 +1573,8 @@ export class GalleryPage extends DrawnGame {
           WidthRequest: ViewerWidth,
           HeightRequest: GlobeHeight,
           BackgroundColor: "#080A16",
+          BevelType: "Emboss",
+          Bevel: Theme.CardBevel(),
           Children: [
             this._globe,
             // The pins, then their name chips over every pin.
@@ -1480,25 +1593,29 @@ export class GalleryPage extends DrawnGame {
             Make(new SkiaStack(), {
               Spacing: 4,
               Children: [
-                Make(new SkiaLabel(), { Text: "Offices", FontSize: 24, FontFamily: Theme.Title, TextColor: Theme.Ink, AccessibilityRole: Aria.RoleHeading }),
-                Make(new SkiaLabel(), { Text: "Pick a city to turn the globe to it, or tap a pin.", FontSize: 13, TextColor: Theme.Muted }),
+                Make(new Copyable("Our offices"), { FontSize: 24, FontFamily: Theme.Title, TextColor: Theme.Ink, AccessibilityRole: Aria.RoleHeading }),
+                Make(new Copyable("Pick a city to turn the globe to it, or tap a pin."), { FontSize: 13, TextColor: Theme.Muted }),
               ],
             }),
             Make(new SkiaWrap(), {
               Spacing: 8,
               AccessibilityRole: Aria.RoleRadioGroup,
               AccessibilityLabel: "Cities",
-              Children: Cities.map(([name], i) => this._cityButtons[i] = Make(new UiButton(name, Theme.Quiet, -1), {
+              Children: Cities.map(([name], i) => this._cityButtons[i] = Make(new Button3D(name, Theme.Quiet, -1), {
                 AccessibilityRole: Aria.RoleRadio,
                 Tapped: () => this.GoToCity(i),
               })),
             }),
-            this._spinButton = Make(new UiButton("Pause spin", Theme.Quiet, 158), {
+            // the globe turning by itself: on from the start, a turn to a city keeps it going
+            Make(new SkiaRow(), {
+              Spacing: 10,
               Margin: new Thickness(0, 6, 0, 0),
-              AccessibilityHint: "Stops or starts the globe turning by itself",
-              Tapped: () => this.SetSpin(!this._spinning),
+              Children: [
+                Make(new SkiaLabel(), { Text: "Spin", FontSize: 14, FontFamily: Theme.Title, TextColor: Theme.Ink, VerticalOptions: "Center" }),
+                this._spinSwitch = Make(new Switch3D(), { IsToggled: true, VerticalOptions: "Center", AccessibilityLabel: "Spin", AccessibilityHint: "The globe turns by itself", Toggled: (_, on) => this.SetSpin(on) }),
+              ],
             }),
-            Make(new SkiaLabel(), { Text: "Image: NASA Blue Marble", FontSize: 12, TextColor: Theme.Muted }),
+            Make(new Copyable("Image: NASA Blue Marble"), { FontSize: 12, TextColor: Theme.Muted }),
           ],
         }),
       ],
@@ -1604,13 +1721,12 @@ export class GalleryPage extends DrawnGame {
     this.PlacePins();
   }
 
-  /** Turns the globe to a city in 0.6 s, stops its spin and shows the city's name. */
+  /** Turns the globe to a city in 0.6 s and shows the city's name; a spinning globe goes on spinning after. */
   private GoToCity(index: number): void {
     this._cityButtons.forEach((button, i) => {
       button.Fill = i === index ? Theme.Accent : Theme.Quiet;
       button.AccessibilityIsPressed = i === index;
     });
-    this.SetSpin(false);
     const [yaw, pitch] = Facing(OnGlobe(Cities[index][2], Cities[index][3]));
     this._globeFromYaw = this._globe.Yaw;
     this._globeFromPitch = this._globe.Pitch;
@@ -1624,8 +1740,7 @@ export class GalleryPage extends DrawnGame {
   private SetSpin(on: boolean): void {
     this._spinning = on;
     this._globe.AutoRotate = on ? 10 : 0;
-    this._spinButton.Text = on ? "Pause spin" : "Spin";
-    this._spinButton.AccessibilityIsPressed = !on;
+    this._spinSwitch.IsToggled = on;
   }
 
   /** Pins and the open name chip go where their cities show; a city on the far side hides its pin. */
@@ -1701,6 +1816,8 @@ export class GalleryPage extends DrawnGame {
           CornerRadius: 14,
           BackgroundColor: Theme.Page,
           Padding: new Thickness(24),
+          BevelType: "Emboss",
+          Bevel: Theme.CardBevel(),
           WidthRequest: FormWidth,
           VerticalOptions: "Start",
           // The form beside a mascot that moves every frame: blitted, drawn again when a field changes.
@@ -1709,19 +1826,22 @@ export class GalleryPage extends DrawnGame {
             Make(new SkiaStack(), {
               Spacing: 12,
               Children: [
-                Make(new SkiaLabel(), { Text: "Create your account", FontSize: 22, FontFamily: Theme.Title, TextColor: Theme.Ink, AccessibilityRole: Aria.RoleHeading }),
-                Make(new SkiaLabel(), { Text: "It takes a minute. Our mascot will not peek at your password.", FontSize: 13, TextColor: Theme.Muted }),
+                Make(new Copyable("Create your account"), { FontSize: 22, FontFamily: Theme.Title, TextColor: Theme.Ink, AccessibilityRole: Aria.RoleHeading }),
+                Make(new Copyable("It takes a minute. Our mascot will not peek at your password."), { FontSize: 13, TextColor: Theme.Muted }),
                 this._nameField = this.Field("Name", false, 0),
                 this._emailField = this.Field("Email", false, 1),
                 this._passwordField = this.Field("Password", true, 2),
-                Make(new UiButton("Sign up", Theme.Accent), { HorizontalOptions: "Fill", WidthRequest: -1, Tapped: () => this.SignUp() }),
+                Make(new Button3D("Sign up", Theme.Accent), { HorizontalOptions: "Fill", WidthRequest: -1, Tapped: () => this.SignUp() }),
                 this._formStatus = Make(new SkiaLabel(), { FontSize: 14, TextColor: Theme.Gold, HeightRequest: 20, AccessibilityRole: Aria.RoleText, AccessibilityLive: Aria.LivePolite }),
               ],
             }),
           ],
         }),
         Make(GalleryPage.Stage(this._mascot = Make(new SkiaModel3D(Theme.Avatar), {
+          ...View3D("Mascot"),
           Animation: "CharacterArmature|Idle",
+          // framed for what it does here, not for the file's jumps and falls it never plays
+          FrameAnimations: ["CharacterArmature|Idle", "CharacterArmature|Wave", "CharacterArmature|No"],
           // The camera on the mascot's left: it faces the form at screen left (a view turn, no mirror).
           Yaw: 32,
           Pitch: 8,
@@ -1871,26 +1991,122 @@ export class GalleryPage extends DrawnGame {
   /** The product box tile: a box wearing a label drawn in code, switched live. */
   private ProductBoxTile(): SkiaControl {
     this._labels ??= Labels();
-    this._product = Make(GalleryPage.Shaded(ProductBox(), 28, 18), { AutoRotate: 40, Tapped3D: () => this.NextImage() });
+    // smooth edges (multisampling): the box's straight edges show steps without it
+    this._product = Make(GalleryPage.Shaded(ProductBox(), 28, 18), { AutoRotate: 40, Antialias: true, Tapped3D: () => this.NextImage(), ...View3D("Product box") });
     this._product.SetMaterialImage("box", this._labels[0]);
-    return GalleryPage.Tile("Product box", "A box with its label: tap it or switch the design.",
+    return GalleryPage.Tile("Product box", "Any image applied as texture. Tap to switch design.",
           this._product,
+          Make(new Button3D("Next design", Theme.Accent, 124), { Tapped: () => this.NextImage() }));
+  }
+
+  // ---- GalleryPage.Dice.cs ----
+  //
+  // A small game: two dice made in code (a rounded cube wearing its six faces, pips drawn with Skia) that tumble, hop and
+  // land on a number. Flick them sideways, tap them or press Roll.
+
+  private _diceView!: SkiaModel3D;
+  private _diceResult!: SkiaLabel;
+  private _diceRoll?: AbortController;
+  /** Each die's turn now (x, z) and the turn of its holder around the vertical (yaw). */
+  private readonly _diePose: [number, number, number][] = [[0, 0, 20], [0, 0, -15]];
+
+  /** A die's place: turned, lifted to rest on the table plus its hop, its shadow wider and lighter as it rises. */
+  private PlaceDie(d: number, pose: [number, number, number], hop: number): void {
+    const lift = RestingLift(pose[0], pose[1]) + hop;
+    this._diceView.SetNodeRotation(`die${d}`, pose[0], 0, pose[1]);
+    this._diceView.SetNodeRotation(`holder${d}`, 0, pose[2], 0);
+    this._diceView.SetNodeTranslation(`holder${d}`, DieX[d], lift, 0);
+    const spread = 1 + lift * 0.6;
+    this._diceView.SetNodeScale(`shadow${d}`, spread, 1, spread);
+    this._diceView.SetMaterialColor(`shadow${d}`, Theme.Alpha("#FFFFFF", Math.min(Math.max(0.99 - lift * 0.9, 0.3), 0.99)));
+  }
+
+  /** The dice's table: green casino felt, lit in its middle and darker toward its sunk edges. */
+  private static Felt(dice: SkiaControl): SkiaShape {
+    return Make(new SkiaShape(), {
+      CornerRadius: 14,
+      UseCache: "None",
+      HorizontalOptions: "Fill",
+      BackgroundColor: "#115232",
+      // a lamp over the table: the light falls off softly into the felt's own green, no rim of shade
+      FillGradient: { Type: "Circular", StartXRatio: 0.5, StartYRatio: 0.45, Colors: ["#248450", "#196A40", "#115232"], ColorPositions: [0, 0.6, 1] },
+      BevelType: "Emboss",
+      Bevel: Theme.CardBevel(),
+      Children: [dice],
+    });
+  }
+
+  private DiceCard(): SkiaControl {
+    const faces = DieFaces(), shadow = ShadowSpot();
+    this._diceView = Make(new SkiaModel3D(TwoDice()), {
+      Orbit: false, Yaw: 0, Pitch: 32,
+      // room for a die turned on its corner and hopping
+      FrameMargin: 0.5,
+      Antialias: true,
+      HorizontalOptions: "Fill", VerticalOptions: "Fill",
+      AccessibilityRole: Aria.RoleImg, AccessibilityLabel: "Two dice",
+      Tapped3D: () => this.RollDice(),
+      // a flick sideways rolls them; the page keeps its vertical drags
+      ConsumeGestures: (me, e) => {
+        if (e.Args.Type !== "Up") return;
+        const moved = e.Args.Event.Distance.Total;
+        if (Math.abs(moved.X) > 40 * me.RenderingScale && Math.abs(moved.X) > Math.abs(moved.Y)) this.RollDice();
+      },
+    });
+    for (let d = 0; d < 2; d++) {
+      this._diceView.SetMaterialImage(`die${d}`, faces);
+      // polished plastic: a soft shine
+      this._diceView.SetMaterialRoughness(`die${d}`, 0.3);
+      this._diceView.SetMaterialImage(`shadow${d}`, shadow);
+      this._diceView.SetMaterialVisible(`holder${d}`, false);
+    }
+    for (let d = 0; d < 2; d++) this.PlaceDie(d, this._diePose[d], 0);
+    return this.WideCard("Dice roll",
+      "Two dice made in code: a rounded cube wearing one image of its six faces, pips drawn in Skia. Flick them sideways, tap them or press Roll.",
+      Make(new SkiaStack(), {
+        Spacing: 12,
+        Children: [
+          Make(GalleryPage.Felt(this._diceView), { HeightRequest: DiceHeight }),
           Make(new SkiaRow(), {
-            Spacing: 8,
+            Spacing: 16,
             Children: [
-              Make(new UiButton("Next design", Theme.Accent, 124), { Tapped: () => this.NextImage() }),
-              // The box's edges: hard (the default) or smooth (4x multisampling).
-              Make(new UiButton("Edges: hard", Theme.Quiet, 124), {
-                Tapped: (me) => {
-                  const button = me as UiButton;
-                  this._product.Antialias = !this._product.Antialias;
-                  button.Text = this._product.Antialias ? "Edges: smooth" : "Edges: hard";
-                  button.Fill = this._product.Antialias ? Theme.Accent : Theme.Quiet;
-                  button.AccessibilityIsPressed = this._product.Antialias;
-                },
-              }),
+              Make(new Button3D("Roll", Theme.Accent, 120), { Tapped: () => this.RollDice() }),
+              this._diceResult = Make(new Copyable("Roll the dice"), { FontSize: 18, FontFamily: Theme.Title, TextColor: Theme.Ink, VerticalOptions: "Center" }),
             ],
-          }));
+          }),
+        ],
+      }), true);
+  }
+
+  /** Picks both results, then tumbles each die into its face-up turn with a few hops, from where it stands. */
+  RollDice(): void {
+    this._diceRoll?.abort();
+    const roll = this._diceRoll = new AbortController();
+    const random = (from: number, to: number) => from + Math.floor(Math.random() * (to - from));
+    const values = [random(1, 7), random(1, 7)];
+    const from = this._diePose.map((p) => [...p] as [number, number, number]);
+    const to: [number, number, number][] = [];
+    for (let d = 0; d < 2; d++) {
+      const up = FaceUp[values[d] - 1];
+      // two or three whole turns on top of the landing turn, alternately forward and back
+      const spins = 360 * random(2, 4) * (d === 0 ? 1 : -1);
+      to[d] = [up[0] + spins, up[1] + 360 * random(1, 3), from[d][2] + random(-60, 61)];
+    }
+    this._diceResult.Text = "Rolling...";
+    void this._diceView.AnimateRangeAsync((t) => {
+      const hop = Bounces(t);
+      for (let d = 0; d < 2; d++) {
+        const p: [number, number, number] = [Tumble(from[d][0], to[d][0], t), Tumble(from[d][1], to[d][1], t), Tumble(from[d][2], to[d][2], t)];
+        this._diePose[d] = p;
+        this.PlaceDie(d, p, hop);
+      }
+    }, 0, 1, RollMs, undefined, roll.signal).then(() => {
+      if (roll.signal.aborted) return;
+      for (let d = 0; d < 2; d++) this._diePose[d] = [to[d][0] % 360, to[d][1] % 360, to[d][2] % 360];
+      const sum = values[0] + values[1];
+      this._diceResult.Text = values[0] === values[1] ? `Doubles! ${values[0]} + ${values[1]} = ${sum}` : `${values[0]} + ${values[1]} = ${sum}`;
+      this._diceView.AccessibilityLabel = `Two dice showing ${values[0]} and ${values[1]}`;
+    }, () => {});
   }
 
   // ---- GalleryPage.Loop.cs ----
