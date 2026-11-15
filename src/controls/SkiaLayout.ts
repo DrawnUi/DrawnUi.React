@@ -802,15 +802,19 @@ export class SkiaLayout extends SkiaControl {
       return;
     }
 
+    // main axis of a stack: an End child gets the room up to the end of the stack, so it sits there (a button after a
+    // text in a full-width row); every child still takes only its measured size from the flow (DrawnUI for Rust)
     for (const v of this.LayoutViews()) {
       if (!v.IsVisible) continue;
       if (this.Type === "Column") {
         const h = v.MeasuredSize.Pixels.Height;
-        v.Arrange(new SKRect(inner.Left, cursor, inner.Right, cursor + h), v.WidthRequest, v.HeightRequest, scale);
+        const end = v.VerticalOptions === "End" ? Math.max(inner.Bottom, cursor + h) : cursor + h;
+        v.Arrange(new SKRect(inner.Left, cursor, inner.Right, end), v.WidthRequest, v.HeightRequest, scale);
         cursor += h + gap;
       } else if (this.Type === "Row") {
         const w = v.MeasuredSize.Pixels.Width;
-        v.Arrange(new SKRect(cursor, inner.Top, cursor + w, inner.Bottom), v.WidthRequest, v.HeightRequest, scale);
+        const end = v.HorizontalOptions === "End" ? Math.max(inner.Right, cursor + w) : cursor + w;
+        v.Arrange(new SKRect(cursor, inner.Top, end, inner.Bottom), v.WidthRequest, v.HeightRequest, scale);
         cursor += w + gap;
       } else {
         v.Arrange(inner, v.WidthRequest, v.HeightRequest, scale);

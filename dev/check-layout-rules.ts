@@ -3,8 +3,10 @@
 // A) Fill with a WidthRequest keeps the requested width, at the start of the parent.
 // B) A layer without its own size is as big as its sized children; a Fill child without content fills that size.
 // C) Center with unequal margins: the box is centered in the whole space, then moved by the full margin difference.
+// E) In a stack, an End child gets the room up to the stack's end: a button after a text in a full-width row sits at
+//    the row's end (Rust controls/layout.rs stack arrange: "an End child everything up to the end of the stack").
 import { readFileSync } from "node:fs";
-import { Super, SKRect, SkiaAccessibilityManager, HoverManager, SkiaLayer, SkiaShape, SkiaLabel, Thickness, type AnimatorBase, type Canvas, type SkiaControl } from "../src/index.ts";
+import { Super, SKRect, SkiaAccessibilityManager, HoverManager, SkiaLayer, SkiaRow, SkiaStack, SkiaShape, SkiaLabel, Thickness, type AnimatorBase, type Canvas, type SkiaControl } from "../src/index.ts";
 
 declare const CanvasKitInit: (o: { locateFile: () => string }) => Promise<any>;
 const ROOT = process.cwd();
@@ -67,6 +69,19 @@ const rect = (c: SkiaControl) => { const r = c.DrawingRect; return `${r.Left},${
     const s = new SkiaShape(); s.WidthRequest = 50; s.HeightRequest = 20; s.HorizontalOptions = "Center"; s.VerticalOptions = "Center"; s.Margin = margin;
     host(400, 400, s);
     check(`C: Center 50x20 in 400 with margin ${margin.Left},${margin.Top},${margin.Right},${margin.Bottom}: ${want} (Rust)`, rect(s) === want, rect(s));
+  }
+
+  {
+    const text = new SkiaShape(); text.WidthRequest = 100; text.HeightRequest = 20;
+    const button = new SkiaShape(); button.WidthRequest = 60; button.HeightRequest = 20; button.HorizontalOptions = "End";
+    const row = new SkiaRow(); row.HorizontalOptions = "Fill"; row.Spacing = 10; row.AddSubView(text); row.AddSubView(button);
+    host(400, 100, row);
+    check("E: an End child of a full-width row sits at the row's end (Rust 340,0 60x20)", rect(button) === "340,0 60x20", rect(button));
+    const top = new SkiaShape(); top.WidthRequest = 50; top.HeightRequest = 30;
+    const bottom = new SkiaShape(); bottom.WidthRequest = 50; bottom.HeightRequest = 30; bottom.VerticalOptions = "End";
+    const column = new SkiaStack(); column.VerticalOptions = "Fill"; column.Spacing = 0; column.AddSubView(top); column.AddSubView(bottom);
+    host(100, 200, column);
+    check("E: an End child of a full-height column sits at its bottom (0,170 50x30)", rect(bottom) === "0,170 50x30", rect(bottom));
   }
 
   console.log(failures ? `FAIL: ${failures} checks` : "OK: layout rules as DrawnUI for Rust");
