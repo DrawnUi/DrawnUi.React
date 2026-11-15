@@ -130,6 +130,13 @@ createRoot(document.getElementById("root")!).render(
   `rgb()` / `rgba()`. When app code paints with CanvasKit directly (an offscreen `Surface`, a `Paint`), convert with
   `Super.ParseColor(color)`; never call `CK.parseColorString` (CSS order, reads `#22FFFFFF` as opaque cyan) or build
   `CK.Color(...)` from a DrawnUi string. `#RRGGBBAA` must never surface in app code.
+- Images (`SkiaImageManager`, as DrawnUi.Net): every control on the same source shares one decoded image
+  (`ReuseBitmaps`, on; off, each control gets a copy of its own of the one cached copy). Cached images are fetched
+  again after `CacheLongevitySecs` (1800). The cache keeps at most `CacheBudgetMb` megabytes of decoded pixels (128,
+  0 = no limit; `Instance.CacheMemoryMb` reads it): over it, images no control shows go, the one used longest ago
+  first; images on screen never go. `RemoveFromCache(uri)` drops an entry, never an image a control still shows.
+  `LoadImageManagedAsync` (queued, cached) and `PreloadImages` warm it; `LoadImageAsync` is a direct load outside the
+  cache whose image the caller owns. Failed loads resolve to `undefined` after `EnableHttpRetry` retries.
 - Caching is the same plan as C#: `UseCache="Image"` on stable subtrees, `"Operations"` for vector content (the
   default on shapes and labels), `"ImageComposite"` for a layer whose children change independently (only the
   dirty children are re-recorded; `LastCompositeRecord` reports what happened), `None` for per-frame painters.

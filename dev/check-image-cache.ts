@@ -36,7 +36,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
   };
   const fetched = (part: string) => requests.filter((r) => r.toLowerCase().includes(part.toLowerCase())).length;
   const M = SkiaImageManager.Instance;
-  const reset = () => { M.ClearCache(); requests.length = 0; SkiaImageManager.ReuseBitmaps = true; SkiaImageManager.UseCache = true; SkiaImageManager.CacheLongevitySecs = 1800; SkiaImageManager.CacheBudgetBytes = 128 << 20; };
+  const reset = () => { M.ClearCache(); requests.length = 0; SkiaImageManager.ReuseBitmaps = true; SkiaImageManager.UseCache = true; SkiaImageManager.CacheLongevitySecs = 1800; SkiaImageManager.CacheBudgetMb = 128; };
 
   // 1. bugs: a removed entry is not deleted while a control holds it; it goes when the control lets it go
   reset();
@@ -87,7 +87,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
   // 3. budget: room for 4 images; 5 loaded, 2 held by controls; image 3 read again after 4 came, so 4 was used longest ago
   reset();
   {
-    SkiaImageManager.CacheBudgetBytes = BYTES * 4;
+    SkiaImageManager.CacheBudgetMb = (BYTES * 4) / (1 << 20);
     const held = [new SkiaImage(), new SkiaImage()];
     held[0].Source = "b/1.png"; held[1].Source = "b/2.png";
     await sleep(30);
@@ -96,12 +96,19 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
     M.GetFromCache("b/3.png");
     await M.PreloadImage("b/5.png");
     const kept = ["b/1.png", "b/2.png", "b/3.png", "b/4.png", "b/5.png"].map((s) => (M.GetFromCacheInternal(s) ? 1 : 0)).join("");
-    check("over the budget the image used longest ago goes first, held ones never", kept === "11101" && !!four && four.isDeleted() && M.MemoryBytes <= BYTES * 4,
-      `kept ${kept}, ${M.MemoryBytes / BYTES} images of bytes`);
+    check("over the budget the image used longest ago goes first, held ones never", kept === "11101" && !!four && four.isDeleted() && M.CacheMemoryMb * (1 << 20) <= BYTES * 4,
+      `kept ${kept}, ${(M.CacheMemoryMb * (1 << 20)) / BYTES} images of bytes`);
     for (const c of held) c.Dispose();
-    SkiaImageManager.CacheBudgetBytes = BYTES;
+    SkiaImageManager.CacheBudgetMb = BYTES / (1 << 20);
     M.Trim();
-    check("a smaller budget trims what no control holds any more", M.MemoryBytes <= BYTES, `${M.MemoryBytes / BYTES} images of bytes`);
+    check("a smaller budget trims what no control holds any more", M.CacheMemoryMb * (1 << 20) <= BYTES, `${(M.CacheMemoryMb * (1 << 20)) / BYTES} images of bytes`);
+  }
+  // 3b. CacheBudgetMb 0 or less: no limit
+  reset();
+  {
+    SkiaImageManager.CacheBudgetMb = 0;
+    for (const s of ["n/1.png", "n/2.png", "n/3.png"]) await M.PreloadImage(s);
+    check("CacheBudgetMb 0: no limit, nothing dropped", ["n/1.png", "n/2.png", "n/3.png"].every((s) => !!M.GetFromCacheInternal(s)) && Math.abs(M.CacheMemoryMb - (3 * BYTES) / (1 << 20)) < 1e-9);
   }
   // 4. direct load, keys, UseCache
   reset();

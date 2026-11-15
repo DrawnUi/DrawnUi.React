@@ -29,7 +29,7 @@ interface Entry {
  * (`ReuseBitmaps`; off, each caller gets a copy of its own of the one cached copy). `LoadImageManagedAsync` caches and
  * goes through the priority queue (High > Normal > Low, at most `MaxParallelLoads` fetches in flight; the same source
  * requested twice is fetched once); `LoadImageAsync` is a direct load that does not touch the cache. The cache keeps
- * at most `CacheBudgetBytes` of decoded pixels: over it, images no control holds go, the one held longest ago first
+ * at most `CacheBudgetMb` megabytes of decoded pixels: over it, images no control holds go, the one held longest ago first
  * (as DrawnUI for Rust's image cache); images a control holds never go. Keys are case-insensitive and local paths
  * normalized (backslashes, a leading slash). Sources are URLs (absolute, or relative to the page like
  * "images/photo.jpg").
@@ -47,8 +47,11 @@ export class SkiaImageManager {
   static UseCache = true;
   /** Seconds a cached image is kept before the next load fetches it again (DrawnUi, 30 minutes). */
   static CacheLongevitySecs = 1800;
-  /** Most bytes of decoded pixels the cache keeps (128 MB, as DrawnUI for Rust). Images a control holds never go for it. */
-  static CacheBudgetBytes = 128 << 20;
+  /**
+   * Most megabytes of decoded pixels the cache keeps (DrawnUi CacheBudgetMb, 128 as DrawnUI for Rust; 0 or less = no
+   * limit). Images a control holds never go for it.
+   */
+  static CacheBudgetMb = 128;
   /** Fetches in flight at once through the managed queue (C# CreateSemaphoreForLocalFiles: 5). */
   static MaxParallelLoads = 5;
   /** Retry a failed load (DrawnUi EnableHttpRetry): up to HttpRetryMaxAttempts more times, 100, 200, 400 ms apart. */
@@ -80,8 +83,8 @@ export class SkiaImageManager {
   /** Queue diagnostics. */
   get QueuedCount(): number { return this.queue.length; }
   get RunningCount(): number { return this.running; }
-  /** Bytes of decoded pixels the cache holds now. */
-  get MemoryBytes(): number { return this.used; }
+  /** Megabytes of decoded pixels the cache holds now (DrawnUi CacheMemoryMb). */
+  get CacheMemoryMb(): number { return this.used / (1 << 20); }
   /** The browser says it has no network. */
   get IsOffline(): boolean { return typeof navigator !== "undefined" && navigator.onLine === false; }
 
@@ -212,10 +215,11 @@ export class SkiaImageManager {
 
   /** Over the budget: the cached images no holder draws go, the one held longest ago first (DrawnUI for Rust trim). */
   Trim(): void {
-    if (this.used <= SkiaImageManager.CacheBudgetBytes) return;
+    const budget = SkiaImageManager.CacheBudgetMb * (1 << 20);
+    if (SkiaImageManager.CacheBudgetMb <= 0 || this.used <= budget) return;
     const idle = [...this.cache.values()].filter((e) => e.Holders === 0).sort((a, b) => a.Shown - b.Shown);
     for (const entry of idle) {
-      if (this.used <= SkiaImageManager.CacheBudgetBytes) break;
+      if (this.used <= budget) break;
       this.Drop(entry);
     }
   }
