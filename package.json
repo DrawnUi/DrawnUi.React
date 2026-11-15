@@ -141,7 +141,9 @@
     "check:editor-wheel": "node dev/check.mjs dev/check-editor-wheel.ts",
     "check:reading-order": "node dev/check.mjs dev/check-reading-order.ts",
     "check:editor-rightpress": "node dev/check.mjs dev/check-editor-rightpress.ts",
-    "browser:touch-contextmenu": "node dev/check-touch-contextmenu.mjs"
+    "browser:touch-contextmenu": "node dev/check-touch-contextmenu.mjs",
+    "browser:tab-scroll": "node dev/check-tab-scroll.mjs",
+    "check:recycled-doublebuffer": "node dev/check.mjs dev/check-recycled-doublebuffer.ts"
   },
   "peerDependencies": {
     "playwright-core": ">=1.40",
