@@ -78,6 +78,29 @@ export class Theme {
     return `#${alpha}${lift(0)}${lift(2)}${lift(4)}`.toUpperCase();
   }
 
+  // Where the gallery links to (this is the React build; the Rust and .NET galleries are the same demo).
+  static readonly ArticleUrl = "https://drawnui.net/articles/add3d.html";
+  static readonly DocsUrl = "https://drawnui.net/";
+  static readonly RepoUrl = "https://github.com/DrawnUi/DrawnUi.React";
+  static readonly RustDemoUrl = "https://add3d.drawnui.net/";
+  static readonly NetDemoUrl = "https://add3dnet.drawnui.net/";
+  static readonly LinkColor = "#ACA0FF";
+
+  /** A text link: the accent color, the ink color under the mouse, a link for the keyboard and screen readers; opens in a new tab. */
+  static Link(text: string, url: string): SkiaLabel {
+    return Make(new SkiaLabel(), {
+      Text: text,
+      FontSize: 14,
+      FontFamily: Theme.Title,
+      TextColor: Theme.LinkColor,
+      AccessibilityRole: Aria.RoleLink,
+      AccessibilityLabel: text,
+      AccessibilityHint: url,
+      HoverChanged: (me, on) => { (me as SkiaLabel).TextColor = on ? Theme.Ink : Theme.LinkColor; me.UpdateDraw(); },
+      Tapped: () => Super.OpenLink(url),
+    });
+  }
+
   /** A section title with the line under it. */
   static Section(title: string, caption: string): SkiaControl {
     return Make(new SkiaStack(), {

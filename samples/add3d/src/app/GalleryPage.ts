@@ -8,7 +8,7 @@
 // transform or the opacity. Label texts invalidate by themselves.
 import type { Canvas as SkCanvas, Paint, Path } from "canvaskit-wasm";
 import {
-  Aria, DrawnGame, Easing, ScaledSize, SkiaControl, SkiaEditor, SkiaLabel, SkiaLayer, SkiaLayout, SkiaRow, SkiaScroll,
+  Aria, DrawnGame, ScaledSize, SkiaControl, SkiaEditor, SkiaLabel, SkiaLayer, SkiaLayout, SkiaRow, SkiaScroll,
   SkiaScrollBar, SkiaShadow, SkiaShape, SkiaStack, SkiaValueAnimator, SkiaWrap, Super, Thickness, type Color,
 } from "drawnui-react/core";
 import { LoadState3D, Look, Mesh3D, Model3D, SkiaModel3D, SkiaScene3D, Texture3D } from "drawnui-react-add3d/core";
@@ -31,8 +31,6 @@ const TwoColumnsMin = 720;
 const RowBesideMin = 420;
 /** The mascot's view height when the form and the mascot stack. */
 const StackedView = 320;
-/** The medal's resting turn: it spins from here and lands here. */
-const MedalYaw = 20;
 /** The drawn look of the mobs: toon shading and the gallery's ink outline (same in DrawnUI for Rust). */
 const DrawnOutline = 2;
 const DrawnInk = "#2B2540";
@@ -115,19 +113,36 @@ const CardScale = 8.56 / 1024;
 // ---- GalleryPage.Globe.cs ----
 
 const GlobeHeight = 420;
-/** The pin's size, its tip (the city's point) from its top left, the chip's size and how far above the point it sits. */
-const PinW = 32, PinH = 48, PinTipX = 16, PinTipY = 43, ChipW = 130, ChipH = 30, ChipRise = 78;
-const PinRed = "#EA4335";
+/** A city's light: its size, centered on the city's point; the callout's size and how far above the point its top sits. */
+const PinW = 44, PinH = 44, PinTipX = 22, PinTipY = 22, ChipW = 168, ChipH = 46, ChipRise = 62;
+const StarGold = "#F6B820";
+/** The callouts' dark glass. */
+const CalloutFill = "#F01E202E";
+const SparkGold = "#FFC846";
 
-/** The pinned cities: name, latitude and longitude in degrees. */
-const Cities: [string, number, number][] = [
-  ["Tokyo", 35.7, 139.7],
-  ["Sydney", -33.9, 151.2],
-  ["Cape Town", -33.9, 18.4],
-  ["London", 51.5, -0.1],
-  ["New York", 40.7, -74.0],
-  ["Rio de Janeiro", -22.9, -43.2],
+/** The pinned cities: name, country, latitude and longitude in degrees. */
+const Cities: [string, string, number, number][] = [
+  ["Tokyo", "Japan", 35.7, 139.7],
+  ["Sydney", "Australia", -33.9, 151.2],
+  ["Cape Town", "South Africa", -33.9, 18.4],
+  ["London", "United Kingdom", 51.5, -0.1],
+  ["New York", "United States", 40.7, -74.0],
+  ["Rio de Janeiro", "Brazil", -22.9, -43.2],
 ];
+
+/** A thin ray of a city's light: bright in the middle, fading to nothing at both ends, in screen blend. */
+function Ray(length: number, thickness: number, degrees: number): SkiaShape {
+  return Make(new SkiaShape(), {
+    WidthRequest: length,
+    HeightRequest: thickness,
+    HorizontalOptions: "Center",
+    VerticalOptions: "Center",
+    Rotation: degrees,
+    BackgroundColor: "#FFFFFF",
+    FillBlendMode: "Screen",
+    FillGradient: { StartXRatio: 0, StartYRatio: 0.5, EndXRatio: 1, EndYRatio: 0.5, Colors: ["#00FFFFFF", "#F0FFF8DC", "#00FFFFFF"], ColorPositions: [0, 0.5, 1] },
+  });
+}
 
 /**
  * A point on the globe for a latitude and a longitude, a hair above the surface (the pin stands on it). The image
@@ -356,9 +371,6 @@ const CardBack = () => Painted(1024, 646, (c, w, h) => {
 
 // ---- GalleryPage.Shapes.cs ----
 
-const Gold = "#FFC43D";
-const GoldLight = "#FFDE7A";
-const Grey = "#C4C0CE";
 const ConfettiColors = ["#FF6384", "#FFC43D", "#4CC98C", "#5C8CFF", "#B266FF"];
 
 function Star(points: number, outer: number, inner: number): Path {
@@ -373,35 +385,12 @@ function Star(points: number, outer: number, inner: number): Path {
   return path.detachAndDelete();
 }
 
-function Heart(): Path {
-  const path = new Super.CK.PathBuilder();
-  path.moveTo(50, 88);
-  path.cubicTo(20, 65, 0, 45, 0, 28);
-  path.cubicTo(0, 12, 12, 0, 27, 0);
-  path.cubicTo(38, 0, 46, 7, 50, 15);
-  path.cubicTo(54, 7, 62, 0, 73, 0);
-  path.cubicTo(88, 0, 100, 12, 100, 28);
-  path.cubicTo(100, 45, 80, 65, 50, 88);
-  path.close();
-  return path.detachAndDelete();
-}
-
 /** A 3D mesh pushed out of a 2D path (the path is freed). */
 function Extruded(path: Path, depth: number): Mesh3D {
   const mesh = Mesh3D.Extrude(path, depth);
   path.delete();
   return mesh;
 }
-
-/** A medal on two ribbons. */
-const Medal = () => new Model3D()
-  .Part("ribbon_left", Mesh3D.Cuboid(0.55, 1.5, 0.06), "#FF6384").At(-0.38, 1.05, -0.12).Turned(0, 0, 22)
-  .Part("ribbon_right", Mesh3D.Cuboid(0.55, 1.5, 0.06), "#5C8CFF").At(0.38, 1.05, -0.12).Turned(0, 0, -22)
-  .Part("disc", Mesh3D.Cylinder(1, 0.22), Gold).Turned(90, 0, 0)
-  .Part("inner", Mesh3D.Cylinder(0.76, 0.34), GoldLight).Turned(90, 0, 0)
-  .Part("star", Extruded(Star(5, 0.52, 0.22), 0.08), "#FFFFFF").At(0, 0, 0.2);
-
-const HeartModel = () => new Model3D().Part("heart", Extruded(Heart(), 22), "#FF4D6D");
 
 /** A strip of paper for the confetti; the part to recolor is "piece". */
 const Paper = () => new Model3D().Part("piece", Mesh3D.Cuboid(1, 0.45, 0.06), "#FFFFFF");
@@ -428,8 +417,6 @@ const MaxMobs = 100;
 const PieceNames = Array.from({ length: PieceCount }, (_, i) => `c${i}`);
 const MobNames = Array.from({ length: MaxMobs }, (_, i) => `m${i}`);
 
-const EaseOut = (t: number) => 1 - Math.pow(1 - Clamp(t, 0, 1), 3);
-
 /** Moves a control drawn over another to a point, skipping changes under a quarter point. */
 function Move(control: SkiaControl, x: number, y: number): void {
   if (Math.abs(control.TranslationX - x) > 0.25 || Math.abs(control.TranslationY - y) > 0.25) {
@@ -454,20 +441,16 @@ function Show(control: SkiaControl, visible: boolean): void {
  * - a card that flips;
  * - a globe with pins;
  * - a 3D mascot beside a plain sign-up form;
- * - micro-interactions (like, celebration, achievement), an image on a 3D box, models with their own animations,
- *   and a field of walking mobs drawn by one 3D layer.
+ * - small 3D touches (celebration, a product box wearing an image, a reward chest);
+ * - a field of walking mobs drawn by one 3D layer;
+ * - a footer with the article, the docs, the source and the same demo in the other engines.
  */
 export class GalleryPage extends DrawnGame {
   private _scroll!: SkiaScroll;
-  private _medal!: SkiaModel3D;
-  private _heart!: SkiaModel3D;
-  private _avatar!: SkiaModel3D;
   private _chest!: SkiaModel3D;
   private _rain!: SkiaScene3D;
   private _field!: SkiaScene3D;
   private _scenery!: Scenery;
-  private _medalButton!: UiButton;
-  private _likeButton!: UiButton;
   private _chestButton!: UiButton;
   private readonly _mobButtons: UiButton[] = [];
   private readonly _lookButtons: UiButton[] = [];
@@ -500,53 +483,33 @@ export class GalleryPage extends DrawnGame {
                   Text: "Where 3D earns its place in an app: products, lists, cards, maps and forms first, then the fun.",
                   FontSize: 15, TextColor: Theme.Muted, HorizontalOptions: "Center", HorizontalTextAlignment: "Center",
                 }),
+                Make(new SkiaRow(), {
+                  Spacing: 20,
+                  HorizontalOptions: "Center",
+                  Children: [Theme.Link("Read the 3D article", Theme.ArticleUrl), Theme.Link("Source on GitHub", Theme.RepoUrl)],
+                }),
               ],
             }),
+
+            this.GlobeCard(),
+
+            this.FlipCard(),
 
             this.ViewerCard(),
 
             this.ListCard(),
 
-            this.FlipCard(),
-
-            this.GlobeCard(),
-
-            this.FormCard(),
-
-            Theme.Section("Micro-interactions", "Small 3D touches that answer a tap."),
+            Theme.Section("Small 3D touches", "Little 3D moments that answer a tap."),
             Make(new SkiaWrap(), {
               Spacing: 16,
               HorizontalOptions: "Center",
               Children: [
-                GalleryPage.Tile("Like", "A heart that beats, and jumps when liked.",
-                  this._heart = Make(GalleryPage.Shaded(HeartModel(), -24, 12), { Tapped3D: () => this.ToggleLike() }),
-                  this._likeButton = Make(new UiButton("Unlike", Theme.Accent), { Tapped: () => this.ToggleLike() })),
                 GalleryPage.Tile("Celebration", "Confetti and stars falling: one 3D layer, many pieces.",
                   this._rain = Make(new SkiaScene3D(), { Tilt: 20, HorizontalOptions: "Fill", VerticalOptions: "Fill" })
                     .Model("paper", Paper())
                     .Model("star", ConfettiStar()),
                   Make(new UiButton("Hooray", Theme.Accent), { Tapped: () => this.Hooray() })),
-                GalleryPage.Tile("Achievement", "A medal that lights up and spins when unlocked.",
-                  this._medal = Make(GalleryPage.Shaded(Medal(), MedalYaw, 12), { Tapped3D: () => this.SpinMedal() }),
-                  this._medalButton = Make(new UiButton("Lock", Theme.Accent), { Tapped: () => this.ToggleMedal() })),
-              ],
-            }),
-
-            Theme.Section("Images on 3D", "Any image on a 3D surface, switched live: drawn in code here, or a photo or a file."),
-            this.ImagesSection(),
-
-            Theme.Section("From model files", "Free 3D models with their own animations, driven by the app."),
-            Make(new SkiaWrap(), {
-              Spacing: 16,
-              HorizontalOptions: "Center",
-              Children: [
-                GalleryPage.Tile("Avatar", "A character that idles, and waves when tapped.",
-                  this._avatar = Make(new SkiaModel3D(Theme.Avatar), {
-                    Animation: "CharacterArmature|Idle", Yaw: 25, Pitch: 10,
-                    HorizontalOptions: "Fill", VerticalOptions: "Fill",
-                    Tapped3D: (me) => { me.PlayOnce("CharacterArmature|Wave"); },
-                  }),
-                  Make(new UiButton("Wave", Theme.Accent), { Tapped: () => { this._avatar.PlayOnce("CharacterArmature|Wave"); } })),
+                this.ProductBoxTile(),
                 GalleryPage.Tile("Reward", "A chest that opens and closes.",
                   this._chest = Make(new SkiaModel3D(Theme.Chest), {
                     Animation: "Chest_Open", IsPlaying: false, Yaw: 30, Pitch: 20, Orbit: false,
@@ -556,8 +519,12 @@ export class GalleryPage extends DrawnGame {
               ],
             }),
 
+            this.FormCard(),
+
             Theme.Section("Games", "Many 3D characters on one field, moved like sprites and drawn by one layer in one pass."),
             this.MobsCard(),
+
+            GalleryPage.Footer(),
           ],
         }),
       }),
@@ -567,6 +534,31 @@ export class GalleryPage extends DrawnGame {
     // C# ViewerCard().Initialize(...)
     this.SetFabric(0);
     this.LoadViewer(Source.App);
+  }
+
+  /** The page's end: where to read more, the source, and the same demo in the other DrawnUI engines. */
+  private static Footer(): SkiaControl {
+    return Make(new SkiaStack(), {
+      Spacing: 14,
+      Margin: new Thickness(0, 24, 0, 8),
+      HorizontalOptions: "Fill",
+      UseCache: "Image",
+      Children: [
+        Make(new SkiaShape(), { HeightRequest: 1, HorizontalOptions: "Fill", BackgroundColor: Theme.Line }),
+        Make(new SkiaWrap(), {
+          Spacing: 24,
+          HorizontalOptions: "Center",
+          Children: [
+            Theme.Link("3D article", Theme.ArticleUrl),
+            Theme.Link("DrawnUI docs", Theme.DocsUrl),
+            Theme.Link("Source on GitHub", Theme.RepoUrl),
+            Theme.Link("Same demo in Rust", Theme.RustDemoUrl),
+            Theme.Link("Same demo in .NET", Theme.NetDemoUrl),
+          ],
+        }),
+        Make(new SkiaLabel(), { Text: "Drawn with DrawnUI: every pixel of this page, the 3D included.", FontSize: 12, TextColor: Theme.Muted, HorizontalOptions: "Center" }),
+      ],
+    });
   }
 
   /** A card: title, caption, the 3D piece on its stage, the button that drives it. */
@@ -785,44 +777,16 @@ export class GalleryPage extends DrawnGame {
 
   /**
    * Something the loop drives moves now and can be seen: a section on screen that moves by itself (the mobs' field, the
-   * confetti, the beating heart, the globe's pulses), or a change running (a price counting, the medal's spin, the
-   * card's half turn, the mascot's head, a new number of mobs). Off screen everything waits where it is.
+   * confetti, the globe's flashing lights), or a change running (a price counting, the card's half turn, the mascot's
+   * head, a new number of mobs). Off screen everything waits where it is.
    */
   private Busy(): boolean {
     const target = this._fabrics[Math.max(this._fabric, 0)][4];
     const near = (a: number, b: number) => Math.abs(a - b) < 0.01;
     return this._priceShown !== target || !this._rainReady || this._walkersOnField !== this._mobs
-      || WasInLastFrame(this._field) || WasInLastFrame(this._rain) || WasInLastFrame(this._heart) || WasInLastFrame(this._globe)
-      || (this._spin < 1 && WasInLastFrame(this._medal))
+      || WasInLastFrame(this._field) || WasInLastFrame(this._rain) || WasInLastFrame(this._globe)
       || (this._cardTurn !== this._cardTurnTo && WasInLastFrame(this._card))
       || (WasInLastFrame(this._mascot) && !(near(this._headYaw, this._headYawTo) && near(this._headPitch, this._headPitchTo) && near(this._look, this._lookTo) && near(this._hands, this._handsTo)));
-  }
-
-  private SpinMedal(): void { this._spin = 0; }
-
-  private MedalColors(): void {
-    this._medal.SetMaterialColor("disc", this._unlocked ? undefined : Grey);
-    this._medal.SetMaterialColor("inner", this._unlocked ? undefined : "#DEDBE6");
-    this._medal.SetMaterialColor("star", this._unlocked ? undefined : "#F4F2F8");
-  }
-
-  private ToggleMedal(): void {
-    this._unlocked = !this._unlocked;
-    this._medalButton.Text = this._unlocked ? "Lock" : "Unlock";
-    this.MedalColors();
-    if (this._unlocked) {
-      this._spin = 0;
-      this._medal.Scale = 0.6;
-      this._medal.RepaintComposition();
-      void this._medal.ScaleToAsync(1, 1, 500, Easing.SpringOut);
-    }
-  }
-
-  private ToggleLike(): void {
-    this._liked = !this._liked;
-    this._pop = this._liked ? 1 : 0;
-    this._heart.SetMaterialColor("heart", this._liked ? undefined : Grey);
-    this._likeButton.Text = this._liked ? "Unlike" : "Like";
   }
 
   private Hooray(): void {
@@ -1453,15 +1417,16 @@ export class GalleryPage extends DrawnGame {
 
   // ---- GalleryPage.Globe.cs ----
   //
-  // The globe: NASA's Blue Marble on a sphere, turning slowly by itself and by drag. Map pins (a glossy teardrop with a
-  // pulse ring) stay on their cities, hide when their city turns to the far side, and show a name chip when tapped;
-  // picking a city in the list turns the globe to it. The same look and numbers as DrawnUI for Rust's gallery3d.
+  // The globe: NASA's Blue Marble on a sphere, turning slowly by itself and by drag. Each city is a flashing light flare
+  // (drawn in screen blend, so it only brightens the globe) that stays on its city, hides when the city turns to the far
+  // side, and opens a dark glass callout with the city and its country when tapped; picking a city in the list turns the
+  // globe to it. The same look and numbers as the .NET gallery.
 
   private _globe!: SkiaModel3D;
   private _spinButton!: UiButton;
   private readonly _cityPins: SkiaLayer[] = [];
-  private readonly _pulses: SkiaShape[] = [];
-  private readonly _cityLabels: SkiaShape[] = [];
+  private readonly _pulses: SkiaLayer[] = [];
+  private readonly _cityLabels: SkiaLayer[] = [];
   private readonly _cityButtons: UiButton[] = [];
   private _openCity = -1;
   private _spinning = true;
@@ -1502,7 +1467,7 @@ export class GalleryPage extends DrawnGame {
             // The pins, then their name chips over every pin.
             Make(new SkiaLayer(), {
               VerticalOptions: "Fill",
-              Children: [...Cities.map(([name], i) => this.CityPin(i, name)), ...Cities.map(([name], i) => this.CityLabel(i, name))],
+              Children: [...Cities.map(([name], i) => this.CityPin(i, name)), ...Cities.map(([name, country], i) => this.CityLabel(i, name, country))],
             }),
           ],
         }),
@@ -1540,7 +1505,7 @@ export class GalleryPage extends DrawnGame {
     }), ViewerWidth, GlobeHeight));
   }
 
-  /** A map pin: a glossy teardrop with a soft shadow, a white dot inside and a ring pulsing where it stands. */
+  /** A city's light: a soft gold bloom, a white-hot core and four thin rays, every part in screen blend; it is the tap target. */
   private CityPin(index: number, name: string): SkiaLayer {
     return this._cityPins[index] = Make(new SkiaLayer(), {
       WidthRequest: PinW,
@@ -1554,18 +1519,28 @@ export class GalleryPage extends DrawnGame {
       AccessibilityLabel: name,
       AccessibilityHint: "Shows the city's name",
       Children: [
-        this._pulses[index] = Make(new SkiaShape(), { Type: "Ellipse", WidthRequest: 30, HeightRequest: 10, Margin: new Thickness(1, 38, 0, 0), StrokeColor: PinRed, StrokeWidth: 2 }),
-        Make(new SkiaShape(), {
-          Type: "Path",
-          PathData: "M16 0 C7.2 0 0 7 0 15.6 C0 27 16 43 16 43 C16 43 32 27 32 15.6 C32 7 24.8 0 16 0 Z",
-          WidthRequest: 32,
-          HeightRequest: 43,
-          BackgroundColor: PinRed,
-          FillGradient: { StartXRatio: 0.3, StartYRatio: 0, EndXRatio: 0.7, EndYRatio: 1, Colors: ["#FF7060", "#C82820"] },
-          Shadows: [new SkiaShadow({ Blur: 5, Y: 3, Opacity: 0.45, Color: "#000000" })],
+        // flashes by scale and turn, never by opacity: a faded layer would draw the screen blend into itself, not over the globe
+        this._pulses[index] = Make(new SkiaLayer(), {
+          WidthRequest: PinW,
+          HeightRequest: PinH,
+          Children: [
+            Make(new SkiaShape(), {
+              Type: "Circle",
+              WidthRequest: PinW,
+              HeightRequest: PinH,
+              BackgroundColor: SparkGold,
+              // light only brightens what is under it: no dark disc over the ocean
+              FillBlendMode: "Screen",
+              // a tight bloom around the core only: a wide gold haze over the deep blue ocean reads as a grey smudge
+              FillGradient: { Type: "Circular", StartXRatio: 0.5, StartYRatio: 0.5, Colors: ["#FFFFFAE6", "#C8FFE296", "#00FFC846", "#00FFC846"], ColorPositions: [0, 0.1, 0.28, 1] },
+            }),
+            Ray(PinW, 2, 0),
+            Ray(PinW, 2, 90),
+            Ray(PinW * 0.55, 1.5, 45),
+            Ray(PinW * 0.55, 1.5, 135),
+            Make(new SkiaShape(), { Type: "Circle", WidthRequest: 5, HeightRequest: 5, HorizontalOptions: "Center", VerticalOptions: "Center", BackgroundColor: "#FFFFFF", FillBlendMode: "Screen" }),
+          ],
         }),
-        Make(new SkiaShape(), { Type: "Circle", WidthRequest: 12, HeightRequest: 12, Margin: new Thickness(10, 10, 0, 0), BackgroundColor: "#FFFFFF" }),
-        Make(new SkiaShape(), { Type: "Ellipse", WidthRequest: 10, HeightRequest: 5, Margin: new Thickness(8, 4, 0, 0), BackgroundColor: "#5AFFFFFF" }),
       ],
       HoverChanged: (me, on) => { me.Scale = on ? 1.15 : 1; me.RepaintComposition(); },
       Tapped: () => this.ToggleCity(index),
@@ -1573,20 +1548,53 @@ export class GalleryPage extends DrawnGame {
   }
 
   /**
-   * A clean name chip over a pin. The globe under it draws every frame, the chip never changes: one image, its blurred
-   * shadow and text made once and blitted where the city shows.
+   * A city's callout over its light: a dark glass card with a hairline edge and a soft shadow, a gold star, the city in
+   * semibold and its country under it. The globe under it draws every frame, the callout never changes: one image, made
+   * once and blitted where the city shows.
    */
-  private CityLabel(index: number, name: string): SkiaShape {
-    return this._cityLabels[index] = Make(new SkiaShape(), {
+  private CityLabel(index: number, name: string, country: string): SkiaLayer {
+    return this._cityLabels[index] = Make(new SkiaLayer(), {
       WidthRequest: ChipW,
       HeightRequest: ChipH,
-      CornerRadius: 15,
       UseCache: "Image",
-      BackgroundColor: "#FAFAFC",
-      Shadows: [new SkiaShadow({ Blur: 6, Y: 2, Opacity: 0.35, Color: "#000000" })],
       IsVisible: false,
       InputTransparent: true,
-      Children: [Make(new SkiaLabel(), { Text: name, FontSize: 14, TextColor: "#1E202C", HorizontalOptions: "Center", VerticalOptions: "Center" })],
+      Children: [
+        Make(new SkiaShape(), {
+          WidthRequest: ChipW,
+          HeightRequest: ChipH,
+          CornerRadius: 12,
+          BackgroundColor: CalloutFill,
+          StrokeColor: "#1EFFFFFF",
+          StrokeWidth: 1,
+          Shadows: [new SkiaShadow({ Blur: 10, Y: 4, Opacity: 0.5, Color: "#000000" })],
+          Children: [
+            Make(new SkiaRow(), {
+              Spacing: 9,
+              Padding: new Thickness(12, 0),
+              VerticalOptions: "Center",
+              Children: [
+                Make(new SkiaShape(), {
+                  Type: "Path",
+                  PathData: "M7.00 0.40 L8.70 5.05 L13.66 5.24 L9.76 8.30 L11.11 13.06 L7.00 10.30 L2.89 13.06 L4.24 8.30 L0.34 5.24 L5.30 5.05 Z",
+                  WidthRequest: 14,
+                  HeightRequest: 14,
+                  VerticalOptions: "Center",
+                  BackgroundColor: StarGold,
+                }),
+                Make(new SkiaStack(), {
+                  Spacing: 1,
+                  VerticalOptions: "Center",
+                  Children: [
+                    Make(new SkiaLabel(), { Text: name, FontSize: 14, FontFamily: Theme.Title, TextColor: Theme.Ink, MaxLines: 1 }),
+                    Make(new SkiaLabel(), { Text: country, FontSize: 11, TextColor: Theme.Muted, MaxLines: 1 }),
+                  ],
+                }),
+              ],
+            }),
+          ],
+        }),
+      ],
     });
   }
 
@@ -1603,7 +1611,7 @@ export class GalleryPage extends DrawnGame {
       button.AccessibilityIsPressed = i === index;
     });
     this.SetSpin(false);
-    const [yaw, pitch] = Facing(OnGlobe(Cities[index][1], Cities[index][2]));
+    const [yaw, pitch] = Facing(OnGlobe(Cities[index][2], Cities[index][3]));
     this._globeFromYaw = this._globe.Yaw;
     this._globeFromPitch = this._globe.Pitch;
     this._globeToYaw = yaw;
@@ -1623,7 +1631,7 @@ export class GalleryPage extends DrawnGame {
   /** Pins and the open name chip go where their cities show; a city on the far side hides its pin. */
   private PlacePins(): void {
     for (let i = 0; i < Cities.length; i++) {
-      const at = this._globe.ScreenPosition(OnGlobe(Cities[i][1], Cities[i][2]));
+      const at = this._globe.ScreenPosition(OnGlobe(Cities[i][2], Cities[i][3]));
       const shown = !!at && !at.Occluded;
       const pin = this._cityPins[i];
       Show(pin, shown);
@@ -1636,7 +1644,7 @@ export class GalleryPage extends DrawnGame {
     }
   }
 
-  /** Each frame: a glide to a city goes on, the pins' pulse rings grow and fade. */
+  /** Each frame: a glide to a city goes on, the cities' lights flash. */
   private GlobeFrame(delta: number): void {
     if (!WasInLastFrame(this._globe)) return;
     if (this._globeGlide < 1) {
@@ -1649,12 +1657,13 @@ export class GalleryPage extends DrawnGame {
     }
     for (let i = 0; i < Cities.length; i++) {
       if (!this._cityPins[i].IsVisible) continue;
-      // Each pulse grows and fades over 1.6 s, the pins out of step.
-      const phase = (this._time / 1.6 + i * 0.17) % 1;
-      const ring = this._pulses[i];
-      ring.Scale = 0.4 + phase;
-      ring.Opacity = 1 - phase;
-      ring.RepaintComposition();
+      // Each light flashes now and then: a short bright swell, then calm, every city at its own moment.
+      const phase = (this._time / 2.6 + i * 0.37) % 1;
+      const flash = Math.pow(Math.max(0, Math.sin(phase * Math.PI)), 8);
+      const flare = this._pulses[i];
+      flare.Scale = 0.45 + 0.75 * flash;
+      flare.Rotation = 20 * flash;
+      flare.RepaintComposition();
     }
   }
 
@@ -1859,16 +1868,12 @@ export class GalleryPage extends DrawnGame {
     this._product.SetMaterialImage("box", this._labels![this._label]);
   }
 
-  /** The section's tile. */
-  private ImagesSection(): SkiaControl {
+  /** The product box tile: a box wearing a label drawn in code, switched live. */
+  private ProductBoxTile(): SkiaControl {
     this._labels ??= Labels();
     this._product = Make(GalleryPage.Shaded(ProductBox(), 28, 18), { AutoRotate: 40, Tapped3D: () => this.NextImage() });
     this._product.SetMaterialImage("box", this._labels[0]);
-    return Make(new SkiaWrap(), {
-      Spacing: 16,
-      HorizontalOptions: "Center",
-      Children: [
-        GalleryPage.Tile("Product box", "A box with its label: tap it or switch the design.",
+    return GalleryPage.Tile("Product box", "A box with its label: tap it or switch the design.",
           this._product,
           Make(new SkiaRow(), {
             Spacing: 8,
@@ -1885,9 +1890,7 @@ export class GalleryPage extends DrawnGame {
                 },
               }),
             ],
-          })),
-      ],
-    });
+          }));
   }
 
   // ---- GalleryPage.Loop.cs ----
@@ -1896,12 +1899,6 @@ export class GalleryPage extends DrawnGame {
 
   private _time = 0;
   private _pan = 0;
-  private _unlocked = true;
-  /** The medal's spin after unlocking, 0 to 1. */
-  private _spin = 1;
-  private _liked = true;
-  /** The heart's pop after a like, 1 to 0. */
-  private _pop = 0;
   private _open = false;
   private readonly _pieces: Piece[] = [];
   private _rainReady = false;
@@ -1925,18 +1922,6 @@ export class GalleryPage extends DrawnGame {
     this.CardFrame(delta);
     this.GlobeFrame(delta);
     this.FormFrame(delta);
-
-    if (this._spin < 1) {
-      this._spin = Math.min(this._spin + delta / 0.9, 1);
-      this._medal.Yaw = MedalYaw + 360 * EaseOut(this._spin);
-    }
-
-    this._pop = Math.max(this._pop - delta * 3, 0);
-    // Controls off screen are not touched: their state moves on, they get it when they show again.
-    if (WasInLastFrame(this._heart)) {
-      const beat = 1 + 0.05 * Math.max(Math.sin(t * 5), 0) + 0.35 * this._pop;
-      this._heart.SetNodeScale("heart", beat, beat, 1);
-    }
 
     if (!this._rainReady) {
       this._rainReady = true;
