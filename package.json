@@ -137,7 +137,8 @@
     "check:parent-independent": "node dev/check.mjs dev/check-parent-independent.ts",
     "check:update-while-recording": "node dev/check.mjs dev/check-update-while-recording.ts",
     "check:image-cache": "node dev/check.mjs dev/check-image-cache.ts",
-    "browser:canvas-contexts": "node dev/check-canvas-contexts.mjs"
+    "browser:canvas-contexts": "node dev/check-canvas-contexts.mjs",
+    "check:editor-wheel": "node dev/check.mjs dev/check-editor-wheel.ts"
   },
   "peerDependencies": {
     "playwright-core": ">=1.40",
