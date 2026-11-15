@@ -513,6 +513,8 @@ export class SkiaEditor extends SkiaShape {
       }
       case "Up": this.dragSelecting = false; return this;
       case "Tapped": return this;
+      // the field scrolls its text only to follow the caret: the wheel is the page's, over the field too
+      case "Wheel": return null;
     }
     return this;
   }

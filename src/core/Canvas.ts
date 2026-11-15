@@ -1079,7 +1079,9 @@ export class Canvas {
     }
 
     const consumed = root.ProcessGestures(args, info());
-    if (!wheel) this.gestureOwner = consumed && args.Type !== "Up" ? consumed : null;
+    // a mouse move never makes an owner (DrawnUi.Net 62608ca7): a focused field takes every hover, and as the owner it
+    // would get the next release of a press that began elsewhere
+    if (!wheel && args.Type !== "Pointer") this.gestureOwner = consumed && args.Type !== "Up" ? consumed : null;
     return consumed;
   }
 }
