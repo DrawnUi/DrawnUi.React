@@ -49,8 +49,22 @@ property names, layout and drawing rules. What you learn here works there, and s
 
 DrawnUI is MIT licensed in every language and on every platform: desktop, mobile, web and embedded devices. Ship it in commercial products with no attribution badge, no about screen and no per-device royalty.
 
-## What's new in the next preview
+## What's new in 0.1.0-preview.42
 
+- **Images:** images that show the same file or URL share one decoded copy; image memory stays within a budget
+  (`SkiaImageManager.CacheBudgetMb`, 128 MB by default), and the images no control shows go first. Cached images
+  refresh after 30 minutes or on `RemoveFromCache`, and an image stays on screen as long as a control shows it. The
+  image manager follows DrawnUi.Net: `ReuseBitmaps`, `UseCache`, retries of failed loads, `RegisterImage`,
+  `IsLoadingLocked`; `LoadImageAsync` is a direct load outside the cache.
+- **Controls on a new canvas:** a control shown on a new canvas redraws its GPU and image caches there.
+- **Changes during a cache recording:** a control that changes while a cached parent records it (shown from another
+  control's paint, or from an event raised as it draws) is drawn on the next frame.
+- **Parent-independent controls:** a control marked `IsParentIndependent` lays itself out again in its own slot when its
+  content changes, so a live counter in a row shows every new value without laying out the row.
+- **`End` in stacks:** a child with `End` in a row or column sits at the stack's end, as in DrawnUI for Rust (a button
+  after a text in a full-width row lines up on the right).
+- **Zoom wheels:** `TouchActionEventArgs.Wheel.IsZoom` tells a Ctrl / Cmd + wheel or a touchpad pinch from a plain wheel.
+- **Add-on packages:** `Registry` and `DrawnProps` let a separate package register its own JSX tags.
 - **`SkiaShell` without React:** the shell is an engine control in `drawnui-react/core`: build it in code with
   controls as pages, popups, modals and toasts. The JSX `<SkiaShell>` works as before on top of it.
 - **Quiet console:** WebGL starts and comes back after a lost context without browser warnings, in Chromium and WebKit.

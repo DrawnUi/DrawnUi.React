@@ -41,7 +41,7 @@ import type { Color, RenderingModeType } from "../core/Types";
 import type { GesturesMode } from "../core/Gestures";
 import { createDrawnRoot } from "./reconciler";
 export { DesignerSourceOf, type DesignerSource } from "./reconciler";
-/** JSX tag name -> engine class: add-on packages register their controls here (drawnui-react-add3d). */
+/** JSX tag name -> engine class: add-on packages register their controls here. */
 export { Registry } from "./reconciler";
 import { DesignerActions, designerAction } from "../core/DesignerActions";
 export { DesignerActions, designerAction };
