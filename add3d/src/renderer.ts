@@ -7,6 +7,14 @@ import { Super, type Canvas } from "drawnui-react/core";
 import { Invert, MsaaSamples, Normalize, Transform4, type Mat4, type Vec3 } from "./math";
 import type { Image3D, MaterialOverride, Scene3D } from "./scene";
 import { Look } from "./types";
+import { GlState } from "./glstate";
+
+interface Saved {
+  active: number; texture: WebGLTexture | null; drawFb: WebGLFramebuffer | null; readFb: WebGLFramebuffer | null; rb: WebGLRenderbuffer | null;
+  viewport: number[]; caps: Map<number, boolean>; blend: number[]; equation: number[]; colorMask: boolean[]; depthMask: boolean;
+  clearColor: number[]; clearDepth: number; depthFunc: number; frontFace: number; cullFace: number;
+  program: WebGLProgram | null; vao: WebGLVertexArrayObject | null; arrayBuffer: WebGLBuffer | null; align: number; flip: boolean; premul: boolean;
+}
 
 /** Joint matrices a skinned mesh may use (WebGL2 guarantees 256 vertex uniform vectors). */
 const MAX_JOINTS = 64;
@@ -178,7 +186,12 @@ export class Renderer3D {
   private stateTexture: WebGLTexture | null | undefined = undefined;
   private stateSkinned = 0;
 
-  private constructor(readonly gl: WebGL2RenderingContext, private readonly canvas: Canvas, private readonly epoch: number) {}
+  private readonly state: GlState;
+
+  private constructor(readonly gl: WebGL2RenderingContext, private readonly canvas: Canvas, private readonly epoch: number) {
+    // a new renderer for a canvas means a new context generation (a restore puts every GL value back to its default)
+    this.state = GlState.Of(gl, true);
+  }
 
   private Shader(kind: number, source: string): WebGLShader | null {
     const s = this.gl.createShader(kind);
@@ -391,60 +404,56 @@ export class Renderer3D {
     (surface as unknown as { _resetContext?: () => void } | undefined)?._resetContext?.();
   }
 
-  private saved: unknown[] = [];
+  private saved?: Saved;
 
   /**
    * Starts a GL session on CanvasKit's context: keeps every piece of state our calls change, since CanvasKit's own state
-   * cache would not see them (it re-reads only texture bindings). End puts each back as it was.
+   * cache would not see them (it re-reads only texture bindings). End puts each back as it was. The values come from
+   * the state tracked in JavaScript (GlState), never from getParameter: each of those is a round trip to the GPU process.
    */
   private Begin(): void {
-    const gl = this.gl;
-    const active = gl.getParameter(gl.ACTIVE_TEXTURE);
-    gl.activeTexture(gl.TEXTURE0);
-    this.saved = [
-      active, gl.getParameter(gl.TEXTURE_BINDING_2D),
-      gl.getParameter(gl.DRAW_FRAMEBUFFER_BINDING), gl.getParameter(gl.READ_FRAMEBUFFER_BINDING), gl.getParameter(gl.RENDERBUFFER_BINDING),
-      gl.getParameter(gl.VIEWPORT), gl.isEnabled(gl.SCISSOR_TEST), gl.isEnabled(gl.STENCIL_TEST), gl.isEnabled(gl.BLEND),
-      gl.getParameter(gl.BLEND_SRC_RGB), gl.getParameter(gl.BLEND_DST_RGB), gl.getParameter(gl.BLEND_SRC_ALPHA), gl.getParameter(gl.BLEND_DST_ALPHA),
-      gl.getParameter(gl.BLEND_EQUATION_RGB), gl.getParameter(gl.BLEND_EQUATION_ALPHA),
-      gl.getParameter(gl.COLOR_WRITEMASK), gl.getParameter(gl.DEPTH_WRITEMASK), gl.getParameter(gl.COLOR_CLEAR_VALUE), gl.getParameter(gl.DEPTH_CLEAR_VALUE),
-      gl.isEnabled(gl.DEPTH_TEST), gl.getParameter(gl.DEPTH_FUNC), gl.getParameter(gl.FRONT_FACE), gl.getParameter(gl.CULL_FACE_MODE), gl.isEnabled(gl.CULL_FACE),
-      gl.getParameter(gl.CURRENT_PROGRAM), gl.getParameter(gl.VERTEX_ARRAY_BINDING), gl.getParameter(gl.ARRAY_BUFFER_BINDING),
-      gl.getParameter(gl.UNPACK_ALIGNMENT), gl.getParameter(gl.UNPACK_FLIP_Y_WEBGL), gl.getParameter(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL),
-    ];
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
-    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
-    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
+    const gl = this.gl, s = this.state;
+    this.saved = {
+      active: s.activeTexture, texture: s.texture0, drawFb: s.drawFb, readFb: s.readFb, rb: s.rb, viewport: [...s.viewport],
+      caps: new Map(s.caps), blend: [...s.blend], equation: [...s.equation], colorMask: [...s.colorMask], depthMask: s.depthMask,
+      clearColor: [...s.clearColor], clearDepth: s.clearDepth, depthFunc: s.depthFunc, frontFace: s.frontFace, cullFace: s.cullFace,
+      program: s.program, vao: s.vao, arrayBuffer: s.arrayBuffer, align: s.unpackAlignment, flip: s.unpackFlipY, premul: s.unpackPremultiply,
+    };
+    if (s.activeTexture !== gl.TEXTURE0) gl.activeTexture(gl.TEXTURE0);
+    if (s.unpackFlipY) gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    if (s.unpackPremultiply) gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+    if (s.unpackAlignment !== 4) gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
   }
 
+  /** Puts back what Begin kept: only the values the pass changed (the tracked state says which). */
   private End(surface?: Surface): void {
-    const gl = this.gl;
-    const [active, texture, drawFb, readFb, rb, viewport, scissor, stencil, blend, srcRgb, dstRgb, srcA, dstA, eqRgb, eqA,
-      colorMask, depthMask, clearColor, clearDepth, depthTest, depthFunc, frontFace, cullMode, cull, program, vao, buffer, align, flip, premul] = this.saved as any[];
-    const on = (cap: number, v: boolean) => (v ? gl.enable(cap) : gl.disable(cap));
-    gl.bindVertexArray(vao);
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-    gl.useProgram(program);
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.activeTexture(active);
-    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, drawFb);
-    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, readFb);
-    gl.bindRenderbuffer(gl.RENDERBUFFER, rb);
-    gl.viewport(viewport[0], viewport[1], viewport[2], viewport[3]);
-    on(gl.SCISSOR_TEST, scissor); on(gl.STENCIL_TEST, stencil); on(gl.BLEND, blend); on(gl.DEPTH_TEST, depthTest); on(gl.CULL_FACE, cull);
-    gl.blendFuncSeparate(srcRgb, dstRgb, srcA, dstA);
-    gl.blendEquationSeparate(eqRgb, eqA);
-    gl.colorMask(colorMask[0], colorMask[1], colorMask[2], colorMask[3]);
-    gl.depthMask(depthMask);
-    gl.clearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
-    gl.clearDepth(clearDepth);
-    gl.depthFunc(depthFunc);
-    gl.frontFace(frontFace);
-    gl.cullFace(cullMode);
-    gl.pixelStorei(gl.UNPACK_ALIGNMENT, align);
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, flip);
-    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, premul);
-    this.saved = [];
+    const gl = this.gl, s = this.state, v = this.saved;
+    if (!v) return;
+    const same = (a: ArrayLike<unknown>, b: ArrayLike<unknown>) => { for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false; return true; };
+    if (s.vao !== v.vao) gl.bindVertexArray(v.vao);
+    if (s.arrayBuffer !== v.arrayBuffer) gl.bindBuffer(gl.ARRAY_BUFFER, v.arrayBuffer);
+    if (s.program !== v.program) gl.useProgram(v.program);
+    if (s.activeTexture !== gl.TEXTURE0) gl.activeTexture(gl.TEXTURE0);
+    if (s.texture0 !== v.texture) gl.bindTexture(gl.TEXTURE_2D, v.texture);
+    if (v.active !== gl.TEXTURE0) gl.activeTexture(v.active);
+    if (s.drawFb !== v.drawFb) gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, v.drawFb);
+    if (s.readFb !== v.readFb) gl.bindFramebuffer(gl.READ_FRAMEBUFFER, v.readFb);
+    if (s.rb !== v.rb) gl.bindRenderbuffer(gl.RENDERBUFFER, v.rb);
+    if (!same(s.viewport, v.viewport)) gl.viewport(v.viewport[0], v.viewport[1], v.viewport[2], v.viewport[3]);
+    for (const [cap, on] of v.caps) if (s.caps.get(cap) !== on) { if (on) gl.enable(cap); else gl.disable(cap); }
+    if (!same(s.blend, v.blend)) gl.blendFuncSeparate(v.blend[0], v.blend[1], v.blend[2], v.blend[3]);
+    if (!same(s.equation, v.equation)) gl.blendEquationSeparate(v.equation[0], v.equation[1]);
+    if (!same(s.colorMask, v.colorMask)) gl.colorMask(v.colorMask[0], v.colorMask[1], v.colorMask[2], v.colorMask[3]);
+    if (s.depthMask !== v.depthMask) gl.depthMask(v.depthMask);
+    if (!same(s.clearColor, v.clearColor)) gl.clearColor(v.clearColor[0], v.clearColor[1], v.clearColor[2], v.clearColor[3]);
+    if (s.clearDepth !== v.clearDepth) gl.clearDepth(v.clearDepth);
+    if (s.depthFunc !== v.depthFunc) gl.depthFunc(v.depthFunc);
+    if (s.frontFace !== v.frontFace) gl.frontFace(v.frontFace);
+    if (s.cullFace !== v.cullFace) gl.cullFace(v.cullFace);
+    if (s.unpackAlignment !== v.align) gl.pixelStorei(gl.UNPACK_ALIGNMENT, v.align);
+    if (s.unpackFlipY !== v.flip) gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, v.flip);
+    if (s.unpackPremultiply !== v.premul) gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, v.premul);
+    this.saved = undefined;
     this.Reset(surface);
   }
 
