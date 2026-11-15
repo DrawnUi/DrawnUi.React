@@ -1,6 +1,6 @@
 // A glTF 2.0 scene (.glb) drawn in real 3D inside a DrawnUI screen. Port of DrawnUi.Add3d SkiaModel3D (.NET) and
 // drawnui-add3d (Rust): same names, same rules.
-import { ActionOnTickAnimator, SkiaControl, SkiaScroll, Super, type DrawingContext, type GestureEventProcessingInfo, type SkiaGesturesParameters } from "drawnui-react/core";
+import { ActionOnTickAnimator, SkiaControl, SkiaScroll, Super, VelocityAccumulator, type DrawingContext, type GestureEventProcessingInfo, type SkiaGesturesParameters } from "drawnui-react/core";
 import { Euler, type Mat4, type Quat, type Vec3 } from "./math";
 import { Player3D } from "./player";
 import { Renderer3D, RenderTarget, type RenderItem } from "./renderer";
@@ -65,6 +65,17 @@ export class SkiaModel3D extends SkiaControl implements IPrefetch3D {
   private pinchFrom = 1;
   private multiTouch = false;
   private lastTapMs = 0;
+  // ---- Fling (.NET 3929baa3, 846583d4) ----
+  private fling = false;
+  /** Degrees per second the model turns on by itself after a drag was let go, slowing as a scroll does. */
+  private flingYaw = 0;
+  private flingPitch = 0;
+  private dragged = false;
+  private readonly velocity = new VelocityAccumulator();
+  /** The way the automatic turn goes: 1 as the app set it, -1 after a fling the other way (it follows the last swipe). */
+  private autoDirection = 1;
+  /** The scroll's deceleration: the speed keeps this share of itself each millisecond. */
+  private static readonly FlingDeceleration = 0.998;
   /** Drawn since the last frame tick: a model that was not (off screen) stops asking for frames. */
   private painted = false;
   /** Something changed since the last 3D render (every change calls Update); false = its image can be shown again. */
@@ -239,6 +250,21 @@ export class SkiaModel3D extends SkiaControl implements IPrefetch3D {
   set CrossfadeMs(value: number) { this.player.Fade = Math.max(0, value) / 1000; }
 
   /** Turns the scene by itself, degrees per second (0 = still). */
+  /** A drag that is let go keeps the model turning, slowing down as a scroll does after a swipe (off by default). A finger put down stops it. */
+  get Fling(): boolean { return this.fling; }
+  set Fling(value: boolean) { this.fling = value; if (!value) this.StopFling(); }
+
+  /** Turns the model on by itself from these speeds (degrees per second) until it slows to a stop. */
+  StartFling(yawPerSecond: number, pitchPerSecond: number): void {
+    // a fling against the automatic turn makes it turn that way afterwards (it slows into the turn, never back)
+    if (this.autoRotate !== 0 && Math.abs(yawPerSecond) > Math.abs(this.autoRotate)) this.autoDirection = Math.sign(yawPerSecond) * Math.sign(this.autoRotate);
+    this.flingYaw = yawPerSecond - this.autoDirection * this.autoRotate;
+    this.flingPitch = this.LockPitch ? 0 : pitchPerSecond;
+    this.Changed();
+  }
+
+  private StopFling(): void { this.flingYaw = 0; this.flingPitch = 0; }
+
   get AutoRotate(): number { return this.autoRotate; }
   set AutoRotate(value: number) { this.autoRotate = value; this.Changed(); }
 
@@ -422,7 +448,7 @@ export class SkiaModel3D extends SkiaControl implements IPrefetch3D {
   /** Something that may start or stop the motion changed: frames on or off, and one redraw. */
   private Changed(): void { this.UpdateTicking(); this.Redraw(); }
 
-  private get WantsFrames(): boolean { return !!this.scene && (this.autoRotate !== 0 || this.reset < 1 || this.player.Busy || this.TiltMoving); }
+  private get WantsFrames(): boolean { return !!this.scene && (this.autoRotate !== 0 || this.reset < 1 || this.player.Busy || this.TiltMoving || this.flingYaw !== 0 || this.flingPitch !== 0); }
 
   private get TiltMoving(): boolean {
     if (this.tilt <= 0) return false;
@@ -457,7 +483,15 @@ export class SkiaModel3D extends SkiaControl implements IPrefetch3D {
   Advance(delta: number): void {
     const scene = this.scene;
     if (!scene) return;
-    this.yaw = (this.yaw + this.autoRotate * delta) % 360;
+    this.yaw = (this.yaw + this.autoRotate * this.autoDirection * delta) % 360;
+    if (this.flingYaw !== 0 || this.flingPitch !== 0) {
+      this.yaw = (this.yaw + this.flingYaw * delta) % 360;
+      if (this.flingPitch !== 0) this.pitch = Math.min(Math.max(this.pitch + this.flingPitch * delta, -60), 80);
+      const keep = Math.pow(SkiaModel3D.FlingDeceleration, delta * 1000);
+      this.flingYaw *= keep; this.flingPitch *= keep;
+      // under a degree and a half per second it no longer reads as moving
+      if (Math.abs(this.flingYaw) < 1.5 && Math.abs(this.flingPitch) < 1.5) this.StopFling();
+    }
     if (this.tilt > 0) {
       // pointer moves come in bursts: the lean chases where they point, reaching it in about 0.15 s
       const t = this.TiltTarget(), k = Math.min(1, delta * 14);
@@ -494,7 +528,81 @@ export class SkiaModel3D extends SkiaControl implements IPrefetch3D {
     }
   }
 
-  private Camera(width: number, height: number): Mat4 { return this.scene!.Camera(this.camera, this.yaw, this.pitch, this.zoom, width / Math.max(height, 1)); }
+  /**
+   * The view: a view nobody turns (no drag, no tilt, no auto turn) is fitted exactly as it is seen; one the user turns is
+   * fitted for any yaw at this pitch by the model's outline (a ball keeps its size at every tilt), a lean toward the
+   * pointer over its whole range, so hovering never moves the camera (.NET 1cbfdb01, 231903da).
+   */
+  private Camera(width: number, height: number): Mat4 {
+    const scene = this.scene!, aspect = width / Math.max(height, 1);
+    const [min, max] = this.FrameBox();
+    if (!this.Orbit && this.tilt === 0 && this.autoRotate === 0) return scene.CameraAsSeen(this.camera, min, max, this.yaw, this.pitch, this.zoom, aspect, this.frameMargin);
+    const outline = this.FrameOutline();
+    const axis = scene.ProfileOf(-1).Axis;
+    const center: [number, number, number] = [axis[0], (min[1] + max[1]) / 2, axis[1]];
+    const [from, to] = this.tilt > 0 ? [this.homePitch - this.tilt, this.homePitch + this.tilt] : [this.pitch, this.pitch];
+    const f = this.fitKey;
+    if (aspect !== f.Aspect || from !== f.From || to !== f.To || this.frameMargin !== f.Margin || outline !== f.Outline) {
+      Object.assign(f, { Aspect: aspect, From: from, To: to, Margin: this.frameMargin, Outline: outline });
+      this.fit = Scene3D.OutlineFit(outline, center[1], from, to, aspect, this.frameMargin);
+    }
+    const radius = Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]) / 2 + this.frameMargin;
+    return Scene3D.CameraAt(this.camera, center, radius, this.fit * this.zoom, this.yaw, this.pitch, aspect);
+  }
+
+  private fit = 1;
+  private readonly fitKey: { Aspect: number; From: number; To: number; Margin: number; Outline?: number[] } = { Aspect: NaN, From: 0, To: 0, Margin: 0 };
+  private frameScene?: Scene3D;
+  private frameBox: [[number, number, number], [number, number, number]] = [[-1, -1, -1], [1, 1, 1]];
+  private outline?: number[];
+  private frameMargin = 0;
+  private frameAnimations?: readonly string[];
+
+  /**
+   * Room kept around the model's resting box, in the model's own units, for parts that move past it (dice that tumble and
+   * hop, a character's swinging arms): the view backs off so they stay in sight. 0 by default.
+   */
+  get FrameMargin(): number { return this.frameMargin; }
+  set FrameMargin(value: number) { this.frameMargin = Math.max(0, value); this.Redraw(); }
+
+  /**
+   * The animations the view keeps in frame, besides the model at rest. Undefined (the default): every animation of the
+   * file, so playing any of them never cuts the model. Name only the ones the app plays when the file has bigger ones it
+   * never uses (a jump, a fall): the model then shows larger.
+   */
+  get FrameAnimations(): readonly string[] | undefined { return this.frameAnimations; }
+  set FrameAnimations(value: readonly string[] | undefined) { this.frameAnimations = value; this.frameScene = undefined; this.outline = undefined; this.Redraw(); }
+
+  /** The box the view keeps in frame: the model at rest and through FrameAnimations. */
+  private FrameBox(): [[number, number, number], [number, number, number]] { this.Frame(); return this.frameBox; }
+
+  /** The outline the view keeps in frame (reach from the vertical axis, height), worked out once. */
+  private FrameOutline(): number[] {
+    this.Frame();
+    if (!this.outline) {
+      const scene = this.scene!, out: number[] = [];
+      scene.ProfileOf(-1).Points(out);
+      for (let a = 0; a < scene.Animations.length; a++) if (!this.frameAnimations || this.frameAnimations.includes(scene.Animations[a].Name)) scene.ProfileOf(a).Points(out);
+      this.outline = out;
+    }
+    return this.outline;
+  }
+
+  private Frame(): void {
+    const scene = this.scene!;
+    if (this.frameScene === scene) return;
+    this.frameScene = scene;
+    this.outline = undefined;
+    if (!this.frameAnimations) { this.frameBox = [scene.PlayMin, scene.PlayMax]; return; }
+    let box: [[number, number, number], [number, number, number]] = [scene.BoundsMin, scene.BoundsMax];
+    for (const name of this.frameAnimations) {
+      const a = scene.AnimationNamed(name);
+      if (a < 0) continue;
+      const [lo, hi] = scene.AnimationBounds(a);
+      box = [[Math.min(box[0][0], lo[0]), Math.min(box[0][1], lo[1]), Math.min(box[0][2], lo[2])], [Math.max(box[1][0], hi[0]), Math.max(box[1][1], hi[1]), Math.max(box[1][2], hi[2])]];
+    }
+    this.frameBox = box;
+  }
 
   /** What the ray through this point of the control (in points from its corner) meets first; undefined when nothing. */
   HitTest(x: number, y: number): ModelHit | undefined {
@@ -540,6 +648,15 @@ export class SkiaModel3D extends SkiaControl implements IPrefetch3D {
       if (args.Event.NumberOfTouches > 1) this.multiTouch = true;
       else if (args.Type === "Down") this.multiTouch = false;
       const type = args.Type;
+      if (type === "Down") {
+        // a finger put down catches the model
+        this.StopFling(); this.velocity.Clear(); this.dragged = false;
+      } else if (type === "Up" && this.fling && this.dragged && !this.multiTouch) {
+        this.dragged = false;
+        // the drag's speed when let go, in points per second, turned the way the drag turns the model
+        const v = this.velocity.CalculateFinalVelocity(4000);
+        this.StartFling(-v.X * 0.5, v.Y * 0.3);
+      }
       if (this.tilt > 0 && (type === "Pointer" || type === "Down" || type === "Panning")) {
         if (type === "Down") this.panAxis = 0;
         else if (type === "Panning") {
@@ -581,6 +698,7 @@ export class SkiaModel3D extends SkiaControl implements IPrefetch3D {
         // the surface follows the finger: a drag to the right turns the near side to the right, in points whatever the density
         this.yaw -= (args.Event.Distance.Delta.X / scale) * 0.5;
         if (!this.LockPitch) this.pitch = Math.min(Math.max(this.pitch + (args.Event.Distance.Delta.Y / scale) * 0.3, -60), 80);
+        if (this.fling) { this.dragged = true; this.velocity.CaptureVelocity(args.Event.Distance.Velocity.X / scale, args.Event.Distance.Velocity.Y / scale, args.ArrivedTimeNanos); }
         this.Redraw();
         return this;
       } else if (type === "Wheel" && this.PinchZoom && args.Event.Wheel.IsZoom) {

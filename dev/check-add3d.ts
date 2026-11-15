@@ -69,7 +69,7 @@ const near = (a: number, b: number, e = 1e-4) => Math.abs(a - b) <= e;
       check(`${name}: an animation sampled at 0.37 s gives finite locals and unit rotations`, bad === 0, `${bad} bad nodes`);
     }
     // rays: the camera's center ray meets the model, a ray from far to the side going away does not
-    const camera = scene.Camera(new Float32Array(16), 20, 10, 1, 1);
+    const camera = scene.CameraAsSeen(new Float32Array(16), scene.BoundsMin, scene.BoundsMax, 20, 10, 1, 1, 0);
     const { From, Dir } = Scene3D.Ray(camera, 0.5, 0.5);
     const hidden = new Array(scene.Nodes.length).fill(false);
     const hit = scene.RayHit(pose, hidden, [], From, Dir);

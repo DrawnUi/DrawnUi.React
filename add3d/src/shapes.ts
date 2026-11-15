@@ -117,6 +117,58 @@ export class Mesh3D {
     return m;
   }
 
+  /**
+   * A box with rounded edges and corners (a die, a soap bar, a phone, a cushion), centered; `radius` in the box's units,
+   * at most half its smallest side. An image covers each face whole, upright on the sides, as on Cuboid; with `atlas`
+   * each face takes its own cell of one image split 3 x 2, in the order +X, -X, +Y on the top row and -Y, +Z, -Z on the
+   * bottom row (a die's six faces in one image). (.NET 20d83ead)
+   */
+  static RoundedCuboid(width: number, height: number, depth: number, radius: number, atlas = false): Mesh3D {
+    const e: Vec3 = [width / 2, height / 2, depth / 2];
+    const r = Math.min(Math.max(radius, 0), Math.min(e[0], e[1], e[2]));
+    const inner: Vec3 = [e[0] - r, e[1] - r, e[2] - r];
+    const steps = 6; // per 45 degrees of an edge's curve
+    const mesh = new Mesh3D();
+    // a face's coordinates along one axis: the curve at each edge in even angles, flat between
+    const along = (half: number): number[] => {
+      const c = new Array<number>(2 * steps + 2);
+      for (let k = 0; k <= steps; k++) {
+        const off = half - r + r * Math.tan((((steps - k) / steps) * Math.PI) / 4);
+        c[k] = -off; c[2 * steps + 1 - k] = off;
+      }
+      return c;
+    };
+    // face normal, right and up as seen from outside (as Cuboid lays its images)
+    const faces: [Vec3, Vec3, Vec3][] = [
+      [[1, 0, 0], [0, 0, -1], [0, 1, 0]], [[-1, 0, 0], [0, 0, 1], [0, 1, 0]],
+      [[0, 1, 0], [1, 0, 0], [0, 0, -1]], [[0, -1, 0], [1, 0, 0], [0, 0, 1]],
+      [[0, 0, 1], [1, 0, 0], [0, 1, 0]], [[0, 0, -1], [-1, 0, 0], [0, 1, 0]],
+    ];
+    const absDot = (a: Vec3, b: Vec3) => Math.abs(a[0] * b[0] + a[1] * b[1] + a[2] * b[2]);
+    faces.forEach(([n, u, v], f) => {
+      const en = absDot(n, e), eu = absDot(u, e), ev = absDot(v, e);
+      const cu = along(eu), cv = along(ev);
+      const at = mesh.Positions.length / 3;
+      for (const t of cv) for (const s of cu) {
+        const p: Vec3 = [n[0] * en + u[0] * s + v[0] * t, n[1] * en + u[1] * s + v[1] * t, n[2] * en + u[2] * s + v[2] * t];
+        const core: Vec3 = [Math.min(Math.max(p[0], -inner[0]), inner[0]), Math.min(Math.max(p[1], -inner[1]), inner[1]), Math.min(Math.max(p[2], -inner[2]), inner[2])];
+        let dir: Vec3 = [p[0] - core[0], p[1] - core[1], p[2] - core[2]];
+        const l = Math.hypot(dir[0], dir[1], dir[2]);
+        dir = l > 0 ? [dir[0] / l, dir[1] / l, dir[2] / l] : n;
+        mesh.Positions.push(core[0] + dir[0] * r, core[1] + dir[1] * r, core[2] + dir[2] * r);
+        mesh.Normals.push(...dir);
+        const uv: V2 = [(s / eu + 1) / 2, 1 - (t / ev + 1) / 2];
+        mesh.Uvs.push(...(atlas ? [((f % 3) + uv[0]) / 3, (Math.floor(f / 3) + uv[1]) / 2] : uv));
+      }
+      const row = cu.length;
+      for (let j = 0; j + 1 < cv.length; j++) for (let i = 0; i + 1 < row; i++) {
+        const a = at + j * row + i;
+        mesh.Indices.push(a, a + 1, a + 1 + row, a, a + 1 + row, a + row);
+      }
+    });
+    return mesh;
+  }
+
   // ponytail: contours are filled as solids, holes (an O, a ring) are not cut; draw a ring with Torus or Lathe until a
   // shape needs a hole.
   /**

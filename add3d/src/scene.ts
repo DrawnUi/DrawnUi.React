@@ -73,6 +73,12 @@ export class Scene3D {
   /** The scene's box at rest. */
   BoundsMin: Vec3 = [-1, -1, -1];
   BoundsMax: Vec3 = [1, 1, 1];
+  /** The box around the model at rest and through all its animations: what a viewer's camera fits. */
+  PlayMin: Vec3 = [-1, -1, -1];
+  PlayMax: Vec3 = [1, 1, 1];
+  private animationBounds: ([Vec3, Vec3] | undefined)[] = [];
+  private restProfile?: Profile3D;
+  private profiles: (Profile3D | undefined)[] = [];
   /** The most joints any skin has. */
   MaxJoints = 0;
 
@@ -285,36 +291,120 @@ export class Scene3D {
   }
 
   private RestBounds(): void {
-    const pose = this.Pose(-1, 0);
-    const lo: Vec3 = [Infinity, Infinity, Infinity], hi: Vec3 = [-Infinity, -Infinity, -Infinity];
-    let at = new Float32Array(0);
-    for (let i = 0; i < this.Nodes.length; i++) {
-      const mesh = this.Nodes[i].Mesh;
-      if (mesh < 0 || mesh >= this.Meshes.length) continue;
-      for (const p of this.Meshes[mesh]) {
-        if (at.length < p.Positions.length) at = new Float32Array(p.Positions.length);
-        this.PosedPositions(i, p, pose, at);
-        for (let v = 0; v < p.VertexCount; v++)
-          for (let k = 0; k < 3; k++) { const x = at[v * 3 + k]; if (x < lo[k]) lo[k] = x; if (x > hi[k]) hi[k] = x; }
-      }
-    }
-    if (lo[0] > hi[0]) { this.BoundsMin = [-1, -1, -1]; this.BoundsMax = [1, 1, 1]; } else { this.BoundsMin = lo; this.BoundsMax = hi; }
+    [this.BoundsMin, this.BoundsMax] = this.Extent(-1);
+    this.animationBounds = new Array(this.Animations.length);
+    this.profiles = new Array(this.Animations.length);
+    this.restProfile = undefined;
+    let [lo, hi] = [this.BoundsMin, this.BoundsMax];
+    for (let a = 0; a < this.Animations.length; a++) [lo, hi] = Union([lo, hi], this.AnimationBounds(a));
+    this.PlayMin = lo; this.PlayMax = hi;
   }
 
-  /** View and projection that fit the scene's box, turned by yaw / pitch (degrees), into `out`. */
-  Camera(out: Mat4, yaw: number, pitch: number, zoom: number, aspect: number): Mat4 {
-    const lo = this.BoundsMin, hi = this.BoundsMax;
-    const center: Vec3 = [(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2];
-    const radius = Math.max(Math.hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) / 2, 1e-3);
-    const fov = Radians(35);
-    const fit = (radius / Math.sin(fov / 2)) * (aspect < 1 ? 1 / aspect : 1);
-    const distance = fit * zoom;
-    // glam: from_rotation_y(yaw) * from_rotation_x(-pitch), applied to (0, 0, distance).
-    const rotation = mulQ(QuatAxisAngle([0, 1, 0], Radians(yaw)), QuatAxisAngle([1, 0, 0], Radians(-pitch)));
-    const off = Rotate(rotation, [0, 0, distance]);
+  /** The box around the model through one animation (sampled), worked out once. */
+  AnimationBounds(animation: number): [Vec3, Vec3] { return (this.animationBounds[animation] ??= this.Extent(animation)); }
+
+  /**
+   * The box around the model at rest (`animation` -1) or through one animation of the file (a chest's opening lid, a
+   * character's swing), sampled: a view fitted to it does not cut the model while it plays. With `profile`, also the
+   * model's outline turned around its vertical axis.
+   */
+  private Extent(animation: number, profile?: Profile3D): [Vec3, Vec3] {
+    const lo: Vec3 = [Infinity, Infinity, Infinity], hi: Vec3 = [-Infinity, -Infinity, -Infinity];
+    let at = new Float32Array(0);
+    const add = (pose: Float32Array) => {
+      for (let i = 0; i < this.Nodes.length; i++) {
+        const mesh = this.Nodes[i].Mesh;
+        if (mesh < 0 || mesh >= this.Meshes.length) continue;
+        for (const p of this.Meshes[mesh]) {
+          if (at.length < p.Positions.length) at = new Float32Array(p.Positions.length);
+          this.PosedPositions(i, p, pose, at);
+          for (let v = 0; v < p.VertexCount; v++) {
+            for (let k = 0; k < 3; k++) { const x = at[v * 3 + k]; if (x < lo[k]) lo[k] = x; if (x > hi[k]) hi[k] = x; }
+            profile?.Add(at[v * 3], at[v * 3 + 1], at[v * 3 + 2]);
+          }
+        }
+      }
+    };
+    if (animation < 0) add(this.Pose(-1, 0));
+    else for (let s = 0; s <= BOUNDS_SAMPLES; s++) add(this.Pose(animation, (this.Animations[animation].Duration * s) / BOUNDS_SAMPLES * 0.999));
+    return lo[0] > hi[0] ? [[-1, -1, -1], [1, 1, 1]] : [lo, hi];
+  }
+
+  /** The outline of the model turned around its vertical axis, at rest (-1) or through one animation. */
+  ProfileOf(animation: number): Profile3D {
+    if (animation < 0) {
+      if (!this.restProfile) this.Extent(-1, (this.restProfile = this.NewProfile()));
+      return this.restProfile;
+    }
+    let p = this.profiles[animation];
+    if (!p) this.Extent(animation, (p = this.profiles[animation] = this.NewProfile()));
+    return p;
+  }
+
+  private NewProfile(): Profile3D {
+    const lo = this.BoundsMin, hi = this.BoundsMax, height = Math.max(hi[1] - lo[1], 1e-3);
+    return new Profile3D([(lo[0] + hi[0]) / 2, (lo[2] + hi[2]) / 2], lo[1] - height, hi[1] + height);
+  }
+
+  /**
+   * View and projection for a view nobody turns, into `out`: the box from `min` to `max` (`margin` scene units around
+   * it) fitted exactly as it is seen from this yaw and pitch.
+   */
+  CameraAsSeen(out: Mat4, min: Vec3, max: Vec3, yaw: number, pitch: number, zoom: number, aspect: number, margin: number): Mat4 {
+    const center: Vec3 = [(min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2];
+    const m = Math.max(0, margin);
+    const half: Vec3 = [(max[0] - min[0]) / 2 + m, (max[1] - min[1]) / 2 + m, (max[2] - min[2]) / 2 + m];
+    const tanV = Math.tan(FOV / 2), tanH = tanV * aspect;
+    const rotation = Turn(yaw, pitch);
+    const right = Rotate(rotation, [1, 0, 0]), upward = Rotate(rotation, [0, 1, 0]), back = Rotate(rotation, [0, 0, 1]);
+    const dot = (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+    let fit = 1e-3;
+    for (let i = 0; i < 8; i++) {
+      const corner: Vec3 = [(i & 1) === 0 ? -half[0] : half[0], (i & 2) === 0 ? -half[1] : half[1], (i & 4) === 0 ? -half[2] : half[2]];
+      const near = dot(corner, back);
+      fit = Math.max(fit, near + Math.abs(dot(corner, right)) / tanH, near + Math.abs(dot(corner, upward)) / tanV);
+    }
+    return Scene3D.CameraAt(out, center, Math.hypot(half[0], half[1], half[2]), fit * AIR * zoom, yaw, pitch, aspect);
+  }
+
+  /**
+   * How far the camera stands (before zoom) so a model's outline turned around the vertical (Profile3D points: reach
+   * from the axis, height) stays in view at any yaw and at every pitch from `pitchFrom` to `pitchTo`: across, each height
+   * band's widest turn; up and down, the band as seen tilted.
+   */
+  static OutlineFit(outline: number[], centerY: number, pitchFrom: number, pitchTo: number, aspect: number, margin: number): number {
+    const tanV = Math.tan(FOV / 2), tanH = tanV * aspect;
+    let fit = 1e-3;
+    const steps = Math.max(1, Math.ceil((pitchTo - pitchFrom) / 10));
+    for (let k = 0; k <= steps; k++) {
+      const tilt = Radians(pitchFrom + ((pitchTo - pitchFrom) * k) / steps);
+      const cos = Math.cos(tilt), sin = Math.sin(tilt);
+      const acrossFactor = Math.sqrt(cos * cos + 1 / (tanH * tanH));
+      for (let i = 0; i < outline.length; i += 2) {
+        // a margin around the box widens the reach by up to the margin's diagonal
+        const reach = outline[i] + margin * 1.415;
+        let y = outline[i + 1] - centerY;
+        y += Math.sign(y) * margin;
+        // up and down: the point swung to the front and to the back of the axis
+        for (let side = -1; side <= 1; side += 2) {
+          const c = side * reach;
+          const near = c * cos + y * sin, up = y * cos - c * sin;
+          fit = Math.max(fit, near + Math.abs(up) / tanV);
+        }
+        // across: swung to the side, at its nearest
+        fit = Math.max(fit, reach * acrossFactor + y * sin);
+      }
+    }
+    return fit * AIR;
+  }
+
+  /** View and projection looking at `center` from `distance`, turned by yaw / pitch, into `out`. */
+  static CameraAt(out: Mat4, center: Vec3, radius: number, distance: number, yaw: number, pitch: number, aspect: number): Mat4 {
+    radius = Math.max(radius, 1e-3);
+    const off = Rotate(Turn(yaw, pitch), [0, 0, distance]);
     const eye: Vec3 = [center[0] + off[0], center[1] + off[1], center[2] + off[2]];
     LookAt(scratchView, eye, center, [0, 1, 0]);
-    PerspectiveGl(scratchProj, fov, aspect, Math.max(distance - radius * 2, distance * 0.01), distance + radius * 2);
+    PerspectiveGl(scratchProj, FOV, aspect, Math.max(distance - radius * 2, distance * 0.01), distance + radius * 2);
     return Mul(out, scratchProj, scratchView);
   }
 
@@ -326,6 +416,50 @@ export class Scene3D {
     const d: Vec3 = [far[0] - near[0], far[1] - near[1], far[2] - near[2]];
     const l = Math.hypot(d[0], d[1], d[2]) || 1;
     return { From: near, Dir: [d[0] / l, d[1] / l, d[2] / l] };
+  }
+}
+
+/** Poses sampled along each animation for the bounds: the view fits what the model does, not only its rest. */
+const BOUNDS_SAMPLES = 8;
+const FOV = Radians(35);
+/** A little air around a fitted model: it never touches the edges of its view. */
+const AIR = 1.1;
+const Union = (a: [Vec3, Vec3], b: [Vec3, Vec3]): [Vec3, Vec3] => [
+  [Math.min(a[0][0], b[0][0]), Math.min(a[0][1], b[0][1]), Math.min(a[0][2], b[0][2])],
+  [Math.max(a[1][0], b[1][0]), Math.max(a[1][1], b[1][1]), Math.max(a[1][2], b[1][2])],
+];
+// glam: from_rotation_y(yaw) * from_rotation_x(-pitch), applied to (0, 0, distance).
+const Turn = (yaw: number, pitch: number): Quat => mulQ(QuatAxisAngle([0, 1, 0], Radians(yaw)), QuatAxisAngle([1, 0, 0], Radians(-pitch)));
+
+/**
+ * A model's outline turned around its vertical axis: for each height band, the farthest it reaches from the axis. What a
+ * camera that may turn the model any way around the vertical must keep in view (tighter than the box: the top of a head
+ * and the tip of a punch are not one corner).
+ */
+export class Profile3D {
+  private static readonly Bands = 48;
+  private readonly step: number;
+  private readonly reach = new Float32Array(Profile3D.Bands).fill(-1);
+  private readonly low = new Float32Array(Profile3D.Bands);
+  private readonly high = new Float32Array(Profile3D.Bands);
+
+  constructor(readonly Axis: [number, number], private readonly y0: number, y1: number) { this.step = Math.max(y1 - y0, 1e-3) / Profile3D.Bands; }
+
+  Add(x: number, y: number, z: number): void {
+    const band = Math.min(Math.max(Math.floor((y - this.y0) / this.step), 0), Profile3D.Bands - 1);
+    const reach = Math.hypot(x - this.Axis[0], z - this.Axis[1]);
+    if (this.reach[band] < 0) { this.reach[band] = reach; this.low[band] = this.high[band] = y; return; }
+    this.reach[band] = Math.max(this.reach[band], reach);
+    this.low[band] = Math.min(this.low[band], y);
+    this.high[band] = Math.max(this.high[band], y);
+  }
+
+  /** Its points (reach, height), flattened: each band's reach at the band's lowest and highest point. */
+  Points(into: number[]): void {
+    for (let b = 0; b < Profile3D.Bands; b++) {
+      if (this.reach[b] < 0) continue;
+      into.push(this.reach[b], this.low[b], this.reach[b], this.high[b]);
+    }
   }
 }
 
