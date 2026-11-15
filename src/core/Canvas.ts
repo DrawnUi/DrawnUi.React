@@ -211,10 +211,14 @@ export class Canvas {
   /** The WebGL context is lost: no frames until the browser restores it. */
   private contextLost = false;
   /**
-   * Bumped when the WebGL context was restored: every GPU object made before (Image caches, picture caches that may
-   * replay them, kept composite surfaces, effect textures) is remade at its next draw (DrawnUi.Rust Gpu::epoch).
+   * The GPU context generation, unique across canvases: a new one when this canvas is made and when its WebGL context
+   * is restored. Every GPU object made under another one (Image caches, picture caches that may replay them, kept
+   * composite surfaces, effect textures; also those a control brought from another canvas) is remade at its next draw
+   * (DrawnUi.Rust Gpu::epoch). A texture of another WebGL context draws nothing.
    */
-  GpuEpoch = 0;
+  GpuEpoch = Canvas.NextGpuEpoch();
+  private static gpuEpochs = 0;
+  private static NextGpuEpoch(): number { return ++Canvas.gpuEpochs; }
 
   /** `init` runs before the first frame is drawn: the place to attach `WillFirstTimeDraw` / `WasDrawn` for that frame. */
   constructor(readonly Element: HTMLCanvasElement, init?: (canvas: Canvas) => void) {
@@ -349,7 +353,7 @@ export class Canvas {
     this.grContext = undefined;
     if (this.glHandle) { Super.CK.deleteContext(this.glHandle); this.glHandle = undefined; }
     this.contextLost = false;
-    this.GpuEpoch++;
+    this.GpuEpoch = Canvas.NextGpuEpoch();
     this.surface = this.CreateSurface(this.Element.width, this.Element.height);
     this.DrawNow();
   };
@@ -559,7 +563,11 @@ export class Canvas {
     this.observer.disconnect();
     this.content?.Dispose();
     this.Content = undefined;
+    this.DrainDisposeQueue(); // what the last frames handed over for deletion goes while the context lives
     this.ReleaseSurface();
+    // GPU objects that outlive this canvas (a control the app keeps and shows on another canvas) are freed later, under
+    // another WebGL context: the abandoned Skia context makes no GL call when they go (as DrawnUi.Net Cells 81b89f1a)
+    if (this.grContext && !this.contextLost) this.grContext.releaseResourcesAndAbandonContext();
     this.grContext?.delete();
     this.grContext = undefined;
     if (this.glHandle) { Super.CK.deleteContext(this.glHandle); this.glHandle = undefined; }
