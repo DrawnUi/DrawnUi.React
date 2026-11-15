@@ -1214,16 +1214,23 @@ export class GalleryPage extends DrawnGame {
       HorizontalOptions: "Fill",
       Children: [
         Make(new SkiaLabel(), { Text: "Shop", FontSize: 18, FontFamily: Theme.Title, TextColor: Theme.Ink, AccessibilityRole: Aria.RoleHeading }),
-        // Changes while the list scrolls: a fixed box. Not IsParentIndependent as in C#: in React a stack does not
-        // re-measure such a child on draw, so its new text would never show (reported to the engine's owner).
+        // Changes while the list scrolls: a fixed box that never lays the card out again (as C#)
         this._listCount = Make(new SkiaLabel(), {
           FontSize: 13, TextColor: Theme.Muted, HorizontalOptions: "End", VerticalOptions: "Center",
-          WidthRequest: 320, HeightRequest: 20, HorizontalTextAlignment: "End",
+          WidthRequest: 320, HeightRequest: 20, HorizontalTextAlignment: "End", IsParentIndependent: true,
         }),
       ],
     });
     // Narrow, the count goes under the title.
-    this._adapt.push((width) => { header.Type = CardInner(width) >= RowBesideMin ? "Row" : "Wrap"; header.Update(); });
+    this._adapt.push((width) => {
+      const beside = CardInner(width) >= RowBesideMin;
+      header.Type = beside ? "Row" : "Wrap";
+      // under the title it takes the card's whole width, never wider than the card
+      this._listCount.WidthRequest = beside ? 320 : -1;
+      this._listCount.HorizontalOptions = beside ? "End" : "Fill";
+      this._listCount.HorizontalTextAlignment = beside ? "End" : "Start";
+      header.Update();
+    });
     return this.WideCard("3D in a scrolling list", "Thirty pieces of furniture, each with a live 3D thumbnail: point at a row to turn it, or drag a thumbnail sideways. Rows off screen draw nothing.", Make(new SkiaStack(), {
       Spacing: 10,
       Children: [

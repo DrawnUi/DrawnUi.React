@@ -12,8 +12,9 @@ export function TrackDownloads(): void {
   let got = 0;
   const show = () => {
     const pct = Math.min(99, Math.floor((got * 100) / total));
-    document.documentElement.style.setProperty("--load-pct", pct + "%");
-    document.documentElement.style.setProperty("--load-pct-text", `"${pct}%"`);
+    document.documentElement.style.setProperty("--drawnui-load-percentage", pct + "%");
+    loader.setAttribute("aria-valuenow", String(pct));
+    document.documentElement.style.setProperty("--drawnui-load-percentage-text", `"${pct}%"`);
   };
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const res = await fetchBefore(input, init);
@@ -39,5 +40,5 @@ export function HideLoader(): void {
   window.fetch = fetchBefore;
   if (!loader || loader.classList.contains("done")) return;
   loader.classList.add("done");
-  setTimeout(() => loader.remove(), 400);
+  setTimeout(() => loader.remove(), 450);
 }
