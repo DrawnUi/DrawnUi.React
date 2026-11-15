@@ -135,7 +135,8 @@
     "preview": "vite preview samples/demo",
     "check:add3d": "node dev/check.mjs dev/check-add3d.ts",
     "check:parent-independent": "node dev/check.mjs dev/check-parent-independent.ts",
-    "check:update-while-recording": "node dev/check.mjs dev/check-update-while-recording.ts"
+    "check:update-while-recording": "node dev/check.mjs dev/check-update-while-recording.ts",
+    "check:image-cache": "node dev/check.mjs dev/check-image-cache.ts"
   },
   "peerDependencies": {
     "playwright-core": ">=1.40",

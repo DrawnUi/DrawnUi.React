@@ -73,8 +73,20 @@ export class SkiaImage extends SkiaControl {
   set ImageBitmap(image: Image | undefined) {
     if (this.LoadedSource === image) return;
     this.loadGeneration++; this.IsLoading = false;
-    this.LoadedSource = image;
+    this.Show(image);
     this.Update();
+  }
+
+  /**
+   * Shows an image: the control holds it while it draws it (the image manager never deletes an image a control holds,
+   * and deletes a copy of its own once the control lets it go: SkiaImageManager.Hold / Free).
+   */
+  private Show(image: Image | undefined): void {
+    if (this.LoadedSource === image) return;
+    const old = this.LoadedSource;
+    this.LoadedSource = image;
+    SkiaImageManager.Instance.Hold(image);
+    SkiaImageManager.Instance.Free(old);
   }
   IsLoading = false;
   /** Where the scaled image was drawn last frame, canvas pixels. */
@@ -94,13 +106,21 @@ export class SkiaImage extends SkiaControl {
     if (this.source === value) return;
     this.source = value;
     const generation = ++this.loadGeneration;
-    this.LoadedSource = undefined;
+    this.Show(undefined);
     if (!value) { this.IsLoading = false; this.Update(); return; }
     this.IsLoading = true;
-    SkiaImageManager.Instance.LoadImageManagedAsync(value, undefined, this.LoadPriority).then(
-      (image) => { if (generation !== this.loadGeneration) return; this.IsLoading = false; this.LoadedSource = image; this.Update(); this.Success?.(this, value); },
-      (error: Error) => { if (generation !== this.loadGeneration) return; this.IsLoading = false; this.Error?.(this, error); },
-    );
+    SkiaImageManager.Instance.LoadImageManagedAsync(value, undefined, this.LoadPriority).then((image) => {
+      if (generation !== this.loadGeneration || this.IsDisposed) {
+        // a load nobody shows: a copy of its own goes at once, a shared image stays in the cache
+        SkiaImageManager.Instance.Hold(image); SkiaImageManager.Instance.Free(image);
+        return;
+      }
+      this.IsLoading = false;
+      if (!image) { this.Error?.(this, new Error(`DrawnUi: cannot load image '${value}'`)); return; }
+      this.Show(image);
+      this.Update();
+      this.Success?.(this, value);
+    });
   }
 
   /** Port of DrawnUi SkiaControl.RescaleAspect: per-axis scale to apply to (width, height) inside dest. */
@@ -232,6 +252,8 @@ export class SkiaImage extends SkiaControl {
 
   protected override OnDisposing(): void {
     this.tileShader?.delete(); this.tileShader = undefined; this.tileShaderKey = undefined;
+    this.loadGeneration++;
+    this.Show(undefined);
     super.OnDisposing();
   }
 }

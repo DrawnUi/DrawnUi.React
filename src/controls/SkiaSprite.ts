@@ -115,7 +115,10 @@ export class SkiaSprite extends AnimatedFramesRenderer {
   static async LoadSourceAsync(source: string): Promise<Image> {
     const cached = SkiaSprite.CachedSpriteSheets.get(source);
     if (cached) return cached;
-    const image = await SkiaImageManager.Instance.LoadImageAsync(source);
+    const image = await SkiaImageManager.Instance.LoadImageManagedAsync(source);
+    if (!image) throw new Error(`DrawnUi: cannot load sprite sheet '${source}'`);
+    // the sheets cache holds it for good (the image manager never deletes an image somebody holds)
+    SkiaImageManager.Instance.Hold(image);
     SkiaSprite.CachedSpriteSheets.set(source, image);
     return image;
   }

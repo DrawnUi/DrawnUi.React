@@ -421,9 +421,13 @@ export class ShaderDoubleTexturesEffect extends SkiaShaderEffect {
   get ControlTo(): SkiaControl | undefined { return this.controlTo; }
   set ControlTo(v: SkiaControl | undefined) { if (this.controlTo !== v) { this.controlTo = v; this.secondary?.delete(); this.secondary = undefined; } }
   get PrimarySource(): string { return this.primarySource; }
-  set PrimarySource(v: string) { if (this.primarySource !== v) { this.primarySource = v; this.primaryImage = undefined; this.LoadTexture(v, (i) => { this.primaryImage = i; this.Update(); }); } }
+  set PrimarySource(v: string) { if (this.primarySource !== v) { this.primarySource = v; this.HoldPrimary(undefined); this.LoadTexture(v, (i) => { this.HoldPrimary(i); this.Update(); }); } }
   get SecondarySource(): string { return this.secondarySource; }
-  set SecondarySource(v: string) { if (this.secondarySource !== v) { this.secondarySource = v; this.secondaryImage = undefined; this.LoadTexture(v, (i) => { this.secondaryImage = i; this.secondary?.delete(); this.secondary = undefined; this.Update(); }); } }
+  set SecondarySource(v: string) { if (this.secondarySource !== v) { this.secondarySource = v; this.HoldSecondary(undefined); this.LoadTexture(v, (i) => { this.HoldSecondary(i); this.secondary?.delete(); this.secondary = undefined; this.Update(); }); } }
+
+  /** The textures it draws are held while it draws them (SkiaImageManager.Hold / Free). */
+  private HoldPrimary(i: Image | undefined): void { const old = this.primaryImage; this.primaryImage = i; SkiaImageManager.Instance.Hold(i); SkiaImageManager.Instance.Free(old); }
+  private HoldSecondary(i: Image | undefined): void { const old = this.secondaryImage; this.secondaryImage = i; SkiaImageManager.Instance.Hold(i); SkiaImageManager.Instance.Free(old); }
 
   private controlFrom?: SkiaControl;
   private controlTo?: SkiaControl;
@@ -437,7 +441,11 @@ export class ShaderDoubleTexturesEffect extends SkiaShaderEffect {
 
   private LoadTexture(url: string, done: (image: Image) => void): void {
     if (!url) return;
-    SkiaImageManager.Instance.LoadImageAsync(url).then((i) => { if (url === this.primarySource || url === this.secondarySource) done(i); }).catch((e) => this.SendError(String(e)));
+    SkiaImageManager.Instance.LoadImageManagedAsync(url).then((i) => {
+      if (!i) { this.SendError(`DrawnUi: cannot load image '${url}'`); return; }
+      if (url !== this.primarySource && url !== this.secondarySource) { SkiaImageManager.Instance.Hold(i); SkiaImageManager.Instance.Free(i); return; }
+      done(i);
+    });
   }
 
   /** C# Resize*LoadedBitmap: the file texture spans the parent box. */
@@ -498,6 +506,8 @@ export class ShaderDoubleTexturesEffect extends SkiaShaderEffect {
     this.resizedPrimary?.image.delete(); this.resizedPrimary = undefined;
     this.resizedSecondary?.image.delete(); this.resizedSecondary = undefined;
     this.controlFrom = undefined; this.controlTo = undefined;
+    this.primarySource = this.secondarySource = "";
+    this.HoldPrimary(undefined); this.HoldSecondary(undefined);
     super.OnDisposing();
   }
 }
