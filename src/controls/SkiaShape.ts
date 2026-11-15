@@ -172,6 +172,13 @@ export class SkiaShape extends SkiaLayout {
 
   // ---- paint ----
 
+  /** C# SkiaShape: the fill's blend mode is the shape's FillBlendMode, also over a FillGradient's own. */
+  protected override CreateBackgroundPaint(rect: SKRect): import("canvaskit-wasm").Paint {
+    const paint = super.CreateBackgroundPaint(rect);
+    if (this.FillBlendMode !== "SrcOver") paint.setBlendMode(Super.CK.BlendMode[this.FillBlendMode]);
+    return paint;
+  }
+
   protected override PaintBackground(ctx: DrawingContext): void {
     const type = this.Type;
     if (type === "Arc" || type === "Line") return; // open shapes: stroke only

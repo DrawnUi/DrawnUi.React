@@ -6,6 +6,7 @@ import { ActionOnTickAnimator, type AnimatorBase, type IOverlayEffect, RippleAni
 import { Easing } from "./Easing";
 import type { Canvas } from "./Canvas";
 import type { InputKey } from "./KeyboardManager";
+import type { BlendMode } from "./ImageEffects";
 import { AccessibilityModals, Aria } from "./Accessibility";
 import { ContextMenuEventArgs, ControlTappedEventArgs, GestureEventProcessingInfo, type LockTouch, SKPoint, SkiaGesturesInfo, SkiaGesturesParameters, TouchActionEventArgs } from "./Gestures";
 import { type CachedTexture, type IPostRendererEffect, IsPostRendererEffect, type SkiaEffect } from "./SkiaEffect";
@@ -144,6 +145,8 @@ export class SkiaControl {
   BackgroundColor?: Color;
   /** Gradient painted as the background (over BackgroundColor). */
   FillGradient?: SkiaGradient;
+  /** Blend mode of the background fill, an SKBlendMode name (C# FillBlendMode); here a FillGradient's own BlendMode wins, on a SkiaShape this one does. */
+  FillBlendMode: BlendMode = "SrcOver";
   IsVisible = true;
   Tag?: string;
 
@@ -1259,6 +1262,7 @@ export class SkiaControl {
     const paint = new CK.Paint();
     paint.setAntiAlias(true);
     if (this.BackgroundColor) paint.setColor(Super.ParseColor(this.BackgroundColor));
+    if (this.FillBlendMode !== "SrcOver") paint.setBlendMode(CK.BlendMode[this.FillBlendMode]);
     if (this.FillGradient && this.FillGradientPaintsBackground()) this.SetupGradient(paint, this.FillGradient, rect);
     return paint;
   }
