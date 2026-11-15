@@ -436,6 +436,14 @@ Updated whenever the port deliberately diverges or finds something worth back-po
 
 ## SkiaImageManager
 
+### Cancels and CanReload as the Blazor head (Nick, 2026-11-15: "react should match blazor")
+- **React**: as `SkiaImageManager.Blazor.cs`: a cached load (or one waiting for `IsLoadingLocked`) whose caller's signal
+  aborts rejects with the abort (an `AbortError`; C# `Task.WaitAsync(token)` throws `OperationCanceledException`); with
+  `UseCache` off a cancelled load resolves to `undefined` (C# swallows the cancel and returns null); `CancelAll` resolves the
+  waiting loads to `undefined`; `CanReload` is raised only when `IsLoadingLocked` turns off, with no arguments.
+- **.NET (Blazor)**: `CancelAll` also cancels each waiting caller's `CancellationTokenSource`. A JS caller's
+  `AbortController` cannot be aborted by the manager, so that part has no React equivalent.
+
 ### Queue in the browser
 - **React**: `LoadImageManagedAsync` orders by priority and caps concurrent fetches at 5 like the C# semaphore; `SkiaImage.Source` goes through it (`LoadPriority`). Browsers already limit connections per host, so the cap mostly keeps decode work paced.
 

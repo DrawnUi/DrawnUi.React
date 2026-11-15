@@ -6,7 +6,11 @@
 // - ReuseBitmaps = false still caches one copy and hands each caller a copy of its own (GetFromCache too);
 // - LoadImageAsync is a direct load that does not touch the cache;
 // - keys are case-insensitive, local paths normalized; UseCache off caches nothing;
-// - a failed load is retried (EnableHttpRetry) and resolves to nothing; RegisterImage aliases; IsLoadingLocked waits.
+// - a failed load is retried (EnableHttpRetry) and resolves to nothing; RegisterImage aliases; IsLoadingLocked waits;
+// - cancels as the DrawnUi.Net Blazor head: a cached load whose caller cancels rejects with an AbortError (C# throws
+//   OperationCanceledException from WaitAsync), also while loading is locked; with UseCache off it resolves to nothing;
+//   CancelAll resolves the waiting loads to nothing; CanReload is raised only when IsLoadingLocked turns off, with no
+//   arguments, never for a failed load.
 import { Super, SkiaImageManager, SkiaImage } from "../src/index.ts";
 
 declare const CanvasKitInit: (o: { locateFile: () => string }) => Promise<any>;
@@ -28,8 +32,15 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
   const requests: string[] = [];
   let failNext = 0;
-  (globalThis as { fetch: unknown }).fetch = async (url: string) => {
+  (globalThis as { fetch: unknown }).fetch = async (url: string, init?: { signal?: AbortSignal }) => {
     requests.push(String(url));
+    if (String(url).includes("slow")) {
+      // a load that takes 150 ms and stops when its signal aborts
+      await new Promise<void>((done, fail) => {
+        const t = setTimeout(done, 150);
+        init?.signal?.addEventListener("abort", () => { clearTimeout(t); fail(new DOMException("aborted", "AbortError")); });
+      });
+    }
     if (failNext > 0) { failNext--; return new Response(null, { status: 503 }); }
     if (String(url).includes("missing")) return new Response(null, { status: 404 });
     return new Response(png.slice(), { status: 200 });
@@ -134,7 +145,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
     check("a failed load is retried (EnableHttpRetry)", !!retried && fetched("r.png") === 3, `${fetched("r.png")} fetches`);
     SkiaImageManager.EnableHttpRetry = false;
     const missing = await M.LoadImageManagedAsync("photos/missing.png");
-    check("a load that fails resolves to nothing (as .NET's null) and raises CanReload", missing === undefined && reload >= 1 && fetched("missing") === 1);
+    check("a load that fails resolves to nothing (as .NET's null) and raises no CanReload (Blazor)", missing === undefined && reload === 0 && fetched("missing") === 1, `CanReload raised ${reload} times`);
     SkiaImageManager.EnableHttpRetry = true;
     M.RegisterImage("logo", "art/logo-final.png");
     await M.PreloadImage("logo");
@@ -147,6 +158,52 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
     M.IsLoadingLocked = false;
     await waiting;
     check("IsLoadingLocked: loads wait until it is unlocked", !whileLocked && done);
+    check("unlocking raises CanReload, with no arguments (Blazor)", reload === 1);
+    M.CanReload = undefined;
+  }
+  // 6. cancels as the Blazor head
+  reset();
+  {
+    const outcome = (p: Promise<unknown>) => p.then((v) => (v === undefined ? "nothing" : "image"), (e) => (e instanceof Error || e instanceof DOMException) && (e as Error).name === "AbortError" ? "AbortError" : `error ${e}`);
+    let reload = 0;
+    M.CanReload = (...a: unknown[]) => { reload++; if (a.length) reload += 100; };
+    // in flight, the caller cancels
+    const c1 = new AbortController();
+    const inflight = outcome(M.LoadImageManagedAsync("photos/slow1.png", c1.signal));
+    await sleep(30); c1.abort();
+    check("a cached load the caller cancels while it runs rejects with an AbortError", (await inflight) === "AbortError", await inflight);
+    // waiting in the queue behind full slots, the caller cancels
+    const busy = Array.from({ length: SkiaImageManager.MaxParallelLoads }, (_, i) => M.LoadImageManagedAsync(`photos/slow-busy${i}.png`));
+    const c2 = new AbortController();
+    const queued = outcome(M.LoadImageManagedAsync("photos/queued.png", c2.signal));
+    await sleep(10); c2.abort();
+    check("a cached load the caller cancels while it waits rejects with an AbortError", (await queued) === "AbortError", await queued);
+    await Promise.all(busy);
+    // already cancelled
+    const c3 = new AbortController(); c3.abort();
+    check("a cached load asked with a cancelled signal rejects with an AbortError", (await outcome(M.LoadImageManagedAsync("photos/pre.png", c3.signal))) === "AbortError");
+    // locked, the caller cancels
+    M.IsLoadingLocked = true;
+    const c4 = new AbortController();
+    const locked = outcome(M.LoadImageManagedAsync("photos/locked2.png", c4.signal));
+    await sleep(10); c4.abort();
+    check("a load waiting for IsLoadingLocked that the caller cancels rejects with an AbortError", (await locked) === "AbortError", await locked);
+    M.IsLoadingLocked = false;
+    reload = 0;
+    // UseCache off: a cancel resolves to nothing
+    SkiaImageManager.UseCache = false;
+    const c5 = new AbortController();
+    const nocache = outcome(M.LoadImageManagedAsync("photos/slow5.png", c5.signal));
+    await sleep(30); c5.abort();
+    check("UseCache off: a load the caller cancels resolves to nothing", (await nocache) === "nothing", await nocache);
+    SkiaImageManager.UseCache = true;
+    // CancelAll: the waiting loads resolve to nothing
+    const busy2 = Array.from({ length: SkiaImageManager.MaxParallelLoads }, (_, i) => M.LoadImageManagedAsync(`photos/slow-b2${i}.png`));
+    const dropped = outcome(M.LoadImageManagedAsync("photos/dropped.png"));
+    await sleep(10); M.CancelAll();
+    check("CancelAll: a waiting load resolves to nothing", (await dropped) === "nothing", await dropped);
+    await Promise.all(busy2);
+    check("no CanReload for cancels", reload === 0, `${reload}`);
     M.CanReload = undefined;
   }
 
