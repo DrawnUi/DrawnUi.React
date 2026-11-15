@@ -541,13 +541,28 @@ export class SkiaAccessibilityManager {
       });
     }
     list = SayNamesOnce(list);
-    list.sort((a, b) => a.Rect.Top - b.Rect.Top || a.Rect.Left - b.Rect.Left);
-    // reading order: nodes whose tops are within half the smaller height form one row, read left to right, so a row of
-    // vertically centered controls of different heights keeps its visual order (C# RectComparer + LeftComparer)
+    // reading order by position inside the nearest scroll two nodes share: a node inside a scroll is placed by the
+    // scroll's box among the nodes outside it, so content scrolled past a header or a footer that stay never reads before
+    // the header or after the footer (the order does not change while the page scrolls)
+    const scrolls = new Map<AccessibilityNode, SkiaControl[]>(list.map((x) => [x, ScrollsAround(x.Source)]));
+    list.sort((a, b) => {
+      const sa = scrolls.get(a)!, sb = scrolls.get(b)!;
+      let i = 0;
+      while (i < sa.length && i < sb.length && sa[i] === sb[i]) i++;
+      const ra = i < sa.length ? sa[i].DrawingRect : undefined, rb = i < sb.length ? sb[i].DrawingRect : undefined;
+      const ta = ra ? ra.Top / scale : a.Rect.Top, tb = rb ? rb.Top / scale : b.Rect.Top;
+      const la = ra ? ra.Left / scale : a.Rect.Left, lb = rb ? rb.Left / scale : b.Rect.Left;
+      // at the same place a scroll that is a node itself reads before what it holds
+      return ta - tb || la - lb || (ra ? 1 : 0) - (rb ? 1 : 0);
+    });
+    // reading order: nodes of the same scroll whose tops are within half the smaller height form one row, read left to
+    // right, so a row of vertically centered controls of different heights keeps its visual order (C# RectComparer +
+    // LeftComparer)
+    const sameScroll = (a: AccessibilityNode, b: AccessibilityNode) => scrolls.get(a)!.at(-1) === scrolls.get(b)!.at(-1);
     for (let start = 0, i = 1; i <= list.length; i++) {
       if (i < list.length) {
         const first = list[start].Rect, next = list[i].Rect;
-        if (next.Top - first.Top < Math.min(first.Height, next.Height) / 2) continue;
+        if (sameScroll(list[start], list[i]) && Math.abs(next.Top - first.Top) < Math.min(first.Height, next.Height) / 2) continue;
       }
       if (i - start > 1) {
         const row = list.slice(start, i).sort((a, b) => a.Rect.Left - b.Rect.Left);
@@ -760,6 +775,13 @@ function FindTarget(item: SkiaControl): SkiaControl | undefined {
   if (item.IsAccessibilityElement && item.AccessibilityCanInteract) return item;
   for (const child of ViewsOf(item)) { const found = FindTarget(child); if (found) return found; }
   return undefined;
+}
+
+/** The scrolls a control is inside, outermost first. */
+function ScrollsAround(control: SkiaControl): SkiaControl[] {
+  const out: SkiaControl[] = [];
+  for (let p = control.Parent; p; p = p.Parent) if (asScroll(p)) out.unshift(p);
+  return out;
 }
 
 /** True when any ancestor is hidden (IsVisible false or Opacity 0): the subtree is not drawn, so it gets no nodes. */
