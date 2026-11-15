@@ -190,10 +190,20 @@ export class TextSelectionDrag {
  * order (the browser would run them together). True when it set the clipboard.
  */
 export function CopyOverlaySelection(e: ClipboardEvent, overlay: HTMLElement | undefined): boolean {
-  const sel = getSelection();
-  if (!overlay || !sel || sel.isCollapsed || sel.rangeCount === 0 || !e.clipboardData) return false;
+  if (!e.clipboardData) return false;
+  const parts = OverlaySelectionParts(overlay);
+  if (parts.length < 2) return false; // one label: the browser's own copy is right
+  e.clipboardData.setData("text/plain", parts.join("\n"));
+  e.preventDefault();
+  return true;
+}
+
+/** The overlay's selected text: each label's selected part in reading order (empty when nothing there is selected). */
+export function OverlaySelectionParts(overlay: HTMLElement | undefined): string[] {
+  const sel = typeof getSelection === "function" ? getSelection() : null;
+  if (!overlay || !sel || sel.isCollapsed || sel.rangeCount === 0) return [];
   const range = sel.getRangeAt(0);
-  if (!overlay.contains(range.commonAncestorContainer) && !overlay.contains(range.startContainer)) return false;
+  if (!overlay.contains(range.commonAncestorContainer) && !overlay.contains(range.startContainer)) return [];
   const parts: string[] = [];
   overlay.querySelectorAll<HTMLElement>(".drawnui-a11y-text").forEach((label) => {
     if (!range.intersectsNode(label)) return;
@@ -204,8 +214,5 @@ export function CopyOverlaySelection(e: ClipboardEvent, overlay: HTMLElement | u
     const text = r.toString();
     if (text) parts.push(text);
   });
-  if (parts.length < 2) return false; // one label: the browser's own copy is right
-  e.clipboardData.setData("text/plain", parts.join("\n"));
-  e.preventDefault();
-  return true;
+  return parts;
 }

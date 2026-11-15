@@ -66,6 +66,8 @@ export class SkiaLabel extends SkiaControl {
 
   /** Set to `Aria.RoleText` to expose every label to screen readers (React extension; C# is opt-in per control). */
   static override DefaultAccessibilityRole?: string;
+  /** The highlight over selected text (AccessibilityTextSelectable), for every label (C# SkiaLabel.TextSelectionColor). */
+  static TextSelectionColor = "rgba(110,168,254,.55)";
   /** Like C# OnTextInternalChanged: the spoken label is the text (or the joined spans) unless AccessibilityLabel is set. */
   protected override DefaultAccessibilityLabel(): string | undefined {
     return this.Spans.length > 0 ? this.Spans.map((s) => s.Text).join("") : this.text || undefined;

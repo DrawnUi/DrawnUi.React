@@ -8,7 +8,7 @@ import type { PopupAnchor, PopupId, PopupWindowOptions } from "../core/PopupWind
 import type { SKPoint } from "../core/Gestures";
 import type { SKRect } from "../core/Types";
 import type { Thickness, ThicknessValue } from "../core/Types";
-import type { SkiaLabel as SkiaLabelCtrl } from "../controls/SkiaLabel";
+import { SkiaLabel as SkiaLabelCtrl } from "../controls/SkiaLabel";
 import type { TextSpan as TextSpanCtrl } from "../controls/TextSpan";
 import type { SkiaRichLabel as SkiaRichLabelCtrl } from "../controls/SkiaRichLabel";
 import type { SkiaLabelFps as SkiaLabelFpsCtrl } from "../controls/SkiaLabelFps";
@@ -258,7 +258,7 @@ const A11Y_CSS = `
 .drawnui-a11y-node:focus-visible{outline:3px solid rgba(13,110,253,.85);outline-offset:1px;border-radius:3px}
 .drawnui-a11y-text{overflow:visible}
 .drawnui-a11y-text>span{position:absolute;white-space:pre;color:transparent;user-select:text;-webkit-user-select:text;pointer-events:auto;cursor:text;line-height:1;font-kerning:none;font-feature-settings:"kern" 0,"liga" 0,"calt" 0;text-rendering:geometricPrecision}
-.drawnui-a11y-text>span::selection{background:rgba(110,168,254,.55);color:transparent}
+.drawnui-a11y-text>span::selection{background:var(--drawnui-text-selection);color:transparent}
 `;
 
 const NAVIGATION_KEYS = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"]);
@@ -385,7 +385,7 @@ function AccessibilityOverlay({ view }: { view: CanvasView }) {
   return (
     <div className="drawnui-a11y-overlay" onScroll={pin} ref={overlayRef}
       role={modal ? modalNode?.Role ?? "dialog" : undefined} aria-label={modalNode?.Label} aria-modal={modal ? true : undefined}>
-      <style>{A11Y_CSS}</style>
+      <style>{A11Y_CSS + `.drawnui-a11y-overlay{--drawnui-text-selection:${SkiaLabelCtrl.TextSelectionColor}}`}</style>
       {nodes.map((n) => {
         if (n === modalNode || (modal && n.Source === modal)) return null;
         const pos: CSSProperties = { left: n.Rect.Left, top: n.Rect.Top, width: n.Rect.Width, height: n.Rect.Height };
@@ -447,10 +447,10 @@ function AccessibilityOverlay({ view }: { view: CanvasView }) {
             }}
             onPointerUp={() => { clearTimeout(textPress.current.Timer); textPress.current.Timer = 0; }}
             onContextMenu={(e) => {
+              // touch: the word under the finger is selected first (6cb); a right click keeps the selection as it is
               const pointerType = (e.nativeEvent as PointerEvent).pointerType;
-              if (pointerType !== "touch" && pointerType !== "pen") return;
-              SelectWordAt(e.clientX, e.clientY);
-              if (view.RaiseTouchContextMenu(e.clientX, e.clientY, e.nativeEvent)) e.preventDefault();
+              if (pointerType === "touch" || pointerType === "pen") SelectWordAt(e.clientX, e.clientY);
+              if (view.ContextMenuFromText(e.nativeEvent)) e.preventDefault();
             }}>
             {n.TextLines.map((l, i) => (
               <span key={i} data-w={l.Width} style={{ left: l.Left, top: l.Top, height: l.Height, fontFamily: l.FontFamily, fontWeight: l.FontWeight, fontSize: l.FontSize, lineHeight: `${l.Height}px` }}>{l.Text}{i < n.TextLines!.length - 1 ? "\n" : ""}</span>

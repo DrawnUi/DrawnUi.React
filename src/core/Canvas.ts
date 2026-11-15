@@ -7,7 +7,7 @@ import { HoverManager } from "./Hover";
 import { TooltipController, type TooltipStyleLike } from "./Tooltips";
 import { PopupAnchor, PopupLayer, type PopupId, type PopupWindowOptions } from "./PopupWindows";
 import { KeyboardManager, type InputKey } from "./KeyboardManager";
-import { CopyOverlaySelection, TextSelectionDrag, type TextSelectionHost } from "./TextSelectionDrag";
+import { CopyOverlaySelection, OverlaySelectionParts, TextSelectionDrag, type TextSelectionHost } from "./TextSelectionDrag";
 import { type Color, Colors, type RenderingModeType, SKRect } from "./Types";
 import {
   ContextMenuEventArgs, type ContextMenuSource,
@@ -632,6 +632,26 @@ export class Canvas {
     return undefined;
   }
   private readonly onCopy = (e: ClipboardEvent) => { CopyOverlaySelection(e, this.OverlayElement); };
+  /** The page's selected text (C# DrawnView.SelectedText): the selected parts of its selectable labels, joined by new lines. */
+  get SelectedText(): string { return OverlaySelectionParts(this.OverlayElement).join("\n"); }
+  /** Copies the page's selected text to the clipboard (C# CopyTextSelection); false when nothing is selected. */
+  CopyTextSelection(): boolean {
+    const text = this.SelectedText;
+    if (!text) return false;
+    void navigator.clipboard?.writeText(text).catch(() => {});
+    return true;
+  }
+  /** Clears the page's text selection (C# ClearTextSelection). */
+  ClearTextSelection(): void { if (OverlaySelectionParts(this.OverlayElement).length) getSelection()?.removeAllRanges(); }
+  /**
+   * A right click (or the Menu key) on the overlay's selectable text (the React overlay calls it): the context menu of
+   * the label under it, as on the canvas; true when a handler took it (the browser's own menu is then not shown).
+   */
+  ContextMenuFromText(e: MouseEvent): boolean {
+    const pointerType = (e as PointerEvent).pointerType;
+    if (pointerType === "touch" || pointerType === "pen") return this.RaiseTouchContextMenu(e.clientX, e.clientY, e);
+    return this.RaiseContextMenu(e.clientX, e.clientY, pointerType === "mouse" || e.button === 2 ? "mouse" : "keyboard", e);
+  }
   /** A mouse press on the overlay's selectable text (the React overlay calls it): its drag may scroll the text's scroll. */
   FollowTextSelection(e: PointerEvent): void { this.textSelection.FollowNative(e); }
 
