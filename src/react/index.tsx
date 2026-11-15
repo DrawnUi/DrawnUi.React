@@ -406,13 +406,15 @@ function AccessibilityOverlay({ view }: { view: CanvasView }) {
                 const next = view.AccessibilityManager.NextTabStop(n.Source, !e.shiftKey);
                 if (next) elementOf(next.AccessibilityId)?.focus({ preventScroll: true });
               }
+              // a list whose cells are made on demand: Tab goes on to the next item, scrolling it in (ac70a1d9)
+              else if (e.key === "Tab" && view.AccessibilityManager.TabThroughList(n.Source, !e.shiftKey)) e.preventDefault();
               else if (NAVIGATION_KEYS.has(e.key) && SkiaAccessibilityManager.Key(n.Source, e.key)) { e.preventDefault(); KeyboardManager.MarkKeyHandled(e.nativeEvent.code); }
             }}
             onFocus={(e) => {
               focusedId.current = n.Id;
               pin({ currentTarget: e.currentTarget.parentElement as HTMLDivElement } as React.SyntheticEvent<HTMLDivElement>);
               // inside every enclosing scroll; the overlay follows that scroll, so the next Tab finds the controls it brings in
-              if (SkiaScrollCtrl.EnsureVisible(n.Source, KeyboardScrollSecs)) view.AccessibilityManager.FollowScroll(KeyboardScrollSecs * 1000 + 150);
+              view.AccessibilityManager.FollowScroll(SkiaScrollCtrl.EnsureVisible(n.Source, KeyboardScrollSecs));
               if (tabbingOut.current === n.Id) tabbingOut.current = 0; // leaving a text field: it keeps no caret
               else n.Source.OnAccessibilityFocused(true); // a text field takes the caret, as after a click
               n.Source.NotifyAccessibilityFocused(true);

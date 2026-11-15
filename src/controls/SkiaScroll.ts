@@ -577,11 +577,11 @@ export class SkiaScroll extends SkiaControl {
   /** Scroll to an offset in points; maxSpeedSecs > 0 animates along the deceleration curve. */
   /**
    * Scrolls every SkiaScroll ancestor of `control` so its DrawingRect lies inside the viewport (React extension,
-   * used by the accessibility overlay when keyboard focus lands on an off-screen node). Offsets are points. True when a
-   * scroll moves.
+   * used by the accessibility overlay when keyboard focus lands on an off-screen node). Offsets are points. Returns the
+   * scrolls that move.
    */
-  static EnsureVisible(control: SkiaControl, maxTimeSecs = 0.25, paddingPts = 8): boolean {
-    let moved = false;
+  static EnsureVisible(control: SkiaControl, maxTimeSecs = 0.25, paddingPts = 8): SkiaScroll[] {
+    const moved: SkiaScroll[] = [];
     let p = control.Parent;
     while (p) {
       if (p instanceof SkiaScroll) {
@@ -592,7 +592,7 @@ export class SkiaScroll extends SkiaControl {
         else if (r.Bottom > v.Bottom) dy = -((r.Bottom - v.Bottom) / scale + paddingPts);
         if (r.Left < v.Left) dx = (v.Left - r.Left) / scale + paddingPts;
         else if (r.Right > v.Right) dx = -((r.Right - v.Right) / scale + paddingPts);
-        if (dx !== 0 || dy !== 0) { p.ScrollTo(p.offsetX + dx, p.offsetY + dy, maxTimeSecs); moved = true; }
+        if (dx !== 0 || dy !== 0) { p.ScrollTo(p.offsetX + dx, p.offsetY + dy, maxTimeSecs); moved.push(p); }
       }
       p = p.Parent;
     }

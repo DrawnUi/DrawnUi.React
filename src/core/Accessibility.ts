@@ -388,6 +388,34 @@ export class SkiaAccessibilityManager {
   }
 
   /**
+   * Tab and Shift+Tab through a templated list whose cells are made on demand (DrawnUi.Net ac70a1d9): from a cell the
+   * keyboard goes to the next (previous) item, scrolled in and focused once drawn, unless the next stop is in the same
+   * cell; at the list's end it leaves the list. Entering the list it goes to its first (last) item. The overlay's DOM order
+   * lags the cells made while the list scrolls, so inside a list the browser's own Tab order is not used. True when it
+   * took the key.
+   */
+  TabThroughList(from: SkiaControl, forward: boolean): boolean {
+    if (this.KeyboardScope) return false;
+    const next = this.NextTabStop(from, forward);
+    const here = TemplatedCellOf(from), there = next ? TemplatedCellOf(next) : undefined;
+    let list: SkiaControl, target: number;
+    if (here) {
+      const step = forward ? 1 : -1;
+      if (there && there.Cell === here.Cell) return false; // the next stop is in the same cell: the usual order
+      // a Tab while the previous one is still scrolling its item in goes on from that item (as the arrow keys)
+      const pending = this.groupRequest?.Group === here.List ? this.groupRequest.Index : undefined;
+      list = here.List; target = (pending ?? here.Cell.ContextIndex) + step;
+    } else if (there) {
+      list = there.List; target = forward ? 0 : ItemCount(list) - 1;
+      if (there.Cell.ContextIndex === target) return false;
+    } else return false;
+    if (target < 0 || target >= ItemCount(list)) return false;
+    this.groupRequest = { Group: list, Scroll: FindScroll(list), Index: target, Step: forward ? 1 : -1, Deadline: performance.now() + 3000, ScrollIssued: false };
+    list.Superview?.Update();
+    return true;
+  }
+
+  /**
    * A popup window just opened: at the end of the frame that draws it, the keyboard goes to its arrow-key group's current
    * choice (a checked radio, menuitemradio, option or tab), else to its first interactive item, however it was opened.
    */
@@ -465,14 +493,18 @@ export class SkiaAccessibilityManager {
 
   ForceRebuildOnNextFrame(): void { this.lastRebuild = -Infinity; this.dirty = true; }
 
-  /** Until when every drawn frame rebuilds the overlay (FollowScroll). */
-  private followUntil = 0;
+  /** The scrolls moving the keyboard's control into view, and when each was asked (FollowScroll). */
+  private readonly following = new Map<{ IsScrolling: boolean }, number>();
   /**
-   * A scroll is bringing the keyboard's control into view for `ms`: every frame it draws rebuilds the overlay, so the
-   * controls it brings near are there for the next Tab (the timed rebuild could come a second later, and Tab would fall
-   * out of the canvas).
+   * Scrolls are bringing the keyboard's control into view: every frame they draw rebuilds the overlay until each has
+   * stopped, so the overlay's rects are where the controls are and the controls they bring near are there for the next
+   * Tab (the timed rebuild could come a second later, and Tab would fall out of the canvas).
    */
-  FollowScroll(ms: number): void { this.followUntil = performance.now() + ms; this.dirty = true; }
+  FollowScroll(scrolls: { IsScrolling: boolean }[]): void {
+    const now = performance.now();
+    for (const s of scrolls) this.following.set(s, now);
+    if (scrolls.length) this.dirty = true;
+  }
 
   Unregister(node: SkiaControl): void {
     if (this.nodes.delete(node)) { node.OnAccessibilityUnregistered(); this.dirty = true; }
@@ -503,7 +535,12 @@ export class SkiaAccessibilityManager {
     this.appFocusThisFrame = false;
     if (this.nodes.size === 0 && this.Snapshot.length === 0) return;
     const now = performance.now();
-    if (now < this.followUntil) { this.Rebuild(scale, canvasWidthPx, canvasHeightPx); return; }
+    if (this.following.size > 0) {
+      this.Rebuild(scale, canvasWidthPx, canvasHeightPx);
+      // a scroll is followed until it stopped (its animation starts with the next frame; 3 s at most)
+      for (const [s, at] of this.following) if ((!s.IsScrolling && now - at > 50) || now - at > 3000) this.following.delete(s);
+      return;
+    }
     const wait = this.MinUpdateIntervalMs - (now - this.lastRebuild);
     // a live region whose text changed is read on the next frame, not at the next timed rebuild (accessibility-plan B2)
     if (wait > 0 && this.liveSaid.size > 0 && this.LiveChanged()) { this.Rebuild(scale, canvasWidthPx, canvasHeightPx); return; }
@@ -774,6 +811,12 @@ function PageSize(scroll: GroupScroll, item: SkiaControl, vertical: boolean): nu
 function FindTarget(item: SkiaControl): SkiaControl | undefined {
   if (item.IsAccessibilityElement && item.AccessibilityCanInteract) return item;
   for (const child of ViewsOf(item)) { const found = FindTarget(child); if (found) return found; }
+  return undefined;
+}
+
+/** The cell of a templated layout that holds a control, and that layout. */
+function TemplatedCellOf(control: SkiaControl): { List: SkiaControl; Cell: SkiaControl } | undefined {
+  for (let c: SkiaControl | undefined = control; c?.Parent; c = c.Parent) if (asLayout(c.Parent)?.IsTemplated) return { List: c.Parent, Cell: c };
   return undefined;
 }
 
