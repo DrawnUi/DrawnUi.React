@@ -717,7 +717,7 @@ export class GalleryPage extends DrawnGame {
     });
     // The whole field scaled down to the card when the card is narrower than it.
     this._adapt.push((width) => { field.HeightRequest = Math.round((FieldHeight * Math.min(CardInner(width), FieldWidth)) / FieldWidth); field.Update(); });
-    return this.WideCard("Mobs on a 2D field",
+    return this.WideCard("3D mobs on a 2D field",
       "Many 3D monsters from one model, moved like sprites and drawn by one layer in one pass. Tap one to hit it.", Make(new SkiaStack(), {
         Spacing: 10,
         Children: [
