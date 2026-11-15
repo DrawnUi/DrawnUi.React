@@ -259,6 +259,7 @@ const A11Y_CSS = `
 .drawnui-a11y-text{overflow:visible}
 .drawnui-a11y-text>span{position:absolute;white-space:pre;color:transparent;user-select:text;-webkit-user-select:text;pointer-events:auto;cursor:text;line-height:1;font-kerning:none;font-feature-settings:"kern" 0,"liga" 0,"calt" 0;text-rendering:geometricPrecision}
 .drawnui-a11y-text>span::selection{background:var(--drawnui-text-selection);color:transparent}
+.drawnui-a11y-node[role=link]>span,.drawnui-a11y-node[role=button]>span{cursor:pointer}
 `;
 
 const NAVIGATION_KEYS = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"]);
@@ -405,15 +406,49 @@ function AccessibilityOverlay({ view }: { view: CanvasView }) {
         if (n === modalNode || (modal && n.Source === modal)) return null;
         const pos: CSSProperties = { left: n.Rect.Left, top: n.Rect.Top, width: n.Rect.Width, height: n.Rect.Height };
         const activate = () => SkiaAccessibilityManager.Activate(n.Source);
+        // selectable text (AccessibilityTextSelectable): one positioned span per drawn line, in the drawn font, so the browser
+        // selects and copies it like HTML; a control with selectable text (a link) keeps its role and takes part in the
+        // page selection too
+        const lines = n.TextLines?.map((l, i) => (
+          <span key={i} data-w={l.Width} style={{ left: l.Left, top: l.Top, height: l.Height, fontFamily: l.FontFamily, fontWeight: l.FontWeight, fontSize: l.FontSize, lineHeight: `${l.Height}px` }}>{l.Text}{i < n.TextLines!.length - 1 ? "\n" : ""}</span>
+        ));
+        const textEvents = {
+          // a long press on touch raises the context menu once (6cb): the browser's contextmenu (Android) or the press's own timer (iOS)
+          onPointerDown: (e: React.PointerEvent) => {
+            if (e.pointerType === "mouse") { view.FollowTextSelection(e.nativeEvent); return; }
+            view.StartTouchPress();
+            const x = e.clientX, y = e.clientY;
+            clearTimeout(textPress.current.Timer);
+            textPress.current = { X: x, Y: y, Timer: window.setTimeout(() => { SelectWordAt(x, y); view.RaiseTouchContextMenu(x, y); }, CanvasView.LongPressTimeMs) };
+          },
+          onPointerMove: (e: React.PointerEvent) => {
+            const p = textPress.current;
+            if (e.pointerType !== "mouse" && p.Timer && Math.hypot(e.clientX - p.X, e.clientY - p.Y) > CanvasView.TappedCancelMoveThresholdPoints) { clearTimeout(p.Timer); p.Timer = 0; }
+            // the control under the text hovers as over the canvas (a link lights up)
+            if (e.pointerType === "mouse" && e.buttons === 0) view.HoverFromOverlay(e.nativeEvent);
+          },
+          onPointerUp: () => { clearTimeout(textPress.current.Timer); textPress.current.Timer = 0; },
+          onContextMenu: (e: React.MouseEvent) => {
+            // touch: the word under the finger is selected first (6cb); a right click keeps the selection as it is
+            const pointerType = (e.nativeEvent as PointerEvent).pointerType;
+            if (pointerType === "touch" || pointerType === "pen") SelectWordAt(e.clientX, e.clientY);
+            if (view.ContextMenuFromText(e.nativeEvent)) e.preventDefault();
+          },
+        };
         return n.CanInteract ? (
           <div key={n.Id} data-a11y-id={n.Id} role={n.Role} aria-label={n.Label} title={n.Hint} {...valueAttributes(n)}
             aria-pressed={n.Role === "button" ? n.IsPressed : undefined}
             aria-expanded={n.Expanded} aria-haspopup={n.Expanded !== undefined && n.Role === "menuitem" ? "menu" : undefined}
             aria-checked={n.Role === "switch" || n.Role === "checkbox" || n.Role === "radio" ? n.IsPressed : undefined}
             aria-live={n.Live as "polite" | "assertive" | undefined}
-            tabIndex={view.AccessibilityManager.IsTabStop(n.Source) ? 0 : -1} className="drawnui-a11y-node" style={{ ...pos, fontSize: 0, userSelect: "none" }}
-            onClick={activate}
-            onContextMenu={(e) => { if (view.OpenContextMenuFromKeyboard(n.Source, e.nativeEvent)) e.preventDefault(); }}
+            tabIndex={view.AccessibilityManager.IsTabStop(n.Source) ? 0 : -1} className={lines ? "drawnui-a11y-node drawnui-a11y-text" : "drawnui-a11y-node"} style={{ ...pos, fontSize: 0, userSelect: "none" }}
+            {...(lines ? textEvents : {})}
+            // a click that ends a selection over its text does not activate it
+            onClick={(e) => { if (!lines || e.target === e.currentTarget || getSelection()?.isCollapsed !== false) activate(); }}
+            onContextMenu={(e) => {
+              if (lines && e.target !== e.currentTarget) { textEvents.onContextMenu(e); return; } // on its text: as selectable text
+              if (view.OpenContextMenuFromKeyboard(n.Source, e.nativeEvent)) e.preventDefault();
+            }}
             onKeyDown={(e) => {
               // the canvas navigation gets the key first; the app's KeyDown runs after it with IsKeyHandled (6az)
               if (e.key === "Enter" || e.key === " ") { e.preventDefault(); if (activate()) KeyboardManager.MarkKeyHandled(e.nativeEvent.code); }
@@ -443,33 +478,12 @@ function AccessibilityOverlay({ view }: { view: CanvasView }) {
               n.Source.OnAccessibilityFocused(false);
               n.Source.NotifyAccessibilityFocused(false);
             }}>
-            {n.Label}
+            {lines ?? n.Label}
           </div>
         ) : n.TextLines ? (
           // AccessibilityTextSelectable: one positioned span per drawn line, in the drawn font, so the browser selects and copies it like HTML
-          <div key={n.Id} role={n.Role} title={n.Hint} aria-disabled={n.Disabled || undefined} aria-live={n.Live as "polite" | "assertive" | undefined} className="drawnui-a11y-node drawnui-a11y-text" style={pos}
-            // a long press on touch raises the context menu once (6cb): the browser's contextmenu (Android) or the press's own timer (iOS)
-            onPointerDown={(e) => {
-              if (e.pointerType === "mouse") { view.FollowTextSelection(e.nativeEvent); return; }
-              view.StartTouchPress();
-              const x = e.clientX, y = e.clientY;
-              clearTimeout(textPress.current.Timer);
-              textPress.current = { X: x, Y: y, Timer: window.setTimeout(() => { SelectWordAt(x, y); view.RaiseTouchContextMenu(x, y); }, CanvasView.LongPressTimeMs) };
-            }}
-            onPointerMove={(e) => {
-              const p = textPress.current;
-              if (e.pointerType !== "mouse" && p.Timer && Math.hypot(e.clientX - p.X, e.clientY - p.Y) > CanvasView.TappedCancelMoveThresholdPoints) { clearTimeout(p.Timer); p.Timer = 0; }
-            }}
-            onPointerUp={() => { clearTimeout(textPress.current.Timer); textPress.current.Timer = 0; }}
-            onContextMenu={(e) => {
-              // touch: the word under the finger is selected first (6cb); a right click keeps the selection as it is
-              const pointerType = (e.nativeEvent as PointerEvent).pointerType;
-              if (pointerType === "touch" || pointerType === "pen") SelectWordAt(e.clientX, e.clientY);
-              if (view.ContextMenuFromText(e.nativeEvent)) e.preventDefault();
-            }}>
-            {n.TextLines.map((l, i) => (
-              <span key={i} data-w={l.Width} style={{ left: l.Left, top: l.Top, height: l.Height, fontFamily: l.FontFamily, fontWeight: l.FontWeight, fontSize: l.FontSize, lineHeight: `${l.Height}px` }}>{l.Text}{i < n.TextLines!.length - 1 ? "\n" : ""}</span>
-            ))}
+          <div key={n.Id} role={n.Role} title={n.Hint} aria-disabled={n.Disabled || undefined} aria-live={n.Live as "polite" | "assertive" | undefined} className="drawnui-a11y-node drawnui-a11y-text" style={pos} {...textEvents}>
+            {lines}
           </div>
         ) : (
           // static text is exposed as real (transparent) text content; aria-label only for roles that need a name

@@ -46,7 +46,7 @@ async function run(name, type) {
       const errors = [];
       page.on("pageerror", (e) => errors.push(String(e).slice(0, 160)));
       await page.goto(`${base}/?r=shapes#/shapes`); await sleep(2500);
-      await page.evaluate(async ([src, m]) => { (await import(src)).Mount(m); }, [`${base}/@fs/${process.cwd().replace(/\\/g, "/")}/dev/fixtures/TabFixture.tsx`, mode]);
+      await page.evaluate(async ([src, m]) => { (await import(src)).Mount(m); }, [`${base}/@fs/${process.cwd().replace(/\\/g, "/")}/dev/fixtures/TabFixture.tsx?v=${Date.now()}`, mode]);
       await sleep(2500);
       // start from the fixture's Back button
       await page.evaluate(() => [...document.querySelectorAll("[aria-label]")].filter((e) => e.getAttribute("aria-label") === "Back").pop()?.focus());

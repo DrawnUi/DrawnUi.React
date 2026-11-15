@@ -652,6 +652,15 @@ export class Canvas {
     if (pointerType === "touch" || pointerType === "pen") return this.RaiseTouchContextMenu(e.clientX, e.clientY, e);
     return this.RaiseContextMenu(e.clientX, e.clientY, pointerType === "mouse" || e.button === 2 ? "mouse" : "keyboard", e);
   }
+  /** A mouse move over the overlay's selectable text (the React overlay calls it): hover and tooltips as over the canvas. */
+  HoverFromOverlay(e: PointerEvent): void {
+    if (e.pointerType !== "mouse" || this.activeTouchIds.size > 0) return;
+    const r = this.Element.getBoundingClientRect(), k = this.RenderingScale;
+    const hx = (e.clientX - r.left) * k, hy = (e.clientY - r.top) * k;
+    this.Hover.Move(this.content, hx, hy);
+    this.tooltip.OnPointerMove(this.Hover.Path, hx, hy);
+    if (this.popups.HasAny) this.popups.PointerAt(hx, hy);
+  }
   /** A mouse press on the overlay's selectable text (the React overlay calls it): its drag may scroll the text's scroll. */
   FollowTextSelection(e: PointerEvent): void { this.textSelection.FollowNative(e); }
 

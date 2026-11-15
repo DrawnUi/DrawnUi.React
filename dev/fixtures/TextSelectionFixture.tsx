@@ -16,6 +16,8 @@ export function Mount(): void {
       <SkiaStack Padding={new Thickness(40, 30)} Spacing={24} HorizontalOptions="Fill">
         {label("Alpha label one")}
         {label("Bravo label two")}
+        <SkiaLabel AccessibilityTextSelectable Text="Delta link" FontSize={16} TextColor="#FFD06E" AccessibilityRole="link" AccessibilityLabel="Delta link"
+          Tapped={() => { (window as unknown as { __linkTaps: number }).__linkTaps = ((window as unknown as { __linkTaps?: number }).__linkTaps ?? 0) + 1; }} />
         {label("Charlie label three")}
         <SkiaButton Text="Button" WidthRequest={120} />
         <SkiaScroll HeightRequest={200} HorizontalOptions="Fill" BackgroundColor="#222222">

@@ -23,7 +23,7 @@ async function run(name, type) {
     const errors = [];
     page.on("pageerror", (e) => errors.push(String(e).slice(0, 160)));
     await page.goto(`${base}/?r=a11y#/a11y`); await sleep(3000);
-    await page.evaluate(async (src) => { (await import(src)).Mount(); }, `${base}/@fs/${process.cwd().replace(/\\/g, "/")}/dev/fixtures/TextSelectionFixture.tsx`);
+    await page.evaluate(async (src) => { (await import(src)).Mount(); }, `${base}/@fs/${process.cwd().replace(/\\/g, "/")}/dev/fixtures/TextSelectionFixture.tsx?v=${Date.now()}`);
     await sleep(2500);
     const rect = (text) => page.evaluate((t) => { const s = [...document.querySelectorAll(".drawnui-a11y-text > span")].find((x) => x.textContent.startsWith(t)); if (!s) return null; const r = s.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; }, text);
     const sel = () => page.evaluate(() => String(getSelection()));
@@ -42,10 +42,26 @@ async function run(name, type) {
     const c = await rect("Charlie");
     await drag(a.x + 5, a.y - 12, c.x + c.w * 0.4, c.y + c.h / 2);
     const s2 = await sel();
-    check(`${name}: a drag from above the first label to the middle of the third selects across them`, /^Alpha label one\s*Bravo label two\s*Charlie/.test(s2) && !s2.includes("three"), s2);
+    check(`${name}: a drag from above the first label to the middle of the last selects across them, the link too`, /^Alpha label one\s*Bravo label two\s*Delta link\s*Charlie/.test(s2) && !s2.includes("three"), s2);
     // what a copy gives (a copy event, as Ctrl+C sends; the handler fills its clipboard data)
-    const copied = await page.evaluate(() => { const dt = new DataTransfer(); document.dispatchEvent(new ClipboardEvent("copy", { clipboardData: dt, bubbles: true, cancelable: true })); return dt.getData("text/plain"); });
-    check(`${name}: copy joins the labels with new lines`, /^Alpha label one\nBravo label two\nCharlie/.test(copied), copied);
+    const copy = () => page.evaluate(() => { const dt = new DataTransfer(); document.dispatchEvent(new ClipboardEvent("copy", { clipboardData: dt, bubbles: true, cancelable: true })); return dt.getData("text/plain"); });
+    const copied = await copy();
+    check(`${name}: copy joins the labels and the link with new lines`, /^Alpha label one\nBravo label two\nDelta link\nCharlie/.test(copied), copied);
+
+    // 2b. a link with selectable text: a drag starting on a label and ending on the link selects the link's text too; a
+    //     click that ends a selection over it does not open it, a plain click does
+    await clear();
+    await page.evaluate(() => { window.__linkTaps = 0; });
+    const b = await rect("Bravo"), d = await rect("Delta");
+    await drag(b.x + 2, b.y + b.h / 2, d.x + d.w - 2, d.y + d.h / 2);
+    const s2b = await copy();
+    const tapsAfterDrag = await page.evaluate(() => window.__linkTaps ?? 0);
+    check(`${name}: a drag from a label across the link selects the link's text too`, /^Bravo label two\nDelta link/.test(s2b), s2b);
+    await clear();
+    await page.evaluate(() => { window.__linkTaps = 0; });
+    await page.mouse.click(d.x + d.w / 2, d.y + d.h / 2); await sleep(400);
+    const tapsAfterClick = await page.evaluate(() => window.__linkTaps ?? 0);
+    check(`${name}: a plain click opens the link, a drag ending on it does not`, tapsAfterDrag === 0 && tapsAfterClick === 1, `after the drag ${tapsAfterDrag}, after a click ${tapsAfterClick}`);
 
     // 3. inside the scroll, over its text
     await clear();

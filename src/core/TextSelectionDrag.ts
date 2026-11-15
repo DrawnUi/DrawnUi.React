@@ -74,7 +74,8 @@ export class TextSelectionDrag {
 
   /**
    * A mouse press on the overlay's selectable text: the browser selects; while the drag is held past the edge of the
-   * scroll the text is in, the scroll moves on and the selection follows the mouse.
+   * scroll the text is in, the scroll moves on and the selection follows the mouse. (The selection is never set while the
+   * browser's own drag runs over the text: changing it then stops the drag's events in Chromium.)
    */
   FollowNative(e: PointerEvent): void {
     this.Stop();
