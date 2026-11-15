@@ -762,7 +762,40 @@ export class GalleryPage extends DrawnGame {
     // The pins' first placement makes the globe's ray tree (hidden pins are found by a ray): done now, while the
     // page opens, and not in the frame the globe scrolls into view.
     this.PlacePins();
-    this.StartLoop();
+    this.Loop(true);
+    // After every drawn frame (a scroll, a tap, a 3D view that moves): what follows the page itself, and the loop
+    // again once something it drives is on screen or set moving.
+    this.Superview?.WasDrawnListeners.add(() => {
+      if (this.IsDisposed) return;
+      this.ListFrame();
+      // a note that was placed before it had its size goes above its dot once it has it
+      if (this._note.IsVisible && this._note.MeasuredSize.Units.Height !== this._noteHeight) this.PlaceSpots();
+      if (!this._looping && this.Busy()) this.Loop(true);
+    });
+  }
+
+  private _looping = false;
+
+  /** The gallery's loop runs only while something it drives moves on screen: at rest the canvas draws no frame. */
+  private Loop(on: boolean): void {
+    if (on === this._looping) return;
+    this._looping = on;
+    if (on) this.StartLoop(); else this.StopLoop();
+  }
+
+  /**
+   * Something the loop drives moves now and can be seen: a section on screen that moves by itself (the mobs' field, the
+   * confetti, the beating heart, the globe's pulses), or a change running (a price counting, the medal's spin, the
+   * card's half turn, the mascot's head, a new number of mobs). Off screen everything waits where it is.
+   */
+  private Busy(): boolean {
+    const target = this._fabrics[Math.max(this._fabric, 0)][4];
+    const near = (a: number, b: number) => Math.abs(a - b) < 0.01;
+    return this._priceShown !== target || !this._rainReady || this._walkersOnField !== this._mobs
+      || WasInLastFrame(this._field) || WasInLastFrame(this._rain) || WasInLastFrame(this._heart) || WasInLastFrame(this._globe)
+      || (this._spin < 1 && WasInLastFrame(this._medal))
+      || (this._cardTurn !== this._cardTurnTo && WasInLastFrame(this._card))
+      || (WasInLastFrame(this._mascot) && !(near(this._headYaw, this._headYawTo) && near(this._headPitch, this._headPitchTo) && near(this._look, this._lookTo) && near(this._hands, this._handsTo)));
   }
 
   private SpinMedal(): void { this._spin = 0; }
@@ -1885,9 +1918,6 @@ export class GalleryPage extends DrawnGame {
     const t = this._time;
 
     this.PriceFrame(delta);
-    // A note that was placed before it had its size goes above its dot once it has it.
-    if (this._note.IsVisible && this._note.MeasuredSize.Units.Height !== this._noteHeight) this.PlaceSpots();
-    this.ListFrame();
     // The scene pans: every layer slides by its share, the ground (and the mobs on it) the most.
     // Wrapped where every layer is back at its start (100000 pt, 50 min), so the number keeps its fractions.
     this._pan = (this._pan + Scenery.PanSpeed * delta) % 100_000;
@@ -1955,5 +1985,7 @@ export class GalleryPage extends DrawnGame {
       else if (w.X > FieldWidth + 40) w.X -= FieldWidth + 80;
       if (fieldShown) this._field.SetPosition(MobNames[i], w.X, w.Y);
     }
+    // nothing it drives moves on screen any more: no frames until a drawn frame finds something again
+    if (!this.Busy()) this.Loop(false);
   }
 }
