@@ -262,6 +262,8 @@ const A11Y_CSS = `
 `;
 
 const NAVIGATION_KEYS = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"]);
+/** How long a scroll bringing the keyboard's control into view takes, seconds. */
+const KeyboardScrollSecs = 0.25;
 
 /**
  * Invisible ARIA elements mirroring the accessible drawn controls, positioned over the canvas (the DrawnUi.Blazor
@@ -388,7 +390,8 @@ function AccessibilityOverlay({ view }: { view: CanvasView }) {
             onFocus={(e) => {
               focusedId.current = n.Id;
               pin({ currentTarget: e.currentTarget.parentElement as HTMLDivElement } as React.SyntheticEvent<HTMLDivElement>);
-              SkiaScrollCtrl.EnsureVisible(n.Source); // inside every enclosing scroll
+              // inside every enclosing scroll; the overlay follows that scroll, so the next Tab finds the controls it brings in
+              if (SkiaScrollCtrl.EnsureVisible(n.Source, KeyboardScrollSecs)) view.AccessibilityManager.FollowScroll(KeyboardScrollSecs * 1000 + 150);
               if (tabbingOut.current === n.Id) tabbingOut.current = 0; // leaving a text field: it keeps no caret
               else n.Source.OnAccessibilityFocused(true); // a text field takes the caret, as after a click
               n.Source.NotifyAccessibilityFocused(true);
