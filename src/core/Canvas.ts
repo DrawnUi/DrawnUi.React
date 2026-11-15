@@ -647,22 +647,49 @@ export class Canvas {
 
   /** DOM contextmenu (right click / long press / Menu key) -> ContextMenuEventArgs routed through the tree like a tap. */
   private readonly onContextMenu = (e: MouseEvent) => {
-    const rect = this.Element.getBoundingClientRect();
-    const scale = this.RenderingScale;
-    const x = e.clientX - rect.left, y = e.clientY - rect.top;
     const pointerType = (e as PointerEvent).pointerType;
     const source: ContextMenuSource = pointerType === "touch" || pointerType === "pen" ? "touch" : pointerType === "mouse" || e.button === 2 ? "mouse" : "keyboard";
-    const args = new ContextMenuEventArgs(new SKPoint(x, y), new SKPoint(x * scale, y * scale), source, e);
+    // a long press: the browser's own contextmenu (Android Chrome) or the press's long press raises it, once (6cb)
+    const handled = source === "touch" ? this.RaiseTouchContextMenu(e.clientX, e.clientY, e) : this.RaiseContextMenu(e.clientX, e.clientY, source, e);
+    if (handled) e.preventDefault();
+  };
+
+  /** A context-menu request at a point of the page (client CSS px), routed through the tree like a tap; true when one took it. */
+  private RaiseContextMenu(clientX: number, clientY: number, source: ContextMenuSource, native: MouseEvent): boolean {
+    const rect = this.Element.getBoundingClientRect();
+    const scale = this.RenderingScale;
+    const x = clientX - rect.left, y = clientY - rect.top;
+    const args = new ContextMenuEventArgs(new SKPoint(x, y), new SKPoint(x * scale, y * scale), source, native);
     this.tooltip.CloseOnInput();
     // over a popup window its content is asked; elsewhere the popups close and the request goes on, so a new menu can
     // open there (C# PopupLayer ContextMenu)
     const popupRoot = this.popups.HasInteractive ? this.popups.At(args.Pixels.X, args.Pixels.Y) : undefined;
-    if (popupRoot) { popupRoot.ProcessContextMenu(args.Pixels, args); e.preventDefault(); return; }
+    if (popupRoot) { popupRoot.ProcessContextMenu(args.Pixels, args); return true; }
     if (this.popups.HasInteractive) { this.popups.CloseAll(false); this.AfterPopupsChanged(); }
     let handled = this.content?.ProcessContextMenu(args.Pixels, args) ?? false;
     if (!handled && this.ContextMenu) handled = this.ContextMenu(this, args) === true;
-    if (handled) e.preventDefault();
-  };
+    return handled;
+  }
+
+  // ---- a long press on touch raises the context menu (drawnui-cross 6cb) ----
+  /** The touch or pen press going on: its context menu is raised once, by the browser's contextmenu or after its long press. */
+  private touchMenu?: { Raised: boolean; Handled: boolean };
+  /** The long press of a touch press was just queued: its context menu follows the LongPressing (client CSS px). */
+  private touchMenuDue?: { X: number; Y: number };
+  /** A touch or pen press starts (on the canvas, or on selectable text of the overlay): its context menu is still to come. */
+  StartTouchPress(): void { this.touchMenu = { Raised: false, Handled: false }; }
+  /**
+   * The context menu of the touch press now (Source "touch"), raised once per press whoever asks first: the browser's own
+   * contextmenu (Android Chrome fires one on a long press) or the press's long press (iOS Safari fires none). True when a
+   * handler took it: the browser's own menu is then suppressed where it can be.
+   */
+  RaiseTouchContextMenu(clientX: number, clientY: number, native?: MouseEvent): boolean {
+    const press = this.touchMenu ??= { Raised: false, Handled: false };
+    if (press.Raised) return press.Handled;
+    press.Raised = true;
+    press.Handled = this.RaiseContextMenu(clientX, clientY, "touch", native ?? new MouseEvent("contextmenu", { clientX, clientY }));
+    return press.Handled;
+  }
 
   /**
    * The Menu key, Shift+F10 or a screen reader's context-menu command on the control in keyboard focus (the DOM
@@ -844,6 +871,7 @@ export class Canvas {
     const id = args.Id;
 
     if (args.Type === "Pressed") {
+      if (args.Pointer && args.Pointer.DeviceType !== "Mouse" && this.activeTouchIds.size === 0) this.StartTouchPress();
       this.ArmLongPress(id, args);
       // the fingers for pinch and turn: the first restarts them, a second one makes the press no tap
       if (this.activeTouchIds.size === 0) { this.fingers.Restart(id, args.Location); this.multiTouch = false; }
@@ -921,6 +949,11 @@ export class Canvas {
       Object.assign(args, down);
       args.Location = down.StartingLocation ?? down.Location;
       this.OnGestureEvent(args, "LongPressing");
+      // on touch the context menu follows the long press (6cb), at the press point
+      if (down.Pointer && down.Pointer.DeviceType !== "Mouse") {
+        const rect = this.Element.getBoundingClientRect(), scale = Math.max(0.1, this.RenderingScale);
+        this.touchMenuDue = { X: rect.left + args.Location.X / scale, Y: rect.top + args.Location.Y / scale };
+      }
     }, Canvas.LongPressTimeMs));
   }
 
@@ -940,6 +973,8 @@ export class Canvas {
     const root = this.content;
     if (!root) return;
     for (const args of batch) this.ProcessGestures(root, args);
+    const due = this.touchMenuDue;
+    if (due) { this.touchMenuDue = undefined; this.RaiseTouchContextMenu(due.X, due.Y); }
   }
 
   /**

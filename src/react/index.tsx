@@ -262,6 +262,25 @@ const A11Y_CSS = `
 `;
 
 const NAVIGATION_KEYS = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"]);
+
+/**
+ * A long press on selectable text (6cb): when no selection covers the point, the word there is selected first, so the
+ * context menu comes with it (a long press over the current selection keeps it).
+ */
+function SelectWordAt(x: number, y: number): void {
+  const sel = getSelection();
+  if (!sel) return;
+  if (!sel.isCollapsed) {
+    for (let i = 0; i < sel.rangeCount; i++) for (const r of sel.getRangeAt(i).getClientRects()) if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return;
+  }
+  const d = document as Document & { caretPositionFromPoint?(x: number, y: number): { offsetNode: Node; offset: number } | null };
+  const at = d.caretPositionFromPoint?.(x, y) ?? (() => { const r = document.caretRangeFromPoint?.(x, y); return r ? { offsetNode: r.startContainer, offset: r.startOffset } : null; })();
+  if (!at || at.offsetNode.nodeType !== Node.TEXT_NODE) return;
+  const text = at.offsetNode.textContent ?? "";
+  for (const s of new Intl.Segmenter(undefined, { granularity: "word" }).segment(text)) {
+    if (at.offset >= s.index && at.offset <= s.index + s.segment.length && s.isWordLike) { sel.setBaseAndExtent(at.offsetNode, s.index, at.offsetNode, s.index + s.segment.length); return; }
+  }
+}
 /** How long a scroll bringing the keyboard's control into view takes, seconds. */
 const KeyboardScrollSecs = 0.25;
 
@@ -304,6 +323,8 @@ function AccessibilityOverlay({ view }: { view: CanvasView }) {
   // belong to the app again (as in the other engines); the DOM focus stays on the canvas host, so a screen reader is not
   // thrown to the top of the page and the next Tab starts from the canvas. A focus the user moved away stays away.
   const focusedId = useRef(0);
+  /** A touch press on selectable text: where it started and its long-press timer (6cb). */
+  const textPress = useRef({ X: 0, Y: 0, Timer: 0 });
   useLayoutEffect(() => {
     const id = focusedId.current;
     if (!id || nodes.some((n) => n.Id === id)) return;
@@ -407,7 +428,26 @@ function AccessibilityOverlay({ view }: { view: CanvasView }) {
           </div>
         ) : n.TextLines ? (
           // AccessibilityTextSelectable: one positioned span per drawn line, in the drawn font, so the browser selects and copies it like HTML
-          <div key={n.Id} role={n.Role} title={n.Hint} aria-disabled={n.Disabled || undefined} aria-live={n.Live as "polite" | "assertive" | undefined} className="drawnui-a11y-node drawnui-a11y-text" style={pos}>
+          <div key={n.Id} role={n.Role} title={n.Hint} aria-disabled={n.Disabled || undefined} aria-live={n.Live as "polite" | "assertive" | undefined} className="drawnui-a11y-node drawnui-a11y-text" style={pos}
+            // a long press on touch raises the context menu once (6cb): the browser's contextmenu (Android) or the press's own timer (iOS)
+            onPointerDown={(e) => {
+              if (e.pointerType === "mouse") return;
+              view.StartTouchPress();
+              const x = e.clientX, y = e.clientY;
+              clearTimeout(textPress.current.Timer);
+              textPress.current = { X: x, Y: y, Timer: window.setTimeout(() => { SelectWordAt(x, y); view.RaiseTouchContextMenu(x, y); }, CanvasView.LongPressTimeMs) };
+            }}
+            onPointerMove={(e) => {
+              const p = textPress.current;
+              if (e.pointerType !== "mouse" && p.Timer && Math.hypot(e.clientX - p.X, e.clientY - p.Y) > CanvasView.TappedCancelMoveThresholdPoints) { clearTimeout(p.Timer); p.Timer = 0; }
+            }}
+            onPointerUp={() => { clearTimeout(textPress.current.Timer); textPress.current.Timer = 0; }}
+            onContextMenu={(e) => {
+              const pointerType = (e.nativeEvent as PointerEvent).pointerType;
+              if (pointerType !== "touch" && pointerType !== "pen") return;
+              SelectWordAt(e.clientX, e.clientY);
+              if (view.RaiseTouchContextMenu(e.clientX, e.clientY, e.nativeEvent)) e.preventDefault();
+            }}>
             {n.TextLines.map((l, i) => (
               <span key={i} data-w={l.Width} style={{ left: l.Left, top: l.Top, height: l.Height, fontFamily: l.FontFamily, fontWeight: l.FontWeight, fontSize: l.FontSize, lineHeight: `${l.Height}px` }}>{l.Text}{i < n.TextLines!.length - 1 ? "\n" : ""}</span>
             ))}
