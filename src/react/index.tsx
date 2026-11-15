@@ -325,13 +325,28 @@ function AccessibilityOverlay({ view }: { view: CanvasView }) {
   const focusedId = useRef(0);
   /** A touch press on selectable text: where it started and its long-press timer (6cb). */
   const textPress = useRef({ X: 0, Y: 0, Timer: 0 });
+  const previousNodes = useRef(nodes);
   useLayoutEffect(() => {
+    const previous = previousNodes.current;
+    previousNodes.current = nodes;
     const id = focusedId.current;
     if (!id || nodes.some((n) => n.Id === id)) return;
     focusedId.current = 0;
-    if (view.AccessibilityManager.FocusedNode?.AccessibilityId === id) view.AccessibilityManager.NotifyFocused(undefined);
+    const mgr = view.AccessibilityManager;
+    if (mgr.FocusedNode?.AccessibilityId === id) mgr.NotifyFocused(undefined);
     const active = document.activeElement;
     if (active && active !== document.body) return;
+    // its control went away (hidden, removed, no longer taking input: a pin turned to the far side of a globe): the
+    // keyboard goes on to the next stop, or the one before it at the end, never to nothing (DrawnUi.Net KeyboardTabScrollTests).
+    // A node only scrolled far away keeps no focus here (moving it would scroll the page back).
+    const at = previous.findIndex((n) => n.Id === id), gone = at >= 0 ? previous[at].Source : undefined;
+    if (gone && (gone.IsDisposed || !gone.Superview || gone.HiddenInTree() || gone.Opacity <= 0 || !gone.AccessibilityCanInteract)) {
+      const alive = new Set(nodes.map((n) => n.Id));
+      const stop = (n: AccessibilityNode) => alive.has(n.Id) && n.CanInteract && mgr.IsTabStop(n.Source);
+      const next = previous.slice(at + 1).find(stop) ?? previous.slice(0, at).reverse().find(stop);
+      const el = next && elementOf(next.Id);
+      if (el) { el.focus({ preventScroll: true }); return; }
+    }
     overlayRef.current?.parentElement?.focus({ preventScroll: true });
   }, [nodes]);
   // Tab / Shift+Tab in a text field leave it for the next node, also after a click into it: DOM focus goes to the
