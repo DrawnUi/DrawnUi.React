@@ -60,11 +60,8 @@ export class SkiaImageManager {
   /** Base address of relative sources (DrawnUi HttpBaseAddress); unset, they resolve against the page. */
   static HttpBaseAddress?: string;
 
-  /**
-   * C# CanReload: raised when a load failed (with its source and why) so the caller may retry later, and when
-   * `IsLoadingLocked` is turned off (no arguments).
-   */
-  CanReload?: (source?: string, error?: Error) => void;
+  /** C# CanReload: raised when `IsLoadingLocked` is turned off, so what waited or failed meanwhile may load again. */
+  CanReload?: () => void;
 
   private readonly cache = new Map<string, Entry>();
   /** Every image the manager made and still tracks: cached ones and the copies it handed out. */
@@ -285,11 +282,13 @@ export class SkiaImageManager {
   /**
    * Queued, cached load (C# LoadImageManagedAsync): a cached image resolves at once, the rest wait their turn by priority;
    * one fetch serves every request of the same source. Resolves to the shared image (ReuseBitmaps) or a copy of its own,
-   * undefined when it could not be loaded (CanReload hears why).
+   * undefined when it could not be loaded. As the DrawnUi.Net Blazor head: when the caller's signal aborts a cached load,
+   * or a load waiting for IsLoadingLocked, the promise rejects with the abort (an AbortError, C# OperationCanceledException);
+   * with UseCache off a cancelled load resolves to undefined.
    */
   async LoadImageManagedAsync(source: string, signal?: AbortSignal, priority: LoadPriority = "Normal"): Promise<Image | undefined> {
     if (!source) return undefined;
-    while (this.locked) await this.unlocked;
+    while (this.locked) await SkiaImageManager.WithCancel(this.unlocked, signal);
     const key = SkiaImageManager.Key(source);
     if (!SkiaImageManager.UseCache) return this.Enqueue(key, source, priority, signal, false);
     const cached = this.GetFromCacheInternal(key);
@@ -300,7 +299,19 @@ export class SkiaImageManager {
       this.inflight.set(key, task);
       void task.finally(() => this.inflight.delete(key));
     }
-    return this.HandOut(await task, key);
+    return this.HandOut(await SkiaImageManager.WithCancel(task, signal), key);
+  }
+
+  /** C# Task.WaitAsync(token): rejects with the abort when the signal aborts; the load itself goes on for the others. */
+  private static WithCancel<T>(task: Promise<T>, signal?: AbortSignal): Promise<T> {
+    if (!signal) return task;
+    const reason = () => signal.reason ?? new DOMException("image load cancelled", "AbortError");
+    if (signal.aborted) return Promise.reject(reason());
+    return new Promise<T>((resolve, reject) => {
+      const abort = () => reject(reason());
+      signal.addEventListener("abort", abort, { once: true });
+      task.then((v) => { signal.removeEventListener("abort", abort); resolve(v); }, (e) => { signal.removeEventListener("abort", abort); reject(e); });
+    });
   }
 
   private Enqueue(key: string, source: string, priority: LoadPriority, signal: AbortSignal | undefined, cache: boolean): Promise<Image | undefined> {
@@ -332,9 +343,8 @@ export class SkiaImageManager {
       if (this.waiting.get(item.key)?.includes(item)) this.waiting.delete(item.key);
       if (item.signal?.aborted) { for (const r of requesters) r.resolve(undefined); continue; }
       this.running++;
-      void this.Fetch(item.source, item.signal).then(({ Image: image, Error: error }) => {
+      void this.Fetch(item.source, item.signal).then(({ Image: image }) => {
         if (image) this.Track(image, item.key);
-        else this.CanReload?.(item.source, error);
         // the first requester caches it; the others get what is cached
         for (const r of requesters) r.resolve(image);
       }).finally(() => { this.running--; this.Pump(); });
