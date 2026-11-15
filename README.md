@@ -58,6 +58,10 @@ DrawnUI is MIT licensed in every language and on every platform: desktop, mobile
   control comes back to the top.
 - **`FillBlendMode`** on controls and shapes.
 - **Image loads:** a cancelled image load reports a cancel, as in DrawnUi.Net.
+- **Right click in a text field:** a right click keeps the caret and the selection, so the context menu sees what was
+  selected.
+- **Long press on touch:** a long press raises the context menu on phones and tablets too, in every browser; on
+  selectable text it selects the word first, or keeps the selection it presses on.
 
 ## What's new in 0.1.0-preview.42
 
