@@ -788,9 +788,11 @@ export class GalleryPage extends DrawnGame {
           Make(new SkiaWrap(), {
             Spacing: 8,
             Children: [
-              // how many: one radio group, its own Tab stop walked with the arrows
-              Make(new SkiaRow(), {
+              // how many: one radio group, its own Tab stop walked with the arrows; on a narrow phone its buttons wrap
+              // instead of squeezing
+              Make(new SkiaWrap(), {
                 Spacing: 8,
+                HorizontalOptions: "Start",
                 AccessibilityRole: Aria.RoleRadioGroup,
                 AccessibilityLabel: "Mobs on the field",
                 Children: MobCounts.map((n, i) => this._mobButtons[i] = Make(new Button3D(`${n} mobs`, Theme.Quiet, 110), {
@@ -1100,7 +1102,9 @@ export class GalleryPage extends DrawnGame {
           Spacing: 10,
           HorizontalOptions: "Center",
           VerticalOptions: "Center",
-          WidthRequest: 340,
+          // at most 340 pt: in a narrow viewer (a phone) the text wraps inside it
+          MaximumWidthRequest: 340,
+          Margin: new Thickness(16, 0),
           Children: [
             Make(new SkiaShape(), {
               Type: "Circle", WidthRequest: 48, HeightRequest: 48, BackgroundColor: "#2EFF6384",
