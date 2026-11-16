@@ -101,7 +101,8 @@ for (const [name, type] of [["webkit", webkit], ["chromium", chromium]]) {
       Object.defineProperty(window, "visualViewport", { value: vv, configurable: true });
       ed.Canvas.Gestures = "Disabled"; ed.Canvas.Gestures = "Lock"; // the canvas listens to the new visual viewport
       ed.Scroll.AdaptToKeyboardAuto = auto; ed.Scroll.AdaptToKeyboardGap = 16;
-      ed.Editor.IsFocused = false; ed.Lower.IsFocused = false; ed.Scroll.ScrollTo(0, 0, 0); await wait(400);
+      // the last field at the content end, the page scrolled to its end
+      ed.Editor.IsFocused = false; ed.Lower.IsFocused = false; ed.Scroll.ScrollTo(0, -100000, 0); await wait(400);
       const p = rectOf(ed.Lower), before = p.bottom;
       const touch = async (q, id) => {
         const o = (buttons) => ({ clientX: q.x, clientY: q.y, bubbles: true, cancelable: true, pointerId: id, pointerType: "touch", isPrimary: true, button: 0, buttons });
@@ -113,6 +114,16 @@ for (const [name, type] of [["webkit", webkit], ["chromium", chromium]]) {
       await wait(900);
       const ir = document.querySelector("[data-drawnui-text-input]").getBoundingClientRect();
       const out = { focused: ed.Lower.IsFocused, before: Math.round(before), after: Math.round(rectOf(ed.Lower).bottom), input: [Math.round(ir.left), Math.round(ir.top)] };
+      // Chrome on Android reports the full-height viewport for a moment right after a field switch while the keyboard stays
+      // up (its input method restarts): one frame of it must not drop the room or move the page
+      const offsetBefore = ed.Scroll.ViewportOffsetY;
+      vv.height = innerHeight; vv.dispatchEvent(new Event("resize")); await wait(120);
+      vv.height = 300; vv.dispatchEvent(new Event("resize")); await wait(700);
+      out.flicker = { before: Math.round(offsetBefore), after: Math.round(ed.Scroll.ViewportOffsetY), field: Math.round(rectOf(ed.Lower).bottom) };
+      // the keyboard closes with the page scrolled into its room: the page glides back to the content end
+      vv.height = innerHeight; vv.dispatchEvent(new Event("resize")); await wait(1200);
+      out.closed = { offset: Math.round(ed.Scroll.ViewportOffsetY), end: Math.round(ed.Scroll.ContentOffsetBounds.Top), field: Math.round(rectOf(ed.Lower).bottom) };
+      vv.height = 300; vv.dispatchEvent(new Event("resize")); await wait(400);
       // a switch to the upper field with the keyboard up: the input never loses focus on the way
       let blurs = 0; const input = document.querySelector("[data-drawnui-text-input]"); const count = () => blurs++; input.addEventListener("blur", count);
       ed.Scroll.ScrollTo(0, 0, 0); await wait(400);
@@ -128,6 +139,8 @@ for (const [name, type] of [["webkit", webkit], ["chromium", chromium]]) {
     const above = await keyboardCase(true);
     check(`${name}: a field focused by a touch keeps its hidden input at the top-left corner (iOS never pans the page to reveal it)`, above.input[0] === 0 && above.input[1] === 0, above);
     check(`${name}: with AdaptToKeyboardAuto the keyboard opening over a field in the lower half scrolls it above the keyboard`, above.focused && above.before > 300 && above.after <= 300 - 16 + 1 && above.after > 100, above);
+    check(`${name}: a full-height viewport for up to 120 ms with the field still focused (an input method restart) moves nothing`, above.flicker.before === above.flicker.after && above.flicker.field <= 300 - 16 + 1, above.flicker);
+    check(`${name}: the keyboard closing with the page in its room glides the page back to the content end`, above.closed.offset === above.closed.end && above.flicker.before < above.closed.end, { closed: above.closed, inRoom: above.flicker.before });
     check(`${name}: a touch on another field with the keyboard up moves focus without the input losing focus (no hide and show)`, above.switched.upperFocused && !above.switched.lowerFocused && above.switched.blurs === 0 && above.switched.active, above.switched);
     // 7. the soft keyboard's return key (a field focused by a touch tap, enterkeyhint done): editing ends, the keyboard closes;
     //    a physical Enter (a field focused by a mouse click) keeps the field focused
