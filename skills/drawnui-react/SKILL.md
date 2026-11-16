@@ -382,6 +382,33 @@ createRoot(document.getElementById("root")!).render(
   bots read it, Googlebot (renders JS) sees the a11y overlay instead — a control without `AccessibilityRole` is in
   neither. Style via `.drawnui-static` or `render: { style: false }`.
 
+## 3D add-on (`drawnui-react-add3d`)
+
+`npm i drawnui-react-add3d` (peer: `drawnui-react`). Importing it registers two JSX tags; the engine classes are in
+`drawnui-react-add3d/core`. Live demo: https://add3dreact.drawnui.net. Draw with `RenderingMode="Accelerated"`: 3D
+renders through the canvas's WebGL 2 context.
+
+- `<SkiaModel3D>`: one glTF scene framed by its own camera. Props: `Glb` (bytes), `Source` (an address or app file,
+  loads async; `LoadState`, `LoadStateChanged`), `Model` (a `Model3D` made in code), `Animation`, `Yaw`, `Pitch`,
+  `Zoom`, `PinchZoom`, `ResetOnDoubleTap`, `LockPitch`, `AutoRotate`, `TiltToPointer`, `Orbit`, `Look`
+  (`Look.Lit` / `Toon` / `Flat`), `OutlineWidth`, `OutlineColor`, `Antialias`, `Tapped3D={(me, hit) => …}`
+  (`hit.Node`, `hit.Material`, `hit.Point`), `AnimationEnded`, `ViewChanged`.
+- Through the ref: `Play`, `PlayOnce`, `Hold`, `PlayLayer`, `StopLayer`, `SetNodeVisible / Translation / Rotation /
+  Scale`, `ResetNode`, `SetMaterialColor`, `SetMaterialImage(name, Texture3D.Decode(bytes))`, `SetMaterialRoughness`,
+  `SetMaterialVisible`, `ScreenPosition(point)` (where a 3D point is on screen and whether the model hides it),
+  `ResetView()`. Names come from the file: `Animations`, `NodeNames`, `MaterialNames`; never guess them.
+- Keep `Glb` and `Model` values stable between renders (`useMemo`, a module constant): a new value rebuilds the scene
+  and drops material overrides. Set images and colors from a ref callback or `useEffect`.
+- `<SkiaScene3D ref={field} Tilt={30}>`: many objects on a 2D field, one pass, each model loaded once. In
+  `useEffect`: `field.current.Model("slime", glb)`, `Add("mob7", "slime", x, y, height)`, then `SetPosition`,
+  `SetFacing`, `Play(name, animation)`, `PlayOnce`, `Remove` from game code (no re-render). `Tapped3D` gives
+  `hit.Object`.
+- Shapes in code: `new Model3D().Part("earth", Mesh3D.Sphere(1), "#FFFFFF").At(x, y, z).Turned(x, y, z)`, meshes
+  `Sphere`, `Cylinder`, `Torus`, `Cuboid`, `RoundedCuboid`, `Lathe`, `Extrude(path, depth)`.
+- Inside a `SkiaScroll` a drag picks its direction: vertical scrolls the page, sideways turns the model; a plain wheel
+  scrolls, Ctrl / Cmd + wheel or a touchpad pinch zooms. A still model asks for no frames; never cache an animated
+  model.
+
 ## Debugging in the browser
 
 - Tools (DrawnUI Designer and the like): `canvas.PopupWindowRoots` (the open popup windows' roots),

@@ -51,6 +51,11 @@ DrawnUI is MIT licensed in every language and on every platform: desktop, mobile
 
 ## What's new in 0.1.0-preview.43
 
+- **3D add-on:** [`drawnui-react-add3d`](https://www.npmjs.com/package/drawnui-react-add3d) puts real 3D inside the
+  drawn UI: glTF models with their animations, a product viewer that turns, zooms and resets, many animated
+  characters on a 2D field in one pass, shapes made in code, Lit, Toon and Flat looks. Live demo:
+  [add3dreact.drawnui.net](https://add3dreact.drawnui.net), article:
+  [drawnui.net/articles/add3d.html](https://drawnui.net/articles/add3d.html).
 - **Text selection:** selectable labels (`AccessibilityTextSelectable`) select as in DrawnUi.Net, drawn in
   `SkiaLabel.TextSelectionColor`: a mouse drag (across several labels, in reading order), a double click for a word, a
   long press on touch with a Copy button; Ctrl+C copies, and the context menu sees the selection
@@ -62,7 +67,12 @@ DrawnUI is MIT licensed in every language and on every platform: desktop, mobile
   field, and a keyboard the user closed stays closed while the page scrolls.
 - **Fields above the keyboard:** `SkiaScroll.AdaptToKeyboardAuto` (opt-in, with `AdaptToKeyboardGap`) keeps the focused
   field above the on-screen keyboard, the last field of a form too.
-- **Double tap in iOS Safari:** a double tap reaches the controls as two taps (a 3D viewer's reset).
+- **Double tap:** a double tap reaches the controls as two taps in iOS Safari too, and counts by when the taps
+  happened, so it holds while frames are busy (a 3D viewer's reset).
+- **Screen readers:** the texts inside a button, radio, switch, tab or image are read once, as the control's name;
+  inside a scroll the reading and Tab order follow the content.
+- **Password fields:** screen readers hear a password field's placeholder, never the typed text.
+- **React 19.2:** the package declares React 19.2 or newer, the version its renderer runs on.
 - **Right click in a text field:** a right click keeps the caret and the selection, so the context menu sees what was
   selected.
 - **Mouse wheel over text fields:** a focused text field no longer stops the mouse wheel: the page scrolls over the field

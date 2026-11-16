@@ -1,28 +1,53 @@
 {
   "name": "drawnui-react-add3d",
-  "version": "0.1.0-preview.1",
+  "version": "0.1.0-preview.43",
   "description": "3D add-on for DrawnUi.React: glTF models with skeleton animations inside a drawn UI (SkiaModel3D viewer, SkiaScene3D for many objects in one pass, shapes made in code, Lit / Toon / Flat looks), drawn on CanvasKit's own WebGL 2 context.",
   "license": "MIT",
   "author": "Nick Kovalsky (AppoMobi)",
-  "homepage": "https://helloreact.drawnui.net",
+  "homepage": "https://add3dreact.drawnui.net",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/DrawnUi/DrawnUi.React.git",
     "directory": "add3d"
   },
-  "keywords": ["drawnui", "drawnui-react", "3d", "gltf", "glb", "webgl2", "canvaskit", "skia", "react"],
+  "keywords": [
+    "drawnui",
+    "drawnui-react",
+    "3d",
+    "gltf",
+    "glb",
+    "webgl2",
+    "canvaskit",
+    "skia",
+    "react"
+  ],
   "type": "module",
   "main": "./dist/react.js",
   "module": "./dist/react.js",
   "types": "./dist/react.d.ts",
   "exports": {
-    ".": { "types": "./dist/react.d.ts", "import": "./dist/react.js" },
-    "./core": { "types": "./dist/index.d.ts", "import": "./dist/index.js" }
+    ".": {
+      "types": "./dist/react.d.ts",
+      "import": "./dist/react.js"
+    },
+    "./core": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
   },
-  "files": ["dist", "README.md"],
-  "sideEffects": ["./dist/react.js"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "sideEffects": [
+    "./dist/react.js"
+  ],
   "peerDependencies": {
-    "drawnui-react": ">=0.1.0-preview.42",
-    "react": "^18.2.0 || ^19.0.0"
+    "drawnui-react": ">=0.1.0-preview.43",
+    "react": "^19.2.0"
+  },
+  "scripts": {
+    "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
+    "prepublishOnly": "npm run build"
   }
 }
