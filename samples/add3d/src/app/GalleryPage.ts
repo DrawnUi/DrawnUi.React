@@ -531,6 +531,9 @@ export class GalleryPage extends DrawnGame {
         ScrollBar: Make(new SkiaScrollBar(), { IsDraggable: true, Thickness: 6 }),
         ScrollBarThumbColor: Theme.Muted,
         ScrollBarTrackColor: Theme.Alpha("#FFFFFF", 18 / 255),
+        // the sign-up form's fields stay above the on-screen keyboard, the last one too
+        AdaptToKeyboardAuto: true,
+        AdaptToKeyboardGap: 16,
         HorizontalOptions: "Fill",
         VerticalOptions: "Fill",
         Content: Make(new SkiaStack(), {
