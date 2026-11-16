@@ -13,6 +13,10 @@ export class TextInputProxy {
   private static element?: HTMLTextAreaElement;
   private static owner?: SkiaEditor;
   private static composing = false;
+  /** The field took focus from a touch tap: its keys come from the soft keyboard (the return key ends editing). */
+  private static byTouch = false;
+  /** Set by the canvas while it runs a touch release's gestures (a field focused by them was focused by a touch). */
+  static TouchGesture = false;
   private static applying = false;
 
   /** The textarea (created on first use); KeyboardManager recognizes it through `data-drawnui-text-input`. */
@@ -53,6 +57,7 @@ export class TextInputProxy {
     if (!el) return;
     TextInputProxy.owner = editor;
     TextInputProxy.composing = false;
+    TextInputProxy.byTouch = TextInputProxy.TouchGesture || !!editor.Superview?.TouchPressed;
     TextInputProxy.Configure(editor, el);
     TextInputProxy.Sync(editor);
     TextInputProxy.WatchKeyboard();
@@ -110,7 +115,7 @@ export class TextInputProxy {
    * tap and comes back on a tap after the user closed it. A touch anywhere else leaves it as it is: the keyboard the user
    * closed stays closed while the page is scrolled. True when the tap was on the focused field (its input has focus now).
    */
-  static FocusFromTap(clientX: number, clientY: number): boolean {
+  static FocusFromTap(clientX: number, clientY: number, touch = false): boolean {
     const owner = TextInputProxy.owner, el = TextInputProxy.element;
     if (!owner || !el || !owner.IsFocused) return false;
     const canvas = owner.Superview?.Element;
@@ -124,6 +129,7 @@ export class TextInputProxy {
       el.focus({ preventScroll: true });
       TextInputProxy.Sync(owner);
     }
+    TextInputProxy.byTouch = touch;
     return true;
   }
 
@@ -183,6 +189,9 @@ export class TextInputProxy {
         const text = inserted.replace(/\n/g, "");
         if (text) editor.StubTypeText(text); else if (endPrev > start) editor.StubBackspace();
         editor.StubPressEnter(false, false);
+        // the soft keyboard's return key (done / go / search / send) in a single-line field ends editing and closes the
+        // keyboard, as a MAUI single-line field; a physical keyboard's Enter keeps the field focused (the Blazor rule)
+        if (TextInputProxy.byTouch && !editor.IsMultiline && ["done", "go", "search", "send"].includes(el.enterKeyHint)) editor.IsFocused = false;
       } else if (inserted) editor.StubTypeText(inserted);
       else editor.StubBackspace();
     } finally { TextInputProxy.applying = false; }
