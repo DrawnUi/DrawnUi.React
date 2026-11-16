@@ -453,7 +453,8 @@ export class SkiaScroll extends SkiaControl {
     const viewportW = this.DrawingRect.Width / scale, viewportH = this.DrawingRect.Height / scale;
     const extra = this.HeaderExtentPts + this.FooterExtentPts;
     const width = Math.max(0, this.ContentSize.Units.Width + (this.Orientation === "Horizontal" ? extra : 0) - viewportW);
-    const height = Math.max(0, this.ContentSize.Units.Height + (this.Orientation !== "Horizontal" ? extra : 0) - viewportH);
+    // with the keyboard up (AdaptToKeyboardAuto), its cover of the viewport is room at the content end
+    const height = Math.max(0, this.ContentSize.Units.Height + (this.Orientation !== "Horizontal" ? extra + this.keyboardInset : 0) - viewportH);
     this.ContentOffsetBounds = new SKRect(-width, -height, 0, 0);
     // C# InitializeViewport: pull an offset the new bounds no longer contain back inside them, here where
     // the bounds change. Shrinking content (fewer items) otherwise leaves the viewport parked past its end
@@ -466,6 +467,82 @@ export class SkiaScroll extends SkiaControl {
     }
     this.ArrangeContent();
     this.CheckLoadMore();
+  }
+
+  // ---- the on-screen keyboard (C# SkiaScroll ScrollViewKeyboardAwareBehavior, drawnui-cross 6cj) ----
+  /**
+   * When true, the canvas keeps the focused text field of this scroll above the on-screen keyboard by itself (it sets
+   * AdaptToKeyboardFor and AdaptToKeyboardSize), and while the keyboard is up the part of the viewport it covers is room at
+   * the content end, so the last fields rise above it too. Off by default: an app that wires those two itself keeps doing so.
+   */
+  AdaptToKeyboardAuto = false;
+  /** Points kept between the bottom of AdaptToKeyboardFor and the keyboard's top (8 by default). */
+  AdaptToKeyboardGap = 8;
+  private adaptFor?: SkiaControl;
+  private adaptSize = 0;
+  private keyboardInset = 0;
+  private adaptPending = false;
+  /** The field to keep above the keyboard (set by the app, or by the canvas with AdaptToKeyboardAuto). */
+  get AdaptToKeyboardFor(): SkiaControl | undefined { return this.adaptFor; }
+  set AdaptToKeyboardFor(v: SkiaControl | undefined) { if (this.adaptFor !== v) { this.adaptFor = v; this.AdaptToKeyboard(); } }
+  /** Points of the canvas, from its bottom, the keyboard covers (0 = no keyboard). */
+  get AdaptToKeyboardSize(): number { return this.adaptSize; }
+  set AdaptToKeyboardSize(v: number) { if (this.adaptSize !== v) { this.adaptSize = v; this.AdaptToKeyboard(); } }
+
+  /**
+   * After the keyboard or the focused field changed: scrolls so the field shows above the keyboard. A field already
+   * visible, or the keyboard closing, leaves the page where it is (the keyboard closing settles a page scrolled into the
+   * keyboard's room at the content end). One adaptation for the field and the size set together.
+   */
+  AdaptToKeyboard(): void {
+    if (this.adaptPending) return;
+    this.adaptPending = true;
+    setTimeout(() => {
+      this.adaptPending = false;
+      if (this.IsDisposed) return;
+      this.UpdateKeyboardInset();
+      const to = this.CalculateNeededScrollForKeyboard();
+      if (!Number.isNaN(to)) { this.ViewportOffsetY = to; this.Repaint(); }
+    }, 150);
+  }
+
+  /** The keyboard's top in canvas points, from AdaptToKeyboardSize; NaN without one. */
+  private KeyboardTopPts(): number {
+    const canvas = this.Superview;
+    if (!canvas || this.adaptSize <= 0) return Number.NaN;
+    return canvas.Element.height / (this.RenderingScale || 1) - this.adaptSize;
+  }
+
+  private UpdateKeyboardInset(): void {
+    let inset = 0;
+    const top = this.KeyboardTopPts();
+    if (this.AdaptToKeyboardAuto && !Number.isNaN(top) && this.Orientation === "Vertical") {
+      const covered = this.GetAccessibilityPixelRect().Bottom / (this.RenderingScale || 1) - top;
+      // the gap too: the last field rests that far above the keyboard
+      if (covered > 0) inset = covered + Math.max(0, this.AdaptToKeyboardGap);
+    }
+    if (Math.abs(inset - this.keyboardInset) < 0.5) return;
+    const shrinking = inset < this.keyboardInset;
+    this.keyboardInset = inset;
+    const viewportH = this.DrawingRect.Height / (this.RenderingScale || 1);
+    const height = Math.max(0, this.ContentSize.Units.Height + this.HeaderExtentPts + this.FooterExtentPts + inset - viewportH);
+    this.ContentOffsetBounds = new SKRect(this.ContentOffsetBounds.Left, -height, this.ContentOffsetBounds.Right, 0);
+    // the keyboard closed: content past the new end settles at the end, animated, as native scroll views do
+    if (shrinking && this.offsetY < -height && !this.IsUserPanning) this.ScrollTo(this.offsetX, -height, this.AutoScrollingSpeedMs / 1000, true);
+    this.Repaint();
+  }
+
+  /** Where the scroll must go so the field's bottom sits AdaptToKeyboardGap above the keyboard; NaN = nothing to move. */
+  CalculateNeededScrollForKeyboard(): number {
+    const field = this.adaptFor, top = this.KeyboardTopPts();
+    if (!field || Number.isNaN(top) || !this.Superview) return Number.NaN;
+    this.StopScrolling();
+    const k = this.RenderingScale || 1;
+    const f = field.GetAccessibilityPixelRect(), viewport = this.GetAccessibilityPixelRect();
+    if (f.Width <= 0 || f.Height <= 0) return Number.NaN;
+    const visibleBottom = Math.min(viewport.Bottom, top * k);
+    const need = (f.Bottom - visibleBottom) / k + this.AdaptToKeyboardGap;
+    return need > 0 ? this.offsetY - need : Number.NaN;
   }
 
   /** Places Content at the current offset; called on layout and every frame while the offset moves. */
