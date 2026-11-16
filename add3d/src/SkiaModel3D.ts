@@ -372,11 +372,16 @@ export class SkiaModel3D extends SkiaControl implements IPrefetch3D {
     this.nodes[i].T = [x, y, z]; this.Redraw();
     return true;
   }
-  /** Turns a node by name: rotations around x, y, z in degrees (applied in that order). */
-  SetNodeRotation(name: string, x: number, y: number, z: number): boolean {
+  /**
+   * Turns a node by name: rotations around x, y, z in degrees (applied in that order), or a quaternion [x, y, z, w] (a turn
+   * worked out in code, such as a physics step; C# SetNodeRotation(name, Quaternion)).
+   */
+  SetNodeRotation(name: string, rotation: Quat): boolean;
+  SetNodeRotation(name: string, x: number, y: number, z: number): boolean;
+  SetNodeRotation(name: string, x: number | Quat, y = 0, z = 0): boolean {
     const i = this.NodeIndex(name);
     if (i < 0) return false;
-    this.nodes[i].R = Euler(x, y, z); this.Redraw();
+    this.nodes[i].R = typeof x === "number" ? Euler(x, y, z) : [x[0], x[1], x[2], x[3]]; this.Redraw();
     return true;
   }
   /** Scales a node by name. */

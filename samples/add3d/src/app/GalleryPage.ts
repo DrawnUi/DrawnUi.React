@@ -12,6 +12,7 @@ import {
   SkiaScrollBar, SkiaShadow, SkiaShape, SkiaStack, SkiaValueAnimator, SkiaWrap, Super, Thickness, type Color,
 } from "drawnui-react/core";
 import { LoadState3D, Look, Mesh3D, Model3D, SkiaModel3D, SkiaScene3D, Texture3D } from "drawnui-react-add3d/core";
+import { DiceThrow, QuatAxisAngle } from "./DiceThrow";
 import { RescalingLayout } from "./RescalingLayout";
 import { Scenery } from "./Scenery";
 import { Button3D, Copyable, Make, Switch3D, Theme, View3D, WasInLastFrame } from "./Theme";
@@ -400,17 +401,11 @@ const ConfettiStar = () => new Model3D().Part("piece", Extruded(Star(5, 0.6, 0.2
 // ---- GalleryPage.Dice.cs: helpers ----
 
 const DiceHeight = 280;
-/** The turn (x, z) that puts a face on top: 1 starts on top, 6 under it, 2 in front, 5 behind, 3 right, 4 left. */
-const FaceUp: [number, number][] = [[0, 0], [-90, 0], [0, 90], [0, -90], [90, 0], [180, 0]];
 /** A die's faces in one image, one 256 px cell each, in the order RoundedCuboid lays an atlas. */
 const AtlasFaces = [3, 4, 1, 6, 2, 5]; // +X, -X, +Y on top; -Y, +Z, -Z below
 const DieRounding = 0.14;
-const DieX = [-0.8, 0.8];
 /** A die's shadow, a little toward the viewer and right: away from the key light, up and to the left. */
 const ShadowShift: [number, number] = [0.12, 0.15];
-const RollMs = 1700;
-/** The part of a roll spent tumbling; the rest is the die settling on the face it landed on, on a spring. */
-const Tumbling = 0.8;
 
 const DieFaces = () => Painted(768, 512, (c) => {
   c.clear(Rgb(250, 246, 236));
@@ -437,15 +432,16 @@ function Pips(c: SkCanvas, value: number): void {
 }
 
 /**
- * Two dice, each a holder that turns it around the vertical and lifts it, a rounded cube wearing its faces, and a soft
- * shadow on the table under it (it stays on the table while the die hops).
+ * Two dice, each a rounded cube wearing its faces, and a soft shadow on the table under it (it stays on the table while
+ * the die is in the air).
  */
 function TwoDice(): Model3D {
   const model = new Model3D();
   for (let d = 0; d < 2; d++) {
-    model.Part(`shadow${d}`, Mesh3D.Cuboid(1.45, 0.001, 1.45), "#FCFFFFFF").At(DieX[d] + ShadowShift[0], -0.505, ShadowShift[1])
-      .Part(`holder${d}`, Mesh3D.Cuboid(0.01, 0.01, 0.01), "#FFFFFF").At(DieX[d], 0, 0)
-      .Part(`die${d}`, Mesh3D.RoundedCuboid(1, 1, 1, DieRounding, true), "#FFFFFF").Inside(`holder${d}`);
+    const x = d === 0 ? -0.8 : 0.8;
+    // a little toward the viewer and right: away from the key light, up and to the left
+    model.Part(`shadow${d}`, Mesh3D.Cuboid(1.45, 0.001, 1.45), "#FCFFFFFF").At(x + ShadowShift[0], -0.505, ShadowShift[1])
+      .Part(`die${d}`, Mesh3D.RoundedCuboid(1, 1, 1, DieRounding, true), "#FFFFFF").At(x, 0, 0);
   }
   return model;
 }
@@ -459,49 +455,6 @@ const ShadowSpot = () => Painted(128, 128, (c, w, h) => {
   paint.setShader(shader);
   c.drawRect(CK.LTRBRect(0, 0, w, h), paint);
 });
-
-/** How high a die's center must be for its lowest point to touch the table, turned by (x, z) degrees. */
-function RestingLift(x: number, z: number): number {
-  const rx = (x * Math.PI) / 180, rz = (z * Math.PI) / 180, core = 0.5 - DieRounding;
-  let lowest = 0;
-  for (let i = 0; i < 8; i++) {
-    const cx = i & 1 ? core : -core, cy = i & 2 ? core : -core, cz = i & 4 ? core : -core;
-    // the turn X then Z (as Quaternion X * Z applied to the corner: Z first, then X)
-    const y1 = cx * Math.sin(rz) + cy * Math.cos(rz);
-    const y2 = y1 * Math.cos(rx) - cz * Math.sin(rx);
-    lowest = Math.min(lowest, y2);
-  }
-  return -lowest + DieRounding - 0.5;
-}
-
-/**
- * A die's angle during a roll: it keeps turning fast, loses speed to friction but never crawls (its last turn is still at
- * 40% of its average speed), hits its face and settles on it like a damped spring: it rocks back off the face and in
- * again, each swing smaller, and stops.
- */
-function Tumble(from: number, to: number, t: number): number {
-  const d = to - from;
-  if (t < Tumbling) { const u = t / Tumbling; return from + d * u * (1.6 - 0.6 * u); }
-  // a damped spring started by the impact: x(s) = A e^(-zeta w s) sin(w_d s), back off the face first
-  const s = (t - Tumbling) / (1 - Tumbling);
-  const zeta = 0.28, cycles = 2.2, wd = 2 * Math.PI * cycles, w = wd / Math.sqrt(1 - zeta * zeta);
-  const amplitude = Math.min(Math.abs(d), 7);
-  return to - Math.sign(d) * amplitude * Math.exp(-zeta * w * s) * Math.sin(wd * s);
-}
-
-/** Hops off the table: three falls under gravity, each lower and shorter, done before the die lands. */
-function Bounces(t: number): number {
-  const heights = [0.32, 0.12, 0.04];
-  // time of a hop grows with the square root of its height, as for a falling body
-  const total = heights.reduce((s, h) => s + Math.sqrt(h), 0);
-  let at = (t / (Tumbling * 0.95)) * total;
-  for (const h of heights) {
-    const span = Math.sqrt(h);
-    if (at < span) { const u = at / span; return 4 * h * u * (1 - u); }
-    at -= span;
-  }
-  return 0;
-}
 
 // ---- GalleryPage.Loop.cs: types ----
 
@@ -2007,16 +1960,18 @@ export class GalleryPage extends DrawnGame {
   private _diceView!: SkiaModel3D;
   private _diceResult!: SkiaLabel;
   private _diceRoll?: AbortController;
-  /** Each die's turn now (x, z) and the turn of its holder around the vertical (yaw). */
-  private readonly _diePose: [number, number, number][] = [[0, 0, 20], [0, 0, -15]];
+  /** Where each die lies now and how it is turned. */
+  private readonly _dieAt: Vec3[] = [[-0.8, 0, 0], [0.8, 0, 0]];
+  private readonly _dieTurn: Quat[] = [QuatAxisAngle([0, 1, 0], 0.35), QuatAxisAngle([0, 1, 0], -0.26)];
+  private readonly _throw = new DiceThrow(DieRounding);
 
-  /** A die's place: turned, lifted to rest on the table plus its hop, its shadow wider and lighter as it rises. */
-  private PlaceDie(d: number, pose: [number, number, number], hop: number): void {
-    const lift = RestingLift(pose[0], pose[1]) + hop;
-    this._diceView.SetNodeRotation(`die${d}`, pose[0], 0, pose[1]);
-    this._diceView.SetNodeRotation(`holder${d}`, 0, pose[2], 0);
-    this._diceView.SetNodeTranslation(`holder${d}`, DieX[d], lift, 0);
+  /** A die's place and turn; its shadow under it on the table, wider and lighter as the die rises. */
+  private PlaceDie(d: number, at: Vec3, turn: Quat): void {
+    this._diceView.SetNodeRotation(`die${d}`, turn);
+    this._diceView.SetNodeTranslation(`die${d}`, at[0], at[1], at[2]);
+    const lift = Math.max(0, at[1]);
     const spread = 1 + lift * 0.6;
+    this._diceView.SetNodeTranslation(`shadow${d}`, at[0] + ShadowShift[0], -0.505, at[2] + ShadowShift[1]);
     this._diceView.SetNodeScale(`shadow${d}`, spread, 1, spread);
     this._diceView.SetMaterialColor(`shadow${d}`, Theme.Alpha("#FFFFFF", Math.min(Math.max(0.99 - lift * 0.9, 0.3), 0.99)));
   }
@@ -2050,7 +2005,7 @@ export class GalleryPage extends DrawnGame {
       ConsumeGestures: (me, e) => {
         if (e.Args.Type !== "Up") return;
         const moved = e.Args.Event.Distance.Total;
-        if (Math.abs(moved.X) > 40 * me.RenderingScale && Math.abs(moved.X) > Math.abs(moved.Y)) this.RollDice();
+        if (Math.abs(moved.X) > 40 * me.RenderingScale && Math.abs(moved.X) > Math.abs(moved.Y)) this.RollDice(Math.sign(moved.X));
       },
     });
     for (let d = 0; d < 2; d++) {
@@ -2058,9 +2013,8 @@ export class GalleryPage extends DrawnGame {
       // polished plastic: a soft shine
       this._diceView.SetMaterialRoughness(`die${d}`, 0.3);
       this._diceView.SetMaterialImage(`shadow${d}`, shadow);
-      this._diceView.SetMaterialVisible(`holder${d}`, false);
     }
-    for (let d = 0; d < 2; d++) this.PlaceDie(d, this._diePose[d], 0);
+    for (let d = 0; d < 2; d++) this.PlaceDie(d, this._dieAt[d], this._dieTurn[d]);
     return this.WideCard("Dice roll",
       "Two dice made in code: a rounded cube wearing one image of its six faces, pips drawn in Skia. Flick them sideways, tap them or press Roll.",
       Make(new SkiaStack(), {
@@ -2078,35 +2032,36 @@ export class GalleryPage extends DrawnGame {
       }), true);
   }
 
-  /** Picks both results, then tumbles each die into its face-up turn with a few hops, from where it stands. */
-  RollDice(): void {
+  /**
+   * Throws both dice from where they lie (toward `direction`: -1 left, 1 right, 0 either). The throw is physics (DiceThrow)
+   * stepped along with each frame at its real pace, so nothing is worked out up front; the faces they end on are the result.
+   */
+  RollDice(direction = 0): void {
     this._diceRoll?.abort();
-    const roll = this._diceRoll = new AbortController();
-    const random = (from: number, to: number) => from + Math.floor(Math.random() * (to - from));
-    const values = [random(1, 7), random(1, 7)];
-    const from = this._diePose.map((p) => [...p] as [number, number, number]);
-    const to: [number, number, number][] = [];
-    for (let d = 0; d < 2; d++) {
-      const up = FaceUp[values[d] - 1];
-      // two or three whole turns on top of the landing turn, alternately forward and back
-      const spins = 360 * random(2, 4) * (d === 0 ? 1 : -1);
-      to[d] = [up[0] + spins, up[1] + 360 * random(1, 3), from[d][2] + random(-60, 61)];
-    }
+    const cancel = this._diceRoll = new AbortController();
+    const roll = this._throw;
+    roll.Throw(this._dieAt[0], this._dieTurn[0], this._dieAt[1], this._dieTurn[1], direction, Math.random);
     this._diceResult.Text = "Rolling...";
+    let last = 0;
+    // 4 s is the longest a throw runs; the animation stops itself when the dice lie still
     void this._diceView.AnimateRangeAsync((t) => {
-      const hop = Bounces(t);
+      const now = t * 4;
+      roll.Run(now - last);
+      last = now;
       for (let d = 0; d < 2; d++) {
-        const p: [number, number, number] = [Tumble(from[d][0], to[d][0], t), Tumble(from[d][1], to[d][1], t), Tumble(from[d][2], to[d][2], t)];
-        this._diePose[d] = p;
-        this.PlaceDie(d, p, hop);
+        this._dieAt[d] = roll.Position(d);
+        this._dieTurn[d] = roll.Turn(d);
+        this.PlaceDie(d, this._dieAt[d], this._dieTurn[d]);
       }
-    }, 0, 1, RollMs, undefined, roll.signal).then(() => {
-      if (roll.signal.aborted) return;
-      for (let d = 0; d < 2; d++) this._diePose[d] = [to[d][0] % 360, to[d][1] % 360, to[d][2] % 360];
-      const sum = values[0] + values[1];
-      this._diceResult.Text = values[0] === values[1] ? `Doubles! ${values[0]} + ${values[1]} = ${sum}` : `${values[0]} + ${values[1]} = ${sum}`;
-      this._diceView.AccessibilityLabel = `Two dice showing ${values[0]} and ${values[1]}`;
-    }, () => {});
+      if (roll.Done && !cancel.signal.aborted) this.Landed(roll.Faces[0], roll.Faces[1]);
+    }, 0, 1, 4000, undefined, cancel.signal).then(() => {}, () => {});
+  }
+
+  private Landed(a: number, b: number): void {
+    this._diceRoll?.abort(); // stops the animation: nothing moves any more
+    const sum = a + b;
+    this._diceResult.Text = a === b ? `Doubles! ${a} + ${b} = ${sum}` : `${a} + ${b} = ${sum}`;
+    this._diceView.AccessibilityLabel = `Two dice showing ${a} and ${b}`;
   }
 
   // ---- GalleryPage.Loop.cs ----
