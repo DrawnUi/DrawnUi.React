@@ -978,7 +978,7 @@ export class GalleryPage extends DrawnGame {
                 Make(new SkiaWrap(), {
                   Spacing: 10,
                   AccessibilityRole: Aria.RoleRadioGroup,
-                  AccessibilityLabel: "Upholstery",
+                  AccessibilityLabel: "Fabric",
                   Children: this._fabrics.map(([name, , , swatch, price], i) => Make(new SkiaStack(), {
                     Spacing: 4,
                     WidthRequest: 60,
