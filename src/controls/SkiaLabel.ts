@@ -1,6 +1,7 @@
 import type { Font } from "canvaskit-wasm";
 import { type DrawingContext, SkiaControl } from "../core/SkiaControl";
 import { ControlTappedEventArgs, type GestureEventProcessingInfo, type SkiaGesturesParameters } from "../core/Gestures";
+import { KeyboardManager, type InputKey } from "../core/KeyboardManager";
 import { Super } from "../core/Super";
 import {
   type Color, Colors, type DrawTextAlignment, type FontAttributes, type LineBreakMode, ScaledSize, SKRect, type SkiaGradient, type TextAlignment,
@@ -17,6 +18,8 @@ interface SpanFonts { Key: string; Main: Font; Fallbacks: Font[]; Ascent: number
  * level and its x from the line start (runs stay in logical order).
  */
 interface TextRun { Text: string; Font: Font; Width: number; Span?: TextSpan; Fonts: SpanFonts; Shaped?: Shaped; Level?: number; X?: number; /** Rank of its visual run and its offset in the line text (bidirectional lines). */ Rank?: number; At?: number }
+/** A drawn line as the selection sees it (pixels relative to DrawingRect): its source range, caret slots and glyph boxes. */
+interface SelectionLine { Start: number; Length: number; Left: number; Right: number; Top: number; Bottom: number; Rtl: boolean; Slots: { Offset: number; X: number }[]; Boxes: { Offset: number; Length: number; Left: number; Right: number }[] }
 /** One laid-out line: runs, total advance, max ascent above / descent below the baseline (pixels). */
 interface TextLine { Runs: TextRun[]; Width: number; Ascent: number; Descent: number; /** Starts a paragraph after the first one (ParagraphSpacing above it). */ Para?: boolean; /** Its paragraph runs right to left (first strong letter). */ Rtl?: boolean }
 /** A paragraph of wrap tokens; `LineBreak`: it follows a U+2028 line separator, not a new paragraph. */
@@ -66,6 +69,10 @@ export class SkiaLabel extends SkiaControl {
 
   /** Set to `Aria.RoleText` to expose every label to screen readers (React extension; C# is opt-in per control). */
   static override DefaultAccessibilityRole?: string;
+  /** Highlight drawn over selected text (AccessibilityTextSelectable), for every label (C# SkiaLabel.TextSelectionColor). */
+  static TextSelectionColor: Color = "rgba(13,110,253,0.353)";
+  /** Caption of the Copy button shown over a touch selection (C# SkiaLabel.CopyButtonText). */
+  static CopyButtonText = "Copy";
   /** Like C# OnTextInternalChanged: the spoken label is the text (or the joined spans) unless AccessibilityLabel is set. */
   protected override DefaultAccessibilityLabel(): string | undefined {
     return this.Spans.length > 0 ? this.Spans.map((s) => s.Text).join("") : this.text || undefined;
@@ -82,7 +89,7 @@ export class SkiaLabel extends SkiaControl {
   private SetLook<K extends keyof this>(key: K, v: this[K]): void { if (this[key] !== v) { this[key] = v; this.UpdateDraw(); } }
 
   get Text(): string { return this.text; }
-  set Text(v: string) { this.Set("text" as keyof this, v as this[keyof this]); }
+  set Text(v: string) { if (v !== this.text && this.selLength > 0) this.ClearSelection(); this.Set("text" as keyof this, v as this[keyof this]); }
 
   get FontSize(): number { return this.fontSize; }
   set FontSize(v: number) { this.Set("fontSize" as keyof this, v as this[keyof this]); }
@@ -756,14 +763,6 @@ export class SkiaLabel extends SkiaControl {
     return out;
   }
 
-  /** Lines as CSS text for the accessibility overlay (AccessibilityTextSelectable): font alias chain, weight and px size. */
-  override GetAccessibilityTextLines(scale: number): import("../core/Accessibility").AccessibilityTextLine[] {
-    const family = [this.fontFamily || Super.DefaultFontAlias, ...this.fontFamilyFallback.split(",").map((f) => f.trim()).filter(Boolean)].filter(Boolean).join(", ");
-    const weight = this.fontWeight > 0 ? this.fontWeight : this.fontAttributes === "Bold" || this.fontAttributes === "BoldItalic" ? 600 : 400;
-    const size = this.fontSize;
-    return this.LineGeometry().map((g) => ({ Text: g.text, Left: g.x / scale, Top: g.y / scale, Width: g.w / scale, Height: g.h / scale, FontFamily: family, FontWeight: weight, FontSize: size }));
-  }
-
   /** Laid-out lines with their text index range (a wrapped-away space or line break sits between two lines). */
   GetLineBoxes(): LineBox[] {
     const geo = this.LineGeometry();
@@ -934,10 +933,15 @@ export class SkiaLabel extends SkiaControl {
     }
     for (const paint of paints.values()) paint.delete();
     strokePaint?.delete(); shadowPaint?.delete();
+    if (this.AccessibilityTextSelectable && this.selLength > 0) this.DrawTextSelection(ctx);
   }
 
   // ---- span taps (port of C# SkiaLabel.ProcessGestures) ----
   override ProcessGestures(args: SkiaGesturesParameters, apply: GestureEventProcessingInfo): SkiaControl | null {
+    if (this.AccessibilityTextSelectable) {
+      const consumed = this.ProcessTextSelection(args, apply);
+      if (consumed) return consumed;
+    }
     if (args.Type === "Tapped" && this.Spans.length > 0) {
       const x = apply.MappedLocation.X + apply.ChildOffset.X - this.DrawingRect.Left;
       const y = apply.MappedLocation.Y + apply.ChildOffset.Y - this.DrawingRect.Top;
@@ -962,5 +966,298 @@ export class SkiaLabel extends SkiaControl {
   protected OnSpanTapped(span: TextSpan, args: SkiaGesturesParameters, apply: GestureEventProcessingInfo): SkiaControl | null {
     span.FireTap(new ControlTappedEventArgs(this, args, apply));
     return this;
+  }
+
+  // ---- text selection (port of C# SkiaLabel TEXT SELECTION, drawnui-cross 6cb / 6cc) ----
+
+  override get AccessibilityTextSelectable(): boolean { return super.AccessibilityTextSelectable; }
+  /**
+   * The text can be selected and copied, drawn by the label (C# SkiaLabel.AccessibilityTextSelectable). Mouse: drag, double
+   * click for a word. Touch: long press picks a word, keep the finger down and drag to extend, a Copy button appears.
+   * Ctrl+C (Cmd+C) copies and Ctrl+A selects all while the label holds the selection; a click elsewhere drops it. The label
+   * takes the mouse press for this, so it no longer reaches controls under it. Free when off. Copies through
+   * Super.SetClipboardText.
+   */
+  override set AccessibilityTextSelectable(v: boolean) { super.AccessibilityTextSelectable = v; if (!v) this.ClearSelection(); }
+
+  private selStart = 0;
+  private selLength = 0;
+  private anchorStart = 0;
+  private anchorEnd = 0;
+  private selecting = false;
+  private touchSelection = false;
+  private copyPressed = false;
+  private selectionKeysAttached = false;
+  private lastClickMs = 0;
+  private lastClickX = 0;
+  private lastClickY = 0;
+  /** The drawn Copy button of a touch selection, relative to DrawingRect (pixels); empty when none. */
+  private copyButton = new SKRect(0, 0, 0, 0);
+  private selectionMap?: { Key: string; Source: string; Lines: SelectionLine[] };
+
+  /** Start of the selection in the selection's source: the label's text when the lines are taken from it verbatim, else the drawn lines joined. */
+  get SelectionStart(): number { return this.selStart; }
+  /** Length of the selection, 0 when nothing is selected. */
+  get SelectionLength(): number { return this.selLength; }
+  /** The selected text, empty when nothing is selected. */
+  get SelectedText(): string {
+    if (this.selLength <= 0) return "";
+    const source = this.SelectionMap().Source;
+    const start = Math.min(Math.max(this.selStart, 0), source.length);
+    return source.substr(start, Math.min(Math.max(this.selLength, 0), source.length - start));
+  }
+  /** Selects a range of the text (see SelectionStart for what the indexes count). */
+  Select(start: number, length: number): void {
+    const n = this.SelectionMap().Source.length;
+    start = Math.min(Math.max(start, 0), n);
+    length = Math.min(Math.max(length, 0), n - start);
+    if (start === this.selStart && length === this.selLength) return;
+    this.selStart = start; this.selLength = length;
+    this.UpdateDraw();
+  }
+  /** Selects all of the text. */
+  SelectAll(): void { this.Select(0, this.SelectionMap().Source.length); }
+  /** Drops the selection. */
+  ClearSelection(): void {
+    this.selecting = false; this.copyPressed = false;
+    if (this.selLength === 0 && !this.touchSelection) return;
+    this.selLength = 0; this.touchSelection = false;
+    this.UpdateDraw();
+  }
+  /** The app showed its own context menu for a touch selection: the drawn Copy button steps aside, the selection stays. */
+  HideCopyButton(): void {
+    if (!this.touchSelection) return;
+    this.touchSelection = false;
+    this.copyButton = new SKRect(0, 0, 0, 0);
+    this.UpdateDraw();
+  }
+  /** Puts the selected text on the clipboard through Super.SetClipboardText. False when nothing is selected. */
+  CopySelection(): boolean {
+    const text = this.SelectedText;
+    if (!text) return false;
+    Super.SetClipboardText(text);
+    return true;
+  }
+
+  /** A selectable label takes the canvas focus while text is selected and drops the selection when the focus moves elsewhere. */
+  override SetFrameworkFocus(focus: boolean): boolean {
+    if (!this.AccessibilityTextSelectable) return super.SetFrameworkFocus(focus);
+    if (!focus) this.ClearSelection();
+    this.AttachSelectionKeys(focus);
+    return true;
+  }
+
+  protected override OnDisposing(): void { this.AttachSelectionKeys(false); super.OnDisposing(); }
+
+  private AttachSelectionKeys(attach: boolean): void {
+    if (attach === this.selectionKeysAttached) return;
+    this.selectionKeysAttached = attach;
+    if (attach) KeyboardManager.Subscribe(this.onSelectionKey, SkiaLabel.noChar);
+    else KeyboardManager.Unsubscribe(this.onSelectionKey, SkiaLabel.noChar);
+  }
+  private static readonly noChar = () => {};
+  private readonly onSelectionKey = (key: InputKey, e: KeyboardEvent) => {
+    // Ctrl+C in a page input or a focused element is that element's copy, not this selection's
+    if (KeyboardManager.IsOwnedByElement(e)) return;
+    // a drag selected page text: the page copies it
+    if (this.Superview?.OwnsTextSelectionKeys) return;
+    if (!KeyboardManager.IsControlPressed) return;
+    if (key === "KeyC") this.CopySelection();
+    else if (key === "KeyA") { e.preventDefault(); this.SelectAll(); }
+  };
+  private ClaimSelectionFocus(): void { this.Superview?.ReportFocus(this, this); this.AttachSelectionKeys(true); }
+
+  /**
+   * The drawn lines mapped onto a source string: the label's text when every line is found in it in order (spaces
+   * dropped at wraps are then copied too), else the lines joined, a new line between paragraphs. Each line keeps its
+   * caret slots (x of each text index, relative to DrawingRect) and its glyph boxes.
+   */
+  private SelectionMap(): { Source: string; Lines: SelectionLine[] } {
+    const d = this.DrawingRect;
+    const key = `${this.LayoutVersion}|${d.Width}|${d.Height}|${this.text}`;
+    if (this.selectionMap?.Key === key) return this.selectionMap;
+    const boxes = this.GetLineBoxes(), glyphs = this.GetGlyphBoxes();
+    const texts = this.lines.map((l) => l.Runs.map((r) => r.Text).join(""));
+    const starts: number[] = [];
+    let source = this.text ?? "", position = 0, verbatim = true;
+    for (const t of texts) {
+      const at = source.indexOf(t, position);
+      if (at < 0) { verbatim = false; break; }
+      starts.push(at); position = at + t.length;
+    }
+    if (!verbatim) {
+      starts.length = 0; source = "";
+      texts.forEach((t, i) => { if (i > 0 && this.lines[i].Para) source += "\n"; starts.push(source.length); source += t; });
+    }
+    const lines: SelectionLine[] = boxes.map((b, i) => {
+      const own = glyphs.filter((g) => g.Line === i);
+      const rtl = own.some((g) => g.Rtl);
+      const slots: { Offset: number; X: number }[] = own.map((g) => ({ Offset: g.Index - b.Start, X: g.Rtl ? g.Left + g.Width : g.Left }));
+      slots.push({ Offset: texts[i].length, X: this.lines[i].Rtl ? b.Left : b.Left + b.Width });
+      return { Start: starts[i] ?? 0, Length: texts[i].length, Left: b.Left, Right: b.Left + b.Width, Top: b.Top, Bottom: b.Top + b.Height, Rtl: rtl, Slots: slots,
+        Boxes: own.map((g) => ({ Offset: g.Index - b.Start, Length: g.Length, Left: g.Left, Right: g.Left + g.Width })) };
+    });
+    this.selectionMap = { Key: key, Source: source, Lines: lines };
+    return this.selectionMap;
+  }
+
+  /** Text index under a point relative to DrawingRect (pixels). */
+  private IndexAt(x: number, y: number): number {
+    const lines = this.SelectionMap().Lines;
+    if (lines.length === 0) return 0;
+    const line = lines.find((l) => y <= l.Bottom) ?? lines[lines.length - 1];
+    let best = 0, bestDistance = Infinity;
+    for (const s of line.Slots) { const dx = Math.abs(s.X - x); if (dx < bestDistance) { bestDistance = dx; best = s.Offset; } }
+    return line.Start + best;
+  }
+
+  private WordAt(index: number): [number, number] {
+    const text = this.SelectionMap().Source;
+    if (text.length === 0) return [0, 0];
+    index = Math.min(Math.max(index, 0), text.length - 1);
+    const isWord = (c: string) => /[\p{L}\p{N}_']/u.test(c);
+    if (!isWord(text[index]) && index > 0 && isWord(text[index - 1])) index--;
+    if (!isWord(text[index])) return [index, index + 1];
+    let start = index; while (start > 0 && isWord(text[start - 1])) start--;
+    let end = index + 1; while (end < text.length && isWord(text[end])) end++;
+    return [start, end];
+  }
+
+  /** Text index under a canvas point (pixels), for a selection a page drag makes across labels. */
+  TextIndexAtCanvas(x: number, y: number): number {
+    const r = this.GetAccessibilityPixelRect();
+    if (r.Width <= 0 || r.Height <= 0) return 0;
+    return this.IndexAt(x - r.Left, y - r.Top);
+  }
+  /** Length of the text a selection counts in (see SelectionStart). */
+  get SelectableLength(): number { return this.SelectionMap().Source.length; }
+
+  private SelectBetween(index: number): void {
+    const start = Math.min(this.anchorStart, index), end = Math.max(this.anchorEnd, index);
+    this.Select(start, end - start);
+  }
+
+  /** Pointer handling of AccessibilityTextSelectable; null lets the gesture go on as usual. */
+  protected ProcessTextSelection(args: SkiaGesturesParameters, apply: GestureEventProcessingInfo): SkiaControl | null {
+    const x = apply.MappedLocation.X + apply.ChildOffset.X - this.DrawingRect.Left;
+    const y = apply.MappedLocation.Y + apply.ChildOffset.Y - this.DrawingRect.Top;
+    const pointer = args.Event.Pointer;
+    const mouse = pointer?.DeviceType === "Mouse";
+    const onCopy = () => { const b = this.copyButton; return x >= b.Left && x < b.Right && y >= b.Top && y < b.Bottom; };
+    switch (args.Type) {
+      case "Down": {
+        if (this.touchSelection && this.selLength > 0 && onCopy()) { this.copyPressed = true; return this; }
+        if (!mouse) return null; // touch: a long press selects, a drag keeps scrolling
+        // only the main button selects: a right click keeps the selection for its context menu
+        if (pointer && pointer.Button !== "Left") return this.selLength > 0 ? this : null;
+        const index = this.IndexAt(x, y);
+        // when the click happened (stamped at arrival), not when a frame got to process it
+        const now = args.Event.Timestamp;
+        const second = now - this.lastClickMs < 450 && Math.hypot(x - this.lastClickX, y - this.lastClickY) < 8 * this.RenderingScale;
+        this.lastClickMs = second ? 0 : now; this.lastClickX = x; this.lastClickY = y;
+        [this.anchorStart, this.anchorEnd] = second ? this.WordAt(index) : [index, index];
+        this.touchSelection = false;
+        this.selecting = true;
+        this.Select(this.anchorStart, this.anchorEnd - this.anchorStart);
+        this.ClaimSelectionFocus();
+        return this;
+      }
+      case "LongPressing": {
+        if (mouse) return this.selecting ? this : null;
+        const pressed = this.IndexAt(x, y);
+        // a long press on the selection keeps it, for the context menu that follows
+        if (this.selLength > 0 && pressed >= this.selStart && pressed < this.selStart + this.selLength) {
+          [this.anchorStart, this.anchorEnd] = [this.selStart, this.selStart + this.selLength];
+          this.touchSelection = true; this.selecting = true;
+          this.ClaimSelectionFocus();
+          this.UpdateDraw();
+          return this;
+        }
+        [this.anchorStart, this.anchorEnd] = this.WordAt(pressed);
+        this.touchSelection = true; this.selecting = true;
+        this.Select(this.anchorStart, this.anchorEnd - this.anchorStart);
+        this.ClaimSelectionFocus();
+        this.UpdateDraw();
+        return this;
+      }
+      case "Panning":
+        if (!this.selecting) return null;
+        this.SelectBetween(this.IndexAt(x, y));
+        return this;
+      case "Up":
+        if (this.copyPressed) {
+          this.copyPressed = false;
+          if (onCopy()) { this.CopySelection(); this.ClearSelection(); }
+          return this;
+        }
+        if (this.selecting) { this.selecting = false; return this; }
+        return null;
+      case "Tapped":
+        if (this.copyPressed) return this; // the tap on the Copy button: its Up (after the tap) copies
+        if (this.selLength <= 0) return null; // nothing selected: span links and Tapped still get the tap
+        if (!mouse) this.ClearSelection(); // a tap drops a touch selection
+        // a click that selected (double click) is the label's: unconsumed, the canvas would read it as a tap on empty
+        // space and take the focus, and with it the selection
+        return this;
+    }
+    return null;
+  }
+
+  /** Draws the selection over the lines just drawn, and the Copy button of a touch selection. */
+  protected DrawTextSelection(ctx: DrawingContext): void {
+    const CK = Super.CK, map = this.SelectionMap(), canvas = ctx.Context.Canvas, d = ctx.Destination, scale = ctx.Scale;
+    const paint = new CK.Paint();
+    paint.setAntiAlias(true);
+    paint.setColor(Super.ParseColor(SkiaLabel.TextSelectionColor));
+    const start = this.selStart, end = this.selStart + this.selLength;
+    let first: SKRect | undefined, last: SKRect | undefined;
+    map.Lines.forEach((line, i) => {
+      const lineEnd = line.Start + line.Length;
+      const a = Math.max(start, line.Start), b = Math.min(end, lineEnd);
+      const continues = end > lineEnd && i < map.Lines.length - 1;
+      if (a > b || (a === b && !continues)) return;
+      let rect: SKRect | undefined;
+      if (line.Rtl) {
+        // right-to-left text: the selected characters' boxes, blocks across a direction change
+        for (const g of line.Boxes) {
+          if (g.Offset < a - line.Start || g.Offset >= b - line.Start) continue;
+          const block = new SKRect(d.Left + g.Left, d.Top + line.Top, d.Left + g.Right, d.Top + line.Bottom);
+          canvas.drawRect(CK.LTRBRect(block.Left, block.Top, block.Right, block.Bottom), paint);
+          rect = rect ? new SKRect(Math.min(rect.Left, block.Left), block.Top, Math.max(rect.Right, block.Right), block.Bottom) : block;
+        }
+        if (!rect) return;
+      } else {
+        const slotX = (offset: number) => line.Slots.find((s) => s.Offset >= offset)?.X ?? line.Right;
+        const x0 = slotX(a - line.Start), x1 = continues && b === lineEnd ? line.Right : slotX(b - line.Start);
+        rect = new SKRect(d.Left + x0, d.Top + line.Top, d.Left + Math.max(x1, x0 + scale), d.Top + line.Bottom);
+        canvas.drawRect(CK.LTRBRect(rect.Left, rect.Top, rect.Right, rect.Bottom), paint);
+      }
+      first ??= rect; last = rect;
+    });
+    this.copyButton = new SKRect(0, 0, 0, 0);
+    if (!this.touchSelection || !first || !last) { paint.delete(); return; }
+
+    // the Copy button inside the label (its cache clips and its hit box is the label): above the selection, else below
+    // it, else beside it on the same line, overlapping only when none fits
+    const font = Super.GetFont(this.fontFamily || Super.DefaultFontAlias, 400, false, 14 * scale);
+    const caption = SkiaLabel.CopyButtonText;
+    const textWidth = font.getGlyphWidths(font.getGlyphIDs(caption)).reduce((s: number, w: number) => s + w, 0);
+    const height = 32 * scale, width = textWidth + 28 * scale, gap = 6 * scale;
+    const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), Math.max(lo, hi));
+    const centered = clamp((first.Left + first.Right) / 2 - width / 2, d.Left, d.Right - width);
+    const middle = clamp((first.Top + first.Bottom) / 2 - height / 2, d.Top, d.Bottom - height);
+    let bx: number, by: number;
+    if (first.Top - gap - height >= d.Top) [bx, by] = [centered, first.Top - gap - height];
+    else if (last.Bottom + gap + height <= d.Bottom) [bx, by] = [centered, last.Bottom + gap];
+    else if (first.Right + gap + width <= d.Right) [bx, by] = [first.Right + gap, middle];
+    else if (first.Left - gap - width >= d.Left) [bx, by] = [first.Left - gap - width, middle];
+    else [bx, by] = [centered, Math.max(d.Top, d.Bottom - height)];
+    paint.setColor(CK.Color(33, 37, 41, 235 / 255));
+    canvas.drawRRect(CK.RRectXY(CK.LTRBRect(bx, by, bx + width, by + height), height / 2, height / 2), paint);
+    paint.setColor(CK.WHITE);
+    const m = font.getMetrics();
+    canvas.drawText(caption, bx + width / 2 - textWidth / 2, by + height / 2 - (m.ascent + m.descent) / 2, paint, font);
+    paint.delete();
+    this.copyButton = new SKRect(bx - d.Left, by - d.Top, bx + width - d.Left, by + height - d.Top);
   }
 }

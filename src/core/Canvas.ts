@@ -1,5 +1,5 @@
 import type { GrDirectContext, Surface, WebGLContextHandle } from "canvaskit-wasm";
-import { type CachedObject, CanvasLeaveWatchers, type DrawingContext, type SkiaControl } from "./SkiaControl";
+import { type CachedObject, CanvasLeaveWatchers, type DrawingContext, SkiaControl } from "./SkiaControl";
 import type { AnimatorBase } from "./Animators";
 import { Super } from "./Super";
 import { SkiaAccessibilityManager } from "./Accessibility";
@@ -370,6 +370,7 @@ export class Canvas {
   private Draw(canvas: import("canvaskit-wasm").Canvas): void {
     const started = performance.now();
     this.ProcessPendingGestures();
+    this.ProcessTextSelectionFrame();
     // Animators run on the frame's vsync time (inside a rAF callback document.timeline.currentTime is the frame
     // timestamp), not on when this callback happened to start: callback starts drift by several ms around vsync
     // (measured 12..23 ms between frames shown 16.7 ms apart), and a game loop moving by speed * delta then
@@ -589,6 +590,140 @@ export class Canvas {
   private readonly previousTouchArgs = new Map<number, TouchActionEventArgs>();
   private readonly pendingGestures: SkiaGesturesParameters[] = [];
 
+  // ---- page text selection with the mouse, as in browsers (port of C# DrawnView.TextSelection, drawnui-cross 6cc) ----
+  // A main-button drag that starts on no interactive control selects the selectable labels (AccessibilityTextSelectable)
+  // it crosses, in reading order, the first and last partly. Idle cost: one check per gesture and per frame.
+  private textDrag?: { Labels: SelectableLabel[]; StartLabel: SelectableLabel; StartIndex: number; Scroll?: ScrollLike; X: number; Y: number; Moved: boolean };
+  private readonly pageSelection: SelectableLabel[] = [];
+  private pageSelectionKeys = false;
+
+  /**
+   * The text selected on the page: the labels a mouse drag selected, joined with new lines, in page order; else the
+   * selection of the label in focus. Empty when nothing is selected.
+   */
+  get SelectedText(): string {
+    if (this.pageSelection.length > 0) return this.pageSelection.map((l) => l.SelectedText).filter((t) => t).join("\n");
+    return (this.focusedChild as SelectableLabel | undefined)?.SelectedText ?? "";
+  }
+  /** True while a mouse drag selection holds page text: the page, not a label, owns Ctrl+C. */
+  get OwnsTextSelectionKeys(): boolean { return this.pageSelection.some((l) => l.SelectionLength > 0); }
+  /** Puts SelectedText on the clipboard through Super.SetClipboardText. False when nothing is selected. */
+  CopyTextSelection(): boolean {
+    const text = this.SelectedText;
+    if (!text) return false;
+    Super.SetClipboardText(text);
+    return true;
+  }
+  /** Drops the page text selection (every label a drag selected) and the selection of the label in focus. */
+  ClearTextSelection(): void {
+    for (const label of this.pageSelection) label.ClearSelection();
+    this.pageSelection.length = 0;
+    (this.focusedChild as SelectableLabel | undefined)?.ClearSelection?.();
+    this.AttachPageSelectionKeys(false);
+  }
+
+  /**
+   * Before a gesture goes to the controls: a mouse drag that is selecting text keeps its moves (a scroll under it does
+   * not scroll), a main-button press drops the previous page selection. True when the gesture was used here.
+   */
+  private PreviewTextSelectionGesture(args: SkiaGesturesParameters): boolean {
+    const mouseMain = args.Event.Pointer?.DeviceType === "Mouse" && args.Event.Pointer.Button === "Left";
+    const drag = this.textDrag;
+    if (args.Type === "Down" && mouseMain) {
+      this.textDrag = undefined;
+      // a press on an open popup window (the menu that copies the selection) keeps it, as browsers keep a selection
+      // while their context menu is used
+      const onPopup = this.popups.HasInteractive && !!this.popups.At(args.Event.Location.X, args.Event.Location.Y);
+      if (this.pageSelection.length > 0 && !onPopup) this.ClearTextSelection();
+    } else if (args.Type === "Panning" && drag) {
+      drag.X = args.Event.Location.X; drag.Y = args.Event.Location.Y; drag.Moved = true;
+      this.UpdateTextDrag(drag);
+      this.Update();
+      return true;
+    } else if (args.Type === "Up" && drag) {
+      if (drag.Moved) this.UpdateTextDrag(drag);
+      this.textDrag = undefined;
+    }
+    return false;
+  }
+
+  /**
+   * After a mouse main-button press went to the controls: when it landed on no interactive control (empty space, a
+   * scroll's empty area, a selectable label), a drag from here selects text. Not inside a scroll that holds no
+   * selectable text: that one keeps scrolling by mouse drag.
+   */
+  private AfterTextSelectionDown(args: SkiaGesturesParameters, consumed: SkiaControl | null): void {
+    if (args.Type !== "Down" || args.Event.Pointer?.DeviceType !== "Mouse" || args.Event.Pointer.Button !== "Left") return;
+    if (consumed && !IsScroll(consumed) && !IsSelectableLabel(consumed)) return;
+    const collected: SelectableLabel[] = [];
+    if (this.content) CollectSelectable(this.content, collected);
+    if (collected.length === 0) return;
+    const labels = ReadingOrder(collected);
+    const x = args.Event.Location.X, y = args.Event.Location.Y;
+    const scroll = (consumed && IsScroll(consumed) ? consumed : undefined) ?? ScrollOf(consumed ?? undefined) ?? ScrollAt(labels, x, y);
+    if (scroll && !labels.some((l) => IsInside(l, scroll))) return;
+    const [label, index] = Locate(labels, x, y);
+    if (!label) return;
+    this.textDrag = { Labels: labels, StartLabel: label, StartIndex: index, Scroll: scroll, X: x, Y: y, Moved: false };
+  }
+
+  /** Frame start: while a drag holds the pointer past a scroll's top or bottom edge, the scroll follows it. */
+  private ProcessTextSelectionFrame(): void {
+    const drag = this.textDrag;
+    if (!drag?.Scroll || !drag.Moved) return;
+    const view = drag.Scroll.GetAccessibilityPixelRect();
+    if (view.Width <= 0 || view.Height <= 0) return;
+    const past = drag.Y > view.Bottom ? drag.Y - view.Bottom : drag.Y < view.Top ? drag.Y - view.Top : 0;
+    if (past === 0) return;
+    // faster the farther past the edge, as browsers do
+    const step = Math.min(Math.max(Math.abs(past) * 0.25, 2), 40) / this.RenderingScale * Math.sign(past);
+    drag.Scroll.ScrollTo(drag.Scroll.ViewportOffsetX, drag.Scroll.ViewportOffsetY - step, 0, true);
+    this.UpdateTextDrag(drag);
+    this.Update();
+  }
+
+  private UpdateTextDrag(drag: NonNullable<Canvas["textDrag"]>): void {
+    const [endLabel, endIndex] = Locate(drag.Labels, drag.X, drag.Y);
+    if (!endLabel) return;
+    const a = drag.Labels.indexOf(drag.StartLabel), b = drag.Labels.indexOf(endLabel);
+    if (a < 0 || b < 0) return;
+    const [fromLabel, fromIndex, toLabel, toIndex] = a < b || (a === b && drag.StartIndex <= endIndex)
+      ? [a, drag.StartIndex, b, endIndex] : [b, endIndex, a, drag.StartIndex];
+    for (const label of this.pageSelection) {
+      const at = drag.Labels.indexOf(label);
+      if (at < fromLabel || at > toLabel) label.ClearSelection();
+    }
+    this.pageSelection.length = 0;
+    for (let i = fromLabel; i <= toLabel; i++) {
+      const label = drag.Labels[i];
+      const start = i === fromLabel ? fromIndex : 0, end = i === toLabel ? toIndex : label.SelectableLength;
+      label.Select(start, Math.max(0, end - start));
+      this.pageSelection.push(label);
+    }
+    this.AttachPageSelectionKeys(this.OwnsTextSelectionKeys);
+  }
+
+  private AttachPageSelectionKeys(attach: boolean): void {
+    if (attach === this.pageSelectionKeys) return;
+    this.pageSelectionKeys = attach;
+    if (attach) KeyboardManager.Subscribe(this.onPageSelectionKey, Canvas.noChar); else KeyboardManager.Unsubscribe(this.onPageSelectionKey, Canvas.noChar);
+  }
+  private static readonly noChar = () => {};
+  private readonly onPageSelectionKey = (key: InputKey, e: KeyboardEvent) => {
+    // Esc keeps the selection, as in browsers: a click elsewhere drops it
+    if (KeyboardManager.IsOwnedByElement(e) || !KeyboardManager.IsControlPressed) return;
+    if (key === "KeyC") this.CopyTextSelection();
+    else if (key === "KeyA" && IsSelectableLabel(this.focusedChild)) {
+      // as for one label: Ctrl+A selects all of the label in focus
+      e.preventDefault();
+      const focused = this.focusedChild as SelectableLabel;
+      for (const label of this.pageSelection) label.ClearSelection();
+      this.pageSelection.length = 0;
+      this.AttachPageSelectionKeys(false);
+      focused.SelectAll();
+    }
+  };
+
   private readonly onPointer = (e: PointerEvent) => {
     const type: TouchActionType | undefined =
       e.type === "pointerdown" ? "Pressed" :
@@ -649,9 +784,18 @@ export class Canvas {
   private readonly onContextMenu = (e: MouseEvent) => {
     const pointerType = (e as PointerEvent).pointerType;
     const source: ContextMenuSource = pointerType === "touch" || pointerType === "pen" ? "touch" : pointerType === "mouse" || e.button === 2 ? "mouse" : "keyboard";
-    // a long press: the browser's own contextmenu (Android Chrome) or the press's long press raises it, once (6cb)
+    // a long press: the browser's own contextmenu (Android Chrome) or the press's long press raises it, once (6cb); a
+    // browser menu that comes first runs the long press before it (the word under the finger is selected first, C#
+    // SkipRepeatedTouchContextMenu)
+    if (source === "touch") this.LongPressNow((e as PointerEvent).pointerId);
+    // the press the menu comes from first, in the order it happened (the browser sends contextmenu at the press on macOS
+    // and Linux, after the release on Windows): processed later, its press would close a menu that opens now
+    else this.ProcessPendingGestures();
     const handled = source === "touch" ? this.RaiseTouchContextMenu(e.clientX, e.clientY, e) : this.RaiseContextMenu(e.clientX, e.clientY, source, e);
     if (handled) e.preventDefault();
+    // a menu opened while the button is still down: the rest of that press goes nowhere (its release would tap the item
+    // under it)
+    if (source !== "touch" && this.activeTouchIds.size > 0 && this.popups.HasInteractive) this.popups.SwallowPress = true;
   };
 
   /** A context-menu request at a point of the page (client CSS px), routed through the tree like a tap; true when one took it. */
@@ -688,6 +832,8 @@ export class Canvas {
     if (press.Raised) return press.Handled;
     press.Raised = true;
     press.Handled = this.RaiseContextMenu(clientX, clientY, "touch", native ?? new MouseEvent("contextmenu", { clientX, clientY }));
+    // the app showed its own menu: the drawn Copy button of a touch text selection steps aside, the selection stays
+    if (press.Handled) (this.focusedChild as SelectableLabel | undefined)?.HideCopyButton?.();
     return press.Handled;
   }
 
@@ -849,6 +995,7 @@ export class Canvas {
     for (const t of ["pointerdown", "pointermove", "pointerup", "pointercancel"]) el.removeEventListener(t, this.onPointer as EventListener);
     el.removeEventListener("pointerleave", this.onPointerLeave);
     el.removeEventListener("contextmenu", this.onContextMenu);
+    this.textDrag = undefined;
     el.removeEventListener("wheel", this.onWheel);
     window.removeEventListener("blur", this.onWindowBlur);
     el.removeEventListener("touchmove", this.preventTouch);
@@ -957,6 +1104,19 @@ export class Canvas {
     }, Canvas.LongPressTimeMs));
   }
 
+  /** The long press of a held touch, now (the browser's context menu came first): queued gestures first, then it; its timer is off. */
+  private LongPressNow(pointerId: number): void {
+    const id = this.longPressTimers.has(pointerId) ? pointerId : [...this.longPressTimers.keys()][0];
+    const down = id === undefined ? undefined : this.pointerDownArgs.get(id);
+    if (id === undefined || !down || !this.activeTouchIds.has(id)) return;
+    this.DisarmLongPress(id);
+    this.longPressed.add(id);
+    const args = new TouchActionEventArgs();
+    Object.assign(args, down);
+    args.Location = down.StartingLocation ?? down.Location;
+    this.ProcessGestureNow(args, "LongPressing");
+  }
+
   private DisarmLongPress(id: number): void {
     const t = this.longPressTimers.get(id);
     if (t) { clearTimeout(t); this.longPressTimers.delete(id); }
@@ -1059,7 +1219,11 @@ export class Canvas {
   /** Entry into the control tree; on a completed tap the focus follows it (C# Canvas: focus only on Tapped). */
   protected ProcessGestures(root: SkiaControl, args: SkiaGesturesParameters): SkiaControl | null {
     if (args.Type === "Down") { this.focusAtDown = this.focusedChild; this.tapNoFocus = false; }
+    // a mouse drag selecting page text keeps its moves: no scroll under it scrolls (the pointer is captured, so the
+    // moves keep coming once it leaves the canvas and the scroll follows it past its edge)
+    if (this.PreviewTextSelectionGesture(args)) return null;
     const consumed = this.RouteGestures(root, args);
+    this.AfterTextSelectionDown(args, consumed);
     // a control that claimed the focus during this gesture (an editor on its press) keeps it; a press that closed the
     // popup windows moves nothing
     if (args.Type === "Tapped" && !this.tapNoFocus && this.focusedChild === this.focusAtDown) this.ReportFocus(consumed ?? undefined);
@@ -1119,4 +1283,76 @@ export class Canvas {
     if (!wheel && args.Type !== "Pointer") this.gestureOwner = consumed && args.Type !== "Up" ? consumed : null;
     return consumed;
   }
+}
+
+/** What the page selection needs from a selectable SkiaLabel (core does not import the controls). */
+interface SelectableLabel extends SkiaControl {
+  readonly SelectedText: string; readonly SelectionLength: number; readonly SelectableLength: number;
+  Select(start: number, length: number): void; SelectAll(): void; ClearSelection(): void; HideCopyButton(): void; TextIndexAtCanvas(x: number, y: number): number;
+}
+interface ScrollLike extends SkiaControl { ViewportOffsetX: number; ViewportOffsetY: number; ScrollTo(x: number, y: number, secs: number, clamp?: boolean): void }
+const IsScroll = (c: SkiaControl | undefined): c is ScrollLike => !!c && "ScrollTo" in c && "ViewportOffsetY" in c;
+const IsSelectableLabel = (c: SkiaControl | undefined): c is SelectableLabel => !!c && c.AccessibilityTextSelectable && "TextIndexAtCanvas" in c;
+
+/**
+ * Where a canvas point falls in the labels' order: inside a drawn label, its text index there; before a label (above it,
+ * or left of it on its line), that label's start; past them all, the end of the last drawn one.
+ */
+function Locate(labels: SelectableLabel[], x: number, y: number): [SelectableLabel | undefined, number] {
+  let last: SelectableLabel | undefined;
+  for (const label of labels) {
+    const r = label.GetAccessibilityPixelRect();
+    if (r.Width <= 0 || r.Height <= 0) continue;
+    if (x >= r.Left && x < r.Right && y >= r.Top && y < r.Bottom) return [label, label.TextIndexAtCanvas(x, y)];
+    if (y < r.Top || (y <= r.Bottom && x < r.Left)) return [label, 0];
+    last = label;
+  }
+  return last ? [last, last.SelectableLength] : [undefined, 0];
+}
+/**
+ * The labels in reading order, as they are seen (the tree order is not: a page in two columns lists the left column's
+ * labels first, and a drag in the right column would then start at a label below it): by top, labels whose tops are within
+ * half the smaller height forming one line, read left to right.
+ */
+function ReadingOrder(labels: SelectableLabel[]): SelectableLabel[] {
+  const rects = new Map(labels.map((l) => [l, l.GetAccessibilityPixelRect()]));
+  const sorted = [...labels].sort((a, b) => rects.get(a)!.Top - rects.get(b)!.Top || rects.get(a)!.Left - rects.get(b)!.Left);
+  for (let start = 0, i = 1; i <= sorted.length; i++) {
+    if (i < sorted.length) {
+      const first = rects.get(sorted[start])!, next = rects.get(sorted[i])!;
+      if (next.Top - first.Top < Math.min(first.Height, next.Height) / 2) continue;
+    }
+    if (i - start > 1) {
+      const line = sorted.slice(start, i).sort((a, b) => rects.get(a)!.Left - rects.get(b)!.Left);
+      for (let k = 0; k < line.length; k++) sorted[start + k] = line[k];
+    }
+    start = i;
+  }
+  return sorted;
+}
+function CollectSelectable(control: SkiaControl, into: SelectableLabel[]): void {
+  if (!control.IsVisible || control.IsDisposed) return;
+  if (IsSelectableLabel(control)) into.push(control);
+  const views = "Views" in control ? (control as unknown as { Views: readonly SkiaControl[] }).Views : undefined;
+  const content = views ? undefined : (control as unknown as { Content?: SkiaControl }).Content;
+  for (const child of views ?? (content ? [content] : [])) CollectSelectable(child, into);
+}
+function ScrollOf(control: SkiaControl | undefined): ScrollLike | undefined {
+  for (let p = control?.Parent; p; p = p.Parent) if (IsScroll(p)) return p;
+  return undefined;
+}
+/** The innermost drawn scroll around a selectable label whose viewport holds the point. */
+function ScrollAt(labels: SelectableLabel[], x: number, y: number): ScrollLike | undefined {
+  for (const label of labels) {
+    for (let p = label.Parent; p; p = p.Parent) {
+      if (!IsScroll(p)) continue;
+      const r = p.GetAccessibilityPixelRect();
+      if (x >= r.Left && x < r.Right && y >= r.Top && y < r.Bottom) return p;
+    }
+  }
+  return undefined;
+}
+function IsInside(control: SkiaControl, ancestor: SkiaControl): boolean {
+  for (let p = control.Parent; p; p = p.Parent) if (p === ancestor) return true;
+  return false;
 }

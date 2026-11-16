@@ -347,8 +347,10 @@ createRoot(document.getElementById("root")!).render(
   move; `canvas.KeyboardFocusNode = undefined` leaves no drawn control focused.
 - Accessibility: an invisible DOM overlay mirrors accessible controls over the `aria-hidden` canvas
   (`AccessibilityRole`, `AccessibilityLabel`, `AccessibilityHint`, `AccessibilityIsPressed`, `AccessibilityLive`,
-  `Aria.RolePresentation` to hide). `AccessibilityTextSelectable` (opt-in) makes a label's text natively
-  selectable and copyable; never enable it on gesture-driven controls, the text then owns the pointer.
+  `Aria.RolePresentation` to hide). `AccessibilityTextSelectable` (opt-in) makes a label's text selectable and
+  copyable, drawn by the label as in DrawnUi.Net (mouse drag across labels, double click, touch long press with a drawn
+  Copy button, Ctrl+C; `canvas.SelectedText` / `CopyTextSelection()` / `ClearTextSelection()`,
+  `SkiaLabel.TextSelectionColor`); the label takes the mouse press, so keep it off inside gesture-driven controls.
   Each name is said once: a text or heading inside a node, repeating that node's label, is read only once (a card
   button keeps its name and the title is left out; a group card loses its name and its heading says it). A control
   role (button, link, checkbox, switch, slider, textbox, tab, option, menu item...) that cannot take input is

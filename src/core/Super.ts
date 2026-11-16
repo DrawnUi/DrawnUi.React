@@ -58,10 +58,6 @@ export class DrawnUiBuilder {
         face = Super.LoadFace(data);
         if (!face) throw new Error(`DrawnUi: cannot load font '${f.Source}'`);
         loaded.set(f.Source, face);
-        // the same face as a CSS font under the alias: the accessibility overlay's selectable text lines up with the drawn glyphs
-        if (typeof FontFace !== "undefined" && typeof document !== "undefined") {
-          try { const css = new FontFace(f.Alias, data, { weight: String(f.Weight) }); await css.load(); document.fonts.add(css); } catch { /* selection text falls back to a system font */ }
-        }
       }
       let weights = Super.Fonts.get(f.Alias);
       if (!weights) { weights = new Map(); Super.Fonts.set(f.Alias, weights); }
@@ -148,6 +144,8 @@ export class Super {
 
   static UseDrawnUi(): DrawnUiBuilder { return new DrawnUiBuilder(); }
 
+  /** C# Super.SetClipboardText: puts text on the clipboard (selection copies go through it; replace it to observe or redirect them). */
+  static SetClipboardText: (text: string) => void = (text) => { void navigator.clipboard?.writeText(text).catch(() => {}); };
   /** C# Super.OpenLink: opens an address in a new browser tab (noopener: the opened page gets no handle on this one). */
   static OpenLink(url: string): void { window.open(url, "_blank", "noopener"); }
 
