@@ -4,7 +4,7 @@
 // inside a later span. CharacterSpacing is not ported here (SKIPPED), so the spaced cases of 6p do not apply.
 import { readFileSync } from "node:fs";
 import {
-  Super, SKRect, Thickness, SkiaAccessibilityManager, HoverManager, SkiaGrid, SkiaLayout, SkiaLabel, SkiaShape, TextSpan,
+  Super, SKRect, Thickness, SkiaAccessibilityManager, HoverManager, SkiaGrid, SkiaLayout, SkiaLabel, SkiaShape, SkiaStack, SkiaWrap, TextSpan,
   type SkiaControl, type AnimatorBase, type Canvas,
 } from "../src/index.ts";
 
@@ -101,6 +101,23 @@ const lines = (l: SkiaLabel) => ((l as unknown as { lines: { Runs: { Text: strin
       const ink = draw(host, 400, 100) + 1;
       check(`${name}, MaxLines ${maxLines}, width 150: ink inside the label`, ink > 0 && ink <= 151, `ink ends at ${ink}; ${lines(label).join(" | ")}`);
     }
+  }
+
+  {
+    // a grid of a set height, "Auto,*,Auto" rows in its default Auto column: the last row is a full-width stack holding a
+    // wrap of buttons, one line at an unbounded width, three at the grid's (the 3D gallery Boss page). The star row keeps
+    // what the wrapped row leaves; the rows never run past the grid
+    const grid = new SkiaGrid(); grid.RowDefinitions = "Auto,*,Auto"; grid.RowSpacing = 10; grid.Padding = new Thickness(20); grid.HeightRequest = 500;
+    const top = new SkiaShape(); top.HeightRequest = 50; top.Row = 0;
+    const star = new SkiaShape(); star.HorizontalOptions = "Fill"; star.VerticalOptions = "Fill"; star.Row = 1;
+    const wrap = new SkiaWrap(); wrap.Spacing = 8; wrap.HorizontalOptions = "Center";
+    for (let i = 0; i < 7; i++) { const b = new SkiaShape(); b.WidthRequest = 100; b.HeightRequest = 40; wrap.AddSubView(b); }
+    const controls = new SkiaStack(); controls.AddSubView(wrap); controls.Row = 2;
+    grid.AddSubView(top); grid.AddSubView(star); grid.AddSubView(controls);
+    (grid as unknown as { _superview: unknown })._superview = new FakeCanvas();
+    grid.Measure(360, Infinity, 1); grid.Arrange(new SKRect(0, 0, 360, 600), -1, -1, 1);
+    const rows = (grid.GridStructure as unknown as { Rows: { Size: number }[] }).Rows.map((r) => Math.round(r.Size));
+    check("a wrap that grows its Auto row at the final width takes its room from the star row: the rows fit the grid", rows[2] === 136 && rows[0] + rows[1] + rows[2] + 2 * 10 + 2 * 20 === 500 && controls.DrawingRect.Bottom <= grid.DrawingRect.Bottom - 20 + 0.5, `rows ${rows.join(",")}, controls bottom ${controls.DrawingRect.Bottom}, grid bottom ${grid.DrawingRect.Bottom}`);
   }
 
   console.log(failures ? `FAIL: ${failures} checks` : "OK: grid Auto rows and label cuts");
