@@ -9,7 +9,7 @@
 import type { Canvas as SkCanvas, Paint, Path } from "canvaskit-wasm";
 import {
   Aria, DrawnGame, ScaledSize, SkiaControl, SkiaEditor, SkiaGrid, SkiaLabel, SkiaLayer, SkiaLayout, SkiaRow, SkiaScroll,
-  SkiaScrollBar, SkiaShadow, SkiaShape, SkiaStack, SkiaValueAnimator, SkiaWrap, Super, Thickness, type Color,
+  SkiaScrollBar, SkiaShadow, SkiaShape, SkiaStack, SkiaValueAnimator, SkiaWrap, Super, Thickness, type Color, type SKRect,
 } from "drawnui-react/core";
 import { LoadState3D, Look, Mesh3D, Model3D, SkiaModel3D, SkiaScene3D, Texture3D } from "drawnui-react-add3d/core";
 import { DiceThrow, QuatAxisAngle } from "./DiceThrow";
@@ -1285,6 +1285,8 @@ export class GalleryPage extends DrawnGame {
   private _listScroll!: SkiaScroll;
   private _listCount!: SkiaLabel;
   private readonly _thumbs: SkiaModel3D[] = [];
+  /** The list's rows: the counter counts the ones on screen (a still row is blitted from its cache, its thumbnail not drawn). */
+  private readonly _rows: SkiaControl[] = [];
   private _thumbsDrawn = -1;
 
   private ListCard(): SkiaControl {
@@ -1407,19 +1409,24 @@ export class GalleryPage extends DrawnGame {
     });
     // Narrow, the button goes under the text.
     this._adapt.push((width) => { row.Type = CardInner(width) >= RowBesideMin ? "Row" : "Wrap"; row.Update(); });
+    this._rows[index] = row;
     return row;
   }
 
-  /** Each frame: how many thumbnails are on screen now, shown above the list (the rest cost nothing). */
+  /**
+   * Each frame: how many thumbnails are on screen now, shown above the list (the rest cost nothing). Counted by rows on
+   * screen, cached or not: a row inside both the page's window and the list's viewport (as the Rust and .NET galleries).
+   */
   private ListFrame(): void {
     if (!WasInLastFrame(this._listScroll)) return;
-    // Drawn by the list, and inside the page's window too (a row below the window's edge is drawn but not seen).
-    const window = this._scroll.GetAccessibilityPixelRect();
+    const window = this._scroll.GetAccessibilityPixelRect(), list = this._listScroll.GetAccessibilityPixelRect();
+    const inside = (r: SKRect, w: SKRect) => r.Left < w.Right && r.Right > w.Left && r.Top < w.Bottom && r.Bottom > w.Top;
     let drawn = 0;
-    for (const thumb of this._thumbs) {
-      if (!WasInLastFrame(thumb)) continue;
-      const r = thumb.GetAccessibilityPixelRect();
-      if (r.Left < window.Right && r.Right > window.Left && r.Top < window.Bottom && r.Bottom > window.Top) drawn++;
+    for (const row of this._rows) {
+      // where the row is drawn now (scroll offsets included), not its layout slot
+      if (!row.IsVisible) continue;
+      const r = row.GetAccessibilityPixelRect();
+      if (inside(r, window) && inside(r, list)) drawn++;
     }
     if (drawn === this._thumbsDrawn) return;
     this._thumbsDrawn = drawn;
