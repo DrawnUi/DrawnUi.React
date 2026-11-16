@@ -12,7 +12,16 @@ export class SKPoint {
 /** Raw platform action (subset of TouchActionType). */
 export type TouchActionType = "Pressed" | "Moved" | "Released" | "Cancelled" | "Wheel" | "Pointer";
 
-/** Recognized gesture (TouchActionResult). LongPressing after Canvas.LongPressTimeMs held still; Pointer / Touch declared for parity, not produced. */
+/** Gesture settings shared by every canvas (AppoMobi TouchEffect, same names on every DrawnUI engine). */
+export class TouchEffect {
+  /**
+   * How long a press is held without moving past Canvas.TappedCancelMoveThresholdPoints to be a LongPressing, at the press
+   * point; its release sends no Tapped. A timer, no frames while waiting. Default 750 ms on every engine (drawnui-cross 6cf).
+   */
+  static LongPressTimeMsDefault = 750;
+}
+
+/** Recognized gesture (TouchActionResult). LongPressing after TouchEffect.LongPressTimeMsDefault held still; Pointer / Touch declared for parity, not produced. */
 export type TouchActionResult = "Touch" | "Down" | "Up" | "Tapped" | "LongPressing" | "Panning" | "Wheel" | "Pointer";
 
 export type GesturesMode = "Disabled" | "Enabled" | "Lock";

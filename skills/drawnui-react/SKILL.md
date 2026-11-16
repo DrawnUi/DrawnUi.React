@@ -183,7 +183,7 @@ createRoot(document.getElementById("root")!).render(
   under the finger, while an up or down swipe on it still scrolls the page.
 - Animators: `Pause()` / `Resume()` (goes on from where it was), `PingPongAnimator`, the MAUI easings (`SinInOut`,
   `BounceIn` / `BounceOut`, `SpringIn` / `SpringOut` overshoot). A held press raises `LongPressing` after
-  `Canvas.LongPressTimeMs` (1500); the release after it is no tap.
+  `TouchEffect.LongPressTimeMsDefault` (750 ms, settable, as AppoMobi; `Canvas.LongPressTimeMs` is the same value); the release after it is no tap.
 - Text: `CharacterSpacing` (1 = the font's own; each glyph gets (value - 1) points more), measured, wrapped and cut at
   the width it draws. Chinese and Japanese wrap between characters, never before closing punctuation or small kana
   (`SkiaLabel.CanBreakInsideWord`); Korean and Latin wrap at spaces, a Latin word wider than the line by characters.
