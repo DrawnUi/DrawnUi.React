@@ -8,7 +8,7 @@
 // transform or the opacity. Label texts invalidate by themselves.
 import type { Canvas as SkCanvas, Paint, Path } from "canvaskit-wasm";
 import {
-  Aria, DrawnGame, ScaledSize, SkiaControl, SkiaEditor, SkiaLabel, SkiaLayer, SkiaLayout, SkiaRow, SkiaScroll,
+  Aria, DrawnGame, ScaledSize, SkiaControl, SkiaEditor, SkiaGrid, SkiaLabel, SkiaLayer, SkiaLayout, SkiaRow, SkiaScroll,
   SkiaScrollBar, SkiaShadow, SkiaShape, SkiaStack, SkiaValueAnimator, SkiaWrap, Super, Thickness, type Color,
 } from "drawnui-react/core";
 import { LoadState3D, Look, Mesh3D, Model3D, SkiaModel3D, SkiaScene3D, Texture3D } from "drawnui-react-add3d/core";
@@ -1098,29 +1098,41 @@ export class GalleryPage extends DrawnGame {
       BackgroundColor: Theme.Stage,
       IsVisible: false,
       Children: [
+        // the icon beside the text, so it fits a viewer scaled down on a phone (as in DrawnUI for Rust)
         Make(new SkiaStack(), {
-          Spacing: 10,
+          Spacing: 12,
           HorizontalOptions: "Center",
           VerticalOptions: "Center",
-          // at most 340 pt: in a narrow viewer (a phone) the text wraps inside it
-          MaximumWidthRequest: 340,
+          MaximumWidthRequest: 360,
           Margin: new Thickness(16, 0),
           Children: [
-            Make(new SkiaShape(), {
-              Type: "Circle", WidthRequest: 48, HeightRequest: 48, BackgroundColor: "#2EFF6384",
-              HorizontalOptions: "Center",
+            Make(new SkiaGrid(), {
+              ColumnSpacing: 12,
+              ColumnDefinitions: "Auto,*",
               Children: [
-                Make(new SkiaLabel(), { Text: "!", FontSize: 24, FontFamily: Theme.Title, TextColor: Theme.Bad, HorizontalOptions: "Center", VerticalOptions: "Center", AccessibilityRole: Aria.RolePresentation }),
+                Make(new SkiaShape(), {
+                  Type: "Circle", WidthRequest: 40, HeightRequest: 40, BackgroundColor: "#2EFF6384",
+                  VerticalOptions: "Start",
+                  Column: 0, Row: 0,
+                  Children: [
+                    Make(new SkiaLabel(), { Text: "!", FontSize: 20, FontFamily: Theme.Title, TextColor: Theme.Bad, HorizontalOptions: "Center", VerticalOptions: "Center", AccessibilityRole: Aria.RolePresentation }),
+                  ],
+                }),
+                Make(new SkiaStack(), {
+                  Spacing: 4,
+                  Column: 1, Row: 0,
+                  Children: [
+                    Make(new SkiaLabel(), {
+                      Text: "The model could not be loaded",
+                      FontSize: 16, FontFamily: Theme.Title, TextColor: Theme.Ink,
+                      AccessibilityRole: Aria.RoleText, AccessibilityLive: Aria.LivePolite,
+                    }),
+                    this._failedText = Make(new SkiaLabel(), { FontSize: 13, TextColor: Theme.Muted }),
+                  ],
+                }),
               ],
             }),
-            Make(new SkiaLabel(), {
-              Text: "The model could not be loaded",
-              FontSize: 16, FontFamily: Theme.Title, TextColor: Theme.Ink, HorizontalOptions: "Center",
-              AccessibilityRole: Aria.RoleText, AccessibilityLive: Aria.LivePolite,
-            }),
-            this._failedText = Make(new SkiaLabel(), { FontSize: 13, TextColor: Theme.Muted, HorizontalOptions: "Center", HorizontalTextAlignment: "Center" }),
             Make(new Button3D("Use the app's copy", Theme.Accent, 180), {
-              Margin: new Thickness(0, 6, 0, 0),
               HorizontalOptions: "Center",
               Tapped: () => this.LoadViewer(Source.App),
             }),
