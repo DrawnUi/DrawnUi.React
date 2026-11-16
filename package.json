@@ -148,7 +148,8 @@
     "check:label-selection": "node dev/check.mjs dev/check-label-selection.ts",
     "check:frame-errors": "node dev/check.mjs dev/check-frame-errors.ts",
     "browser:editor-keyboard": "node dev/check-editor-keyboard.mjs",
-    "browser:double-tap": "node dev/check-double-tap.mjs"
+    "browser:double-tap": "node dev/check-double-tap.mjs",
+    "check:scroll-keyboard": "node dev/check.mjs dev/check-scroll-keyboard.ts"
   },
   "peerDependencies": {
     "playwright-core": ">=1.40",

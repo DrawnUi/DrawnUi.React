@@ -805,6 +805,37 @@ export class Canvas {
     if (this.popups.HasAny) this.popups.PointerAt(undefined, undefined);
   };
   private readonly preventTouch = (e: TouchEvent) => e.preventDefault();
+
+  // ---- the on-screen keyboard (C# DrawnView.Keyboard, drawnui-cross 6cj: SkiaScroll.AdaptToKeyboardAuto, off by default) ----
+  /** Points of this canvas, up from its bottom, that the on-screen keyboard covers (0 when none). */
+  KeyboardCovered = 0;
+  private keyboardScroll?: KeyboardScroll;
+  private readonly onViewportResize = () => this.ApplyKeyboard();
+  /**
+   * Measures the part the keyboard covers (the visual viewport shrinks when it opens) and, when the focused text field sits
+   * in a scroll with AdaptToKeyboardAuto, hands that scroll the field and the covered height; the scroll it adapted lets go
+   * when the keyboard closes or the field moves to another scroll. Runs on viewport resizes and focus changes only.
+   */
+  private ApplyKeyboard(): void {
+    const vv = typeof window !== "undefined" ? window.visualViewport : undefined;
+    if (!vv) return;
+    const layoutH = window.innerHeight, visibleBottom = vv.offsetTop + vv.height;
+    // a keyboard shrinks the visual viewport against the layout viewport (a page zoom scales it instead)
+    const keyboard = layoutH - vv.height > 80 && Math.abs((vv.scale ?? 1) - 1) < 0.01;
+    const b = this.Element.getBoundingClientRect();
+    const covered = keyboard ? Math.max(0, Math.min(b.bottom, layoutH) - visibleBottom) : 0;
+    this.KeyboardCovered = covered;
+    let scroll: KeyboardScroll | undefined;
+    const field = this.focusedChild as (SkiaControl & { IsFocused?: boolean; CursorPosition?: number }) | undefined;
+    if (covered > 0 && field?.IsFocused && field.CursorPosition !== undefined) {
+      for (let p = field.Parent; p && !scroll; p = p.Parent) if ((p as unknown as Partial<KeyboardScroll>).AdaptToKeyboardAuto) scroll = p as unknown as KeyboardScroll;
+      if (scroll) { scroll.AdaptToKeyboardFor = field; scroll.AdaptToKeyboardSize = covered; }
+    }
+    // keyboard up, no focused field (between two fields): the adapted scroll keeps its room
+    if (covered > 0 && !scroll) return;
+    if (this.keyboardScroll && this.keyboardScroll !== scroll) { this.keyboardScroll.AdaptToKeyboardFor = undefined; this.keyboardScroll.AdaptToKeyboardSize = 0; }
+    this.keyboardScroll = scroll;
+  }
   /** When the last touch releases came (ms), at most two. */
   private readonly touchUps: number[] = [];
   private replayingTap = false;
@@ -843,6 +874,7 @@ export class Canvas {
     // the input has focus now: no compatibility mouse events or click follow, whose focus would go to the canvas host
     // and take the keyboard away again
     if (t && TextInputProxy.FocusFromTap(t.clientX, t.clientY, true) && e.cancelable) e.preventDefault();
+    TextInputProxy.AfterTouchEnd();
   };
   /** Gestures="Enabled": touch / pen pointers whose Down a control used (see OnTouchAction). */
   private readonly claimedTouches = new Set<number>();
@@ -1044,6 +1076,7 @@ export class Canvas {
     el.addEventListener("contextmenu", this.onContextMenu);
     el.addEventListener("touchend", this.onTouchEnd);
     el.addEventListener("dblclick", this.onDoubleClick);
+    window.visualViewport?.addEventListener("resize", this.onViewportResize);
     el.addEventListener("wheel", this.onWheel, { passive: false });
     window.addEventListener("blur", this.onWindowBlur);
     if (this.gestures === "Lock") {
@@ -1072,6 +1105,7 @@ export class Canvas {
     el.removeEventListener("contextmenu", this.onContextMenu);
     el.removeEventListener("touchend", this.onTouchEnd);
     el.removeEventListener("dblclick", this.onDoubleClick);
+    window.visualViewport?.removeEventListener("resize", this.onViewportResize);
     this.textDrag = undefined;
     el.removeEventListener("wheel", this.onWheel);
     window.removeEventListener("blur", this.onWindowBlur);
@@ -1290,6 +1324,8 @@ export class Canvas {
       const previous = this.focusedChild;
       this.focusedChild = value;
       if (previous && !previous.IsDisposed) previous.SetFrameworkFocus(false);
+      // the keyboard is up: the newly focused field goes above it too
+      if (this.KeyboardCovered > 0) setTimeout(() => this.ApplyKeyboard(), 50);
     } finally { this.reportingFocus = false; }
   }
 
@@ -1433,3 +1469,6 @@ function IsInside(control: SkiaControl, ancestor: SkiaControl): boolean {
   for (let p = control.Parent; p; p = p.Parent) if (p === ancestor) return true;
   return false;
 }
+
+/** What the canvas needs from a SkiaScroll to keep a field above the keyboard (core does not import the controls). */
+interface KeyboardScroll extends SkiaControl { AdaptToKeyboardAuto: boolean; AdaptToKeyboardFor?: SkiaControl; AdaptToKeyboardSize: number }
