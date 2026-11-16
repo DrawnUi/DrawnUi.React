@@ -592,12 +592,13 @@ export class SkiaModel3D extends SkiaControl implements IPrefetch3D {
         args.Event.Handled = true;
         this.Update();
         return this;
-      } else if (type === "Tapped" && this.ResetOnDoubleTap && performance.now() - this.lastTapMs < 300) {
+      // two taps 300 ms apart by when they happened, not when a frame got to them (a slow frame handles both late)
+      } else if (type === "Tapped" && this.ResetOnDoubleTap && this.lastTapMs > 0 && args.ArrivedTimeNanos / 1e6 - this.lastTapMs < 300) {
         this.lastTapMs = 0;
         this.ResetView();
         return this;
       } else if (type === "Tapped" && (this.ResetOnDoubleTap || this.Tapped3D)) {
-        if (this.ResetOnDoubleTap) this.lastTapMs = performance.now();
+        if (this.ResetOnDoubleTap) this.lastTapMs = args.ArrivedTimeNanos / 1e6;
         if (!this.Tapped3D) return this;
         const at = this.GetOffsetInsideControlInPoints(apply.MappedLocation, apply.ChildOffset);
         const hit = this.HitTest(at.X, at.Y);
