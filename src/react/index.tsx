@@ -260,6 +260,13 @@ const A11Y_CSS = `
 
 const NAVIGATION_KEYS = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"]);
 
+/** The layer a control lives in: its top ancestor (the canvas content for the page, a popup window's root). */
+function LayerOf(control: SkiaControl): SkiaControl {
+  let c = control;
+  while (c.Parent) c = c.Parent;
+  return c;
+}
+
 /** How long a scroll bringing the keyboard's control into view takes, seconds. */
 const KeyboardScrollSecs = 0.25;
 
@@ -302,6 +309,8 @@ function AccessibilityOverlay({ view }: { view: CanvasView }) {
   // belong to the app again (as in the other engines); the DOM focus stays on the canvas host, so a screen reader is not
   // thrown to the top of the page and the next Tab starts from the canvas. A focus the user moved away stays away.
   const focusedId = useRef(0);
+  /** The layer the focused node lives in: the page (the canvas content) or a popup window (its root). */
+  const focusedLayer = useRef<SkiaControl | undefined>(undefined);
   const previousNodes = useRef(nodes);
   useLayoutEffect(() => {
     const previous = previousNodes.current;
@@ -316,10 +325,14 @@ function AccessibilityOverlay({ view }: { view: CanvasView }) {
     // its control went away (hidden, removed, no longer taking input: a pin turned to the far side of a globe): the
     // keyboard goes on to the next stop, or the one before it at the end, never to nothing (DrawnUi.Net KeyboardTabScrollTests).
     // A node only scrolled far away keeps no focus here (moving it would scroll the page back).
+    // The next stop stays in the layer the control lived in; a popup window that closed (its item chosen) takes its layer
+    // with it and the keyboard goes to nothing, never to a page control (that would scroll the page to it).
     const at = previous.findIndex((n) => n.Id === id), gone = at >= 0 ? previous[at].Source : undefined;
-    if (gone && (gone.IsDisposed || !gone.Superview || gone.HiddenInTree() || gone.Opacity <= 0 || !gone.AccessibilityCanInteract)) {
+    const layer = focusedLayer.current;
+    if (gone && layer && nodes.some((n) => LayerOf(n.Source) === layer)
+      && (gone.IsDisposed || !gone.Superview || gone.HiddenInTree() || gone.Opacity <= 0 || !gone.AccessibilityCanInteract)) {
       const alive = new Set(nodes.map((n) => n.Id));
-      const stop = (n: AccessibilityNode) => alive.has(n.Id) && n.CanInteract && mgr.IsTabStop(n.Source);
+      const stop = (n: AccessibilityNode) => alive.has(n.Id) && n.CanInteract && mgr.IsTabStop(n.Source) && LayerOf(n.Source) === layer;
       const next = previous.slice(at + 1).find(stop) ?? previous.slice(0, at).reverse().find(stop);
       const el = next && elementOf(next.Id);
       if (el) { el.focus({ preventScroll: true }); return; }
@@ -382,6 +395,7 @@ function AccessibilityOverlay({ view }: { view: CanvasView }) {
             }}
             onFocus={(e) => {
               focusedId.current = n.Id;
+              focusedLayer.current = LayerOf(n.Source);
               pin({ currentTarget: e.currentTarget.parentElement as HTMLDivElement } as React.SyntheticEvent<HTMLDivElement>);
               // inside every enclosing scroll; the overlay follows that scroll, so the next Tab finds the controls it brings in
               view.AccessibilityManager.FollowScroll(SkiaScrollCtrl.EnsureVisible(n.Source, KeyboardScrollSecs));

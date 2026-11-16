@@ -6,16 +6,16 @@
 // (CSS px) at the left edge of a character of the label showing that text, mid-height of its line.
 import { createRoot } from "react-dom/client";
 import { Canvas, SkiaButton, SkiaLabel, SkiaScroll, SkiaStack, Super, Thickness } from "drawnui-react";
-import { SkiaControl, type Canvas as CanvasView, type SkiaLabel as Label } from "drawnui-react/core";
+import { SkiaControl, SkiaShape as SkiaShapeCtrl, SkiaStack as SkiaStackCtrl, type Canvas as CanvasView, type SkiaLabel as Label } from "drawnui-react/core";
 
-interface Sel { Canvas?: CanvasView; Copied: string[]; LinkTaps: number; Menus: { Source: string; Selected: string }[]; Find(text: string): Label | undefined; At(text: string, index: number): { X: number; Y: number } }
+interface Sel { Canvas?: CanvasView; Copied: string[]; LinkTaps: number; LinkMenuChosen: number; Menus: { Source: string; Selected: string }[]; Find(text: string): Label | undefined; At(text: string, index: number): { X: number; Y: number } }
 
 export function Mount(): void {
   const host = document.createElement("div");
   host.style.cssText = "position:fixed;left:0;top:0;width:600px;height:700px;z-index:10000;background:#111";
   document.body.appendChild(host);
   const sel: Sel = {
-    Copied: [], LinkTaps: 0, Menus: [],
+    Copied: [], LinkTaps: 0, LinkMenuChosen: 0, Menus: [],
     Find(text) {
       const walk = (c: SkiaControl | undefined): Label | undefined => {
         if (!c) return undefined;
@@ -52,7 +52,18 @@ export function Mount(): void {
         {label("Alpha label one")}
         {label("Bravo label two")}
         <SkiaLabel AccessibilityTextSelectable Text="Delta link" FontSize={16} TextColor="#FFD06E" AccessibilityRole="link" AccessibilityLabel="Delta link"
-          Tapped={() => { sel.LinkTaps++; }} />
+          Tapped={() => { sel.LinkTaps++; }}
+          ContextMenu={(me, e) => {
+            // the link's menu: one item that closes it, as an app's Copy Link
+            const canvas = me.Superview!;
+            let id = 0;
+            const item = new SkiaShapeCtrl(); item.WidthRequest = 140; item.HeightRequest = 36; item.BackgroundColor = "#333333";
+            item.AccessibilityRole = "menuitem"; item.AccessibilityLabel = "Copy Link"; item.AccessibilityCanInteract = true;
+            item.Tapped = () => { sel.LinkMenuChosen++; canvas.ClosePopupWindow(id); };
+            const menu = new SkiaStackCtrl(); menu.AccessibilityRole = "menu"; menu.AccessibilityLabel = "Link"; menu.AddSubView(item);
+            id = canvas.OpenPopupWindow(menu, e.Location);
+            return true;
+          }} />
         {label("Charlie label three")}
         <SkiaButton Text="Button" WidthRequest={120} />
         <SkiaScroll HeightRequest={200} HorizontalOptions="Fill" BackgroundColor="#222222">

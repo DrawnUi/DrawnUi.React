@@ -6,7 +6,8 @@
 // 1. a press 3 px left of a label and a drag over it select from its start;
 // 2. a drag from above the first label to the middle of the last selects across them, the link too; Ctrl+C copies them
 //    joined by new lines; a click elsewhere clears it;
-// 3. a drag from a label across the link selects its text and does not open it, a plain click opens it;
+// 3. a drag from a label across the link selects its text and does not open it, a plain click opens it; the link's menu
+//    opened with the mouse, Tab into it, Enter on its item: the keyboard goes to nothing, not to a page control;
 // 4. a double click selects a word, a right click keeps it;
 // 5. a drag inside the scroll over its labels selects and does not scroll; held past its bottom edge it scrolls on;
 // 6. a drag on the scroll's empty space: what it does is printed (the scroll holds text, so it selects, .NET's rule).
@@ -70,6 +71,16 @@ async function run(name, type) {
     await page.mouse.click(d.X, d.Y); await sleep(300);
     const tapsAfterClick = await page.evaluate(() => window.__sel.LinkTaps);
     check(`${name}: a plain click opens the link, a drag ending on it does not`, tapsAfterDrag === 0 && tapsAfterClick === 1, `after the drag ${tapsAfterDrag}, after a click ${tapsAfterClick}`);
+
+    // 3b. the link's menu opened with the mouse, the keyboard Tabs into it, Enter chooses its item: the menu closes and the
+    //     keyboard goes to nothing (its layer is gone), never to a page control (that would scroll the page to it)
+    await clear();
+    await page.mouse.click(d.X, d.Y, { button: "right" }); await sleep(300);
+    await page.keyboard.press("Tab"); await sleep(300);
+    const inMenu = await page.evaluate(() => document.activeElement?.getAttribute("aria-label"));
+    await page.keyboard.press("Enter"); await sleep(700);
+    const chosen = await page.evaluate(() => ({ chosen: window.__sel.LinkMenuChosen, label: document.activeElement?.getAttribute("aria-label") ?? null, node: !!document.activeElement?.dataset?.a11yId }));
+    check(`${name}: an item chosen with the keyboard in a menu opened with the mouse leaves the keyboard on nothing`, inMenu === "Copy Link" && chosen.chosen === 1 && !chosen.node, { inMenu, ...chosen });
 
     // 4. double click, right click
     await clear();

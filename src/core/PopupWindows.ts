@@ -107,6 +107,8 @@ export class PopupLayer {
     }
     this.popups.push(popup);
     this.UpdateKeyboardScope();
+    // its nodes join the accessibility tree with its first frame (a Tab right after it opened goes into it)
+    a11y.ForceRebuildOnNextFrame();
     return popup.Id;
   }
 
