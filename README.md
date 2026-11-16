@@ -58,6 +58,11 @@ DrawnUI is MIT licensed in every language and on every platform: desktop, mobile
 - **Long press on touch:** a long press raises the context menu on phones and tablets too, in every browser; on
   selectable text it selects the word first, or keeps the selection it presses on.
 - **Long press time:** 0.75 s, the same in every DrawnUI engine; set it with `TouchEffect.LongPressTimeMsDefault`.
+- **Text fields on phones:** a tap opens the on-screen keyboard at once, its return key ends editing in a single-line
+  field, and a keyboard the user closed stays closed while the page scrolls.
+- **Fields above the keyboard:** `SkiaScroll.AdaptToKeyboardAuto` (opt-in, with `AdaptToKeyboardGap`) keeps the focused
+  field above the on-screen keyboard, the last field of a form too.
+- **Double tap in iOS Safari:** a double tap reaches the controls as two taps (a 3D viewer's reset).
 - **Right click in a text field:** a right click keeps the caret and the selection, so the context menu sees what was
   selected.
 - **Mouse wheel over text fields:** a focused text field no longer stops the mouse wheel: the page scrolls over the field
