@@ -101,7 +101,7 @@ export class Theme {
   // Where the gallery links to (this is the React build; the Rust and .NET galleries are the same demo).
   static readonly ArticleUrl = "https://drawnui.net/articles/add3d.html";
   static readonly DocsUrl = "https://drawnui.net/";
-  static readonly RepoUrl = "https://github.com/DrawnUi/DrawnUi.React";
+  static readonly RepoUrl = "https://github.com/DrawnUi/DrawnUi.React/tree/master/samples/add3d";
   static readonly RustDemoUrl = "https://add3d.drawnui.net/";
   static readonly NetDemoUrl = "https://add3dnet.drawnui.net/";
   static readonly LinkColor = "#FFD06E";
