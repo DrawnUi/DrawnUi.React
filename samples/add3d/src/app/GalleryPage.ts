@@ -201,8 +201,6 @@ function QSlerp(a: Quat, b: Quat, t: number): Quat {
 const HeadRest: Quat = [-0.0561773, -0.00027504, 0.0000154335, 0.998420775];
 const Ear1LRest: Quat = [0.0947101936, -0.0489338711, -0.193506643, 0.97529];
 const Ear1RRest: Quat = [0.0948166773, 0.0494704843, 0.193454459, 0.97526294];
-const Ear2LRest: Quat = [-0.237358987, -0.0338113457, -0.0107185887, 0.970774233];
-const Ear2RRest: Quat = [-0.223375544, 0.0275211222, 0.0118607497, 0.974271655];
 const ArmLRest: Quat = [0.526785612, 0.503608823, 0.47415754, -0.494013935];
 const ArmRRest: Quat = [0.526785672, -0.503608882, -0.474157482, -0.494013816];
 const ForearmLRest: Quat = [-0.02938167, 0.261505067, -0.280782908, 0.922991216];
@@ -1933,16 +1931,15 @@ export class GalleryPage extends DrawnGame {
       this._headSet = false;
     }
     if (this._hands > 0.01) {
-      // Hiding from the password: the ears fold down over the eyes, the hands go to the cheeks.
+      // Hiding from the password: the hands cover the eyes, the ears lie back a little (folded forward they cut through
+      // the face and the hands)
       this._handsSet = true;
-      this.Turn("Ear1.L", Ear1LRest, 150, 0, 0, this._hands);
-      this.Turn("Ear1.R", Ear1RRest, 150, 0, 0, this._hands);
-      this.Turn("Ear2.L", Ear2LRest, -30, 0, 0, this._hands);
-      this.Turn("Ear2.R", Ear2RRest, -30, 0, 0, this._hands);
+      this.Turn("Ear1.L", Ear1LRest, -25, 0, 0, this._hands);
+      this.Turn("Ear1.R", Ear1RRest, -25, 0, 0, this._hands);
       this.Turn(ArmL, ArmLRest, -150, -150, 60, this._hands);
-      this.Turn(ForearmL, ForearmLRest, 0, 0, 60, this._hands);
+      this.Turn(ForearmL, ForearmLRest, 0, 0, 85, this._hands);
       this.Turn(ArmR, ArmRRest, 30, 30, 120, this._hands);
-      this.Turn(ForearmR, ForearmRRest, 0, 0, -60, this._hands);
+      this.Turn(ForearmR, ForearmRRest, 0, 0, -85, this._hands);
     } else if (this._handsSet) {
       this._handsSet = false;
       for (const bone of ["Ear1.L", "Ear1.R", "Ear2.L", "Ear2.R", ArmL, ArmR, ForearmL, ForearmR]) this._mascot.ResetNode(bone);
