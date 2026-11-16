@@ -8,14 +8,14 @@ import { createRoot } from "react-dom/client";
 import { Canvas, SkiaButton, SkiaLabel, SkiaScroll, SkiaStack, Super, Thickness } from "drawnui-react";
 import { SkiaControl, SkiaShape as SkiaShapeCtrl, SkiaStack as SkiaStackCtrl, type Canvas as CanvasView, type SkiaLabel as Label } from "drawnui-react/core";
 
-interface Sel { Canvas?: CanvasView; Copied: string[]; LinkTaps: number; LinkMenuChosen: number; Menus: { Source: string; Selected: string }[]; Find(text: string): Label | undefined; At(text: string, index: number): { X: number; Y: number } }
+interface Sel { Canvas?: CanvasView; Copied: string[]; LinkTaps: number; LinkMenuChosen: number; ButtonTaps: number; Menus: { Source: string; Selected: string }[]; Find(text: string): Label | undefined; At(text: string, index: number): { X: number; Y: number } }
 
 export function Mount(): void {
   const host = document.createElement("div");
   host.style.cssText = "position:fixed;left:0;top:0;width:600px;height:700px;z-index:10000;background:#111";
   document.body.appendChild(host);
   const sel: Sel = {
-    Copied: [], LinkTaps: 0, LinkMenuChosen: 0, Menus: [],
+    Copied: [], LinkTaps: 0, LinkMenuChosen: 0, ButtonTaps: 0, Menus: [],
     Find(text) {
       const walk = (c: SkiaControl | undefined): Label | undefined => {
         if (!c) return undefined;
@@ -65,7 +65,7 @@ export function Mount(): void {
             return true;
           }} />
         {label("Charlie label three")}
-        <SkiaButton Text="Button" WidthRequest={120} />
+        <SkiaButton Text="Button" WidthRequest={120} Tapped={() => { sel.ButtonTaps++; }} />
         <SkiaScroll HeightRequest={200} HorizontalOptions="Fill" BackgroundColor="#222222">
           <SkiaStack Spacing={12} Padding={new Thickness(10)}>
             {Array.from({ length: 10 }, (_, i) => <SkiaLabel key={i} AccessibilityTextSelectable Text={`Scroll line ${i}`} FontSize={16} TextColor="#FFFFFF" />)}

@@ -794,6 +794,8 @@ export class Canvas {
     // a click on the focused field gives its input DOM focus again (desktop typing and IME); on touch that is done in the
     // touchend (onTouchEnd), the only event iOS opens the soft keyboard from
     if (type === "Released" && e.pointerType === "mouse") TextInputProxy.FocusFromTap(e.clientX, e.clientY);
+    // the touch taps the browser delivered, for a double tap whose second tap it kept (onDoubleClick)
+    if (type === "Released" && e.pointerType !== "mouse" && !this.replayingTap) { this.touchUps.push(performance.now()); if (this.touchUps.length > 2) this.touchUps.shift(); }
   };
   /** The mouse left the canvas: hover ends at once, also while content moves. */
   private readonly onPointerLeave = (e: PointerEvent) => {
@@ -803,6 +805,27 @@ export class Canvas {
     if (this.popups.HasAny) this.popups.PointerAt(undefined, undefined);
   };
   private readonly preventTouch = (e: TouchEvent) => e.preventDefault();
+  /** When the last touch releases came (ms), at most two. */
+  private readonly touchUps: number[] = [];
+  private replayingTap = false;
+  /**
+   * iOS Safari (measured on an iPhone, iOS 26.6.1) takes the second tap of a double tap for itself: it sends no pointer or
+   * touch event for it, only click, click and dblclick. A dblclick that follows ONE touch release (the other browsers
+   * deliver both taps first) brings that tap back as a touch tap at its place, so a double tap reaches the controls (a 3D
+   * viewer's reset).
+   */
+  private readonly onDoubleClick = (e: MouseEvent) => {
+    const now = performance.now(), recent = this.touchUps.filter((t) => now - t < 700);
+    this.touchUps.length = 0;
+    if (recent.length !== 1) return;
+    const pointerId = 2_000_000 + Math.floor(now);
+    const at = { clientX: e.clientX, clientY: e.clientY, pointerId, pointerType: "touch", button: 0, isTrusted: true };
+    this.replayingTap = true;
+    try {
+      this.onPointer({ ...at, type: "pointerdown", buttons: 1 } as unknown as PointerEvent);
+      this.onPointer({ ...at, type: "pointerup", buttons: 0 } as unknown as PointerEvent);
+    } finally { this.replayingTap = false; }
+  };
   /**
    * The end of a touch is the user gesture iOS opens the soft keyboard from (a focus() in pointerup does not open it): the
    * press's gestures run now, inside it, so a field they focus focuses its input here, and a tap on the focused field gives
@@ -1020,6 +1043,7 @@ export class Canvas {
     el.addEventListener("pointerleave", this.onPointerLeave);
     el.addEventListener("contextmenu", this.onContextMenu);
     el.addEventListener("touchend", this.onTouchEnd);
+    el.addEventListener("dblclick", this.onDoubleClick);
     el.addEventListener("wheel", this.onWheel, { passive: false });
     window.addEventListener("blur", this.onWindowBlur);
     if (this.gestures === "Lock") {
@@ -1047,6 +1071,7 @@ export class Canvas {
     el.removeEventListener("pointerleave", this.onPointerLeave);
     el.removeEventListener("contextmenu", this.onContextMenu);
     el.removeEventListener("touchend", this.onTouchEnd);
+    el.removeEventListener("dblclick", this.onDoubleClick);
     this.textDrag = undefined;
     el.removeEventListener("wheel", this.onWheel);
     window.removeEventListener("blur", this.onWindowBlur);
