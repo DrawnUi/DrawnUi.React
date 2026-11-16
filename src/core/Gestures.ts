@@ -196,6 +196,7 @@ export class TouchActionEventArgs {
   /** Panning while two or more fingers are down: how they pinched and turned since the previous move. */
   Manipulation?: ManipulationInfo;
   Scale = 1;
+  /** When the event happened (ms, performance.now() time): the browser event's timeStamp, now for one made in code. */
   Timestamp = performance.now();
   /** ms since the previous event of the same pointer. */
   DeltaTimeMs = 0;
@@ -246,7 +247,9 @@ export class SkiaGesturesParameters {
     const p = new SkiaGesturesParameters();
     p.Type = action;
     p.Event = args;
-    p.ArrivedTimeNanos = Math.round(performance.now() * 1e6);
+    // when its event happened, not when a frame got to it (a slow frame holds the events back; a double tap is judged
+    // by when the taps happened)
+    p.ArrivedTimeNanos = Math.round(args.Timestamp * 1e6);
     return p;
   }
 }

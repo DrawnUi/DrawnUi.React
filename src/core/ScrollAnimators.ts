@@ -203,8 +203,13 @@ export class VelocityAccumulator {
     this.samples.push({ X: x, Y: y, time });
   }
 
-  CalculateFinalVelocity(clampAbsolute = 0): { X: number; Y: number } {
-    const now = performance.now();
+  /**
+   * The release velocity from the samples of the last 150 ms before the release. releasedNanos: when the release happened
+   * (SkiaGesturesParameters.ArrivedTimeNanos, the event's own time), so a slow frame that handles the release late keeps
+   * the samples; now when 0.
+   */
+  CalculateFinalVelocity(clampAbsolute = 0, releasedNanos = 0): { X: number; Y: number } {
+    const now = releasedNanos > 0 ? releasedNanos / 1e6 : performance.now();
     const relevant = this.samples.filter((s) => now - s.time <= VelocityAccumulator.ConsiderationTimeframeMs);
     if (relevant.length === 0) return { X: 0, Y: 0 };
     let sx = 0, sy = 0, weights = 0;

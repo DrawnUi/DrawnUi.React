@@ -950,7 +950,7 @@ export class SkiaScroll extends SkiaControl {
       this.IsUserFocused = false;
       if (!wasPanning && !this.OverScrolled) return childConsumed ?? consumedDefault;
 
-      const finalVelocity = this.velocity.CalculateFinalVelocity(this.MaxVelocity);
+      const finalVelocity = this.velocity.CalculateFinalVelocity(this.MaxVelocity, args.ArrivedTimeNanos);
       const swipeThreshold = SkiaScroll.ThesholdSwipeOnUp * scale;
       let vx = finalVelocity.X * this.ChangeVelocityScrolled;
       let vy = finalVelocity.Y * this.ChangeVelocityScrolled;

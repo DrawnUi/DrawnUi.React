@@ -777,6 +777,7 @@ export class Canvas {
 
     const rect = this.Element.getBoundingClientRect();
     const args = new TouchActionEventArgs();
+    args.Timestamp = EventTime(e);
     args.Id = e.pointerId;
     args.Type = type;
     args.Scale = this.RenderingScale;
@@ -850,7 +851,8 @@ export class Canvas {
     this.touchUps.length = 0;
     if (recent.length !== 1) return;
     const pointerId = 2_000_000 + Math.floor(now);
-    const at = { clientX: e.clientX, clientY: e.clientY, pointerId, pointerType: "touch", button: 0, isTrusted: true };
+    // the second tap happened just before the dblclick: dated by it, not by when a frame handles it
+    const at = { clientX: e.clientX, clientY: e.clientY, pointerId, pointerType: "touch", button: 0, isTrusted: true, timeStamp: e.timeStamp };
     this.replayingTap = true;
     try {
       this.onPointer({ ...at, type: "pointerdown", buttons: 1 } as unknown as PointerEvent);
@@ -990,6 +992,7 @@ export class Canvas {
   private readonly onWheel = (e: WheelEvent) => {
     const rect = this.Element.getBoundingClientRect();
     const args = new TouchActionEventArgs();
+    args.Timestamp = EventTime(e);
     args.Id = -1;
     args.Type = "Wheel";
     args.Scale = this.RenderingScale;
@@ -1205,6 +1208,7 @@ export class Canvas {
       this.longPressed.add(id);
       const args = new TouchActionEventArgs();
       Object.assign(args, down);
+      args.Timestamp = performance.now();
       args.Location = down.StartingLocation ?? down.Location;
       this.OnGestureEvent(args, "LongPressing");
       // on touch the context menu follows the long press (6cb), at the press point
@@ -1224,6 +1228,7 @@ export class Canvas {
     this.longPressed.add(id);
     const args = new TouchActionEventArgs();
     Object.assign(args, down);
+    args.Timestamp = performance.now();
     args.Location = down.StartingLocation ?? down.Location;
     this.ProcessGestureNow(args, "LongPressing");
   }
@@ -1405,6 +1410,15 @@ interface SelectableLabel extends SkiaControl {
 }
 interface ScrollLike extends SkiaControl { ViewportOffsetX: number; ViewportOffsetY: number; ScrollBarOwnsGesture?: boolean; ScrollTo(x: number, y: number, secs: number, clamp?: boolean): void }
 const IsScroll = (c: SkiaControl | undefined): c is ScrollLike => !!c && "ScrollTo" in c && "ViewportOffsetY" in c;
+/**
+ * When a browser event happened, on the performance.now() clock (its timeStamp; now when the browser gives none or a time
+ * from another clock): a slow frame holds events back, and gestures are dated by when they happened.
+ */
+function EventTime(e: { timeStamp?: number }): number {
+  const now = performance.now(), t = e.timeStamp;
+  return typeof t === "number" && t > 0 && t <= now + 1 ? t : now;
+}
+
 const IsSelectableLabel = (c: SkiaControl | undefined): c is SelectableLabel => !!c && c.AccessibilityTextSelectable && "TextIndexAtCanvas" in c;
 
 /**

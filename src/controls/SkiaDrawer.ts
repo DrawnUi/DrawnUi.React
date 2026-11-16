@@ -183,7 +183,7 @@ export class SkiaDrawer extends SnappingLayout {
       case "Up": {
         this.hadDown = false;
         if (this.childWasTapped || !this.IsUserPanning) { this.FinishStoppedMove(); break; }
-        const final = this.velocityAccumulator.CalculateFinalVelocity(3000);
+        const final = this.velocityAccumulator.CalculateFinalVelocity(3000, args.ArrivedTimeNanos);
         const v = this.Horizontal ? new SKPoint(final.X, 0) : new SKPoint(0, final.Y);
         this.CurrentSnap = this.CurrentPosition;
         this.ScrollToNearestAnchor(this.CurrentPosition, v);
