@@ -392,6 +392,7 @@ export class Canvas {
     if (this.popupLayer?.HasAny) this.popupLayer.Draw(top, top.Destination);
     this.tooltipController?.Draw(top, top.Destination);
     this.AccessibilityManager.OnFrameEnd(this.RenderingScale, this.Element.width, this.Element.height, () => this.Update());
+    TextInputProxy.AfterFrame(this);
     this.Hover.AfterFrame(this.content, this.activeTouchIds.size > 0);
     if (this.Hover.Paused) this.tooltipController?.Reset(); // content moves under the pointer
     const now = performance.now();

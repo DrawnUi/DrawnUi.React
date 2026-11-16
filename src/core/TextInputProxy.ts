@@ -171,8 +171,22 @@ export class TextInputProxy {
       const b = canvas.getBoundingClientRect(), scale = editor.RenderingScale || 1, r = editor.GetAccessibilityPixelRect();
       left = Math.round(b.left + r.Left / scale); top = Math.round(b.top + r.Top / scale);
     }
+    if (left === TextInputProxy.placedLeft && top === TextInputProxy.placedTop) return;
+    TextInputProxy.placedLeft = left; TextInputProxy.placedTop = top;
     el.style.left = `${left}px`;
     el.style.top = `${top}px`;
+  }
+  private static placedLeft = 0;
+  private static placedTop = 0;
+
+  /**
+   * After each frame of the canvas: a focused field that moved (its page scrolled) takes its hidden input along, so a
+   * desktop input method keeps its window next to the text. Nothing to do while no field is focused.
+   */
+  static AfterFrame(canvas: unknown): void {
+    const owner = TextInputProxy.owner, el = TextInputProxy.element;
+    if (!owner || !el || TextInputProxy.byTouch || owner.Superview !== canvas) return;
+    TextInputProxy.Place(owner, el);
   }
 
   /** The textarea changed (typing, IME commit, paste, undo): diff against the editor and replay through the stubs. */
