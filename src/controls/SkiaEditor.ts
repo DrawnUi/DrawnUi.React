@@ -539,7 +539,8 @@ export class SkiaEditor extends SkiaShape {
   override OnAccessibilityActivated(): void { if (!this.IsFocused) this.OnAccessibilityFocused(true); }
   /** While editing, arrows, Home / End and PageUp / PageDown belong to the text: they never move a surrounding group. */
   override OnAccessibilityKey(_key: string): boolean { return this.IsFocused; }
-  protected override DefaultAccessibilityLabel(): string | undefined { return this.text || this.placeholderText || undefined; }
+  /** The typed text, else the placeholder. A password field never exposes its text: only the placeholder (C# SkiaEditor). */
+  protected override DefaultAccessibilityLabel(): string | undefined { return (!this.isPassword && this.text) || this.placeholderText || undefined; }
 
   // ---- editing API (C# names) ----
   Submit(): void {
