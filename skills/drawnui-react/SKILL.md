@@ -24,7 +24,7 @@ npm i drawnui-react react react-dom
 - `drawnui-react` = React tags + every engine type. `drawnui-react/core` = the engine only (no React), for
   code-behind classes, cells, effects.
 - ES modules + `.d.ts`. CanvasKit's `.wasm` is referenced through a `?url` import: use Vite or a bundler that
-  understands it. Preview releases carry the `preview` dist-tag.
+  understands it. Releases are published with the `latest` dist-tag.
 - Fonts are plain files under `public/fonts` (`FontCollection.ContentRoot = "fonts/"`), loaded at startup.
 
 ## Startup (same shape as DrawnUi.Net / OpenTK)

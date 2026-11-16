@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to publish (e.g. add3d-v0.1.0-preview.44)"
+        description: "Release tag to publish (e.g. add3d-v1.0.1)"
         required: true
 
 permissions:

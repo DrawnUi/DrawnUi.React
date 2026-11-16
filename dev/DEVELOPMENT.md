@@ -56,10 +56,10 @@ Adding another published sample = one more `wrangler pages deploy dist/<name> --
 is reserved by that username). Every publish carries SLSA provenance, and the version goes out as dist-tag `latest`
 (npm 11 refuses a prerelease without an explicit `--tag`, and previews are the only line for now).
 
-1. Bump `version` in `package.json` (previews: `0.1.0-preview.N`), commit, push.
-2. Tag and release: `git tag v0.1.0-preview.N && git push origin v0.1.0-preview.N`, then
-   `gh release create v0.1.0-preview.N --title ... --notes ... --latest`. Publishing the release runs the workflow.
-   For a release that already exists: `gh workflow run publish.yml -f tag=v0.1.0-preview.N`.
+1. Bump `version` in `package.json` (semver; 1.0.1 was the first stable release, previews before it were `0.1.0-preview.N`), commit, push.
+2. Tag and release: `git tag v<version> && git push origin v<version>`, then
+   `gh release create v<version> --title ... --notes ... --latest`. Publishing the release runs the workflow.
+   For a release that already exists: `gh workflow run publish.yml -f tag=v<version>`.
 3. `gh run watch` — the job checks the tag equals `v<package.json version>`, builds `dist/` via `prepublishOnly`,
    publishes, then polls `npm view drawnui-react dist-tags.latest` until it equals the version (registry lags ~20 s).
 4. Optionally `npm pack` locally and install the tarball in a throwaway Vite app to check `exports`, types and the

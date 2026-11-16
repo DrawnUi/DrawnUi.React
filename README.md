@@ -2,7 +2,7 @@
 
 ![DrawnUI for React: the Hello app in desktop browsers, on iPhone and on Android](.github/images/banner.png)
 
-[![npm](https://img.shields.io/npm/v/drawnui-react/preview.svg)](https://www.npmjs.com/package/drawnui-react)
+[![npm](https://img.shields.io/npm/v/drawnui-react.svg)](https://www.npmjs.com/package/drawnui-react)
 ![License](https://img.shields.io/github/license/DrawnUi/DrawnUi.React.svg)
 
 Build rich, fluid UI for the web by drawing it. Every control is painted on one hardware-accelerated canvas by
@@ -49,10 +49,13 @@ property names, layout and drawing rules. What you learn here works there, and s
 
 DrawnUI is MIT licensed in every language and on every platform: desktop, mobile, web and embedded devices. Ship it in commercial products with no attribution badge, no about screen and no per-device royalty.
 
-## What's new in 0.1.0-preview.44
+## What's new in 1.0.1
 
-- **3D add-on 0.1.0-preview.44:** pictures on 3D models are drawn smooth, with their mipmaps and anisotropic
-  filtering (images on materials, the product box of the [demo](https://add3dreact.drawnui.net)).
+- **First stable release:** `drawnui-react` and the 3D add-on `drawnui-react-add3d` are 1.0.1. Projects on
+  `0.1.0-preview.x` move to it with `npm i drawnui-react@^1.0.1` (and `drawnui-react-add3d@^1.0.1`): npm does not
+  take a major step by itself.
+- **Smooth pictures on 3D models:** images on materials are drawn with their mipmaps and anisotropic filtering (the
+  product box of the [demo](https://add3dreact.drawnui.net)).
 - **FPS counter:** the FPS counter shows the real frame rate: `SkiaLabelFps` keeps the canvas drawing while it is
   shown, as in DrawnUI for .NET and Rust.
 
@@ -209,7 +212,7 @@ npm i drawnui-react react react-dom
 
 `drawnui-react` = React tags + every engine type, `drawnui-react/core` = the engine only. Ships ES modules + `.d.ts`;
 CanvasKit's `.wasm` is referenced with a `?url` import, so use Vite (or any bundler that understands `?url`) and
-put your fonts under `public/fonts`. Preview releases carry the `preview` dist-tag (the first publish also became `latest`, as npm always does).
+put your fonts under `public/fonts`. Releases are published with the `latest` dist-tag.
 
 ## Run
 
