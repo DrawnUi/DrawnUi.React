@@ -1,0 +1,59 @@
+name: Publish drawnui-react-add3d to npm
+
+# The 3D add-on (add3d/), Trusted Publishing (OIDC) as publish.yml: runs when a GitHub release tagged add3d-v<version>
+# is published, or by hand for a given tag. The tag must equal "add3d-v" + add3d/package.json version.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish (e.g. add3d-v0.1.0-preview.44)"
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: publish-npm-add3d
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.event.release.tag_name, 'add3d-v') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - name: npm with trusted publishing support
+        run: npm install -g npm@latest && npm --version
+      - run: npm ci
+      - name: Tag must match add3d/package.json
+        run: |
+          TAG="${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.event.release.tag_name }}"
+          VERSION=$(node -p "require('./add3d/package.json').version")
+          echo "tag=$TAG version=$VERSION"
+          test "$TAG" = "add3d-v$VERSION"
+      - name: Build the engine's types the add-on compiles against
+        run: npm run build:lib
+      - name: Publish (prepublishOnly builds add3d/dist)
+        working-directory: add3d
+        run: npm publish --access public --provenance --tag latest
+      - name: Verify on the registry
+        run: |
+          VERSION=$(node -p "require('./add3d/package.json').version")
+          for i in $(seq 1 60); do
+            LATEST=$(npm view drawnui-react-add3d dist-tags.latest 2>/dev/null || true)
+            echo "latest=$LATEST"
+            test "$LATEST" = "$VERSION" && exit 0
+            sleep 30
+          done
+          echo "still validating on npmjs.com after 30 min"
+          exit 1

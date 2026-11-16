@@ -22,6 +22,8 @@ concurrency:
 
 jobs:
   publish:
+    # add3d-v* releases belong to publish-add3d.yml
+    if: ${{ github.event_name == 'workflow_dispatch' || !startsWith(github.event.release.tag_name, 'add3d-v') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
