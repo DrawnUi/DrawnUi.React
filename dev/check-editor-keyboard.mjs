@@ -8,7 +8,9 @@
 // 3. a tap on the field again focuses it inside the tap (the keyboard comes back);
 // 4. a mouse click on the field focuses the input (desktop typing, IME);
 // 5. a real tap (Playwright's touchscreen: touch events and the compatibility mouse events) leaves the input focused;
-// 6. the soft keyboard opening over a field in the lower half (visualViewport shrinking) scrolls the field above it.
+// 6. the soft keyboard opening over a field in the lower half (visualViewport shrinking) scrolls the field above it;
+// 7. the soft keyboard's return key (done / go / search / send) in a single-line field focused by a tap ends editing, as a
+//    MAUI single-line field; a physical Enter keeps the field focused.
 import { createRequire } from "node:module";
 const { webkit, chromium } = createRequire(import.meta.url)("playwright-core");
 const base = (process.argv[2] ?? "http://localhost:5173").replace(/\/$/, "");
@@ -103,6 +105,25 @@ for (const [name, type] of [["webkit", webkit], ["chromium", chromium]]) {
       return { focused: ed.Lower.IsFocused, before: Math.round(before), after: Math.round(rectOf(ed.Lower).bottom), visibleBottom: 300 };
     });
     check(`${name}: the keyboard opening over a field in the lower half scrolls it above the keyboard`, above.focused && above.before > 300 && above.after <= 300 - 16 + 1 && above.after > 100, above);
+    // 7. the soft keyboard's return key (a field focused by a touch tap, enterkeyhint done): editing ends, the keyboard closes;
+    //    a physical Enter (a field focused by a mouse click) keeps the field focused
+    await page.evaluate(() => { window.__ed.Lower.IsFocused = false; window.__ed.Editor.IsFocused = false; });
+    await page.evaluate(() => { const ed = window.__ed; ed.Canvas.Content.ScrollTo?.(0, 0, 0); });
+    await sleep(400);
+    const fp = await page.evaluate(() => { const ed = window.__ed, r = ed.Editor.GetAccessibilityPixelRect(), k = ed.Canvas.RenderingScale, b = ed.Canvas.Element.getBoundingClientRect(); return { x: b.left + (r.Left + r.Right) / 2 / k, y: b.top + (r.Top + r.Bottom) / 2 / k }; });
+    await page.touchscreen.tap(fp.x, fp.y); await sleep(500);
+    const soft = await page.evaluate(async () => {
+      const input = document.querySelector("[data-drawnui-text-input]"), ed = window.__ed;
+      const hint = input.enterKeyHint, was = ed.Editor.IsFocused;
+      input.value = input.value + "\n"; input.dispatchEvent(new InputEvent("input", { inputType: "insertLineBreak", bubbles: true }));
+      await new Promise((r) => setTimeout(r, 300));
+      return { hint, was, focused: ed.Editor.IsFocused, active: document.activeElement === input };
+    });
+    check(`${name}: the soft keyboard's return key in a single-line field ends editing (keyboard closes)`, soft.was && soft.hint === "done" && !soft.focused && !soft.active, soft);
+    await page.mouse.click(fp.x, fp.y); await sleep(400);
+    await page.keyboard.press("Enter"); await sleep(300);
+    const physical = await page.evaluate(() => ({ focused: window.__ed.Editor.IsFocused }));
+    check(`${name}: a physical Enter in a field focused by a mouse click keeps it focused`, physical.focused, physical);
     check(`${name}: no page errors`, errors.length === 0, errors.join(" | "));
   } finally { await browser.close(); }
 }

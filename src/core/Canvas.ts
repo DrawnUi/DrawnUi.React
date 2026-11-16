@@ -813,11 +813,12 @@ export class Canvas {
     return false;
   }
   private readonly onTouchEnd = (e: TouchEvent) => {
-    this.ProcessPendingGestures();
+    TextInputProxy.TouchGesture = true;
+    try { this.ProcessPendingGestures(); } finally { TextInputProxy.TouchGesture = false; }
     const t = e.changedTouches[0];
     // the input has focus now: no compatibility mouse events or click follow, whose focus would go to the canvas host
     // and take the keyboard away again
-    if (t && TextInputProxy.FocusFromTap(t.clientX, t.clientY) && e.cancelable) e.preventDefault();
+    if (t && TextInputProxy.FocusFromTap(t.clientX, t.clientY, true) && e.cancelable) e.preventDefault();
   };
   /** Gestures="Enabled": touch / pen pointers whose Down a control used (see OnTouchAction). */
   private readonly claimedTouches = new Set<number>();
