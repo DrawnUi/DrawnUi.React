@@ -2,7 +2,7 @@
 // accessibility tree; the gallery's tree is built with the engine API, the same way as the .NET and Rust heads build theirs.
 import { createRoot } from "react-dom/client";
 import { Canvas, SkiaLayer, Super } from "drawnui-react";
-import { Aria, SkiaLabel, type SkiaLayout } from "drawnui-react/core";
+import { Aria, SkiaLabel, TooltipStyle, type SkiaLayout } from "drawnui-react/core";
 import { GalleryRoot } from "./app/GalleryRoot";
 import { Theme } from "./app/Theme";
 import { HideLoader, TrackDownloads } from "./loader";
@@ -21,6 +21,9 @@ await Promise.all([
 
 // Every label is text to a screen reader.
 SkiaLabel.DefaultAccessibilityRole = Aria.RoleText;
+
+// Tooltips look like the active button: accent gold, its dark text, the buttons' font, no border.
+Super.TooltipStyle = Object.assign(new TooltipStyle(), { BackgroundColor: Theme.Accent, TextColor: "#281C06", BorderColor: undefined, FontFamily: Theme.Title });
 
 const root = new GalleryRoot("Add3D addon to DrawnUI for React");
 
