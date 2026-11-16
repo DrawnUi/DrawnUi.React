@@ -6,10 +6,10 @@
 // 2. the keyboard closed by the user (the input blurred), a drag elsewhere on the page scrolls and does NOT focus the input
 //    again (the keyboard does not pop back on every touch);
 // 3. a tap on the field again focuses it inside the tap (the keyboard comes back);
-// 4. a mouse click on the field focuses the input (desktop typing, IME);
+// 4. a mouse click on the field focuses the input (desktop typing, IME) and places the input at the field;
 // 5. a real tap (Playwright's touchscreen: touch events and the compatibility mouse events) leaves the input focused;
 // 6. the soft keyboard opening over a field in the lower half (visualViewport shrinking) scrolls the field above it, and the
-//    hidden input stays at the top-left corner (as the DrawnUi.Net web heads), never over the field;
+//    hidden input of that touch-focused field stays at the top-left corner, never over the field;
 // 7. the soft keyboard's return key (done / go / search / send) in a single-line field focused by a tap ends editing, as a
 //    MAUI single-line field; a physical Enter keeps the field focused.
 import { createRequire } from "node:module";
@@ -78,7 +78,8 @@ for (const [name, type] of [["webkit", webkit], ["chromium", chromium]]) {
     const p = await page.evaluate(() => { const ed = window.__ed, r = ed.Editor.GetAccessibilityPixelRect(), k = ed.Canvas.RenderingScale, b = ed.Canvas.Element.getBoundingClientRect(); return { x: b.left + (r.Left + r.Right) / 2 / k, y: b.top + (r.Top + r.Bottom) / 2 / k }; });
     await page.mouse.click(p.x, p.y); await sleep(500);
     await page.keyboard.type("hi"); await sleep(300);
-    const typed = await page.evaluate(() => ({ active: document.activeElement?.dataset?.drawnuiTextInput === "1", text: window.__ed.Editor.Text }));
+    const typed = await page.evaluate(() => { const ir = document.querySelector("[data-drawnui-text-input]").getBoundingClientRect(); return { active: document.activeElement?.dataset?.drawnuiTextInput === "1", text: window.__ed.Editor.Text, input: [Math.round(ir.left), Math.round(ir.top)] }; });
+    check(`${name}: a field focused by a mouse click has its hidden input at the field (a desktop IME window opens next to it)`, Math.abs(typed.input[0] - p.x) < 200 && Math.abs(typed.input[1] - p.y) < 40, { input: typed.input, field: [Math.round(p.x), Math.round(p.y)] });
     check(`${name}: a mouse click on the field focuses its input and typing reaches it`, typed.active && typed.text.endsWith("hi"), typed);
     // 5. a real tap (the browser's own touch events, then its compatibility mouse events): the input keeps the focus the tap
     //    gave it (the canvas host must not take it back)
@@ -106,7 +107,7 @@ for (const [name, type] of [["webkit", webkit], ["chromium", chromium]]) {
       const ir = document.querySelector("[data-drawnui-text-input]").getBoundingClientRect();
       return { focused: ed.Lower.IsFocused, before: Math.round(before), after: Math.round(rectOf(ed.Lower).bottom), visibleBottom: 300, input: [Math.round(ir.left), Math.round(ir.top)] };
     });
-    check(`${name}: the hidden input stays at the top-left corner, never over the field (iOS never pans the page to reveal it)`, above.input[0] === 0 && above.input[1] === 0, above);
+    check(`${name}: a field focused by a touch keeps its hidden input at the top-left corner (iOS never pans the page to reveal it)`, above.input[0] === 0 && above.input[1] === 0, above);
     check(`${name}: the keyboard opening over a field in the lower half scrolls it above the keyboard`, above.focused && above.before > 300 && above.after <= 300 - 16 + 1 && above.after > 100, above);
     // 7. the soft keyboard's return key (a field focused by a touch tap, enterkeyhint done): editing ends, the keyboard closes;
     //    a physical Enter (a field focused by a mouse click) keeps the field focused

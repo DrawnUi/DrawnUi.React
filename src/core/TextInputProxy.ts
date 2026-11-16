@@ -34,9 +34,7 @@ export class TextInputProxy {
     el.setAttribute("autocorrect", "off");
     el.setAttribute("autocapitalize", "off");
     el.rows = 1;
-    // a fixed 1x1 box at the top-left corner, never over the field (as the DrawnUi.Net web heads): invisible, still
-    // focusable, the 16px font keeps iOS from zooming the page, and iOS never pans the page to reveal it (the field is
-    // moved above the keyboard by the drawn scrolls, EnsureAboveKeyboard)
+    // a fixed 1x1 box (where it sits: Place): invisible, still focusable, the 16px font keeps iOS from zooming the page
     el.style.cssText = "position:fixed;left:0;top:0;width:1px;height:1px;padding:0;border:0;margin:0;opacity:0.01;font-size:16px;line-height:1;resize:none;overflow:hidden;outline:none;background:transparent;color:transparent;caret-color:transparent;pointer-events:none;z-index:-1;";
     el.addEventListener("compositionstart", () => { TextInputProxy.composing = true; });
     el.addEventListener("compositionend", () => { TextInputProxy.composing = false; TextInputProxy.ApplyFromElement(); });
@@ -125,13 +123,13 @@ export class TextInputProxy {
     const b = canvas.getBoundingClientRect(), k = owner.RenderingScale || 1, r = owner.GetAccessibilityPixelRect();
     const x = (clientX - b.left) * k, y = (clientY - b.top) * k;
     if (x < r.Left || x > r.Right || y < r.Top || y > r.Bottom) return false;
+    TextInputProxy.byTouch = touch;
     if (!TextInputProxy.focusedNow) {
       // focus() on the input that has focus already does not open the keyboard: take it off and back on, inside the tap
       if (document.activeElement === el) el.blur();
       el.focus({ preventScroll: true });
-      TextInputProxy.Sync(owner);
     }
-    TextInputProxy.byTouch = touch;
+    TextInputProxy.Sync(owner);
     return true;
   }
 
@@ -157,6 +155,24 @@ export class TextInputProxy {
     if (el.value !== editor.Text) el.value = editor.Text;
     const start = editor.CursorPosition, end = start + editor.SelectionLength;
     if (el.selectionStart !== start || el.selectionEnd !== end) el.setSelectionRange(start, end);
+    TextInputProxy.Place(editor, el);
+  }
+
+  /**
+   * Where the hidden input sits: a field focused by a touch keeps it fixed at the top-left corner, never over the field (as
+   * the DrawnUi.Net web heads), so iOS never pans the page to reveal it (the drawn scrolls move the field above the
+   * keyboard, EnsureAboveKeyboard); a field focused by a mouse or the keyboard has it over the field, so a desktop input
+   * method opens its candidate window next to the text.
+   */
+  private static Place(editor: SkiaEditor, el: HTMLTextAreaElement): void {
+    let left = 0, top = 0;
+    const canvas = editor.Superview?.Element;
+    if (!TextInputProxy.byTouch && canvas) {
+      const b = canvas.getBoundingClientRect(), scale = editor.RenderingScale || 1, r = editor.GetAccessibilityPixelRect();
+      left = Math.round(b.left + r.Left / scale); top = Math.round(b.top + r.Top / scale);
+    }
+    el.style.left = `${left}px`;
+    el.style.top = `${top}px`;
   }
 
   /** The textarea changed (typing, IME commit, paste, undo): diff against the editor and replay through the stubs. */
