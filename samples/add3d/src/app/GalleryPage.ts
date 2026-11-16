@@ -526,6 +526,11 @@ export class GalleryPage extends DrawnGame {
     this.VerticalOptions = "Fill";
     this.Children = [
       this._scroll = Make(new SkiaScroll(), {
+        // an overlay bar, as on phones and the Mac: it shows while the page moves and fades out after; it can be dragged;
+        // not held on hover (the mouse is always over the page, it would never hide)
+        ScrollBar: Make(new SkiaScrollBar(), { IsDraggable: true, Thickness: 6 }),
+        ScrollBarThumbColor: Theme.Muted,
+        ScrollBarTrackColor: Theme.Alpha("#FFFFFF", 18 / 255),
         HorizontalOptions: "Fill",
         VerticalOptions: "Fill",
         Content: Make(new SkiaStack(), {
