@@ -809,7 +809,7 @@ export class GalleryPage extends DrawnGame {
                 Margin: new Thickness(8, 0, 0, 0),
                 VerticalOptions: "Center",
                 Children: [
-                  Make(new SkiaLabel(), { Text: "Drawn", FontSize: 14, FontFamily: Theme.Title, TextColor: Theme.Ink, VerticalOptions: "Center" }),
+                  Make(new SkiaLabel(), { Text: "Drawn", FontSize: 14, FontFamily: Theme.Title, TextColor: Theme.Ink, VerticalOptions: "Center", AccessibilityRole: Aria.RolePresentation }), // the switch says it
                   this._drawnSwitch = Make(new Switch3D(), { VerticalOptions: "Center", AccessibilityLabel: "Drawn look", Toggled: (_, on) => this.SetDrawnMobs(on) }),
                 ],
               }),
@@ -984,7 +984,8 @@ export class GalleryPage extends DrawnGame {
                     WidthRequest: 60,
                     Children: [
                       this._swatches[i] = Make(GalleryPage.Swatch(`${name}, ${Dollars(price)}`, swatch), { Tapped: () => this.SetFabric(i) }),
-                      Make(new Copyable(name), { FontSize: 12, TextColor: Theme.Muted, HorizontalOptions: "Center" }),
+                      // the swatch's caption: its radio already says the name
+                      Make(new SkiaLabel(), { Text: name, FontSize: 12, TextColor: Theme.Muted, HorizontalOptions: "Center", AccessibilityRole: Aria.RolePresentation }),
                     ],
                   })),
                 }),
@@ -1011,7 +1012,8 @@ export class GalleryPage extends DrawnGame {
   }
 
   private static PanelLabel(text: string): SkiaLabel {
-    return Make(new Copyable(text), { FontSize: 12, FontFamily: Theme.Title, TextColor: Theme.Muted, Margin: new Thickness(0, 8, 0, -6), CharacterSpacing: 1.5 });
+    // the caption over a group that says its own name
+    return Make(new Copyable(text), { FontSize: 12, FontFamily: Theme.Title, TextColor: Theme.Muted, Margin: new Thickness(0, 8, 0, -6), CharacterSpacing: 1.5, AccessibilityRole: Aria.RolePresentation });
   }
 
   /** A dot on a part of the model: tap it for the part's note. */
@@ -1371,8 +1373,8 @@ export class GalleryPage extends DrawnGame {
       // A still row (its thumbnail shows its last render) is one GPU blit, also while the list scrolls; the row under
       // the mouse is drawn again while its model turns.
       UseCache: "GPU",
+      // named by its texts (name, detail, price), read in order
       AccessibilityRole: Aria.RoleListItem,
-      AccessibilityLabel: `${name}, ${Dollars(price)}`,
       Children: [
         Make(new SkiaShape(), {
           CornerRadius: 10,
@@ -1588,7 +1590,7 @@ export class GalleryPage extends DrawnGame {
               Spacing: 10,
               Margin: new Thickness(0, 6, 0, 0),
               Children: [
-                Make(new SkiaLabel(), { Text: "Spin", FontSize: 14, FontFamily: Theme.Title, TextColor: Theme.Ink, VerticalOptions: "Center" }),
+                Make(new SkiaLabel(), { Text: "Spin", FontSize: 14, FontFamily: Theme.Title, TextColor: Theme.Ink, VerticalOptions: "Center", AccessibilityRole: Aria.RolePresentation }), // the switch says it
                 this._spinSwitch = Make(new Switch3D(), { IsToggled: true, VerticalOptions: "Center", AccessibilityLabel: "Spin", AccessibilityHint: "The globe turns by itself", Toggled: (_, on) => this.SetSpin(on) }),
               ],
             }),
