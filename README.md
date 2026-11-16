@@ -49,6 +49,11 @@ property names, layout and drawing rules. What you learn here works there, and s
 
 DrawnUI is MIT licensed in every language and on every platform: desktop, mobile, web and embedded devices. Ship it in commercial products with no attribution badge, no about screen and no per-device royalty.
 
+## What's new in 0.1.0-preview.44
+
+- **FPS counter:** `SkiaLabelFps` keeps the canvas drawing while it is shown, so it reads the frame rate the canvas
+  reaches, as in DrawnUI for .NET and Rust.
+
 ## What's new in 0.1.0-preview.43
 
 - **3D add-on:** [`drawnui-react-add3d`](https://www.npmjs.com/package/drawnui-react-add3d) puts real 3D inside the

@@ -125,6 +125,7 @@
     "check:a11y-opacity": "node dev/check.mjs dev/check-a11y-opacity.ts",
     "check:a11y-presentational": "node dev/check.mjs dev/check-a11y-presentational.ts",
     "check:password-a11y": "node dev/check.mjs dev/check-password-a11y.ts",
+    "check:fps-label": "node dev/check.mjs dev/check-fps-label.ts",
     "check:release-velocity": "node dev/check.mjs dev/check-release-velocity.ts",
     "check:quiet-animations": "node dev/check.mjs dev/check-quiet-animations.ts",
     "check:skew-sign": "node dev/check.mjs dev/check-skew-sign.ts",

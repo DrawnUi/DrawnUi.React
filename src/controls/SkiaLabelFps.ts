@@ -4,10 +4,9 @@ import { SkiaLabel } from "./SkiaLabel";
 
 /**
  * Mirrors DrawnUi SkiaLabelFps: a label showing the canvas FPS, drawn above its siblings, input-transparent, never
- * re-laying out its parent. Divergence: C# sets Text on every draw, and each new value asks for another frame, so
- * the counter keeps an idle canvas redrawing. Here the value changes only on frames that running animators already
- * request (scroll inertia, transitions, Lottie, game loops): the counter never asks for a frame itself, and an idle
- * canvas keeps the last value measured. Not ported: ForceRefresh, Format, MonoForDigits.
+ * re-laying out its parent. It shows the value on every frame it draws and asks for the next one, so while it is on
+ * screen the canvas keeps drawing and the number is the frame rate the canvas reaches (as DrawnUi.Net and Rust). Not
+ * ported: ForceRefresh, Format, MonoForDigits.
  */
 export class SkiaLabelFps extends SkiaLabel {
   constructor() {
@@ -25,8 +24,13 @@ export class SkiaLabelFps extends SkiaLabel {
 
   override Render(ctx: DrawingContext): void {
     const view = this.Superview;
-    // the frame this asks for is requested anyway by the running animators
-    if (view && view.AnimatingControls.size > 0) this.Text = `FPS ${view.FPS.toFixed(1).padStart(4, "0")}`;
+    // as SkiaControl.Render: a hidden or transparent label draws nothing and asks for nothing
+    if (view && this.IsVisible && this.Opacity > 0 && !this.IsDisposed) {
+      const shown = `FPS ${view.FPS.toFixed(1).padStart(4, "0")}`;
+      if (shown !== this.Text) this.Text = shown;
+      // the next frame (C#'s ever-changing value asks for it the same way): the counter shows what the canvas reaches
+      view.Update();
+    }
     // parent-independent: it measures itself again in its slot as it draws (SkiaControl.Render)
     super.Render(ctx);
   }
