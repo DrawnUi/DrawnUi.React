@@ -265,13 +265,13 @@ label readable and every button focusable without touching each control.
 The overlay has `pointer-events: none`, so hover and all pointer gestures still reach the canvas — the
 Blazor "accessible control loses hover" limitation does not apply.
 
-Text selection (React extension, opt-in): `AccessibilityTextSelectable` on a `SkiaLabel` renders its laid-out lines
-as real, invisible DOM text in the overlay — one span per drawn line, in the same font (registered fonts are also
-installed as CSS `FontFace`s) and stretched to the drawn line width — with pointer events on. The browser then
-selects, copies (Ctrl+C / context menu) and reads it like an HTML paragraph, and the wheel over it still scrolls the
-drawn content. It is off by default and must stay off on anything gesture-driven (buttons, carousels, drawers): the
-selectable text owns the pointer, so taps and pans under it never reach the drawn control. Everything else in the
-overlay is `user-select: none`, so select-all only highlights opted-in text.
+Text selection (opt-in, as DrawnUi.Net): `AccessibilityTextSelectable` on a `SkiaLabel` lets the user select and copy
+its text, drawn by the label in `SkiaLabel.TextSelectionColor`. Mouse: drag (across several labels in reading order, a
+drag held past a scroll's edge scrolls it), double click for a word; Ctrl+C / Cmd+C copies, a click elsewhere clears.
+Touch: a long press selects a word and shows a drawn Copy button; drag to extend. A right click or a long press raises
+the control's `ContextMenu` with the selection kept (`canvas.SelectedText`, `CopyTextSelection()`,
+`ClearTextSelection()`). The label takes the mouse press for this, so keep it off on labels inside gesture-driven
+controls. The overlay stays for screen readers and the keyboard only: nothing in it is ever selected in the DOM.
 
 ## Crawlers and AI agents: static HTML from the accessibility tree
 

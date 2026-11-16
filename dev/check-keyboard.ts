@@ -181,7 +181,8 @@ class Cell extends SkiaDynamicDrawnCell {
   const node = (c: SkiaControl) => mgr.Snapshot.find((n) => n.Source === c);
   check("group card has no name, its heading says it", !!node(groupCard) && node(groupCard)!.Label === undefined && node(groupTitle)?.Label === "Group card");
   check("card button keeps its name, its title text is left out", node(buttonCard)?.Label === "Button card" && !node(buttonTitle));
-  check("selectable title text stays", node(selectCard)?.Label === "Select card" && !!node(selectTitle));
+  // selection is drawn by the label (no overlay text): a selectable title is said once like any other
+  check("card button keeps its name, its selectable title text is left out", node(selectCard)?.Label === "Select card" && !node(selectTitle));
 
   // aria-disabled: a control role that takes no input, never a group or a text
   check("disabled button is Disabled and no Tab stop", node(tools[2])?.Disabled === true && !mgr.IsTabStop(tools[2]));

@@ -737,8 +737,6 @@ export class SkiaControl {
    */
   get AccessibilityTextSelectable(): boolean { return this.accessibilityTextSelectable; }
   set AccessibilityTextSelectable(v: boolean) { if (this.accessibilityTextSelectable !== v) { this.accessibilityTextSelectable = v; this.AccessibilityChanged(); } }
-  /** Text lines for AccessibilityTextSelectable in CSS px relative to the node (SkiaLabel implements it). */
-  GetAccessibilityTextLines(_scale: number): import("./Accessibility").AccessibilityTextLine[] { return []; }
 
   /** Hit rect in canvas pixels used to position the overlay element: the drawn (transformed) bounds, like C# HitBoxWithTransforms. */
   GetAccessibilityPixelRect(): SKRect {

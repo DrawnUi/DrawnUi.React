@@ -53,9 +53,6 @@ interface GroupScroll { Content?: SkiaControl; ScrollToIndex(index: number, anim
 const asLayout = (c: SkiaControl): GroupLayout | undefined => ("ChildrenFactory" in c && "Split" in c ? c as unknown as GroupLayout : undefined);
 const asScroll = (c: SkiaControl): GroupScroll | undefined => ("ScrollToIndex" in c && "ViewportOffsetY" in c ? c as unknown as GroupScroll : undefined);
 
-/** One laid-out text line exposed for native selection (AccessibilityTextSelectable): CSS px relative to the node. */
-export interface AccessibilityTextLine { Text: string; Left: number; Top: number; Width: number; Height: number; FontFamily: string; FontWeight: number; FontSize: number }
-
 /**
  * The value of a range control (a slider, a progress bar): what a screen reader reads and adjusts (drawnui-cross 6c,
  * C# AccessibilityValue): aria-valuenow / min / max, and aria-valuetext when Text is not empty ("65%", "20 – 80").
@@ -79,8 +76,6 @@ export interface AccessibilityNode {
   Source: SkiaControl;
   /** A range control's value (aria-valuenow / min / max / valuetext); its name stays the app's label. */
   Value?: AccessibilityValue;
-  /** Real text lines rendered into the overlay so the browser can select / copy them (opt-in per control). */
-  TextLines?: AccessibilityTextLine[];
 }
 
 /**
@@ -574,7 +569,6 @@ export class SkiaAccessibilityManager {
         Rect: new SKRect(px.Left / scale, px.Top / scale, px.Right / scale, px.Bottom / scale),
         CanInteract: n.AccessibilityCanInteract, IsPressed: n.AccessibilityIsPressed, Expanded: n.AccessibilityExpanded, Live: n.AccessibilityLive, Source: n,
         Disabled: !n.AccessibilityCanInteract && Aria.IsInteractiveRole(n.AccessibilityRole),
-        TextLines: n.AccessibilityTextSelectable ? n.GetAccessibilityTextLines(scale) : undefined,
       });
     }
     list = SayNamesOnce(list);
@@ -623,12 +617,6 @@ export class SkiaAccessibilityManager {
         || x.IsPressed !== y.IsPressed || x.Expanded !== y.Expanded || x.Live !== y.Live || !SameValue(x.Value, y.Value)
         || Math.abs(x.Rect.Left - y.Rect.Left) > 0.5 || Math.abs(x.Rect.Top - y.Rect.Top) > 0.5
         || Math.abs(x.Rect.Right - y.Rect.Right) > 0.5 || Math.abs(x.Rect.Bottom - y.Rect.Bottom) > 0.5) return false;
-      const tx = x.TextLines, ty = y.TextLines;
-      if (!!tx !== !!ty) return false;
-      if (tx && ty) {
-        if (tx.length !== ty.length) return false;
-        for (let j = 0; j < tx.length; j++) if (tx[j].Text !== ty[j].Text || Math.abs(tx[j].Left - ty[j].Left) > 0.5 || Math.abs(tx[j].Top - ty[j].Top) > 0.5 || tx[j].FontSize !== ty[j].FontSize) return false;
-      }
     }
     return true;
   }
@@ -638,13 +626,13 @@ export class SkiaAccessibilityManager {
  * Each name is said once in the flat overlay (DrawnUi.Rust said_by_child): a text or a heading whose label repeats the
  * label of the node it is in (its nearest ancestor node) is said by one of them. Under an interactive node (a card
  * button) the child is left out, the button keeps its name; under any other node (a group card and its title) the
- * node loses its name and the heading says it. Selectable text (TextLines) always stays.
+ * node loses its name and the heading says it.
  */
 function SayNamesOnce(list: AccessibilityNode[]): AccessibilityNode[] {
   const bySource = new Map<SkiaControl, AccessibilityNode>(list.map((x) => [x.Source, x]));
   const said = new Set<AccessibilityNode>();
   for (const x of list) {
-    if (!x.Label || x.TextLines || (x.Role !== Aria.RoleText && x.Role !== Aria.RoleHeading)) continue;
+    if (!x.Label || (x.Role !== Aria.RoleText && x.Role !== Aria.RoleHeading)) continue;
     let owner: AccessibilityNode | undefined;
     for (let p = x.Source.Parent; p && !owner; p = p.Parent) owner = bySource.get(p);
     if (!owner || owner.Label !== x.Label) continue;

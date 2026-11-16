@@ -45,6 +45,7 @@ class FakeCanvas {
     root.Measure(400, 100, 1); root.Arrange(new SKRect(0, 0, 400, 100), -1, -1, 1);
     const canvas = Object.create(Canvas.prototype) as Canvas & { gestureOwner: SkiaControl | null; activeTouchIds: Set<number> };
     canvas.gestureOwner = null; canvas.activeTouchIds = new Set();
+    (canvas as unknown as { pageSelection: unknown[] }).pageSelection = [];
     (canvas as unknown as { ReportFocus(): void }).ReportFocus = () => {};
     const send = (type: TouchActionResult, x: number, button: MouseButton = "Left") => {
       const a = new TouchActionEventArgs(); a.Location = new SKPoint(x, 20); a.StartingLocation = a.Location; a.Scale = 1;

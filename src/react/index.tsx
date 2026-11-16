@@ -256,32 +256,10 @@ const A11Y_CSS = `
 .drawnui-a11y-node::selection,.drawnui-a11y-node *::selection{background:transparent;color:transparent}
 .drawnui-a11y-node:focus{outline:none}
 .drawnui-a11y-node:focus-visible{outline:3px solid rgba(13,110,253,.85);outline-offset:1px;border-radius:3px}
-.drawnui-a11y-text{overflow:visible}
-.drawnui-a11y-text>span{position:absolute;white-space:pre;color:transparent;user-select:text;-webkit-user-select:text;pointer-events:auto;cursor:text;line-height:1;font-kerning:none;font-feature-settings:"kern" 0,"liga" 0,"calt" 0;text-rendering:geometricPrecision}
-.drawnui-a11y-text>span::selection{background:var(--drawnui-text-selection);color:transparent}
-.drawnui-a11y-node[role=link]>span,.drawnui-a11y-node[role=button]>span{cursor:pointer}
 `;
 
 const NAVIGATION_KEYS = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"]);
 
-/**
- * A long press on selectable text (6cb): when no selection covers the point, the word there is selected first, so the
- * context menu comes with it (a long press over the current selection keeps it).
- */
-function SelectWordAt(x: number, y: number): void {
-  const sel = getSelection();
-  if (!sel) return;
-  if (!sel.isCollapsed) {
-    for (let i = 0; i < sel.rangeCount; i++) for (const r of sel.getRangeAt(i).getClientRects()) if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return;
-  }
-  const d = document as Document & { caretPositionFromPoint?(x: number, y: number): { offsetNode: Node; offset: number } | null };
-  const at = d.caretPositionFromPoint?.(x, y) ?? (() => { const r = document.caretRangeFromPoint?.(x, y); return r ? { offsetNode: r.startContainer, offset: r.startOffset } : null; })();
-  if (!at || at.offsetNode.nodeType !== Node.TEXT_NODE) return;
-  const text = at.offsetNode.textContent ?? "";
-  for (const s of new Intl.Segmenter(undefined, { granularity: "word" }).segment(text)) {
-    if (at.offset >= s.index && at.offset <= s.index + s.segment.length && s.isWordLike) { sel.setBaseAndExtent(at.offsetNode, s.index, at.offsetNode, s.index + s.segment.length); return; }
-  }
-}
 /** How long a scroll bringing the keyboard's control into view takes, seconds. */
 const KeyboardScrollSecs = 0.25;
 
@@ -324,8 +302,6 @@ function AccessibilityOverlay({ view }: { view: CanvasView }) {
   // belong to the app again (as in the other engines); the DOM focus stays on the canvas host, so a screen reader is not
   // thrown to the top of the page and the next Tab starts from the canvas. A focus the user moved away stays away.
   const focusedId = useRef(0);
-  /** A touch press on selectable text: where it started and its long-press timer (6cb). */
-  const textPress = useRef({ X: 0, Y: 0, Timer: 0 });
   const previousNodes = useRef(nodes);
   useLayoutEffect(() => {
     const previous = previousNodes.current;
@@ -365,32 +341,8 @@ function AccessibilityOverlay({ view }: { view: CanvasView }) {
     document.addEventListener("keydown", onKey, true);
     return () => document.removeEventListener("keydown", onKey, true);
   }, [view]);
-  // selectable text spans take pointer events: the wheel over them is re-dispatched to the canvas so drawn scrolls keep working
   const overlayRef = useRef<HTMLDivElement>(null);
-  // the canvas drives mouse text selection over the overlay's selectable text from presses on itself (6cc)
-  useLayoutEffect(() => { view.OverlayElement = overlayRef.current ?? undefined; return () => { if (view.OverlayElement === overlayRef.current) view.OverlayElement = undefined; }; });
-  const hasNodes = nodes.length > 0;
-  useEffect(() => {
-    const el = overlayRef.current;
-    if (!el) return;
-    const forward = (e: WheelEvent) => { e.preventDefault(); view.Element.dispatchEvent(new WheelEvent("wheel", { deltaX: e.deltaX, deltaY: e.deltaY, deltaMode: e.deltaMode, clientX: e.clientX, clientY: e.clientY, ctrlKey: e.ctrlKey, shiftKey: e.shiftKey, bubbles: false, cancelable: true })); };
-    el.addEventListener("wheel", forward, { passive: false });
-    return () => el.removeEventListener("wheel", forward);
-  }, [view, hasNodes]);
-  // the browser lays the invisible lines out with its own shaping; stretch each line with letter-spacing to the drawn width
-  // so the selection highlight covers the drawn glyphs end to end
-  useLayoutEffect(() => {
-    const el = overlayRef.current;
-    if (!el) return;
-    for (const span of el.querySelectorAll<HTMLSpanElement>(".drawnui-a11y-text>span")) {
-      const want = parseFloat(span.dataset.w ?? "0"), n = (span.textContent ?? "").replace(/\n$/, "").length - 1;
-      span.style.letterSpacing = "0px";
-      if (want <= 0 || n <= 0) continue;
-      const have = span.getBoundingClientRect().width;
-      if (Math.abs(have - want) > 0.5) span.style.letterSpacing = `${(want - have) / n}px`;
-    }
-  }, [nodes]);
-  if (!hasNodes) return null;
+  if (nodes.length === 0) return null;
   // the browser scrolls an overflow:hidden container to reveal a focused child; the overlay must stay pinned to the canvas
   const pin = (e: React.SyntheticEvent<HTMLDivElement>) => { e.currentTarget.scrollTop = 0; e.currentTarget.scrollLeft = 0; };
   // an active modal (drawnui-cross 6av): the overlay itself is the dialog (role, name, aria-modal) around the dialog's
@@ -401,54 +353,20 @@ function AccessibilityOverlay({ view }: { view: CanvasView }) {
   return (
     <div className="drawnui-a11y-overlay" onScroll={pin} ref={overlayRef}
       role={modal ? modalNode?.Role ?? "dialog" : undefined} aria-label={modalNode?.Label} aria-modal={modal ? true : undefined}>
-      <style>{A11Y_CSS + `.drawnui-a11y-overlay{--drawnui-text-selection:${SkiaLabelCtrl.TextSelectionColor}}`}</style>
+      <style>{A11Y_CSS}</style>
       {nodes.map((n) => {
         if (n === modalNode || (modal && n.Source === modal)) return null;
         const pos: CSSProperties = { left: n.Rect.Left, top: n.Rect.Top, width: n.Rect.Width, height: n.Rect.Height };
         const activate = () => SkiaAccessibilityManager.Activate(n.Source);
-        // selectable text (AccessibilityTextSelectable): one positioned span per drawn line, in the drawn font, so the browser
-        // selects and copies it like HTML; a control with selectable text (a link) keeps its role and takes part in the
-        // page selection too
-        const lines = n.TextLines?.map((l, i) => (
-          <span key={i} data-w={l.Width} style={{ left: l.Left, top: l.Top, height: l.Height, fontFamily: l.FontFamily, fontWeight: l.FontWeight, fontSize: l.FontSize, lineHeight: `${l.Height}px` }}>{l.Text}{i < n.TextLines!.length - 1 ? "\n" : ""}</span>
-        ));
-        const textEvents = {
-          // a long press on touch raises the context menu once (6cb): the browser's contextmenu (Android) or the press's own timer (iOS)
-          onPointerDown: (e: React.PointerEvent) => {
-            if (e.pointerType === "mouse") { view.FollowTextSelection(e.nativeEvent); return; }
-            view.StartTouchPress();
-            const x = e.clientX, y = e.clientY;
-            clearTimeout(textPress.current.Timer);
-            textPress.current = { X: x, Y: y, Timer: window.setTimeout(() => { SelectWordAt(x, y); view.RaiseTouchContextMenu(x, y); }, CanvasView.LongPressTimeMs) };
-          },
-          onPointerMove: (e: React.PointerEvent) => {
-            const p = textPress.current;
-            if (e.pointerType !== "mouse" && p.Timer && Math.hypot(e.clientX - p.X, e.clientY - p.Y) > CanvasView.TappedCancelMoveThresholdPoints) { clearTimeout(p.Timer); p.Timer = 0; }
-            // the control under the text hovers as over the canvas (a link lights up)
-            if (e.pointerType === "mouse" && e.buttons === 0) view.HoverFromOverlay(e.nativeEvent);
-          },
-          onPointerUp: () => { clearTimeout(textPress.current.Timer); textPress.current.Timer = 0; },
-          onContextMenu: (e: React.MouseEvent) => {
-            // touch: the word under the finger is selected first (6cb); a right click keeps the selection as it is
-            const pointerType = (e.nativeEvent as PointerEvent).pointerType;
-            if (pointerType === "touch" || pointerType === "pen") SelectWordAt(e.clientX, e.clientY);
-            if (view.ContextMenuFromText(e.nativeEvent)) e.preventDefault();
-          },
-        };
         return n.CanInteract ? (
           <div key={n.Id} data-a11y-id={n.Id} role={n.Role} aria-label={n.Label} title={n.Hint} {...valueAttributes(n)}
             aria-pressed={n.Role === "button" ? n.IsPressed : undefined}
             aria-expanded={n.Expanded} aria-haspopup={n.Expanded !== undefined && n.Role === "menuitem" ? "menu" : undefined}
             aria-checked={n.Role === "switch" || n.Role === "checkbox" || n.Role === "radio" ? n.IsPressed : undefined}
             aria-live={n.Live as "polite" | "assertive" | undefined}
-            tabIndex={view.AccessibilityManager.IsTabStop(n.Source) ? 0 : -1} className={lines ? "drawnui-a11y-node drawnui-a11y-text" : "drawnui-a11y-node"} style={{ ...pos, fontSize: 0, userSelect: "none" }}
-            {...(lines ? textEvents : {})}
-            // a click that ends a selection over its text does not activate it
-            onClick={(e) => { if (!lines || e.target === e.currentTarget || getSelection()?.isCollapsed !== false) activate(); }}
-            onContextMenu={(e) => {
-              if (lines && e.target !== e.currentTarget) { textEvents.onContextMenu(e); return; } // on its text: as selectable text
-              if (view.OpenContextMenuFromKeyboard(n.Source, e.nativeEvent)) e.preventDefault();
-            }}
+            tabIndex={view.AccessibilityManager.IsTabStop(n.Source) ? 0 : -1} className="drawnui-a11y-node" style={{ ...pos, fontSize: 0, userSelect: "none" }}
+            onClick={activate}
+            onContextMenu={(e) => { if (view.OpenContextMenuFromKeyboard(n.Source, e.nativeEvent)) e.preventDefault(); }}
             onKeyDown={(e) => {
               // the canvas navigation gets the key first; the app's KeyDown runs after it with IsKeyHandled (6az)
               if (e.key === "Enter" || e.key === " ") { e.preventDefault(); if (activate()) KeyboardManager.MarkKeyHandled(e.nativeEvent.code); }
@@ -478,12 +396,7 @@ function AccessibilityOverlay({ view }: { view: CanvasView }) {
               n.Source.OnAccessibilityFocused(false);
               n.Source.NotifyAccessibilityFocused(false);
             }}>
-            {lines ?? n.Label}
-          </div>
-        ) : n.TextLines ? (
-          // AccessibilityTextSelectable: one positioned span per drawn line, in the drawn font, so the browser selects and copies it like HTML
-          <div key={n.Id} role={n.Role} title={n.Hint} aria-disabled={n.Disabled || undefined} aria-live={n.Live as "polite" | "assertive" | undefined} className="drawnui-a11y-node drawnui-a11y-text" style={pos} {...textEvents}>
-            {lines}
+            {n.Label}
           </div>
         ) : (
           // static text is exposed as real (transparent) text content; aria-label only for roles that need a name

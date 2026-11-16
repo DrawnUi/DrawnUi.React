@@ -145,7 +145,8 @@
     "browser:text-selection": "node dev/check-text-selection.mjs",
     "browser:tab-scroll": "node dev/check-tab-scroll.mjs",
     "check:recycled-doublebuffer": "node dev/check.mjs dev/check-recycled-doublebuffer.ts",
-    "check:add3d-framing": "node dev/check.mjs dev/check-add3d-framing.ts"
+    "check:add3d-framing": "node dev/check.mjs dev/check-add3d-framing.ts",
+    "check:label-selection": "node dev/check.mjs dev/check-label-selection.ts"
   },
   "peerDependencies": {
     "playwright-core": ">=1.40",

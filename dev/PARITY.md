@@ -249,7 +249,7 @@ Updated whenever the port deliberately diverges or finds something worth back-po
 ### Each name said once in the flat overlay (React and Rust only)
 - **React / Rust**: a text or heading whose label repeats the label of the node it is in is said once: under an
   interactive node the child is left out, under any other node (a group card) the node loses its name and the heading
-  says it. Selectable text always stays. The web overlay is flat, so a group's name and its heading are read one after
+  says it. The web overlay is flat, so a group's name and its heading are read one after
   the other.
 - **.NET**: no such rule yet.
 
@@ -556,9 +556,19 @@ Updated whenever the port deliberately diverges or finds something worth back-po
   ContextMenu gesture too (C# 31e5e564). Slider and drawer that are off are still hovered there.
 - **Opinion**: only app `HoverChanged` handlers can see the difference; align when a React control draws hover.
 
-### Selectable text is opt-in
-- **React**: `AccessibilityTextSelectable` (default false) puts a label's lines into the overlay as real text with pointer events; the text then owns the pointer (selection), so it is never enabled implicitly — custom controls would lose taps and pans under their labels. ARIA roles / labels stay unaffected.
-- **.NET**: no selectable labels (only `SkiaEditor` selects).
+### Selectable text: drawn by the label, page drag in reading order
+- **React / .NET**: `AccessibilityTextSelectable` works the same (drawnui-cross 6cc / 6ce): the label draws the selection and
+  the touch Copy button, the overlay is for screen readers and the keyboard only.
+- **React**: a page drag orders the labels as they are seen (by top, a line read left to right); .NET walks them in tree
+  order, so on a page in two columns a drag in the right column starts at a label of the left one (3D gallery: the
+  viewer's hint under the sofa came first and nothing was selected). React also keeps the page selection when the press is
+  on an open popup window (the menu whose Copy copies it), processes a right click's own press before the browser's
+  contextmenu opens a menu (else that press closed it), and lets the Copy button's tap reach its release (the tap came
+  first and cleared the selection; .NET web heads send Tapped before Up too, Canvas.Gestures.Blazor.cs). Reported to the
+  .NET owner.
+- **React**: a page drag of one label also owns Ctrl+C (.NET attaches the page keys only from two labels on, so a drag
+  that starts beside a single label copies nothing).
+- **Opinion**: React's rules are the ones a user expects; .NET should follow.
 
 ## Text shaping
 
