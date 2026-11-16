@@ -120,6 +120,32 @@ const lines = (l: SkiaLabel) => ((l as unknown as { lines: { Runs: { Text: strin
     check("a wrap that grows its Auto row at the final width takes its room from the star row: the rows fit the grid", rows[2] === 136 && rows[0] + rows[1] + rows[2] + 2 * 10 + 2 * 20 === 500 && controls.DrawingRect.Bottom <= grid.DrawingRect.Bottom - 20 + 0.5, `rows ${rows.join(",")}, controls bottom ${controls.DrawingRect.Bottom}, grid bottom ${grid.DrawingRect.Bottom}`);
   }
 
+  // C# GridAutoRowsNarrowTests (5acd8ae4): a full-height grid "Auto,*,Auto,Auto" on a phone and a desktop: the Auto rows
+  // (a wrapping subtitle, two button wraps) take their content at the screen width, the star row what is left
+  const LONG = "A glTF model drawn in 3D inside DrawnUI, driven by the app. Drag it to turn it, tap it to hit it.";
+  for (const [columns, width, height, subtitleLines, movesH, skinsH] of [[undefined, 390, 844, 2, 136, 88], ["*", 390, 844, 2, 136, 88], [undefined, 1280, 796, 1, 40, 40], ["*", 1280, 796, 1, 40, 40]] as [string | undefined, number, number, number, number, number][]) {
+    const buttons = (n: number) => { const w = new SkiaWrap(); w.Spacing = 8; w.HorizontalOptions = "Center"; for (let i = 0; i < n; i++) { const b = new SkiaShape(); b.WidthRequest = 100; b.HeightRequest = 40; w.AddSubView(b); } return w; };
+    const label = (t: string, size: number) => { const l = new SkiaLabel(); l.Text = t; l.FontSize = size; l.HorizontalOptions = "Center"; return l; };
+    const grid = new SkiaGrid(); grid.Padding = new Thickness(20); grid.RowSpacing = 10; grid.VerticalOptions = "Fill"; grid.RowDefinitions = "Auto,*,Auto,Auto";
+    if (columns) grid.ColumnDefinitions = columns;
+    const head = new SkiaStack(); head.Spacing = 8; head.Row = 0;
+    const subtitle = label(LONG, 15); subtitle.HorizontalTextAlignment = "Center";
+    head.AddSubView(label("BOSS FIGHT", 30)); head.AddSubView(subtitle);
+    const star = new SkiaLayout(); star.HorizontalOptions = "Fill"; star.VerticalOptions = "Fill"; star.Row = 1;
+    const news = label("Tap the dragon to hit it.", 15); news.Row = 2;
+    const bottom = new SkiaStack(); bottom.Spacing = 10; bottom.Row = 3;
+    const moves = buttons(7), skins = buttons(6);
+    bottom.AddSubView(label("MOVES", 13)); bottom.AddSubView(moves); bottom.AddSubView(label("SKIN", 13)); bottom.AddSubView(skins);
+    grid.AddSubView(head); grid.AddSubView(star); grid.AddSubView(news); grid.AddSubView(bottom);
+    (grid as unknown as { _superview: unknown })._superview = new FakeCanvas();
+    for (let i = 0; i < 2; i++) { grid.Measure(width, height, 1); grid.Arrange(new SKRect(0, 0, width, height), -1, -1, 1); }
+    const name = `GridAutoRowsNarrow [${columns ?? "Auto"}] ${width}x${height}`;
+    check(`${name}: subtitle ${subtitleLines} line(s), moves ${movesH}, skins ${skinsH}`, lines(subtitle).length === subtitleLines && Math.abs(moves.DrawingRect.Height - movesH) <= 1 && Math.abs(skins.DrawingRect.Height - skinsH) <= 1,
+      `lines ${lines(subtitle).length}, moves ${moves.DrawingRect.Height}, skins ${skins.DrawingRect.Height}`);
+    check(`${name}: the Auto rows end at the bottom padding, the star row takes the rest`, Math.abs(skins.DrawingRect.Bottom - (height - 20)) <= 1 && star.DrawingRect.Height > 100 && Math.abs(star.DrawingRect.Bottom + 10 - news.DrawingRect.Top) <= 1,
+      `skins bottom ${skins.DrawingRect.Bottom}, star ${star.DrawingRect.Height}, news top ${news.DrawingRect.Top}`);
+  }
+
   console.log(failures ? `FAIL: ${failures} checks` : "OK: grid Auto rows and label cuts");
   process.exit(failures ? 1 : 0);
 })();

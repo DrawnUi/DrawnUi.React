@@ -329,14 +329,44 @@ export class SkiaGridStructure {
 
   private static ZeroOutStars(defs: DefinitionInfo[]): void { for (const d of defs) if (d.IsStar) d.Size = 0; }
 
-  /** Tracks are final only now: measure every child at its final cell so its internal layout matches the arranged box. */
+  /**
+   * Final measure pass (C# RemeasureChildrenAtFinalCells, 5acd8ae4), run once every track has its final size. Auto rows
+   * first, measured at their final width with the star rows yielding: an Auto column that got the grid's width only now
+   * (wrapped text, a wrap of buttons on several lines) can make its rows taller than the first pass did, and the star rows
+   * were already given the rest of the height. When an Auto row grew the star rows get what is left now, nothing when the
+   * Auto rows took it all. Then every visible child is measured at the cell it will be arranged in.
+   */
   RemeasureChildrenAtFinalCells(): void {
-    const autoBefore = this.Rows.map((r) => r.Size);
+    if (this.Rows.some((r) => r.IsStar) && isFinite(this.heightConstraint)) {
+      const starSizes = this.Rows.map((r) => r.Size);
+      SkiaGridStructure.ZeroOutStars(this.Rows);
+      if (this.MeasureAtFinalCells(true)) {
+        if (this.heightConstraint - this.GridHeight() > 0) this.ResolveStarRows(this.heightConstraint);
+      } else {
+        for (let n = 0; n < this.Rows.length; n++) if (this.Rows[n].IsStar) this.Rows[n].Size = starSizes[n];
+      }
+    }
+    this.MeasureAtFinalCells(false);
+  }
+
+  /** Measures the visible children at their cells (only those on single Auto rows when autoRowsOnly); true when an Auto row grew. */
+  private MeasureAtFinalCells(autoRowsOnly: boolean): boolean {
+    let autoRowGrew = false;
     for (const cell of this.cells) {
       const child = this.children[cell.ViewIndex];
       if (!child.IsVisible) continue;
+      if (autoRowsOnly && !this.SizesAutoRow(cell)) continue;
       const rect = this.GetCellBoundsFor(child);
       if (rect.Width <= 0 || rect.Height <= 0) continue;
+      if (autoRowsOnly) {
+        // the height the row can grow to, as in MeasureKnownCells: unbounded for a vertical Fill child (it would take the
+        // whole constraint), the result held to the space the row can have
+        let grown = this.MeasurePx(child, rect.Width, this.HeightOnAutoRow(cell, child)).Height;
+        const available = this.AvailableHeight(cell);
+        if (isFinite(available) && grown > available) grown = available;
+        if (grown > this.Rows[cell.Row].Size) { this.Rows[cell.Row].Update(grown); autoRowGrew = true; }
+        continue;
+      }
       // on an Auto row a child that is not Fill vertically keeps the height the row can grow to, as in
       // MeasureKnownCells: the same request returns at once, and wrapped text is not cut to the row
       const height = this.SizesAutoRow(cell) && !SkiaGridStructure.NeedFillY(child) ? Math.max(rect.Height, this.AvailableHeight(cell)) : rect.Height;
@@ -344,28 +374,6 @@ export class SkiaGridStructure {
       if (cell.ColumnSpan === 1 && this.Columns[cell.Column].IsAuto && m.Width > this.Columns[cell.Column].Size) this.Columns[cell.Column].Update(m.Width);
       if (cell.RowSpan === 1 && this.Rows[cell.Row].IsAuto && m.Height > this.Rows[cell.Row].Size) this.Rows[cell.Row].Update(m.Height);
     }
-    this.GiveAutoGrowthFromStars(autoBefore);
-  }
-
-  /**
-   * An Auto row that grew only at its final width (a full-width stack in an Auto column holding a wrap: one line when
-   * first measured unbounded, several at the real width) takes that room from the star rows of a grid of a set height, as
-   * the star rows were sized against the smaller row; the rows never run past the grid. Star rows shrink in proportion,
-   * never below 0, and the children in them are measured again at their new cells.
-   */
-  private GiveAutoGrowthFromStars(before: number[]): void {
-    if (!isFinite(this.heightConstraint) || !this.Rows.some((r, i) => r.IsAuto && r.Size > before[i])) return;
-    const excess = this.GridHeight() - this.heightConstraint;
-    let stars = 0;
-    for (const r of this.Rows) if (r.IsStar) stars += r.Size;
-    if (excess <= 0 || stars <= 0) return;
-    const keep = Math.max(0, stars - excess) / stars;
-    for (const r of this.Rows) if (r.IsStar) r.Size *= keep;
-    for (const cell of this.cells) {
-      const child = this.children[cell.ViewIndex];
-      if (!cell.IsRowSpanStar || !child.IsVisible) continue;
-      const rect = this.GetCellBoundsFor(child);
-      if (rect.Width > 0 && rect.Height > 0) this.MeasurePx(child, rect.Width, rect.Height);
-    }
+    return autoRowGrew;
   }
 }
