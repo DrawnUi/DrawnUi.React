@@ -331,6 +331,7 @@ export class SkiaGridStructure {
 
   /** Tracks are final only now: measure every child at its final cell so its internal layout matches the arranged box. */
   RemeasureChildrenAtFinalCells(): void {
+    const autoBefore = this.Rows.map((r) => r.Size);
     for (const cell of this.cells) {
       const child = this.children[cell.ViewIndex];
       if (!child.IsVisible) continue;
@@ -342,6 +343,29 @@ export class SkiaGridStructure {
       const m = this.MeasurePx(child, rect.Width, height);
       if (cell.ColumnSpan === 1 && this.Columns[cell.Column].IsAuto && m.Width > this.Columns[cell.Column].Size) this.Columns[cell.Column].Update(m.Width);
       if (cell.RowSpan === 1 && this.Rows[cell.Row].IsAuto && m.Height > this.Rows[cell.Row].Size) this.Rows[cell.Row].Update(m.Height);
+    }
+    this.GiveAutoGrowthFromStars(autoBefore);
+  }
+
+  /**
+   * An Auto row that grew only at its final width (a full-width stack in an Auto column holding a wrap: one line when
+   * first measured unbounded, several at the real width) takes that room from the star rows of a grid of a set height, as
+   * the star rows were sized against the smaller row; the rows never run past the grid. Star rows shrink in proportion,
+   * never below 0, and the children in them are measured again at their new cells.
+   */
+  private GiveAutoGrowthFromStars(before: number[]): void {
+    if (!isFinite(this.heightConstraint) || !this.Rows.some((r, i) => r.IsAuto && r.Size > before[i])) return;
+    const excess = this.GridHeight() - this.heightConstraint;
+    let stars = 0;
+    for (const r of this.Rows) if (r.IsStar) stars += r.Size;
+    if (excess <= 0 || stars <= 0) return;
+    const keep = Math.max(0, stars - excess) / stars;
+    for (const r of this.Rows) if (r.IsStar) r.Size *= keep;
+    for (const cell of this.cells) {
+      const child = this.children[cell.ViewIndex];
+      if (!cell.IsRowSpanStar || !child.IsVisible) continue;
+      const rect = this.GetCellBoundsFor(child);
+      if (rect.Width > 0 && rect.Height > 0) this.MeasurePx(child, rect.Width, rect.Height);
     }
   }
 }
