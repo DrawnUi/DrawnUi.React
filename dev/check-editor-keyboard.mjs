@@ -11,7 +11,8 @@
 // 6. the soft keyboard opening over a field in the lower half (visualViewport shrinking) scrolls the field above it, and the
 //    hidden input of that touch-focused field stays at the top-left corner, never over the field;
 // 7. the soft keyboard's return key (done / go / search / send) in a single-line field focused by a tap ends editing, as a
-//    MAUI single-line field; a physical Enter keeps the field focused.
+//    MAUI single-line field; a physical Enter keeps the field focused;
+// 8. a mouse-focused field in a scrolled page has its hidden input where the field is drawn, following it as the page scrolls.
 import { createRequire } from "node:module";
 const { webkit, chromium } = createRequire(import.meta.url)("playwright-core");
 const base = (process.argv[2] ?? "http://localhost:5173").replace(/\/$/, "");
@@ -128,6 +129,19 @@ for (const [name, type] of [["webkit", webkit], ["chromium", chromium]]) {
     await page.keyboard.press("Enter"); await sleep(300);
     const physical = await page.evaluate(() => ({ focused: window.__ed.Editor.IsFocused }));
     check(`${name}: a physical Enter in a field focused by a mouse click keeps it focused`, physical.focused, physical);
+    // 8. a mouse-focused field in a scrolled page: its hidden input sits where the field is drawn, and follows it while the
+    //    page scrolls
+    await page.evaluate(() => { window.__ed.Editor.IsFocused = false; window.__ed.Lower.IsFocused = false; });
+    await page.mouse.move(380, 300); await page.mouse.wheel(0, 300); await sleep(900);
+    const drawn = () => page.evaluate(() => { const ed = window.__ed, r = ed.Lower.GetAccessibilityPixelRect(), k = ed.Canvas.RenderingScale, b = ed.Canvas.Element.getBoundingClientRect(), ir = document.querySelector("[data-drawnui-text-input]").getBoundingClientRect(); return { field: [Math.round(b.left + r.Left / k), Math.round(b.top + r.Top / k)], input: [Math.round(ir.left), Math.round(ir.top)], x: b.left + (r.Left + r.Right) / 2 / k, y: b.top + (r.Top + r.Bottom) / 2 / k }; });
+    const d0 = await drawn();
+    await page.mouse.click(d0.x, d0.y); await sleep(500);
+    const d1 = await drawn();
+    await page.mouse.move(380, 300); await page.mouse.wheel(0, -120); await sleep(900);
+    const d2 = await drawn();
+    const near = (d) => Math.abs(d.input[0] - d.field[0]) <= 2 && Math.abs(d.input[1] - d.field[1]) <= 2;
+    check(`${name}: in a scrolled page a mouse-focused field has its hidden input where the field is drawn`, near(d1), { field: d1.field, input: d1.input });
+    check(`${name}: the hidden input follows the field while the page scrolls`, d2.field[1] !== d1.field[1] && near(d2), { field: d2.field, input: d2.input });
     check(`${name}: no page errors`, errors.length === 0, errors.join(" | "));
   } finally { await browser.close(); }
 }
