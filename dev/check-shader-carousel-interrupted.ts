@@ -3,6 +3,7 @@
 // swipe while the first still animates finishes it fast (phase 1), then goes one slide on (phase 2); Stopped fires once,
 // at real rest, never between the phases, and InTransition stays true from phase 1 to the end of phase 2. A move by
 // code during phase 1 drops the queued phase 2. A tap clears the carousel's finger state (IsUserFocused).
+import { VelocityAccumulator } from "../src/core/ScrollAnimators.ts";
 import {
   Super, SKRect, SKPoint, Canvas, SkiaAccessibilityManager, HoverManager, SkiaLayer, SkiaShape, SkiaShaderCarousel, TouchActionEventArgs, MultitouchTracker,
   type AnimatorBase, type TouchActionType,
@@ -40,6 +41,7 @@ class FakeCanvas {
     const fake = new FakeCanvas();
     root._superview = fake as unknown as Canvas;
     let ms = 1000;
+    VelocityAccumulator.Clock = () => ms; // releases are judged on the clock the touches carry
     const surface = CK.MakeSurface(W, H);
     const frame = () => {
       fake.FrameTimeNanos = Math.round(ms * 1_000_000);

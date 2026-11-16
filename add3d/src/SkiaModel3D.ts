@@ -659,7 +659,7 @@ export class SkiaModel3D extends SkiaControl implements IPrefetch3D {
       } else if (type === "Up" && this.fling && this.dragged && !this.multiTouch) {
         this.dragged = false;
         // the drag's speed when let go, in points per second, turned the way the drag turns the model
-        const v = this.velocity.CalculateFinalVelocity(4000, args.ArrivedTimeNanos);
+        const v = this.velocity.CalculateFinalVelocity(4000);
         this.StartFling(-v.X * 0.5, v.Y * 0.3);
       }
       if (this.tilt > 0 && (type === "Pointer" || type === "Down" || type === "Panning")) {
