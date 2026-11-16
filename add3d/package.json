@@ -1,6 +1,6 @@
 {
   "name": "drawnui-react-add3d",
-  "version": "0.1.0-preview.43",
+  "version": "0.1.0-preview.44",
   "description": "3D add-on for DrawnUi.React: glTF models with skeleton animations inside a drawn UI (SkiaModel3D viewer, SkiaScene3D for many objects in one pass, shapes made in code, Lit / Toon / Flat looks), drawn on CanvasKit's own WebGL 2 context.",
   "license": "MIT",
   "author": "Nick Kovalsky (AppoMobi)",

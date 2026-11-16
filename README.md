@@ -51,8 +51,10 @@ DrawnUI is MIT licensed in every language and on every platform: desktop, mobile
 
 ## What's new in 0.1.0-preview.44
 
-- **FPS counter:** `SkiaLabelFps` keeps the canvas drawing while it is shown, so it reads the frame rate the canvas
-  reaches, as in DrawnUI for .NET and Rust.
+- **3D add-on 0.1.0-preview.44:** pictures on 3D models are drawn smooth, with their mipmaps and anisotropic
+  filtering (images on materials, the product box of the [demo](https://add3dreact.drawnui.net)).
+- **FPS counter:** the FPS counter shows the real frame rate: `SkiaLabelFps` keeps the canvas drawing while it is
+  shown, as in DrawnUI for .NET and Rust.
 
 ## What's new in 0.1.0-preview.43
 
