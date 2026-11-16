@@ -55,6 +55,9 @@ export class TextInputProxy {
     TextInputProxy.composing = false;
     TextInputProxy.Configure(editor, el);
     TextInputProxy.Sync(editor);
+    // a touch press: the input takes focus in its touchend (FocusFromTap), the only place iOS opens the keyboard from; a
+    // focus taken earlier would leave it focused with no keyboard
+    if (editor.Superview?.TouchPressed) return;
     el.focus({ preventScroll: true });
     TextInputProxy.focusedNow = true;
     queueMicrotask(() => { TextInputProxy.focusedNow = false; });
@@ -67,20 +70,23 @@ export class TextInputProxy {
    * The canvas calls it at the end of a tap's release (the pointerup, the user gesture iOS requires to open the soft
    * keyboard): a tap on the focused field gives its input DOM focus inside that gesture, so the keyboard opens on the first
    * tap and comes back on a tap after the user closed it. A touch anywhere else leaves it as it is: the keyboard the user
-   * closed stays closed while the page is scrolled.
+   * closed stays closed while the page is scrolled. True when the tap was on the focused field (its input has focus now).
    */
-  static FocusFromTap(clientX: number, clientY: number): void {
+  static FocusFromTap(clientX: number, clientY: number): boolean {
     const owner = TextInputProxy.owner, el = TextInputProxy.element;
-    if (!owner || !el || !owner.IsFocused || TextInputProxy.focusedNow) return;
+    if (!owner || !el || !owner.IsFocused) return false;
     const canvas = owner.Superview?.Element;
-    if (!canvas) return;
+    if (!canvas) return false;
     const b = canvas.getBoundingClientRect(), k = owner.RenderingScale || 1, r = owner.GetAccessibilityPixelRect();
     const x = (clientX - b.left) * k, y = (clientY - b.top) * k;
-    if (x < r.Left || x > r.Right || y < r.Top || y > r.Bottom) return;
-    // focus() on the input that has focus already does not open the keyboard: take it off and back on, inside the tap
-    if (document.activeElement === el) el.blur();
-    el.focus({ preventScroll: true });
-    TextInputProxy.Sync(owner);
+    if (x < r.Left || x > r.Right || y < r.Top || y > r.Bottom) return false;
+    if (!TextInputProxy.focusedNow) {
+      // focus() on the input that has focus already does not open the keyboard: take it off and back on, inside the tap
+      if (document.activeElement === el) el.blur();
+      el.focus({ preventScroll: true });
+      TextInputProxy.Sync(owner);
+    }
+    return true;
   }
 
   static Detach(editor: SkiaEditor): void {
