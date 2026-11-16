@@ -10,7 +10,7 @@ import { Look } from "./types";
 import { GlState } from "./glstate";
 
 interface Saved {
-  active: number; texture: WebGLTexture | null; drawFb: WebGLFramebuffer | null; readFb: WebGLFramebuffer | null; rb: WebGLRenderbuffer | null;
+  active: number; texture: WebGLTexture | null; sampler: WebGLSampler | null; drawFb: WebGLFramebuffer | null; readFb: WebGLFramebuffer | null; rb: WebGLRenderbuffer | null;
   viewport: number[]; caps: Map<number, boolean>; blend: number[]; equation: number[]; colorMask: boolean[]; depthMask: boolean;
   clearColor: number[]; clearDepth: number; depthFunc: number; frontFace: number; cullFace: number;
   program: WebGLProgram | null; vao: WebGLVertexArrayObject | null; arrayBuffer: WebGLBuffer | null; align: number; flip: boolean; premul: boolean;
@@ -414,12 +414,15 @@ export class Renderer3D {
   private Begin(): void {
     const gl = this.gl, s = this.state;
     this.saved = {
-      active: s.activeTexture, texture: s.texture0, drawFb: s.drawFb, readFb: s.readFb, rb: s.rb, viewport: [...s.viewport],
+      active: s.activeTexture, texture: s.texture0, sampler: s.sampler0, drawFb: s.drawFb, readFb: s.readFb, rb: s.rb, viewport: [...s.viewport],
       caps: new Map(s.caps), blend: [...s.blend], equation: [...s.equation], colorMask: [...s.colorMask], depthMask: s.depthMask,
       clearColor: [...s.clearColor], clearDepth: s.clearDepth, depthFunc: s.depthFunc, frontFace: s.frontFace, cullFace: s.cullFace,
       program: s.program, vao: s.vao, arrayBuffer: s.arrayBuffer, align: s.unpackAlignment, flip: s.unpackFlipY, premul: s.unpackPremultiply,
     };
     if (s.activeTexture !== gl.TEXTURE0) gl.activeTexture(gl.TEXTURE0);
+    // Skia draws images through sampler objects and leaves one bound on unit 0; a bound sampler overrides the texture's
+    // own filtering, so our mipmaps and anisotropy would be ignored (Skia's is nearest): none while we draw
+    if (s.sampler0) gl.bindSampler(0, null);
     if (s.unpackFlipY) gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
     if (s.unpackPremultiply) gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
     if (s.unpackAlignment !== 4) gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
@@ -435,6 +438,7 @@ export class Renderer3D {
     if (s.program !== v.program) gl.useProgram(v.program);
     if (s.activeTexture !== gl.TEXTURE0) gl.activeTexture(gl.TEXTURE0);
     if (s.texture0 !== v.texture) gl.bindTexture(gl.TEXTURE_2D, v.texture);
+    if (s.sampler0 !== v.sampler) gl.bindSampler(0, v.sampler);
     if (v.active !== gl.TEXTURE0) gl.activeTexture(v.active);
     if (s.drawFb !== v.drawFb) gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, v.drawFb);
     if (s.readFb !== v.readFb) gl.bindFramebuffer(gl.READ_FRAMEBUFFER, v.readFb);

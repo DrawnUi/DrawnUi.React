@@ -25,6 +25,8 @@ export class GlState {
   vao: WebGLVertexArrayObject | null = null;
   arrayBuffer: WebGLBuffer | null = null;
   activeTexture = 0x84c0;
+  /** The sampler object bound to texture unit 0 (Skia draws its images through samplers). */
+  sampler0: WebGLSampler | null = null;
   /** The 2D texture bound to unit 0 (the only unit a 3D pass uses). */
   texture0: WebGLTexture | null = null;
   unpackAlignment = 4;
@@ -77,6 +79,7 @@ export class GlState {
       this.texture0 = gl.getParameter(gl.TEXTURE_BINDING_2D);
       gl.activeTexture(this.activeTexture);
     }
+    this.sampler0 = this.activeTexture === gl.TEXTURE0 ? gl.getParameter(gl.SAMPLER_BINDING) : null;
     this.unpackAlignment = gl.getParameter(gl.UNPACK_ALIGNMENT);
     this.unpackFlipY = gl.getParameter(gl.UNPACK_FLIP_Y_WEBGL);
     this.unpackPremultiply = gl.getParameter(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL);
@@ -114,6 +117,7 @@ export class GlState {
     wrap("bindVertexArray", (v: WebGLVertexArrayObject | null) => { s.vao = v; });
     wrap("bindBuffer", (target: number, b: WebGLBuffer | null) => { if (target === gl.ARRAY_BUFFER) s.arrayBuffer = b; });
     wrap("activeTexture", (unit: number) => { s.activeTexture = unit; });
+    wrap("bindSampler", (unit: number, sampler: WebGLSampler | null) => { if (unit === 0) s.sampler0 = sampler; });
     wrap("bindTexture", (target: number, t: WebGLTexture | null) => { if (target === gl.TEXTURE_2D && s.activeTexture === gl.TEXTURE0) s.texture0 = t; });
     wrap("pixelStorei", (name: number, value: number | boolean) => {
       if (name === gl.UNPACK_ALIGNMENT) s.unpackAlignment = value as number;
