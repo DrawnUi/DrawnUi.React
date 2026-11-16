@@ -281,6 +281,19 @@ const element = {
     check("and it stops once the button is up", Math.abs(scroll.ViewportOffsetY - offset) < 1, `${offset} -> ${scroll.ViewportOffsetY}`);
   }
 
+  {
+    // a draggable scroll bar of a scroll holding selectable text: a press on it drags the bar, never a text selection
+    const lines = Array.from({ length: 30 }, (_, i) => text(`Line ${i} of selectable text`));
+    const scroll = scrollOf(lines);
+    const { SkiaScrollBar } = await import("../src/index.ts");
+    const bar = new SkiaScrollBar(); bar.IsDraggable = true; bar.Thickness = 6; scroll.ScrollBar = bar;
+    const stack = new SkiaStack(); stack.AddSubView(scroll); show(stack); frames(3);
+    const r = scroll.GetAccessibilityPixelRect();
+    const x = r.Right - 3;
+    press(x, r.Top + 10); for (let y = r.Top + 20; y <= r.Top + 150; y += 10) move(x, y); release(x, r.Top + 150); frames(3);
+    check("a drag on the scroll bar scrolls, no text gets selected", scroll.ViewportOffsetY < -100 && lines.every((l) => l.SelectedText === ""), `offset ${scroll.ViewportOffsetY}, selected ${canvas.SelectedText.slice(0, 30)}`);
+  }
+
   console.log(failures ? `FAIL: ${failures} checks` : "OK: text selection drawn by the label, as every DrawnUI engine");
   process.exit(failures ? 1 : 0);
 })();

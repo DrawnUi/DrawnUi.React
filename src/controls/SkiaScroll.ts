@@ -746,6 +746,8 @@ export class SkiaScroll extends SkiaControl {
 
   private draggedScrollBar?: IScrollBar & SkiaControl;
   private scrollBarOwnsGesture = false;
+  /** The gesture going on started on a draggable scroll bar: it is the bar's (a page text selection does not start there). */
+  get ScrollBarOwnsGesture(): boolean { return this.scrollBarOwnsGesture; }
 
   /**
    * Thumb drag and track press on a ScrollBar / ScrollBarHorizontal with IsDraggable set (C# ProcessScrollBarGestures).

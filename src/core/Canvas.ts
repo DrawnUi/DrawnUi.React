@@ -654,6 +654,7 @@ export class Canvas {
   private AfterTextSelectionDown(args: SkiaGesturesParameters, consumed: SkiaControl | null): void {
     if (args.Type !== "Down" || args.Event.Pointer?.DeviceType !== "Mouse" || args.Event.Pointer.Button !== "Left") return;
     if (consumed && !IsScroll(consumed) && !IsSelectableLabel(consumed)) return;
+    if (consumed && IsScroll(consumed) && consumed.ScrollBarOwnsGesture) return; // a press on the scroll bar drags the bar
     const collected: SelectableLabel[] = [];
     if (this.content) CollectSelectable(this.content, collected);
     if (collected.length === 0) return;
@@ -1289,7 +1290,7 @@ interface SelectableLabel extends SkiaControl {
   readonly SelectedText: string; readonly SelectionLength: number; readonly SelectableLength: number;
   Select(start: number, length: number): void; SelectAll(): void; ClearSelection(): void; HideCopyButton(): void; TextIndexAtCanvas(x: number, y: number): number;
 }
-interface ScrollLike extends SkiaControl { ViewportOffsetX: number; ViewportOffsetY: number; ScrollTo(x: number, y: number, secs: number, clamp?: boolean): void }
+interface ScrollLike extends SkiaControl { ViewportOffsetX: number; ViewportOffsetY: number; ScrollBarOwnsGesture?: boolean; ScrollTo(x: number, y: number, secs: number, clamp?: boolean): void }
 const IsScroll = (c: SkiaControl | undefined): c is ScrollLike => !!c && "ScrollTo" in c && "ViewportOffsetY" in c;
 const IsSelectableLabel = (c: SkiaControl | undefined): c is SelectableLabel => !!c && c.AccessibilityTextSelectable && "TextIndexAtCanvas" in c;
 
