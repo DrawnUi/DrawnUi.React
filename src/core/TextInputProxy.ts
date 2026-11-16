@@ -55,12 +55,50 @@ export class TextInputProxy {
     TextInputProxy.composing = false;
     TextInputProxy.Configure(editor, el);
     TextInputProxy.Sync(editor);
+    TextInputProxy.WatchKeyboard();
+    // the keyboard may be open already (a move from one field to another): the new field goes above it too
+    setTimeout(() => TextInputProxy.EnsureAboveKeyboard(), 50);
     // a touch press: the input takes focus in its touchend (FocusFromTap), the only place iOS opens the keyboard from; a
     // focus taken earlier would leave it focused with no keyboard
     if (editor.Superview?.TouchPressed) return;
     el.focus({ preventScroll: true });
     TextInputProxy.focusedNow = true;
     queueMicrotask(() => { TextInputProxy.focusedNow = false; });
+  }
+
+  private static watchedViewport?: VisualViewport;
+  /** Follows the visual viewport (it shrinks when a phone's soft keyboard opens, drawnui-cross 6cj). */
+  private static WatchKeyboard(): void {
+    const vv = typeof window !== "undefined" ? window.visualViewport ?? undefined : undefined;
+    if (!vv || vv === TextInputProxy.watchedViewport) return;
+    TextInputProxy.watchedViewport?.removeEventListener("resize", TextInputProxy.onViewport);
+    TextInputProxy.watchedViewport = vv;
+    vv.addEventListener("resize", TextInputProxy.onViewport);
+  }
+  private static readonly onViewport = () => TextInputProxy.EnsureAboveKeyboard();
+
+  /**
+   * The focused field stays in the part of the page the soft keyboard leaves visible (the visual viewport): when the
+   * keyboard opens over it, the drawn scrolls around it move it up, 16 px clear of the keyboard (never past its own top).
+   */
+  static EnsureAboveKeyboard(): void {
+    const owner = TextInputProxy.owner, vv = typeof window !== "undefined" ? window.visualViewport : undefined;
+    if (!owner || !owner.IsFocused || !vv) return;
+    const canvas = owner.Superview?.Element;
+    if (!canvas) return;
+    const b = canvas.getBoundingClientRect(), k = owner.RenderingScale || 1, r = owner.GetAccessibilityPixelRect();
+    const top = b.top + r.Top / k, bottom = b.top + r.Bottom / k;
+    const margin = 16, visibleTop = vv.offsetTop, visibleBottom = vv.offsetTop + vv.height;
+    let dy = bottom + margin - visibleBottom; // CSS px = points the content moves up
+    dy = Math.min(dy, top - visibleTop - margin);
+    if (dy <= 0.5) return;
+    for (let p = owner.Parent; p && dy > 0.5; p = p.Parent) {
+      const scroll = p as unknown as { ScrollTo?(x: number, y: number, secs: number): void; ViewportOffsetX: number; ViewportOffsetY: number; ContentOffsetBounds?: { Top: number } };
+      if (typeof scroll.ScrollTo !== "function" || scroll.ViewportOffsetY === undefined) continue;
+      const target = Math.max(scroll.ContentOffsetBounds?.Top ?? -Infinity, scroll.ViewportOffsetY - dy);
+      const moved = scroll.ViewportOffsetY - target;
+      if (moved > 0) { scroll.ScrollTo(scroll.ViewportOffsetX, target, 0.25); dy -= moved; }
+    }
   }
 
   /** The input got DOM focus in the task running now (Attach): a tap that focused the field needs nothing more. */

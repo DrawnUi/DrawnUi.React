@@ -7,7 +7,8 @@
 //    again (the keyboard does not pop back on every touch);
 // 3. a tap on the field again focuses it inside the tap (the keyboard comes back);
 // 4. a mouse click on the field focuses the input (desktop typing, IME);
-// 5. a real tap (Playwright's touchscreen: touch events and the compatibility mouse events) leaves the input focused.
+// 5. a real tap (Playwright's touchscreen: touch events and the compatibility mouse events) leaves the input focused;
+// 6. the soft keyboard opening over a field in the lower half (visualViewport shrinking) scrolls the field above it.
 import { createRequire } from "node:module";
 const { webkit, chromium } = createRequire(import.meta.url)("playwright-core");
 const base = (process.argv[2] ?? "http://localhost:5173").replace(/\/$/, "");
@@ -83,6 +84,25 @@ for (const [name, type] of [["webkit", webkit], ["chromium", chromium]]) {
     await page.touchscreen.tap(p.x, p.y); await sleep(600);
     const real = await page.evaluate(() => ({ active: document.activeElement?.dataset?.drawnuiTextInput === "1", focused: window.__ed.Editor.IsFocused, focusins: window.__fl }));
     check(`${name}: a real tap on the field leaves its input focused (no compatibility click moves the focus away)`, real.active && real.focused && real.focusins.join() === "input", real);
+    // 6. the soft keyboard opens over a field in the lower half (the visual viewport shrinks to 300 px): the field is scrolled
+    //    above it, 16 px clear
+    const above = await page.evaluate(async () => {
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      const ed = window.__ed, el = ed.Canvas.Element;
+      const rectOf = (c) => { const r = c.GetAccessibilityPixelRect(), k = ed.Canvas.RenderingScale, b = el.getBoundingClientRect(); return { top: b.top + r.Top / k, bottom: b.top + r.Bottom / k, x: b.left + (r.Left + r.Right) / 2 / k, y: b.top + (r.Top + r.Bottom) / 2 / k }; };
+      const vv = Object.assign(new EventTarget(), { width: innerWidth, height: innerHeight, offsetTop: 0, offsetLeft: 0, pageTop: 0, scale: 1 });
+      Object.defineProperty(window, "visualViewport", { value: vv, configurable: true });
+      ed.Editor.IsFocused = false; await wait(200);
+      const p = rectOf(ed.Lower), before = p.bottom;
+      const o = (buttons) => ({ clientX: p.x, clientY: p.y, bubbles: true, cancelable: true, pointerId: 501, pointerType: "touch", isPrimary: true, button: 0, buttons });
+      el.dispatchEvent(new PointerEvent("pointerdown", o(1))); await wait(30); el.dispatchEvent(new PointerEvent("pointerup", o(0)));
+      const end = new Event("touchend", { bubbles: true, cancelable: true }); Object.defineProperty(end, "changedTouches", { value: [{ clientX: p.x, clientY: p.y }] }); el.dispatchEvent(end);
+      await wait(300);
+      vv.height = 300; vv.dispatchEvent(new Event("resize"));
+      await wait(900);
+      return { focused: ed.Lower.IsFocused, before: Math.round(before), after: Math.round(rectOf(ed.Lower).bottom), visibleBottom: 300 };
+    });
+    check(`${name}: the keyboard opening over a field in the lower half scrolls it above the keyboard`, above.focused && above.before > 300 && above.after <= 300 - 16 + 1 && above.after > 100, above);
     check(`${name}: no page errors`, errors.length === 0, errors.join(" | "));
   } finally { await browser.close(); }
 }
