@@ -146,7 +146,8 @@
     "browser:tab-scroll": "node dev/check-tab-scroll.mjs",
     "check:recycled-doublebuffer": "node dev/check.mjs dev/check-recycled-doublebuffer.ts",
     "check:label-selection": "node dev/check.mjs dev/check-label-selection.ts",
-    "check:frame-errors": "node dev/check.mjs dev/check-frame-errors.ts"
+    "check:frame-errors": "node dev/check.mjs dev/check-frame-errors.ts",
+    "browser:editor-keyboard": "node dev/check-editor-keyboard.mjs"
   },
   "peerDependencies": {
     "playwright-core": ">=1.40",
