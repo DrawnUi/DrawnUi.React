@@ -1,5 +1,6 @@
 // A page for the soft-keyboard checks (dev/check-editor-keyboard.mjs), mounted over the demo by the check through the dev
-// server: a text field at the top of a scroll taller than the page (a drag elsewhere scrolls) and one in its lower half.
+// server: a text field at the top of a scroll taller than the page (a drag elsewhere scrolls) and the LAST field at its end
+// (above the keyboard it needs the keyboard's room).
 // Exposes the canvas, the editors and the scroll as window.__ed (Editor, Lower, Scroll).
 import { createRoot } from "react-dom/client";
 import { Canvas, SkiaEditor, SkiaScroll, SkiaShape, SkiaStack, Thickness } from "drawnui-react";
@@ -16,9 +17,8 @@ export function Mount(): void {
       <SkiaScroll ref={(v: Scroll | null) => { ed.Scroll = v ?? undefined; }} HorizontalOptions="Fill" VerticalOptions="Fill">
         <SkiaStack Padding={new Thickness(20)} Spacing={20}>
           <SkiaEditor ref={(v: Editor | null) => { ed.Editor = v ?? undefined; }} WidthRequest={300} HeightRequest={44} MaxLines={1} Text="" BackgroundColor="#222222" TextColor="#FFFFFF" />
-          {Array.from({ length: 3 }, (_, i) => <SkiaShape key={i} HeightRequest={120} HorizontalOptions="Fill" BackgroundColor={i % 2 ? "#333355" : "#335533"} />)}
+          {Array.from({ length: 5 }, (_, i) => <SkiaShape key={i} HeightRequest={120} HorizontalOptions="Fill" BackgroundColor={i % 2 ? "#333355" : "#335533"} />)}
           <SkiaEditor ref={(v: Editor | null) => { ed.Lower = v ?? undefined; }} WidthRequest={300} HeightRequest={44} MaxLines={1} Text="" BackgroundColor="#222222" TextColor="#FFFFFF" />
-          {Array.from({ length: 9 }, (_, i) => <SkiaShape key={`b${i}`} HeightRequest={120} HorizontalOptions="Fill" BackgroundColor={i % 2 ? "#333355" : "#335533"} />)}
         </SkiaStack>
       </SkiaScroll>
     </Canvas>,
