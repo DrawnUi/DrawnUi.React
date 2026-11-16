@@ -8,7 +8,8 @@
 // 3. a tap on the field again focuses it inside the tap (the keyboard comes back);
 // 4. a mouse click on the field focuses the input (desktop typing, IME);
 // 5. a real tap (Playwright's touchscreen: touch events and the compatibility mouse events) leaves the input focused;
-// 6. the soft keyboard opening over a field in the lower half (visualViewport shrinking) scrolls the field above it;
+// 6. the soft keyboard opening over a field in the lower half (visualViewport shrinking) scrolls the field above it, and the
+//    hidden input stays at the top-left corner (as the DrawnUi.Net web heads), never over the field;
 // 7. the soft keyboard's return key (done / go / search / send) in a single-line field focused by a tap ends editing, as a
 //    MAUI single-line field; a physical Enter keeps the field focused.
 import { createRequire } from "node:module";
@@ -102,8 +103,10 @@ for (const [name, type] of [["webkit", webkit], ["chromium", chromium]]) {
       await wait(300);
       vv.height = 300; vv.dispatchEvent(new Event("resize"));
       await wait(900);
-      return { focused: ed.Lower.IsFocused, before: Math.round(before), after: Math.round(rectOf(ed.Lower).bottom), visibleBottom: 300 };
+      const ir = document.querySelector("[data-drawnui-text-input]").getBoundingClientRect();
+      return { focused: ed.Lower.IsFocused, before: Math.round(before), after: Math.round(rectOf(ed.Lower).bottom), visibleBottom: 300, input: [Math.round(ir.left), Math.round(ir.top)] };
     });
+    check(`${name}: the hidden input stays at the top-left corner, never over the field (iOS never pans the page to reveal it)`, above.input[0] === 0 && above.input[1] === 0, above);
     check(`${name}: the keyboard opening over a field in the lower half scrolls it above the keyboard`, above.focused && above.before > 300 && above.after <= 300 - 16 + 1 && above.after > 100, above);
     // 7. the soft keyboard's return key (a field focused by a touch tap, enterkeyhint done): editing ends, the keyboard closes;
     //    a physical Enter (a field focused by a mouse click) keeps the field focused

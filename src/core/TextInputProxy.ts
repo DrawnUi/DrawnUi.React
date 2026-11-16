@@ -34,7 +34,9 @@ export class TextInputProxy {
     el.setAttribute("autocorrect", "off");
     el.setAttribute("autocapitalize", "off");
     el.rows = 1;
-    // fixed 1x1 box over the caret: invisible, still focusable, 16px font keeps iOS from zooming the page
+    // a fixed 1x1 box at the top-left corner, never over the field (as the DrawnUi.Net web heads): invisible, still
+    // focusable, the 16px font keeps iOS from zooming the page, and iOS never pans the page to reveal it (the field is
+    // moved above the keyboard by the drawn scrolls, EnsureAboveKeyboard)
     el.style.cssText = "position:fixed;left:0;top:0;width:1px;height:1px;padding:0;border:0;margin:0;opacity:0.01;font-size:16px;line-height:1;resize:none;overflow:hidden;outline:none;background:transparent;color:transparent;caret-color:transparent;pointer-events:none;z-index:-1;";
     el.addEventListener("compositionstart", () => { TextInputProxy.composing = true; });
     el.addEventListener("compositionend", () => { TextInputProxy.composing = false; TextInputProxy.ApplyFromElement(); });
@@ -155,18 +157,6 @@ export class TextInputProxy {
     if (el.value !== editor.Text) el.value = editor.Text;
     const start = editor.CursorPosition, end = start + editor.SelectionLength;
     if (el.selectionStart !== start || el.selectionEnd !== end) el.setSelectionRange(start, end);
-    TextInputProxy.Place(editor, el);
-  }
-
-  /** Puts the textarea over the editor so mobile browsers scroll the right spot into view. */
-  private static Place(editor: SkiaEditor, el: HTMLTextAreaElement): void {
-    const canvas = editor.Superview?.Element;
-    if (!canvas) return;
-    const b = canvas.getBoundingClientRect();
-    const scale = editor.RenderingScale || 1;
-    const r = editor.DrawingRect;
-    el.style.left = `${Math.round(b.left + r.Left / scale)}px`;
-    el.style.top = `${Math.round(b.top + r.Top / scale)}px`;
   }
 
   /** The textarea changed (typing, IME commit, paste, undo): diff against the editor and replay through the stubs. */
