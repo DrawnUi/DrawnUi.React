@@ -571,6 +571,7 @@ export class SkiaAccessibilityManager {
         Disabled: !n.AccessibilityCanInteract && Aria.IsInteractiveRole(n.AccessibilityRole),
       });
     }
+    list = PresentationalChildren(list);
     list = SayNamesOnce(list);
     list = PageOrder(list, scale);
     this.liveSaid.clear();
@@ -600,6 +601,24 @@ export class SkiaAccessibilityManager {
  * button) the child is left out, the button keeps its name; under any other node (a group card and its title) the
  * node loses its name and the heading says it.
  */
+/** Roles whose content is their look, not more nodes (ARIA "children presentational", C# Aria.ChildrenArePresentational). */
+const PresentationalChildrenRoles = new Set(["button", "checkbox", "radio", "switch", "tab", "option", "slider", "progressbar", "meter", "scrollbar", "separator", "img", "menuitemcheckbox", "menuitemradio"]);
+
+/**
+ * The texts inside a button, a radio, a tab, a slider, an image... are its look: its name says them, so they are no nodes
+ * (C# SkiaAccessibilityManager.InsidePresentational). A control nested in it and selectable text stay; a link, a group,
+ * a list keep their content.
+ */
+function PresentationalChildren(list: AccessibilityNode[]): AccessibilityNode[] {
+  const bySource = new Map<SkiaControl, AccessibilityNode>(list.map((x) => [x.Source, x]));
+  const inside = (x: AccessibilityNode) => {
+    if (Aria.IsInteractiveRole(x.Role) || x.Source.AccessibilityTextSelectable) return false;
+    for (let p = x.Source.Parent; p; p = p.Parent) { const up = bySource.get(p); if (up && PresentationalChildrenRoles.has(up.Role)) return true; }
+    return false;
+  };
+  return list.some(inside) ? list.filter((x) => !inside(x)) : list;
+}
+
 function SayNamesOnce(list: AccessibilityNode[]): AccessibilityNode[] {
   const bySource = new Map<SkiaControl, AccessibilityNode>(list.map((x) => [x.Source, x]));
   const said = new Set<AccessibilityNode>();
