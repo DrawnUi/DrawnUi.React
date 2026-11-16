@@ -7,6 +7,7 @@ import { HoverManager } from "./Hover";
 import { TooltipController, type TooltipStyleLike } from "./Tooltips";
 import { PopupAnchor, PopupLayer, type PopupId, type PopupWindowOptions } from "./PopupWindows";
 import { KeyboardManager, type InputKey } from "./KeyboardManager";
+import { TouchEffect } from "./Gestures";
 import { type Color, Colors, type RenderingModeType, SKRect } from "./Types";
 import {
   ContextMenuEventArgs, type ContextMenuSource,
@@ -26,11 +27,9 @@ export type SystemTheme = "Light" | "Dark";
 export class Canvas {
   /** Points a pointer may travel between Down and Up and still count as a tap (AppoMobi TouchEffect default). */
   static TappedCancelMoveThresholdPoints = 16;
-  /**
-   * A press held this long without moving past TappedCancelMoveThresholdPoints is a LongPressing, at the press point
-   * (AppoMobi TouchEffect, DrawnUi.Rust LONG_PRESS_MS); its release sends no Tapped. A timer, no frames while waiting.
-   */
-  static LongPressTimeMs = 1500;
+  /** Alias of TouchEffect.LongPressTimeMsDefault: how long a press is held still to be a LongPressing. */
+  static get LongPressTimeMs(): number { return TouchEffect.LongPressTimeMsDefault; }
+  static set LongPressTimeMs(ms: number) { TouchEffect.LongPressTimeMsDefault = ms; }
 
   BackgroundColor: Color = Colors.Transparent;
   /** Accelerated = WebGL surface, Default = software. Read once at first frame. */
