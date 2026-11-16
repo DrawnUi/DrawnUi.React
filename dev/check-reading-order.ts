@@ -1,7 +1,8 @@
 // The screen-reader / Tab order of a page that scrolled (`npm run check:reading-order`): a header row above a scroll, a
 // footer under it, the scroll's content moved up past the header. The order stays header (left to right), the content
 // in its own order, footer: a node inside a scroll is placed by the scroll's box among the nodes outside it, so content
-// scrolled above the viewport never comes before the header that stays on top.
+// scrolled above the viewport never comes before the header that stays on top. Inside a scroll the order is the tree
+// order (DrawnUi.Net OrderLocked): a viewer's dots never interleave with the controls beside it.
 import { readFileSync } from "node:fs";
 import { Super, SKRect, SkiaAccessibilityManager, HoverManager, SkiaLayer, SkiaLabel, SkiaScroll, SkiaStack, Aria, Thickness, type AnimatorBase, type Canvas } from "../src/index.ts";
 
@@ -57,6 +58,26 @@ class FakeCanvas {
   scroll.Update();
   const scrolled = frame();
   check("scrolled: still header, the items in order, footer (no item before the header)", scrolled === `Back,Home,${items(0, 11)},Footer`, scrolled);
+  {
+    // inside a scroll: tree order (DrawnUi.Net OrderLocked), not position: a viewer on the left whose dots are placed at
+    // different heights by a 3D view, the controls of the card on the right beside it. Every dot reads before the
+    // controls, in its own order, and no dot lands between two controls
+    const row = new SkiaLayer(); row.WidthRequest = W; row.HeightRequest = 400;
+    const viewer = new SkiaLayer(); viewer.WidthRequest = 180; viewer.HeightRequest = 400;
+    for (const [i, y] of [[0, 300], [1, 20], [2, 150]] as const) viewer.AddSubView(label(`Dot ${i}`, { Margin: new Thickness(10, y, 0, 0), AccessibilityRole: Aria.RoleButton, Tapped: () => {} }));
+    const side = new SkiaStack(); side.Spacing = 40; side.Margin = new Thickness(200, 0, 0, 0);
+    for (let i = 0; i < 5; i++) side.AddSubView(label(`Control ${i}`, { HeightRequest: 30 }));
+    row.AddSubView(viewer); row.AddSubView(side);
+    const sc = new SkiaScroll(); sc.HeightRequest = H; sc.HorizontalOptions = "Fill"; sc.Content = row;
+    const page = new SkiaLayer(); page.WidthRequest = W; page.HeightRequest = H; page.AddSubView(sc);
+    const own = new FakeCanvas(); own.AccessibilityManager.MinUpdateIntervalMs = 0;
+    page._superview = own as unknown as Canvas;
+    page.Measure(W, H, 1); page.Arrange(new SKRect(0, 0, W, H), W, H, 1);
+    page.Render({ Context: { Canvas: surface.getCanvas(), Surface: surface }, Destination: new SKRect(0, 0, W, H), Scale: 1 });
+    own.AccessibilityManager.OnFrameEnd(1, W, H, () => {});
+    const order = own.AccessibilityManager.Snapshot.map((n) => n.Label).join(",");
+    check("inside a scroll the order is the tree order: the viewer's dots, then the controls beside it", order === "Dot 0,Dot 1,Dot 2,Control 0,Control 1,Control 2,Control 3,Control 4", order);
+  }
   surface.delete();
 
   console.log(failures ? `FAIL: ${failures} checks` : "OK: a page's reading order does not change when it scrolls");
