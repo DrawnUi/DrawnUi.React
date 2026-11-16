@@ -559,7 +559,7 @@ export class SkiaCarousel extends SnappingLayout {
         this.hadDown = false;
         if (this.IsUserPanning) {
           consumed = this;
-          const final = this.velocityAccumulator.CalculateFinalVelocity(500, args.ArrivedTimeNanos);
+          const final = this.velocityAccumulator.CalculateFinalVelocity(500);
           this.CurrentSnap = this.CurrentPosition;
           this.releaseHome = this.gestureHome;
           try { this.ScrollToNearestAnchor(this.CurrentSnap, new SKPoint(final.X, final.Y)); } finally { this.releaseHome = undefined; }

@@ -2,6 +2,7 @@
 // 21320167 CarouselLoopedFastSwipeTests), checked in Node (`npm run check:carousel-loop`): fast swipes across the wrap
 // either way, and a re-layout during a transition (a title above it changing its text, in a centered column) leave the
 // position moving by less than half a slide per frame.
+import { VelocityAccumulator } from "../src/core/ScrollAnimators.ts";
 import {
   Super, SKRect, SKPoint, Canvas, SkiaAccessibilityManager, HoverManager, SkiaLayer, SkiaShape, SkiaCarousel, SkiaShaderCarousel, SkiaStack, SkiaLabel, SkiaScroll,
   TouchActionEventArgs, MultitouchTracker, type SkiaControl, type AnimatorBase, type TouchActionType,
@@ -41,6 +42,7 @@ class FakeCanvas {
     const fake = new FakeCanvas();
     root._superview = fake as unknown as Canvas;
     let ms = 1000;
+    VelocityAccumulator.Clock = () => ms; // releases are judged on the clock the touches carry
     // one surface for the carousel's life, as a real canvas has: a surface per frame grew the wasm heap without end
     const surface = CK.MakeSurface(W, H);
     const frame = () => {

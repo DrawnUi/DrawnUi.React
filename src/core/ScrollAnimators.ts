@@ -190,6 +190,8 @@ export class VelocityAccumulator {
   private readonly samples: { X: number; Y: number; time: number }[] = [];
   private static readonly MaxSampleSize = 5;
   private static readonly ConsiderationTimeframeMs = 150;
+  /** The clock (ms) the release is judged on, for checks that drive gestures on a virtual clock (C# ClockOverrideNanos). */
+  static Clock?: () => number;
 
   Clear(): void { this.samples.length = 0; }
 
@@ -204,12 +206,11 @@ export class VelocityAccumulator {
   }
 
   /**
-   * The release velocity from the samples of the last 150 ms before the release. releasedNanos: when the release happened
-   * (SkiaGesturesParameters.ArrivedTimeNanos, the event's own time), so a slow frame that handles the release late keeps
-   * the samples; now when 0.
+   * The release velocity from the samples of the last 150 ms before NOW (as DrawnUi.Net): after a short app freeze a
+   * flick handled late does not fling (samples are dated by when their events happened).
    */
-  CalculateFinalVelocity(clampAbsolute = 0, releasedNanos = 0): { X: number; Y: number } {
-    const now = releasedNanos > 0 ? releasedNanos / 1e6 : performance.now();
+  CalculateFinalVelocity(clampAbsolute = 0): { X: number; Y: number } {
+    const now = VelocityAccumulator.Clock?.() ?? performance.now();
     const relevant = this.samples.filter((s) => now - s.time <= VelocityAccumulator.ConsiderationTimeframeMs);
     if (relevant.length === 0) return { X: 0, Y: 0 };
     let sx = 0, sy = 0, weights = 0;
