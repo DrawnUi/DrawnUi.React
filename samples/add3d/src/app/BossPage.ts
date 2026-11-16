@@ -1,5 +1,5 @@
 // Port of Add3dGallery.Shared Pages/BossPage.cs.
-import { Aria, SkiaGrid, SkiaLabel, SkiaLayer, SkiaShape, SkiaStack, SkiaWrap, Thickness, type Color } from "drawnui-react/core";
+import { Aria, SkiaControl, SkiaGrid, SkiaLabel, SkiaLayer, SkiaScroll, SkiaShape, SkiaStack, SkiaWrap, Thickness, type Color } from "drawnui-react/core";
 import { SkiaModel3D } from "drawnui-react-add3d/core";
 import { Button3D, Copyable, Make, Theme, View3D } from "./Theme";
 
@@ -61,6 +61,27 @@ export class BossPage extends SkiaLayer {
   private _rage = false;
   private _turning = false;
 
+  private static readonly Pad = 20;
+  private static readonly Gap = 10;
+  private static readonly MinDragon = 180;
+  private _top?: SkiaControl;
+  private _controls?: SkiaControl;
+  private _arena?: SkiaGrid;
+
+  /**
+   * The arena fills the page and the dragon takes what the texts and buttons leave; when that is less than MinDragon (a
+   * short window), the arena grows past the page and the page scrolls.
+   */
+  protected override OnLayoutChanged(): void {
+    super.OnLayoutChanged();
+    const page = this.DrawingRect.Height / (this.RenderingScale || 1);
+    if (page <= 0 || !this._top || !this._controls || !this._arena) return;
+    const fixedPart = this._top.MeasuredSize.Units.Height + this._news.MeasuredSize.Units.Height + this._controls.MeasuredSize.Units.Height
+      + 2 * BossPage.Pad + 3 * BossPage.Gap;
+    const height = Math.max(page, fixedPart + BossPage.MinDragon);
+    if (Math.abs(this._arena.HeightRequest - height) > 0.5) { this._arena.HeightRequest = height; this._arena.InvalidateMeasure(); }
+  }
+
   constructor() {
     super();
     this.VerticalOptions = "Fill";
@@ -74,13 +95,16 @@ export class BossPage extends SkiaLayer {
         UseCache: "GPU",
         FillGradient: { Type: "Circular", StartXRatio: 0.5, StartYRatio: 0.42, Colors: ["#5C261E", "#120E16"] },
       }),
-      Make(new SkiaGrid(), {
-        Padding: new Thickness(20),
-        RowSpacing: 10,
+      // a short window (a small phone): the arena keeps the dragon at a usable size and the page scrolls
+      Make(new SkiaScroll(), {
+        HorizontalOptions: "Fill",
         VerticalOptions: "Fill",
+        Content: this._arena = Make(new SkiaGrid(), {
+        Padding: new Thickness(BossPage.Pad),
+        RowSpacing: BossPage.Gap,
         RowDefinitions: "Auto,*,Auto,Auto",
         Children: [
-          Make(new SkiaStack(), {
+          this._top = Make(new SkiaStack(), {
             Spacing: 8,
             UseCache: "Image",
             Row: 0,
@@ -112,7 +136,7 @@ export class BossPage extends SkiaLayer {
             AccessibilityLive: Aria.LivePolite,
             Row: 2,
           }),
-          Make(new SkiaStack(), {
+          this._controls = Make(new SkiaStack(), {
             Spacing: 10,
             UseCache: "Image",
             Row: 3,
@@ -146,6 +170,7 @@ export class BossPage extends SkiaLayer {
             ],
           }),
         ],
+        }),
       }),
     ];
     this.UpdateButtons();
