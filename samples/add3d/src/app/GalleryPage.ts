@@ -552,7 +552,7 @@ export class GalleryPage extends DrawnGame {
                 Make(new SkiaRow(), {
                   Spacing: 20,
                   HorizontalOptions: "Center",
-                  Children: [Theme.Link("Read the 3D article", Theme.ArticleUrl), Theme.Link("Source on GitHub", Theme.RepoUrl)],
+                  Children: [Make(Theme.Link("Read the 3D article", Theme.ArticleUrl), { Tooltip: "DrawnUI official site" }), Make(Theme.Link("Source on GitHub", Theme.RepoUrl), { Tooltip: "Please star if you like it" })],
                 }),
               ],
             }),
