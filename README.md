@@ -49,6 +49,31 @@ property names, layout and drawing rules. What you learn here works there, and s
 
 DrawnUI is MIT licensed in every language and on every platform: desktop, mobile, web and embedded devices. Ship it in commercial products with no attribution badge, no about screen and no per-device royalty.
 
+## What's new in 0.1.0-preview.43
+
+- **Text selection:** selectable labels (`AccessibilityTextSelectable`) select as in DrawnUi.Net, drawn in
+  `SkiaLabel.TextSelectionColor`: a mouse drag (across several labels, in reading order), a double click for a word, a
+  long press on touch with a Copy button; Ctrl+C copies, and the context menu sees the selection
+  (`canvas.SelectedText`, `CopyTextSelection()`, `ClearTextSelection()`).
+- **Long press on touch:** a long press raises the context menu on phones and tablets too, in every browser; on
+  selectable text it selects the word first, or keeps the selection it presses on.
+- **Long press time:** 0.75 s, the same in every DrawnUI engine; set it with `TouchEffect.LongPressTimeMsDefault`.
+- **Text fields on phones:** a tap opens the on-screen keyboard at once, its return key ends editing in a single-line
+  field, and a keyboard the user closed stays closed while the page scrolls.
+- **Fields above the keyboard:** `SkiaScroll.AdaptToKeyboardAuto` (opt-in, with `AdaptToKeyboardGap`) keeps the focused
+  field above the on-screen keyboard, the last field of a form too.
+- **Double tap in iOS Safari:** a double tap reaches the controls as two taps (a 3D viewer's reset).
+- **Right click in a text field:** a right click keeps the caret and the selection, so the context menu sees what was
+  selected.
+- **Mouse wheel over text fields:** a focused text field no longer stops the mouse wheel: the page scrolls over the field
+  and around it.
+- **Tab at typing speed:** Tab moves on at typing speed when focus scrolls the page.
+- **Reading and Tab order:** the reading and Tab order of a page stays the same while it scrolls: Tab after the last
+  control comes back to the top.
+- **Keyboard focus:** when the control with the keyboard focus disappears, the focus moves to the next control.
+- **`FillBlendMode`** on controls and shapes.
+- **Image loads:** a cancelled image load reports a cancel, as in DrawnUi.Net.
+
 ## What's new in 0.1.0-preview.42
 
 - **Images:** images that show the same file or URL share one decoded copy; image memory stays within a budget
