@@ -103,7 +103,7 @@ export class Canvas {
    * tool drawing an overlay on `Surface.getCanvas()`). Made on first use: a canvas without listeners does no work.
    */
   get WasDrawnListeners(): Set<(sender: Canvas) => void> { return this.wasDrawnListeners ??= new Set(); }
-  private readonly raiseWasDrawn = (f: (sender: Canvas) => void) => f(this);
+  private readonly raiseWasDrawn = (f: (sender: Canvas) => void) => Canvas.Guard("a WasDrawn listener", f, () => f(this));
 
   /**
    * Shows `content` over everything, opening from `anchor` the way native menus do: at a point (a right click, canvas
@@ -250,7 +250,7 @@ export class Canvas {
     const surface = this.surface;
     this.frameId = surface.requestAnimationFrame((c) => {
       this.frameId = 0;
-      if (this.surface === surface && !this.disposed) { this.Draw(c); surface.flush(); this.DrainDisposeQueue(); }
+      if (this.surface === surface && !this.disposed) this.DrawGuarded(c, surface);
     });
   }
 
@@ -361,9 +361,7 @@ export class Canvas {
   private DrawNow(): void {
     const surface = this.surface;
     if (!surface || this.disposed || this.contextLost) return;
-    this.Draw(surface.getCanvas());
-    surface.flush();
-    this.DrainDisposeQueue();
+    this.DrawGuarded(surface.getCanvas(), surface);
   }
 
   private Draw(canvas: import("canvaskit-wasm").Canvas): void {
@@ -378,7 +376,7 @@ export class Canvas {
     this.FrameTimeNanos = Math.round(frameTime * 1_000_000);
     const executed = this.ExecuteAnimators(Math.round(frameTime * 1_000_000));
     const canRender = this.CanRender;
-    if (canRender && !this.WasRendered) this.WillFirstTimeDraw?.(this, { Canvas: canvas, Surface: this.surface });
+    if (canRender && !this.WasRendered && this.WillFirstTimeDraw) Canvas.Guard("WillFirstTimeDraw", this.WillFirstTimeDraw, () => this.WillFirstTimeDraw!(this, { Canvas: canvas, Surface: this.surface }));
     canvas.clear(Super.ParseColor(this.BackgroundColor));
     const root = this.content;
     if (root) {
@@ -404,7 +402,7 @@ export class Canvas {
     this.ForgetGoneControls();
     if (executed > 0) this.Update(); // animators running: keep frames coming
     // C# order: WasDrawn at the end of the frame, then the frame counts as rendered
-    this.WasDrawn?.(this);
+    if (this.WasDrawn) Canvas.Guard("WasDrawn", this.WasDrawn, () => this.WasDrawn!(this));
     const listeners = this.wasDrawnListeners;
     if (listeners !== undefined && listeners.size > 0) listeners.forEach(this.raiseWasDrawn);
     if (!this.WasRendered && canRender) this.WasRendered = true;
@@ -459,6 +457,34 @@ export class Canvas {
 
   private static readonly reportedAnimators = new WeakSet<AnimatorBase>();
   /** An animator's callback threw: logged once for that animator, the frame goes on. */
+  /**
+   * One exception never stops the frame loop (drawnui-cross 6ch, DrawnUi.Net 3db4eba3): app code the frame runs (a
+   * listener, a gesture handler) is called through this; a throw is logged once per source and the frame goes on.
+   */
+  private static Guard<T>(what: string, source: object, call: () => T): T | undefined {
+    try { return call(); } catch (e) {
+      if (!Canvas.reportedSources.has(source)) { Canvas.reportedSources.add(source); console.error(`DrawnUi: ${what} threw; the frame goes on`, e); }
+      return undefined;
+    }
+  }
+  private static readonly reportedSources = new WeakSet<object>();
+
+  /**
+   * Draws a frame and always shows it: a throw inside it (app drawing code) is logged once, the canvas state is reset and
+   * the frame loop goes on (a running animation or game keeps asking for frames).
+   */
+  private DrawGuarded(canvas: import("canvaskit-wasm").Canvas, surface: Surface): void {
+    try { this.Draw(canvas); } catch (e) {
+      canvas.restoreToCount(1);
+      if (!Canvas.reportedFrameError) { Canvas.reportedFrameError = true; console.error("DrawnUi: drawing a frame threw; the next frames go on", e); }
+      if (this.AnimatingControls.size > 0) this.Update();
+    } finally {
+      surface.flush();
+      this.DrainDisposeQueue();
+    }
+  }
+  private static reportedFrameError = false;
+
   private static ReportAnimatorError(a: AnimatorBase, e: unknown): void {
     if (Canvas.reportedAnimators.has(a)) return;
     Canvas.reportedAnimators.add(a);
@@ -915,7 +941,8 @@ export class Canvas {
   private ProcessGestureNow(args: TouchActionEventArgs, result: TouchActionResult): boolean {
     this.ProcessPendingGestures();
     const root = this.content;
-    const consumed = root ? this.ProcessGestures(root, SkiaGesturesParameters.Create(result, args)) : null;
+    const gesture = SkiaGesturesParameters.Create(result, args);
+    const consumed = root ? Canvas.Guard("a gesture handler", root, () => this.ProcessGestures(root, gesture)) ?? null : null;
     this.Update();
     return !!consumed && (args.Handled || !consumed.BlockGesturesBelow);
   }
@@ -1132,7 +1159,7 @@ export class Canvas {
     const batch = this.pendingGestures.splice(0);
     const root = this.content;
     if (!root) return;
-    for (const args of batch) this.ProcessGestures(root, args);
+    for (const args of batch) Canvas.Guard("a gesture handler", root, () => this.ProcessGestures(root, args));
     const due = this.touchMenuDue;
     if (due) { this.touchMenuDue = undefined; this.RaiseTouchContextMenu(due.X, due.Y); }
   }
