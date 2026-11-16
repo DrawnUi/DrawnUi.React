@@ -1891,6 +1891,11 @@ export class GalleryPage extends DrawnGame {
       this._headYawTo = -30 + 20 * Math.min((field.Text?.length ?? 0) / 30, 1);
       this._headPitchTo = this._formFocus === 0 ? 10 : 22;
       this._lookTo = 1;
+    } else if (this._formFocus === 2) {
+      // the password: the head tips down behind the hands, so no eye peeks
+      this._headPitchTo = 20;
+      this._headYawTo = 0;
+      this._lookTo = 1;
     } else this._lookTo = 0;
   }
 
@@ -1931,14 +1936,14 @@ export class GalleryPage extends DrawnGame {
       this._headSet = false;
     }
     if (this._hands > 0.01) {
-      // Hiding from the password: the hands cover the eyes, the ears lie back a little (folded forward they cut through
-      // the face and the hands)
+      // Hiding from the password: the hands cover the eyes (the head tips down behind them, see Watch), the ears lie back
+      // a little (folded forward they cut through the face and the hands)
       this._handsSet = true;
       this.Turn("Ear1.L", Ear1LRest, -25, 0, 0, this._hands);
       this.Turn("Ear1.R", Ear1RRest, -25, 0, 0, this._hands);
-      this.Turn(ArmL, ArmLRest, -150, -150, 60, this._hands);
+      this.Turn(ArmL, ArmLRest, -140, -150, 60, this._hands);
       this.Turn(ForearmL, ForearmLRest, 0, 0, 85, this._hands);
-      this.Turn(ArmR, ArmRRest, 30, 30, 120, this._hands);
+      this.Turn(ArmR, ArmRRest, 40, 30, 120, this._hands);
       this.Turn(ForearmR, ForearmRRest, 0, 0, -85, this._hands);
     } else if (this._handsSet) {
       this._handsSet = false;
