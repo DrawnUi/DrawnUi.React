@@ -790,12 +790,9 @@ export class Canvas {
     args.Pointer = pd;
     this.OnTouchAction(args);
     if (type === "Released" || type === "Cancelled") { this.claimedTouches.delete(e.pointerId); this.UpdateTouchAction(); }
-    if (type === "Released") {
-      // a touch release is the user gesture iOS needs to open the soft keyboard: the press's gestures run now, inside it (a
-      // field focused by them focuses its input here), and a tap on the focused field gives its input focus again
-      if (e.pointerType !== "mouse") this.ProcessPendingGestures();
-      TextInputProxy.FocusFromTap(e.clientX, e.clientY);
-    }
+    // a click on the focused field gives its input DOM focus again (desktop typing and IME); on touch that is done in the
+    // touchend (onTouchEnd), the only event iOS opens the soft keyboard from
+    if (type === "Released" && e.pointerType === "mouse") TextInputProxy.FocusFromTap(e.clientX, e.clientY);
   };
   /** The mouse left the canvas: hover ends at once, also while content moves. */
   private readonly onPointerLeave = (e: PointerEvent) => {
@@ -805,6 +802,23 @@ export class Canvas {
     if (this.popups.HasAny) this.popups.PointerAt(undefined, undefined);
   };
   private readonly preventTouch = (e: TouchEvent) => e.preventDefault();
+  /**
+   * The end of a touch is the user gesture iOS opens the soft keyboard from (a focus() in pointerup does not open it): the
+   * press's gestures run now, inside it, so a field they focus focuses its input here, and a tap on the focused field gives
+   * its input focus again.
+   */
+  /** A finger or a pen is down on the canvas: a text field focused now takes its input focus in the touchend (onTouchEnd). */
+  get TouchPressed(): boolean {
+    for (const a of this.pointerDownArgs.values()) if (a.Pointer && a.Pointer.DeviceType !== "Mouse") return true;
+    return false;
+  }
+  private readonly onTouchEnd = (e: TouchEvent) => {
+    this.ProcessPendingGestures();
+    const t = e.changedTouches[0];
+    // the input has focus now: no compatibility mouse events or click follow, whose focus would go to the canvas host
+    // and take the keyboard away again
+    if (t && TextInputProxy.FocusFromTap(t.clientX, t.clientY) && e.cancelable) e.preventDefault();
+  };
   /** Gestures="Enabled": touch / pen pointers whose Down a control used (see OnTouchAction). */
   private readonly claimedTouches = new Set<number>();
   /** Gestures="Enabled": while a claimed touch is down the page may not take its drag. */
@@ -1003,6 +1017,7 @@ export class Canvas {
     for (const t of ["pointerdown", "pointermove", "pointerup", "pointercancel"]) el.addEventListener(t, this.onPointer as EventListener);
     el.addEventListener("pointerleave", this.onPointerLeave);
     el.addEventListener("contextmenu", this.onContextMenu);
+    el.addEventListener("touchend", this.onTouchEnd);
     el.addEventListener("wheel", this.onWheel, { passive: false });
     window.addEventListener("blur", this.onWindowBlur);
     if (this.gestures === "Lock") {
@@ -1029,6 +1044,7 @@ export class Canvas {
     for (const t of ["pointerdown", "pointermove", "pointerup", "pointercancel"]) el.removeEventListener(t, this.onPointer as EventListener);
     el.removeEventListener("pointerleave", this.onPointerLeave);
     el.removeEventListener("contextmenu", this.onContextMenu);
+    el.removeEventListener("touchend", this.onTouchEnd);
     this.textDrag = undefined;
     el.removeEventListener("wheel", this.onWheel);
     window.removeEventListener("blur", this.onWindowBlur);
