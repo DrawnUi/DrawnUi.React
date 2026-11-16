@@ -8,6 +8,7 @@ import { TooltipController, type TooltipStyleLike } from "./Tooltips";
 import { PopupAnchor, PopupLayer, type PopupId, type PopupWindowOptions } from "./PopupWindows";
 import { KeyboardManager, type InputKey } from "./KeyboardManager";
 import { TouchEffect } from "./Gestures";
+import { TextInputProxy } from "./TextInputProxy";
 import { type Color, Colors, type RenderingModeType, SKRect } from "./Types";
 import {
   ContextMenuEventArgs, type ContextMenuSource,
@@ -789,6 +790,12 @@ export class Canvas {
     args.Pointer = pd;
     this.OnTouchAction(args);
     if (type === "Released" || type === "Cancelled") { this.claimedTouches.delete(e.pointerId); this.UpdateTouchAction(); }
+    if (type === "Released") {
+      // a touch release is the user gesture iOS needs to open the soft keyboard: the press's gestures run now, inside it (a
+      // field focused by them focuses its input here), and a tap on the focused field gives its input focus again
+      if (e.pointerType !== "mouse") this.ProcessPendingGestures();
+      TextInputProxy.FocusFromTap(e.clientX, e.clientY);
+    }
   };
   /** The mouse left the canvas: hover ends at once, also while content moves. */
   private readonly onPointerLeave = (e: PointerEvent) => {

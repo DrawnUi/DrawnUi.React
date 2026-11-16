@@ -147,7 +147,8 @@
     "check:recycled-doublebuffer": "node dev/check.mjs dev/check-recycled-doublebuffer.ts",
     "check:add3d-framing": "node dev/check.mjs dev/check-add3d-framing.ts",
     "check:label-selection": "node dev/check.mjs dev/check-label-selection.ts",
-    "check:frame-errors": "node dev/check.mjs dev/check-frame-errors.ts"
+    "check:frame-errors": "node dev/check.mjs dev/check-frame-errors.ts",
+    "browser:editor-keyboard": "node dev/check-editor-keyboard.mjs"
   },
   "peerDependencies": {
     "playwright-core": ">=1.40",
