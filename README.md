@@ -51,17 +51,23 @@ DrawnUI is MIT licensed in every language and on every platform: desktop, mobile
 
 ## What's new in 0.1.0-preview.43
 
+- **Text selection:** selectable labels (`AccessibilityTextSelectable`) select as in DrawnUi.Net, drawn in
+  `SkiaLabel.TextSelectionColor`: a mouse drag (across several labels, in reading order), a double click for a word, a
+  long press on touch with a Copy button; Ctrl+C copies, and the context menu sees the selection
+  (`canvas.SelectedText`, `CopyTextSelection()`, `ClearTextSelection()`).
+- **Long press on touch:** a long press raises the context menu on phones and tablets too, in every browser; on
+  selectable text it selects the word first, or keeps the selection it presses on.
+- **Long press time:** 0.75 s, the same in every DrawnUI engine; set it with `TouchEffect.LongPressTimeMsDefault`.
+- **Right click in a text field:** a right click keeps the caret and the selection, so the context menu sees what was
+  selected.
 - **Mouse wheel over text fields:** a focused text field no longer stops the mouse wheel: the page scrolls over the field
   and around it.
 - **Tab at typing speed:** Tab moves on at typing speed when focus scrolls the page.
 - **Reading and Tab order:** the reading and Tab order of a page stays the same while it scrolls: Tab after the last
   control comes back to the top.
+- **Keyboard focus:** when the control with the keyboard focus disappears, the focus moves to the next control.
 - **`FillBlendMode`** on controls and shapes.
 - **Image loads:** a cancelled image load reports a cancel, as in DrawnUi.Net.
-- **Right click in a text field:** a right click keeps the caret and the selection, so the context menu sees what was
-  selected.
-- **Long press on touch:** a long press raises the context menu on phones and tablets too, in every browser; on
-  selectable text it selects the word first, or keeps the selection it presses on.
 
 ## What's new in 0.1.0-preview.42
 
