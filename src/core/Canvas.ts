@@ -765,6 +765,7 @@ export class Canvas {
       if (this.activeTouchIds.size === 0) {
         this.Hover.Move(this.content, hx, hy);
         this.tooltip.OnPointerMove(this.Hover.Path, hx, hy);
+        this.ProcessPointerMove(e);
       }
       if (this.popups.HasAny) this.popups.PointerAt(hx, hy);
       if (e.pointerType === "mouse") this.UpdateCursor();
@@ -1019,6 +1020,33 @@ export class Canvas {
    * for every gesture it keeps from the controls below (a shell page, a popup backdrop), which is not a use: counting
    * it would block the page wheel over every shell app.
    */
+  /**
+   * A mouse or pen moving with nothing pressed reaches the controls under it as a "Pointer" gesture, through the same
+   * routing as the other gestures (C# TouchActionResult.Pointer): a control that follows the pointer (a card leaning
+   * toward it, SkiaModel3D.TiltToPointer) reads it in ProcessGestures. It never makes a gesture owner and asks for no
+   * frame: a control it changes asks for its own.
+   */
+  private ProcessPointerMove(e: PointerEvent): void {
+    const root = this.content;
+    if (!root) return;
+    this.ProcessPendingGestures();
+    const rect = this.Element.getBoundingClientRect();
+    const args = new TouchActionEventArgs();
+    args.Timestamp = EventTime(e);
+    args.Id = e.pointerId;
+    args.Type = "Pointer";
+    args.Scale = this.RenderingScale;
+    args.Location = new SKPoint((e.clientX - rect.left) * this.RenderingScale, (e.clientY - rect.top) * this.RenderingScale);
+    args.StartingLocation = args.Location;
+    const pd = new PointerData();
+    pd.Button = "Left"; pd.ButtonNumber = 1;
+    pd.DeviceType = e.pointerType === "pen" ? "Pen" : "Mouse";
+    pd.PressedButtons = e.buttons;
+    args.Pointer = pd;
+    const gesture = SkiaGesturesParameters.Create("Pointer", args);
+    Canvas.Guard("a gesture handler", root, () => this.ProcessGestures(root, gesture));
+  }
+
   private ProcessGestureNow(args: TouchActionEventArgs, result: TouchActionResult): boolean {
     this.ProcessPendingGestures();
     const root = this.content;
@@ -1383,7 +1411,7 @@ export class Canvas {
       const popupRoot = popups.At(at.X, at.Y);
       if (popupRoot) {
         const used = popupRoot.ProcessGestures(args, info()) ?? popupRoot;
-        if (!wheel) this.gestureOwner = args.Type !== "Up" ? used : null;
+        if (!wheel && args.Type !== "Pointer") this.gestureOwner = args.Type !== "Up" ? used : null;
         return used;
       }
       if (args.Type === "Down") {

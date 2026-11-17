@@ -49,6 +49,12 @@ property names, layout and drawing rules. What you learn here works there, and s
 
 DrawnUI is MIT licensed in every language and on every platform: desktop, mobile, web and embedded devices. Ship it in commercial products with no attribution badge, no about screen and no per-device royalty.
 
+## What's new in 1.0.2
+
+- **The pointer reaches the controls:** a mouse or pen moving with nothing pressed reaches the controls under it as a
+  `Pointer` gesture, as in DrawnUI for .NET, so a control can follow the pointer: a 3D card leans toward it
+  (`TiltToPointer`). It never takes a press and asks for no frame by itself.
+
 ## What's new in 1.0.1
 
 - **First stable release:** `drawnui-react` and the 3D add-on `drawnui-react-add3d` are 1.0.1. Projects on

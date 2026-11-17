@@ -1,6 +1,6 @@
 {
   "name": "drawnui-react",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "DrawnUi for React: the DrawnUi (.NET) drawn-UI engine in TypeScript on CanvasKit (Skia WASM). Same controls, same PascalCase API as DrawnUi.Net.",
   "license": "MIT",
   "author": "Nick Kovalsky (AppoMobi)",
@@ -126,6 +126,7 @@
     "check:a11y-presentational": "node dev/check.mjs dev/check-a11y-presentational.ts",
     "check:password-a11y": "node dev/check.mjs dev/check-password-a11y.ts",
     "check:fps-label": "node dev/check.mjs dev/check-fps-label.ts",
+    "check:pointer-move": "node dev/check.mjs dev/check-pointer-move.ts",
     "check:release-velocity": "node dev/check.mjs dev/check-release-velocity.ts",
     "check:quiet-animations": "node dev/check.mjs dev/check-quiet-animations.ts",
     "check:skew-sign": "node dev/check.mjs dev/check-skew-sign.ts",
