@@ -41,7 +41,7 @@ export class SkiaImage extends SkiaControl {
   PaintImageFilter?: ImageFilter;
 
   /** C# PaintColorFilter selection (null = no filter). */
-  private CreateColorFilter(): ColorFilter | null {
+  protected CreateColorFilter(): ColorFilter | null {
     if (this.PaintColorFilter) return null; // custom filter applied as is
     switch (this.AddEffect) {
       case "Tint": return this.ColorTint !== Colors.Transparent ? SkiaImageEffects.Tint(this.ColorTint, this.EffectBlendMode) : null;
@@ -57,6 +57,7 @@ export class SkiaImage extends SkiaControl {
       case "Saturation": return this.Saturation >= 0 ? SkiaImageEffects.Saturation(this.Saturation) : null;
       case "Brightness": return this.Brightness >= 1 ? SkiaImageEffects.Brightness(this.Brightness) : null;
       case "TSL": return this.BackgroundColor && this.BackgroundColor !== Colors.Transparent ? SkiaImageEffects.TintSL(this.BackgroundColor, this.Saturation, this.Brightness, this.EffectBlendMode) : null;
+      case "Recolor": return this.ColorTint !== Colors.Transparent ? SkiaImageEffects.Recolor(this.ColorTint, this.Contrast) : null;
       case "HSL": return this.BackgroundColor && this.BackgroundColor !== Colors.Transparent ? SkiaImageEffects.HSL(this.Gamma, this.Saturation, this.Brightness, this.EffectBlendMode) : null;
       default: return null; // None, Custom (PaintColorFilter)
     }

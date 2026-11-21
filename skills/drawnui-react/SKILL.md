@@ -137,6 +137,10 @@ createRoot(document.getElementById("root")!).render(
   first; images on screen never go. `RemoveFromCache(uri)` drops an entry, never an image a control still shows.
   `LoadImageManagedAsync` (queued, cached) and `PreloadImages` warm it; `LoadImageAsync` is a direct load outside the
   cache whose image the caller owns. Failed loads resolve to `undefined` after `EnableHttpRetry` retries.
+- Image effects (`SkiaImage` / `SkiaImageTiles`, as DrawnUi.Net): `AddEffect="Recolor"` with `ColorTint` (and
+  `Contrast`, 1 = as is) paints the picture's brightness in the tint, stretched around its middle by Contrast: one gray
+  picture or texture becomes any color (themes, rooms, teams); a transparent tint = no effect. On `SkiaImageTiles` the
+  image effects (`AddEffect`, `Blur`, `PaintColorFilter`, `PaintImageFilter`) apply once to the whole tiled result.
 - Caching is the same plan as C#: `UseCache="Image"` on stable subtrees, `"Operations"` for vector content (the
   default on shapes and labels), `"ImageComposite"` for a layer whose children change independently (only the
   dirty children are re-recorded; `LastCompositeRecord` reports what happened), `None` for per-frame painters.

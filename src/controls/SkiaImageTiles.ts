@@ -1,5 +1,6 @@
 import type { DrawingContext } from "../core/SkiaControl";
 import { type SkiaCacheType, SKRect, type TransformAspect } from "../core/Types";
+import { Super } from "../core/Super";
 import { SkiaImage } from "./SkiaImage";
 
 /**
@@ -60,14 +61,31 @@ export class SkiaImageTiles extends SkiaImage {
     const tilesX = Math.ceil((dest.Width + offsetX) / tw), tilesY = Math.ceil((dest.Height + Math.abs(offsetY)) / th);
     const startX = dest.Left - offsetX, startY = dest.Top - offsetY;
     this.DisplayRect = dest;
-    for (let x = 0; x < tilesX; x++) {
-      for (let y = 0; y < tilesY; y++) {
-        const left = startX + x * tw, top = startY + y * th;
-        const r = new SKRect(left, top, left + tw, top + th);
-        tile.Measure(tw, th, scale);
-        tile.Arrange(r, tile.WidthRequest, tile.HeightRequest, scale);
-        tile.Render(ctx);
+    // the image effects (AddEffect, Blur, PaintColorFilter, PaintImageFilter) apply to the whole tiled result, once
+    const CK = Super.CK, canvas = ctx.Context.Canvas;
+    const colorFilter = this.PaintColorFilter ? null : this.CreateColorFilter();
+    const blur = !this.PaintImageFilter && this.Blur > 0 ? CK.ImageFilter.MakeBlur(this.Blur * scale, this.Blur * scale, CK.TileMode.Mirror, null) : null;
+    const usedColor = this.PaintColorFilter ?? colorFilter, usedImage = this.PaintImageFilter ?? blur;
+    let layer: import("canvaskit-wasm").Paint | undefined, restore = -1;
+    if (usedColor || usedImage) {
+      layer = new CK.Paint();
+      if (usedColor) layer.setColorFilter(usedColor);
+      if (usedImage) layer.setImageFilter(usedImage);
+      restore = canvas.saveLayer(layer, CK.LTRBRect(dest.Left, dest.Top, dest.Right, dest.Bottom));
+    }
+    try {
+      for (let x = 0; x < tilesX; x++) {
+        for (let y = 0; y < tilesY; y++) {
+          const left = startX + x * tw, top = startY + y * th;
+          const r = new SKRect(left, top, left + tw, top + th);
+          tile.Measure(tw, th, scale);
+          tile.Arrange(r, tile.WidthRequest, tile.HeightRequest, scale);
+          tile.Render(ctx);
+        }
       }
+    } finally {
+      if (restore >= 0) canvas.restoreToCount(restore);
+      layer?.delete(); colorFilter?.delete(); blur?.delete();
     }
   }
 

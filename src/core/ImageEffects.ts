@@ -3,7 +3,7 @@ import { Super } from "./Super";
 import type { Color } from "./Types";
 
 /** DrawnUi SkiaImageEffect. */
-export type SkiaImageEffect = "None" | "BlackAndWhite" | "Pastel" | "Tint" | "Darken" | "Lighten" | "Grayscale" | "Sepia" | "InvertColors" | "Contrast" | "Saturation" | "Brightness" | "Gamma" | "TSL" | "HSL" | "Custom";
+export type SkiaImageEffect = "None" | "BlackAndWhite" | "Pastel" | "Tint" | "Darken" | "Lighten" | "Grayscale" | "Sepia" | "InvertColors" | "Contrast" | "Saturation" | "Brightness" | "Gamma" | "TSL" | "HSL" | "Custom" | "Recolor";
 
 /** SKBlendMode names understood by CanvasKit (`CK.BlendMode[name]`). */
 export type BlendMode = "Clear" | "Src" | "Dst" | "SrcOver" | "DstOver" | "SrcIn" | "DstIn" | "SrcOut" | "DstOut" | "SrcATop" | "DstATop" | "Xor" | "Plus" | "Modulate" | "Screen" | "Overlay" | "Darken" | "Lighten" | "ColorDodge" | "ColorBurn" | "HardLight" | "SoftLight" | "Difference" | "Exclusion" | "Multiply" | "Hue" | "Saturation" | "Color" | "Luminosity";
@@ -17,6 +17,19 @@ export const SkiaImageEffects = {
   Tint(color: Color, mode: BlendMode): ColorFilter {
     const CK = Super.CK;
     return CK.ColorFilter.MakeBlend(Super.ParseColor(color), CK.BlendMode[mode] ?? CK.BlendMode.SrcIn);
+  },
+  /**
+   * The picture's brightness (0.30 R + 0.57 G + 0.13 B) painted in the tint color, stretched around 0.5 by contrast
+   * (1 = as is, 2 = twice the contrast). Alpha is kept.
+   */
+  Recolor(tint: Color, contrast: number): ColorFilter {
+    const [r, g, b] = Super.ParseColor(tint), o = 0.5 * (1 - contrast);
+    return SkiaImageEffects.Matrix([
+      0.30 * r * contrast, 0.57 * r * contrast, 0.13 * r * contrast, 0, o * r,
+      0.30 * g * contrast, 0.57 * g * contrast, 0.13 * g * contrast, 0, o * g,
+      0.30 * b * contrast, 0.57 * b * contrast, 0.13 * b * contrast, 0, o * b,
+      0, 0, 0, 1, 0,
+    ]);
   },
   Darken(amount: number): ColorFilter { const a = -amount / 255; return SkiaImageEffects.Matrix([1, 0, 0, 0, a, 0, 1, 0, 0, a, 0, 0, 1, 0, a, 0, 0, 0, 1, 0]); },
   Lighten(amount: number): ColorFilter { const a = amount / 255; return SkiaImageEffects.Matrix([1, 0, 0, 0, a, 0, 1, 0, 0, a, 0, 0, 1, 0, a, 0, 0, 0, 1, 0]); },
