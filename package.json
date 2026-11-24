@@ -128,6 +128,8 @@
     "check:fps-label": "node dev/check.mjs dev/check-fps-label.ts",
     "check:pointer-move": "node dev/check.mjs dev/check-pointer-move.ts",
     "check:image-recolor": "node dev/check.mjs dev/check-image-recolor.ts",
+    "check:tiles-thin-lines": "node dev/check.mjs dev/check-tiles-thin-lines.ts",
+    "browser:tiles-thin-lines": "node dev/check-tiles-thin-lines.mjs",
     "check:release-velocity": "node dev/check.mjs dev/check-release-velocity.ts",
     "check:quiet-animations": "node dev/check.mjs dev/check-quiet-animations.ts",
     "check:skew-sign": "node dev/check.mjs dev/check-skew-sign.ts",
