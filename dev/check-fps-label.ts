@@ -1,6 +1,6 @@
-// SkiaLabelFps keeps its canvas drawing while it is shown, as DrawnUi.Net and Rust (drawnui-cross), checked in Node
-// (`npm run check:fps-label`): every frame it draws asks for the next one, so the number is the frame rate the canvas
-// reaches; a hidden label asks for none.
+// SkiaLabelFps as DrawnUi.Net (Nick, 2026-11-26: "still screens should show 0 fps"), checked in Node
+// (`npm run check:fps-label`): the label shows the frames the canvas draws, 00.0 on a still screen, and asks for no frames
+// by itself (a new value redraws it once); ForceRefresh keeps the canvas drawing; a hidden label asks for none.
 import { readFileSync } from "node:fs";
 import { Super, SKRect, SkiaAccessibilityManager, HoverManager, SkiaLayer, SkiaLabel, SkiaLabelFps, Aria, Thickness, type AnimatorBase, type Canvas } from "../src/index.ts";
 
@@ -37,12 +37,20 @@ class FakeCanvas {
   const fps = new SkiaLabelFps(); root.AddSubView(fps);
   root._superview = fake as unknown as Canvas;
   const frame = () => { root.Measure(W, H, 1); root.Arrange(new SKRect(0, 0, W, H), W, H, 1); root.Render({ Context: { Canvas: surface.getCanvas(), Surface: surface }, Destination: new SKRect(0, 0, W, H), Scale: 1 }); };
+  fake.FPS = 0;
+  frame(); frame();
+  check("a still screen shows FPS 00.0", fps.Text === "FPS 00.0", fps.Text);
   let before = fake.Updates; frame(); frame(); frame();
-  check("an FPS label on screen asks for the next frame on every frame it draws (no animator running)", fake.Updates - before >= 3, `${fake.Updates - before} requests in 3 frames`);
-  frame(); check("it shows the canvas FPS", fps.Text === "FPS 60.0", fps.Text);
+  check("on a still screen the label asks for no frames", fake.Updates === before, `${fake.Updates - before} requests in 3 frames`);
+  fake.FPS = 60; frame();
+  check("a new value shows on the next frame it draws", fps.Text === "FPS 60.0", fps.Text);
+  frame(); before = fake.Updates; frame(); frame(); frame();
+  check("the same value asks for nothing", fake.Updates === before, `${fake.Updates - before} requests in 3 frames`);
+  fps.ForceRefresh = true; before = fake.Updates; frame(); frame(); frame();
+  check("ForceRefresh keeps the canvas drawing: a request on every frame", fake.Updates - before >= 3, `${fake.Updates - before} requests in 3 frames`);
   fps.IsVisible = false; frame(); before = fake.Updates; frame(); frame();
-  check("a hidden FPS label asks for no frames", fake.Updates === before, `${fake.Updates - before} requests`);
+  check("a hidden FPS label asks for no frames, ForceRefresh too", fake.Updates === before, `${fake.Updates - before} requests`);
   surface.delete();
-  console.log(failures ? `FAIL: ${failures} checks` : "OK: an FPS label keeps its canvas drawing while it is shown");
+  console.log(failures ? `FAIL: ${failures} checks` : "OK: the FPS label shows the frames the canvas draws, ForceRefresh keeps it drawing");
   process.exit(failures ? 1 : 0);
 })();

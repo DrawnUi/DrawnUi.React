@@ -421,7 +421,7 @@ renders through the canvas's WebGL 2 context.
   position). Production builds keep nothing for it.
 - The `Canvas` ref exposes the engine view: `FPS`, `FrameTime`, `RenderingScale`, `AccessibilityManager.Snapshot`.
   Draw events as props (DrawnView names): `WillFirstTimeDraw={(canvas, ctx) => …}` runs once right before the first frame, `WasDrawn={(canvas) => …}` after every frame (keep it cheap, it runs at frame rate); `canvas.WasRendered` becomes true after the first frame. The first frame is drawn before your JSX content mounts, so it shows only the background.
-- On-screen FPS: `<SkiaLabelFps />` (C# SkiaLabelFps) as a sibling on top of your content, e.g. `{import.meta.env.DEV && <SkiaLabelFps VerticalOptions="End" HorizontalOptions="End" />}` inside a `<SkiaLayer>`. While it is shown it keeps the canvas drawing every frame (as DrawnUi .NET and Rust), so the value is the frame rate the canvas reaches; show it only while you measure (e.g. in dev builds).
+- On-screen FPS: `<SkiaLabelFps />` (C# SkiaLabelFps) as a sibling on top of your content, e.g. `{import.meta.env.DEV && <SkiaLabelFps VerticalOptions="End" HorizontalOptions="End" />}` inside a `<SkiaLayer>`. It shows the frames the canvas draws (measured over 0.5 s, 0 on a still screen) and asks for no frames itself; `ForceRefresh={true}` keeps the canvas drawing every frame, so it reads the rate the canvas reaches.
 - The accessibility overlay is the easiest automation hook: every accessible control is a DOM node with
   `role` / `aria-label` positioned over its drawn rect (labels expose their text). Drive UI tests through it.
 - Nothing repaints while idle: an animation or a scroll must request frames (`Repaint()`, animators). If something

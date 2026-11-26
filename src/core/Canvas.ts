@@ -38,9 +38,15 @@ export class Canvas {
   RenderingScale = 1;
   /** Duration of the last Draw in ms (measure + arrange + render, excluding GPU flush). */
   FrameTime = 0;
-  /** Frames per second over the last second of drawn frames. */
+  /**
+   * The frames the canvas draws per second, as DrawnUi.Net (SkiaView CalculateFPS): measured over windows of 0.5 s of
+   * drawn frames, the window starting again after a pause of more than 1 s, so a still screen reads 0 and the value
+   * changes only when a window completes.
+   */
   FPS = 0;
-  private frameTimes: number[] = [];
+  private fpsWindowStart = 0;
+  private fpsLastFrame = 0;
+  private fpsFrames = 0;
 
   /** DrawnView.WasRendered: a frame has been drawn on a ready surface (set after the first one completes). */
   WasRendered = false;
@@ -398,9 +404,11 @@ export class Canvas {
     const now = performance.now();
     this.FrameTime = now - started;
     this.FrameIndex++;
-    this.frameTimes.push(now);
-    while (this.frameTimes.length && this.frameTimes[0] < now - 1000) this.frameTimes.shift();
-    this.FPS = this.frameTimes.length;
+    if (this.fpsWindowStart === 0 || now - this.fpsLastFrame > 1000) { this.fpsWindowStart = now; this.fpsFrames = 0; }
+    this.fpsLastFrame = now;
+    this.fpsFrames++;
+    const elapsed = (now - this.fpsWindowStart) / 1000;
+    if (elapsed >= 0.5) { this.FPS = this.fpsFrames / elapsed; this.fpsFrames = 0; this.fpsWindowStart = now; }
     this.ForgetGoneControls();
     if (executed > 0) this.Update(); // animators running: keep frames coming
     // C# order: WasDrawn at the end of the frame, then the frame counts as rendered

@@ -3,12 +3,15 @@ import { Aria } from "../core/Accessibility";
 import { SkiaLabel } from "./SkiaLabel";
 
 /**
- * Mirrors DrawnUi SkiaLabelFps: a label showing the canvas FPS, drawn above its siblings, input-transparent, never
- * re-laying out its parent. It shows the value on every frame it draws and asks for the next one, so while it is on
- * screen the canvas keeps drawing and the number is the frame rate the canvas reaches (as DrawnUi.Net and Rust). Not
- * ported: ForceRefresh, Format, MonoForDigits.
+ * Mirrors DrawnUi SkiaLabelFps: a label showing the canvas FPS (the frames the canvas draws, 0 on a still screen), drawn
+ * above its siblings, input-transparent, never re-laying out its parent. It asks for no frames by itself: a new value
+ * redraws it once, as in C#. `ForceRefresh` keeps the canvas drawing every frame while the label is shown. Not ported:
+ * Format, MonoForDigits.
  */
 export class SkiaLabelFps extends SkiaLabel {
+  /** Keeps the canvas drawing every frame while the label is shown, so it reads the rate the canvas reaches. */
+  ForceRefresh = false;
+
   constructor() {
     super();
     this.IsParentIndependent = true;
@@ -28,8 +31,7 @@ export class SkiaLabelFps extends SkiaLabel {
     if (view && this.IsVisible && this.Opacity > 0 && !this.IsDisposed) {
       const shown = `FPS ${view.FPS.toFixed(1).padStart(4, "0")}`;
       if (shown !== this.Text) this.Text = shown;
-      // the next frame (C#'s ever-changing value asks for it the same way): the counter shows what the canvas reaches
-      view.Update();
+      if (this.ForceRefresh) view.Update();
     }
     // parent-independent: it measures itself again in its slot as it draws (SkiaControl.Render)
     super.Render(ctx);

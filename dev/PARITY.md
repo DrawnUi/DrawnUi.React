@@ -349,12 +349,13 @@ Updated whenever the port deliberately diverges or finds something worth back-po
   paint); Windows `DrawnSwapChainPanel` already owns surface recreation.
 - **Opinion**: no action; noted so the web behaviour is understood as intentional.
 
-### SkiaLabelFps keeps its canvas drawing (aligned 2026-11-16)
-- **React**: as .NET and Rust: on every frame it draws the label shows `Canvas.FPS` and asks for the next frame, so
-  while it is on screen the canvas keeps drawing and the number is the frame rate the canvas reaches; hidden, it asks
-  for nothing. Before, it refreshed only on animator frames, and the 3D gallery read 11-15 on an iPhone where the .NET
-  and Rust galleries read 60 (drawnui-smart: align to the others). `check:fps-label`.
-- **.NET**: `Draw` sets `Text` from `Superview.FPS` on every draw; the changing value keeps the canvas drawing.
+### SkiaLabelFps shows the frames the canvas draws (aligned 2026-11-26)
+- **React**: as .NET (Nick, 2026-11-26: "still screens should show 0 fps"): `Canvas.FPS` is measured over 0.5 s windows of
+  drawn frames (a pause over 1 s starts a new one, C# SkiaView CalculateFPS), so a still screen reads 0; the label shows it
+  on every frame it draws and asks for no frames by itself (a new value redraws it once). `ForceRefresh` keeps the canvas
+  drawing. The 2026-11-16 "keeps drawing" alignment is reverted, in .NET too. `check:fps-label`, `browser:fps-label`.
+- **.NET**: SkiaView / SkiaViewAccelerated CalculateFPS windows; SkiaLabelFps.Draw sets Text when it changes;
+  ForceRefresh registers it as an animator.
 
 ### SVG rendering
 - **React**: no SVG module in CanvasKit's npm build → browser decodes, raster per displayed size, `TintColor` via

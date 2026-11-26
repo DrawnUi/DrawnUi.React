@@ -99,7 +99,7 @@ export const SkiaGrid = "SkiaGrid" as unknown as FC<LayoutProps<SkiaLayoutCtrl>>
 /** Grid drawing gradient separator lines in its spacing (C# SkiaDecoratedGrid). */
 export const SkiaDecoratedGrid = "SkiaDecoratedGrid" as unknown as FC<LayoutProps<SkiaDecoratedGridCtrl>>;
 export const SkiaLabel = "SkiaLabel" as unknown as FC<LayoutProps<SkiaLabelCtrl>>;
-/** Canvas FPS counter (C# SkiaLabelFps); its value changes only on frames running animators request anyway. */
+/** Canvas FPS counter (C# SkiaLabelFps): the frames the canvas draws, 0 on a still screen; `ForceRefresh` keeps it drawing. */
 export const SkiaLabelFps = "SkiaLabelFps" as unknown as FC<LeafProps<SkiaLabelFpsCtrl>>;
 /** Markdown label (C# SkiaRichLabel): Text is markdown, rendered as spans; LinkTapped for [text](url). */
 export const SkiaRichLabel = "SkiaRichLabel" as unknown as FC<LeafProps<SkiaRichLabelCtrl>>;

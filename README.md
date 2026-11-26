@@ -49,6 +49,10 @@ property names, layout and drawing rules. What you learn here works there, and s
 
 DrawnUI is MIT licensed in every language and on every platform: desktop, mobile, web and embedded devices. Ship it in commercial products with no attribution badge, no about screen and no per-device royalty.
 
+## What's new in 1.0.3
+
+- **FPS label:** shows the frame rate the canvas draws (0 on a still screen); set `ForceRefresh` to keep it drawing.
+
 ## What's new in 1.0.2
 
 - **The pointer reaches the controls:** a mouse or pen moving with nothing pressed reaches the controls under it as a
